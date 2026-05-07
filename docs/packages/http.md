@@ -199,14 +199,14 @@ try {
 
 ### `createHttpService(baseURL, options?)`
 
-| Parameter                  | Type                     | Description                                                            |
-| -------------------------- | ------------------------ | ---------------------------------------------------------------------- |
-| `baseURL`                  | `string`                 | Base URL for all requests                                              |
+| Parameter                  | Type                     | Description                                                             |
+| -------------------------- | ------------------------ | ----------------------------------------------------------------------- |
+| `baseURL`                  | `string`                 | Base URL for all requests                                               |
 | `options.timeout`          | `number \| undefined`    | Request timeout in milliseconds (default: `30000`; pass `0` to disable) |
-| `options.headers`          | `Record<string, string>` | Default headers                                                        |
-| `options.withCredentials`  | `boolean`                | Send cookies cross-origin (default: `true`)                            |
-| `options.withXSRFToken`    | `boolean`                | Include XSRF token (default: `false`)                                  |
-| `options.smartCredentials` | `boolean`                | Auto-toggle credentials by origin (default: `false`)                   |
+| `options.headers`          | `Record<string, string>` | Default headers                                                         |
+| `options.withCredentials`  | `boolean`                | Send cookies cross-origin (default: `true`)                             |
+| `options.withXSRFToken`    | `boolean`                | Include XSRF token (default: `false`)                                   |
+| `options.smartCredentials` | `boolean`                | Auto-toggle credentials by origin (default: `false`)                    |
 
 ### Constants
 
