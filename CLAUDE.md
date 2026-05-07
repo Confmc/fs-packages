@@ -4,7 +4,7 @@ Shared frontend service packages monorepo under the `@script-development` npm sc
 
 ## Stack
 
-- **Language:** TypeScript 5.9+ (strict mode, `verbatimModuleSyntax`)
+- **Language:** TypeScript ^6.0 (strict mode, `verbatimModuleSyntax`)
 - **Build:** tsdown (Rolldown/oxc) — dual ESM + CJS output
 - **Test:** vitest 4 (100% coverage threshold) + Stryker (90% mutation threshold)
 - **Lint:** oxlint (explicit config at `.oxlintrc.json`)
@@ -12,6 +12,22 @@ Shared frontend service packages monorepo under the `@script-development` npm sc
 - **Package lint:** publint + attw (Are The Types Wrong) — `lint:pkg` enforces fail-on-any-advisory via `scripts/lint-pkg.mjs` (suggestions, warnings, and errors all treat as fatal — publint CLI default and `--strict` both exit 0 on suggestions). Motivated by enforcement queue #33 + the PR #35 `git+` prefix regression that silently drifted across 10 packages because the unenforced gate only printed the suggestion.
 - **Publish:** OIDC Trusted Publishing to public npm registry (no stored tokens)
 - **CI:** 8-gate pipeline: audit → format → lint → build → typecheck → lint:pkg → coverage → mutation
+
+## Doctrine #8 — HTTP Timeout Surface (fs-http)
+
+`fs-http` is the war-room reference implementation of Doctrine #8 (Architectural Principle #8, library-author extension — see war-room `CLAUDE.md` `## Architectural Principles` §8, 2026-04-22):
+
+> **Library-author extension (2026-04-22)** — Shared HTTP factory packages (e.g., `@script-development/fs-http`) must expose a compliant timeout surface: a default, a required option, or a documented contract plus consumer-level enforcement. Inheriting framework defaults at the library layer silently propagates the violation to every consumer territory.
+
+`fs-http` exposes a 5-axis timeout surface:
+
+- **Default:** `30000` ms applied if no override is provided.
+- **Service-wide option:** `createHttpService(baseURL, { timeout: number })`.
+- **Per-request override:** standard axios `timeout` config on individual calls.
+- **Opt-out:** `timeout: 0` disables the timeout (use sparingly).
+- **Constant export:** `DEFAULT_TIMEOUT_MS` is barrel-exported for consumers that need to reference the default explicitly.
+
+Consumer territories must apply per-call timeouts at instantiation OR rely on the 30000 ms default. See `docs/packages/http.md#timeout` for usage.
 
 ## Packages (10)
 
@@ -36,6 +52,26 @@ Shared frontend service packages monorepo under the `@script-development` npm sc
 - **Loose coupling:** Prefer structural typing (duck types) over direct package imports where possible. `fs-theme`'s `ThemeStorageContract` is the exemplar.
 - **Test environment:** Browser-dependent tests use `// @vitest-environment happy-dom` file-level comments.
 - **Identical build config:** All packages share the same `tsdown.config.ts` structure.
+
+### Internal Dependency Coordination
+
+Two packages share an internal direct-dep on `string-ts`: `fs-helpers` (`deepCamelKeys`, `deepSnakeKeys`, `DeepSnakeKeys` type) and `fs-translation` (`replaceAll`). Symbols are disjoint, npm dedupes the dep in consumer `node_modules` when ranges align, and tsdown externalizes string-ts in both bundles — consumers using both packages do **not** ship duplicate copies.
+
+**Discipline:** when bumping `string-ts` in either package, bump it in the other in the same PR. Range drift across the two consumers (e.g. one on `^2.x`, the other on `^3.x`) breaks consumer dedupe.
+
+## Versioning Discipline (Pre-1.0)
+
+While packages remain pre-1.0, npm caret semantics treat every minor bump as breaking (`^0.1.0` matches only `0.1.x`). Each `fs-http` minor bump cascades into peer-range widenings on `fs-loading` and `fs-adapter-store`. The cascade is mechanical, not avoidable on npm.
+
+Per-bump checklist:
+
+1. Grep all `packages/*/package.json` for the bumped package's name.
+2. For every match in `dependencies` / `devDependencies` / `peerDependencies`, widen the range (e.g. `^0.1.0` → `^0.1.0 || ^0.2.0`).
+3. Patch-bump the affected sibling packages — the peer-range widening is observable in published metadata and deserves its own version.
+4. Regenerate `package-lock.json` and verify every `node_modules/@script-development/*` resolves to the workspace (`"resolved": "packages/*"`, `"link": true`). No nested registry copies anywhere in the lock.
+5. CI passing `npm ci` is necessary but not sufficient — inspect the lock for nested copies after every cross-minor bump.
+
+This tax disappears once packages reach 1.0. The `workspace:*` protocol is **not** an option on npm (npm 11+ rejects it as `EUNSUPPORTEDPROTOCOL`); it is a pnpm/yarn feature.
 
 ## Commands
 
