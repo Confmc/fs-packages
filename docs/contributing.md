@@ -2,8 +2,8 @@
 
 ## Prerequisites
 
-- **Node.js** 22+
-- **npm** 11+
+- **Node.js** 24+ (matches root `engines.node: ">=24.0.0"`)
+- **npm** 11+ (no enforced constraint, but matches the version bundled with Node 24)
 
 Clone the repository and install dependencies:
 
@@ -146,13 +146,15 @@ Follow the conventions:
 - **Factory pattern:** Export a `createXxxService()` function that returns a plain object.
 - **No default exports.**
 
-### 5. Create a changeset
+### 5. Bump the package version
 
-```bash
-npx changeset
-```
+Set `version` in your new package's `package.json` to `0.1.0` (the conventional starting version for new packages). When making subsequent changes to existing packages, bump the `version` field manually following semver:
 
-Select your package, choose the version bump type (major/minor/patch), and write a description of the change. Changesets are how we track what changed and generate changelogs.
+- **patch** (`0.1.0` → `0.1.1`) — bug fixes, doc-only changes, or peer-range widenings.
+- **minor** (`0.1.0` → `0.2.0`) — new features, new exports, or any pre-1.0 breaking change (caret semver treats minor bumps as breaking pre-1.0; expect a peer-range cascade — see the territory's `CLAUDE.md` § "Versioning Discipline (Pre-1.0)").
+- **major** (`0.1.0` → `1.0.0`) — package crosses the stability boundary; document the contract guarantees that ship at 1.0.
+
+Push to `main` triggers an automatic publish (see [Publishing](#publishing) below).
 
 ## Conventions
 
@@ -190,8 +192,12 @@ export type {ExampleService, ExampleConfig} from './types';
 If your package depends on another `@script-development/fs-*` package, declare it as a **peer dependency**, not a regular dependency. This prevents duplicate installations:
 
 ```json
-{"peerDependencies": {"@script-development/fs-http": "^1.0.0"}}
+{"peerDependencies": {"@script-development/fs-http": "^0.3.0"}}
 ```
+
+::: warning Pre-1.0 caret semantics
+Under npm caret semantics, `^0.3.0` matches only `0.3.x` — the next minor (`0.4.0`) is treated as breaking. Cross-minor consumers must widen the range (e.g. `"^0.3.0 || ^0.4.0"`) and patch-bump the affected sibling. See the territory's `CLAUDE.md` § "Versioning Discipline (Pre-1.0)" for the full mechanical checklist.
+:::
 
 ### Testing
 
@@ -211,12 +217,15 @@ describe('createExampleService', () => {
 
 ## Publishing
 
-Packages are published to npm via **OIDC Trusted Publishing** — no stored tokens. The publish workflow triggers automatically when changesets are merged to `main`.
+Packages are published to npm via **OIDC Trusted Publishing** — no stored tokens. The publish workflow (`.github/workflows/publish.yml`) triggers automatically on push to `main` when any `**/package.json` file changes.
 
-To prepare a release:
+The flow:
 
-1. Create your changes on a branch
-2. Run `npx changeset` to describe what changed
-3. Open a PR — CI runs all 8 gates
-4. After merge, the changeset bot creates a "Version Packages" PR
-5. Merging that PR triggers the publish workflow
+1. Create your changes on a branch (including a `version` bump in the affected package's `package.json` per the rules in [Adding a New Package § 5](#_5-bump-the-package-version)).
+2. Open a PR — CI runs all 8 gates (audit → format → lint → build → typecheck → lint:pkg → coverage → mutation).
+3. On merge to `main`, the publish workflow detects the `package.json` change and:
+    - Builds all packages and uploads `dist/` artifacts.
+    - For each package whose published version differs from the local `package.json#version`, publishes the new version via OIDC Trusted Publishing.
+    - Provenance attestation is enabled (`NPM_CONFIG_PROVENANCE=true`).
+
+There is no changeset bot and no "Version Packages" intermediate PR. Version bumps are author-managed in the source PR; the publish step reacts to whatever shipped on `main`.
