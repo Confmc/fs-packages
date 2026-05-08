@@ -1,7 +1,7 @@
 import type {Component, VNode} from 'vue';
 import type {ComponentProps} from 'vue-component-type-helpers';
 
-import {defineComponent, h, ref} from 'vue';
+import {defineComponent, h, onMounted, ref, watch} from 'vue';
 
 /** Public API of a toast service instance. */
 export interface ToastService<C extends Component> {
@@ -19,6 +19,11 @@ export interface ToastService<C extends Component> {
  * The service manages a FIFO queue — when the queue exceeds `maxToasts`,
  * the oldest toast is removed. Each toast component receives an `onClose`
  * prop that removes it from the queue when called.
+ *
+ * The container promotes itself to the browser top layer (via the Popover API
+ * with `popover="manual"`) whenever at least one toast is queued, so toasts
+ * remain visible above `<dialog>.showModal()` backdrops. The container demotes
+ * back to the normal stacking context when the queue empties.
  *
  * @param component - The Vue component to render for each toast.
  * @param maxToasts - Maximum number of visible toasts (default: 4, minimum: 1).
@@ -50,12 +55,51 @@ export const createToastService = <C extends Component>(component: C, maxToasts 
 
     const ToastContainerComponent = defineComponent({
         name: 'ToastContainer',
-        render() {
-            return h(
-                'div',
-                null,
-                toasts.value.map((toast) => toast.node),
+        setup() {
+            const containerRef = ref<HTMLElement | null>(null);
+            let isOpen = false;
+
+            const showContainer = () => {
+                const el = containerRef.value;
+                if (!el || isOpen) return;
+                try {
+                    el.showPopover();
+                    isOpen = true;
+                } catch {
+                    // Popover API unsupported, or element already open under a different
+                    // code path — leave isOpen false so a later attempt can retry.
+                }
+            };
+
+            const hideContainer = () => {
+                const el = containerRef.value;
+                if (!el || !isOpen) return;
+                try {
+                    el.hidePopover();
+                } catch {
+                    // Popover API unsupported, or element already closed — fall through.
+                }
+                isOpen = false;
+            };
+
+            onMounted(() => {
+                if (toasts.value.length > 0) showContainer();
+            });
+
+            watch(
+                () => toasts.value.length,
+                (length) => {
+                    if (length > 0) showContainer();
+                    else hideContainer();
+                },
             );
+
+            return () =>
+                h(
+                    'div',
+                    {ref: containerRef, popover: 'manual'},
+                    toasts.value.map((toast) => toast.node),
+                );
         },
     });
 

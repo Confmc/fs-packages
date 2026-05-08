@@ -125,3 +125,34 @@ This catches toast-related bugs at build time, not at runtime.
 | `show(props)`             | `(props) => string`    | Show a toast, returns unique ID |
 | `hide(id)`                | `(id: string) => void` | Remove a toast by ID            |
 | `ToastContainerComponent` | `Component`            | Mount this in your app root     |
+
+## Top-Layer Behavior (0.2.0+)
+
+The `ToastContainerComponent` promotes itself to the browser **top layer** via the [Popover API](https://developer.mozilla.org/en-US/docs/Web/API/Popover_API) whenever at least one toast is queued. This keeps toasts visible above any open `<dialog>.showModal()` backdrop — without top-layer promotion, no `z-index` value can pierce a modal's stacking context.
+
+The container declares `popover="manual"` and calls `.showPopover()` on the first toast / `.hidePopover()` after the last toast clears. Defensive try/catch guards swallow `InvalidStateError` so rapid show/hide cycles don't surface uncaught errors.
+
+### CSS Specificity (Migration from 0.1.1)
+
+The UA stylesheet applies `position: fixed; inset: 0; margin: auto; width: fit-content; height: fit-content` to any element matching `[popover]:popover-open` — selector specificity `(0,2,0)`. Consumer fallthrough classes like `.toast-stack { position: fixed; top: 1rem; right: 1rem }` (`(0,1,0)`) do **not** override these UA rules.
+
+If you applied positioning via fallthrough classes in 0.1.1, raise selector specificity in 0.2.0 by qualifying with `[popover]`:
+
+```css
+/* Beats UA :popover-open */
+[popover].toast-stack {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    inset: auto;
+    margin: 0;
+    width: auto;
+    height: auto;
+}
+```
+
+`fs-toast` deliberately ships **no** inline `style` resets so consumer CSS retains full control.
+
+### Browser Baseline
+
+Popover API support: Chrome ≥ 114, Firefox ≥ 125, Safari ≥ 17. On older browsers the container's defensive try/catch swallows the missing-method error — toasts still render in normal DOM, just without top-layer promotion (so they will render below modal backdrops on those browsers).
