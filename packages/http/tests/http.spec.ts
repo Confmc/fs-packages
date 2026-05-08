@@ -47,6 +47,46 @@ describe('createHttpService', () => {
         });
     });
 
+    describe('baseURL guard (queue #21)', () => {
+        // Latent for 6 days on entreezuil (PR #40 adoption → PR #96 fix) because integration
+        // tests mock @script-development/fs-http so the real factory never ran. The opaque
+        // native `TypeError: Invalid URL` pointed at fs-http internals rather than the
+        // consumer's createHttpService call site. Library-side fail-fast guard prevents the
+        // class for every future adopter.
+
+        it('throws a library-attributed error when called with a relative path', () => {
+            // Arrange & Act & Assert
+            expect(() => createHttpService('/api')).toThrow(/@script-development\/fs-http/);
+            expect(() => createHttpService('/api')).toThrow(/createHttpService/);
+            expect(() => createHttpService('/api')).toThrow(/absolute baseURL/);
+            expect(() => createHttpService('/api')).toThrow(/"\/api"/);
+        });
+
+        it('throws a library-attributed error when called with an empty string', () => {
+            // Arrange & Act & Assert
+            expect(() => createHttpService('')).toThrow(/@script-development\/fs-http/);
+            expect(() => createHttpService('')).toThrow(/createHttpService/);
+            expect(() => createHttpService('')).toThrow(/absolute baseURL/);
+            expect(() => createHttpService('')).toThrow(/""/);
+        });
+
+        it('throws a library-attributed error for malformed URL strings', () => {
+            // Arrange & Act & Assert — sample of malformed inputs covered by the guard.
+            expect(() => createHttpService('not a url')).toThrow(/@script-development\/fs-http/);
+            expect(() => createHttpService('not a url')).toThrow(/"not a url"/);
+
+            expect(() => createHttpService('http://')).toThrow(/@script-development\/fs-http/);
+            expect(() => createHttpService('http://')).toThrow(/"http:\/\/"/);
+        });
+
+        it('does NOT throw for valid absolute URLs (happy-path regression guard)', () => {
+            // Arrange & Act & Assert — these all succeed because the guard parses successfully.
+            expect(() => createHttpService('http://localhost')).not.toThrow();
+            expect(() => createHttpService('https://example.com/api')).not.toThrow();
+            expect(() => createHttpService('https://api.example.com')).not.toThrow();
+        });
+    });
+
     describe('default options', () => {
         it('creates axios instance with correct defaults', async () => {
             // Arrange

@@ -30,8 +30,26 @@ const unregister = <T>(array: T[], item: T): UnregisterMiddleware => {
     };
 };
 
+/**
+ * Parse the consumer-supplied baseURL with a library-attributed error on failure.
+ * The native `new URL(baseURL)` throws an opaque `TypeError: Invalid URL` that
+ * points at fs-http internals rather than the consumer's call site, latent for
+ * 6 days on entreezuil (PR #40 adoption → PR #96 fix) because integration tests
+ * mocked @script-development/fs-http and the real factory never ran. Fail-fast
+ * here (vs. silent coercion to absolute) prevents the class for every adopter.
+ */
+const parseBaseURL = (baseURL: string): URL => {
+    try {
+        return new URL(baseURL);
+    } catch {
+        throw new Error(
+            `[@script-development/fs-http] createHttpService requires an absolute baseURL (e.g. \`\${location.origin}/api\`). Received: ${JSON.stringify(baseURL)}`,
+        );
+    }
+};
+
 export const createHttpService = (baseURL: string, options?: HttpServiceOptions): HttpService => {
-    const apiUrl = new URL(baseURL);
+    const apiUrl = parseBaseURL(baseURL);
 
     const http = axios.create({
         baseURL: apiUrl.toString(),
