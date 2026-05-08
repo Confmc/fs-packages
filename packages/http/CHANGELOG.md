@@ -1,5 +1,11 @@
 # @script-development/fs-http
 
+## 0.3.1 — 2026-05-08
+
+### Patch Changes
+
+- **Fail-fast guard on relative `baseURL`.** `createHttpService('/api')` now throws a library-attributed `Error` instead of an opaque native `TypeError: Invalid URL`. The new message names the package, names the function, explains that an absolute baseURL is required, and echoes the offending value — so the failure points at the consumer's call site rather than at fs-http internals. Production-bug class previously surfaced only at runtime as opaque `TypeError: Invalid URL` and remained latent in CI when consumers mock `@script-development/fs-http` in integration tests. Closes enforcement queue #21.
+
 ## 0.3.0 — 2026-04-30
 
 ### Breaking Changes
