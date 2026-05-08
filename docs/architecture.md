@@ -81,7 +81,7 @@ When packages do depend on each other (like `fs-loading` using `fs-http`'s middl
 
 ```json
 // fs-loading's package.json
-{"peerDependencies": {"@script-development/fs-http": "^1.0.0", "vue": "^3.5.0"}}
+{"peerDependencies": {"@script-development/fs-http": "^0.1.0 || ^0.2.0 || ^0.3.0", "vue": "^3.5.33"}}
 ```
 
 ## Middleware Architecture
