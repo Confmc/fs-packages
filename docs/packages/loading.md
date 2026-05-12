@@ -6,7 +6,7 @@ Reactive loading state service with counter-based tracking and HTTP middleware i
 npm install @script-development/fs-loading
 ```
 
-**Peer dependencies:** `vue ^3.5.0`, `@script-development/fs-http ^1.0.0`
+**Peer dependencies:** `vue ^3.5.33`, `@script-development/fs-http ^0.1.0 || ^0.2.0 || ^0.3.0`
 
 ## What It Does
 
