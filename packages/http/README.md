@@ -46,6 +46,10 @@ Creates a new HTTP service instance.
 
 Per **Doctrine #8 library-author extension** (war-room CLAUDE.md, 2026-04-22), the factory applies a **30000ms default timeout** with `timeout: 0` opt-out and per-request override. See [the docs site Timeout section](https://packages.script.nl/packages/http#timeout) for the full surface contract.
 
+### Authentication & XSRF
+
+For Laravel Sanctum SPA consumers, `withXSRFToken: true` is required to avoid HTTP 419 (CSRF mismatch) on state-changing requests; mocked transports do not surface this. See [the docs site Authentication & XSRF section](https://packages.script.nl/packages/http#authentication-xsrf) for the full discussion (including stateless / non-Sanctum guidance).
+
 ### Request Methods
 
 - `getRequest<T>(endpoint, options?)` — GET request
