@@ -53,6 +53,7 @@ Consumer territories must apply per-call timeouts at instantiation OR rely on th
 - **Loose coupling:** Prefer structural typing (duck types) over direct package imports where possible. `fs-theme`'s `ThemeStorageContract` is the exemplar.
 - **Test environment:** Browser-dependent tests use `// @vitest-environment happy-dom` file-level comments.
 - **Identical build config:** All packages share the same `tsdown.config.ts` structure.
+- **No direct axios imports in dependent packages.** Route `AxiosResponse` / `AxiosRequestConfig` / sibling types through `fs-http`'s re-exports (e.g. `Parameters<ResponseMiddlewareFunc>[0]` for response types). Direct `import type {AxiosResponse} from 'axios'` breaks rolldown's `d.cts` emission on dual-bundle packages — caught during `fs-cached-adapter-store` scaffold 2026-05-13.
 
 ### Internal Dependency Coordination
 
