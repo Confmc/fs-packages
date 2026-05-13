@@ -39,7 +39,7 @@ Consumer territories must apply per-call timeouts at instantiation OR rely on th
 | fs-theme                | Yes | Reactive dark/light mode with storage persistence                                                                |
 | fs-loading              | Yes | Loading state service with HTTP middleware                                                                       |
 | fs-adapter-store        | Yes | Reactive adapter-store pattern with CRUD resource adapters                                                       |
-| fs-cached-adapter-store | Yes | Higher-order factory wrapping fs-adapter-store with hash-bumping cache-check that suppresses redundant GETs      |
+| fs-cached-adapter-store | Yes | Hash-bumping cache wrapper around fs-adapter-store; middleware-driven invalidation with prime() bootstrap; no retrieveAll/retrieveById on the public surface |
 | fs-toast                | Yes | Component-agnostic toast queue (FIFO)                                                                            |
 | fs-dialog               | Yes | Component-agnostic dialog stack (LIFO) with error middleware                                                     |
 | fs-translation          | Yes | Type-safe reactive i18n with dot-notation keys                                                                   |

@@ -28,9 +28,23 @@ const lanesStore = createCachedAdapterStoreModule<LaneBase, Lane, NewLane>(
     },
     {cacheKey: `projects/${projectId}/lanes`},
 );
+
+// Public surface:
+lanesStore.getAll; // ComputedRef<Lane[]>
+lanesStore.getById(id); // ComputedRef<Lane | undefined>
+lanesStore.getOrFailById(id); // Promise<Lane>
+lanesStore.generateNew(); // NewLane
+await lanesStore.prime(); // bootstrap (idempotent)
 ```
 
-The returned module has the **same shape** as `createAdapterStoreModule`'s `StoreModuleForAdapter<T, E, N>` — a drop-in replacement at every call site.
+The returned module is **intentionally narrower** than `createAdapterStoreModule`'s `StoreModuleForAdapter<T, E, N>`. It exposes `getAll`, `getById`, `getOrFailById`, `generateNew`, and a single bootstrap entry point `prime()`. The two retrieval methods that `createAdapterStoreModule` returns — `retrieveAll` and `retrieveById` — are **deliberately absent** from the public surface:
+
+- **`retrieveAll` is gone** because every ad-hoc consumer-driven `retrieveAll()` call is a potential 429 — the response middleware that observes the cache-hash header is the sole steady-state trigger of the inner fetch. Consumers no longer get to decide "when do we fetch"; the wrapper owns it.
+- **`retrieveById` is gone** because the hash-bumping protocol invalidates a collection wholesale. A store that lets you top up with single-item fetches breaks the invariant that `localHash` describes the contents of `state`. If you need per-id retrieval semantics, the cached wrapper is the wrong tool — use `createAdapterStoreModule` directly.
+
+**Rule of thumb:** call `prime()` once at the consumer's preferred initialization point (app boot, route enter, root component setup) to guarantee the data is loaded even before the first response stamps a cache-hash header on this tab. Trust the middleware for everything else.
+
+The returned type is `CachedStoreModuleForAdapter<T, E, N>`; it is **not** structurally assignable to `StoreModuleForAdapter<T, E, N>`. This is enforced at the type level — attempting that assignment is a compile-time error.
 
 ## Options
 
@@ -51,13 +65,13 @@ x-fs-cache-hashes: v1.<urlencoded JSON>
 where the JSON is a flat `{cacheKey: hashString}` map. The wrapper:
 
 1. Parses the header on every response that carries it.
-2. Updates an in-memory `currentServerHash` for each `cacheKey` matching a registered wrapper instance.
-3. At `retrieveAll()` time, compares the **local hash** (hydrated from `storageService` at construction) against `currentServerHash`. If both are non-null and equal, the inner `retrieveAll()` is skipped entirely.
+2. On every response carrying the header, the middleware updates the in-memory `currentServerHash` for each matching cacheKey, AND triggers an internal `inner.retrieveAll()` if `localHash !== currentServerHash` (fire-and-forget; in-flight-deduped; skip-if-equal).
+3. `prime()` covers the cold-start path where no header has yet been observed on this tab. It is idempotent: two rapid calls dedupe to a single inner fetch, and once a successful retrieve has completed with `localHash !== null`, subsequent `prime()` calls return immediately without invoking inner.
 4. After every successful inner `retrieveAll()`, the current server hash is snapshotted into both the in-memory local hash and `storageService` — never before.
 
-The strict `v1.` version prefix is non-negotiable. A header value not starting with `v1.` is treated as no-signal (fallthrough to fetch). This is intentional: every response stamped with this header is contractually opting into the v1 wire format.
+The strict `v1.` version prefix is non-negotiable. A header value not starting with `v1.` is treated as no-signal (no trigger, no state change). This is intentional: every response stamped with this header is contractually opting into the v1 wire format.
 
-The wrapper does NOT wrap `retrieveById` in v1 — that method is passed through unchanged. The 429 incident that motivated this package is driven by `retrieveAll`; per-id caching is future work.
+The wrapper does NOT expose `retrieveById`. The hash-bumping protocol is all-or-nothing — single-item retrieval would break the invariant that `localHash` describes the data currently in `state`. If you need per-id retrieval semantics, the cached wrapper is the wrong tool — use `createAdapterStoreModule` directly.
 
 ## Operational notes
 
@@ -77,8 +91,8 @@ Per war-room ADR-0011 (Action Class Architecture, cross-project), the backend mu
 
 The wrapper is designed against `fs-http`'s response-middleware contract as documented in the 2026-05-13 Surveyor middleware-invariants report:
 
-- **Throw isolation.** fs-http does not isolate middleware throws — a synchronous throw inside a middleware aborts response delivery to the caller. The wrapper's response middleware body is wrapped in `try/catch` so a malformed header (un-decodable URI, malformed JSON) cannot poison the caller's request.
-- **In-flight deduplication.** Two `retrieveAll()` calls in rapid succession invoke the inner `retrieveAll` exactly once and resolve from the same underlying promise.
+- **Throw isolation.** fs-http does not isolate middleware throws — a synchronous throw inside a middleware aborts response delivery to the caller. The wrapper's response middleware body is wrapped in `try/catch` so a malformed header (un-decodable URI, malformed JSON) cannot poison the caller's request. The middleware-triggered `inner.retrieveAll()` is fire-and-forget; an async rejection is contained inside the in-flight closure's try/finally and a top-level `.catch(() => {})` ensures no unhandled rejection escapes.
+- **In-flight deduplication.** A `prime()` call and a middleware-triggered fetch in flight at the same time share one underlying promise. Two rapid `prime()` calls likewise resolve to one inner fetch.
 - **Idempotent middleware registration.** Multiple wrapper instances sharing one `httpService` register exactly one response middleware between them. Header parsing happens once per response, regardless of how many wrappers are listening.
 
 ## Compatibility
