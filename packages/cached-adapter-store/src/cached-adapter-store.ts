@@ -1,17 +1,11 @@
-import type {
-    Adapted,
-    AdapterStoreConfig,
-    Item,
-    NewAdapted,
-    StoreModuleForAdapter,
-} from '@script-development/fs-adapter-store';
+import type {Adapted, AdapterStoreConfig, Item, NewAdapted} from '@script-development/fs-adapter-store';
 import type {HttpService, ResponseMiddlewareFunc} from '@script-development/fs-http';
 import type {Ref} from 'vue';
 
 import {createAdapterStoreModule} from '@script-development/fs-adapter-store';
 import {ref} from 'vue';
 
-import type {CachedAdapterStoreOptions} from './types';
+import type {CachedAdapterStoreOptions, CachedStoreModuleForAdapter} from './types';
 
 /**
  * Convenience alias for the response shape passed to a response middleware.
@@ -28,7 +22,7 @@ type Response = Parameters<ResponseMiddlewareFunc>[0];
  * carries a freshness signal. Value shape: `v1.${urlencoded JSON}` where the
  * JSON is a flat `{cacheKey: hashString}` map. Anything not starting with
  * `v1.` is treated as no-signal (strict version-prefix policy — see
- * Architecture Lock #5 in the Engineer deployment order, 2026-05-13).
+ * Architecture Lock #5 in the scaffold Engineer deployment order, 2026-05-13).
  */
 const HEADER_NAME = 'x-fs-cache-hashes';
 const VERSION_PREFIX = 'v1.';
@@ -48,16 +42,17 @@ const LOG_PREFIX = '[fs-cached-adapter-store]';
  * for header parsing. Without this, two wrapper-factory calls sharing one
  * `httpService` would parse each response twice.
  *
- * The registry maps `HttpService` -> a map keyed by `cacheKey` -> setter
- * for the corresponding `currentServerHash` ref. When a new wrapper is
- * constructed:
+ * The registry maps `HttpService` -> a map keyed by `cacheKey` -> the
+ * per-cacheKey "observe & trigger" handler that owns
+ * `currentServerHash` update AND the (deduped, skip-if-equal) call into
+ * `inner.retrieveAll()`. When a new wrapper is constructed:
  *  - If its `httpService` is already registered, append the new cacheKey
- *    setter to the existing map.
+ *    handler to the existing map.
  *  - Otherwise, install a single response middleware on the `httpService`
- *    that iterates the map and routes hash updates to the right setter.
+ *    that iterates the map and dispatches to the right handler.
  */
-type CacheKeySetter = (hash: string) => void;
-const httpServiceRegistry = new WeakMap<HttpService, Map<string, CacheKeySetter>>();
+type CacheKeyHandler = (hash: string) => void;
+const httpServiceRegistry = new WeakMap<HttpService, Map<string, CacheKeyHandler>>();
 
 /**
  * Synchronous, exception-safe parse of the `x-fs-cache-hashes` header.
@@ -65,11 +60,11 @@ const httpServiceRegistry = new WeakMap<HttpService, Map<string, CacheKeySetter>
  * failure mode (missing header, missing prefix, decode error, JSON parse
  * error, structurally wrong shape). The function never throws.
  *
- * Per Architecture Lock #10 (Engineer deployment order 2026-05-13) and the
- * Surveyor middleware-invariants verdict (2026-05-13 §Q7/Q8/Q9), fs-http
- * does NOT isolate middleware throws — a throw inside our middleware aborts
- * the caller's entire request. The wrapper owns that isolation discipline,
- * so this function is the throw boundary.
+ * Per Architecture Lock #10 (scaffold Engineer deployment order 2026-05-13)
+ * and the Surveyor middleware-invariants verdict (2026-05-13 §Q7/Q8/Q9),
+ * fs-http does NOT isolate middleware throws — a throw inside our middleware
+ * aborts the caller's entire request. The wrapper owns that isolation
+ * discipline, so this function is the throw boundary.
  *
  * Exported for direct unit testing. The parser's per-branch behavior is
  * difficult to discriminate from the outside (the wrapper's outer try/catch
@@ -109,22 +104,39 @@ export const parseCacheHashHeader = (response: Response): Record<string, string>
  * Wraps {@link createAdapterStoreModule} with a hash-bumping cache-check that
  * suppresses redundant `retrieveAll` GETs at the source.
  *
- * On every response carrying `x-fs-cache-hashes`, the wrapper updates its
- * in-memory `currentServerHash`. At `retrieveAll()` time, it compares
- * `localHash` (hydrated from `storageService` at construction) against
- * `currentServerHash`; if both are non-null and equal, the inner
- * `retrieveAll()` is skipped entirely. After every successful inner
- * `retrieveAll()`, the current server hash is snapshotted into both the
- * in-memory `localHash` and `storageService` — never before, so a failed
- * round-trip cannot leave a persisted hash that doesn't match `state`.
+ * **Public surface is intentionally narrower than `StoreModuleForAdapter`.**
+ * Consumers see `getAll`, `getById`, `getOrFailById`, `generateNew`, and a
+ * single bootstrap entry point `prime()`. There is NO `retrieveAll` and NO
+ * `retrieveById` on the returned module — retrieval is owned by the wrapper:
+ *
+ * - **Middleware-driven invalidation (steady state).** On every response
+ *   carrying `x-fs-cache-hashes`, the wrapper updates its in-memory
+ *   `currentServerHash` for each registered cacheKey AND, if
+ *   `localHash !== currentServerHash`, triggers an internal
+ *   `inner.retrieveAll()` (fire-and-forget; in-flight-deduped; skip-if-equal).
+ * - **`prime()` (cold-start).** A single idempotent entry point for the
+ *   case where no response has yet stamped a hash on this tab. Two rapid
+ *   `prime()` calls dedupe to one inner fetch via the shared in-flight ref;
+ *   once a successful inner retrieve has completed and `localHash !== null`,
+ *   subsequent `prime()` calls return immediately without invoking inner.
+ *
+ * After every successful inner `retrieveAll()`, the current server hash is
+ * snapshotted into both the in-memory `localHash` and `storageService` — never
+ * before, so a failed round-trip cannot leave a persisted hash that doesn't
+ * match `state`.
  *
  * All wrapper concerns (in-flight deduplication, idempotent middleware
  * registration across stores sharing one `httpService`, exception-safe
  * header parsing) are baked into the factory. Adapter-store is unmodified.
  *
- * @see Architecture Locks 1-11 in
+ * @see Architecture Locks 1-10 in
  *      `orders/fs-packages/fs-cached-adapter-store-scaffold-engineer-deployment.md`
  *      for the v1 scope-shaping decisions Commander made on 2026-05-13.
+ * @see Architecture Lock revisions (Commander 2026-05-13) in
+ *      `orders/fs-packages/fs-cached-adapter-store-public-surface-narrowing-engineer-deployment.md`:
+ *      Lock #11 REVERSED (`retrieveById` removed from public surface);
+ *      new Lock #12 (`retrieveAll` removed from public surface);
+ *      new Lock #13 (`prime()` is the only consumer-facing fetch entry point).
  */
 export const createCachedAdapterStoreModule = <
     T extends Item,
@@ -133,7 +145,7 @@ export const createCachedAdapterStoreModule = <
 >(
     config: AdapterStoreConfig<T, E, N>,
     options: CachedAdapterStoreOptions,
-): StoreModuleForAdapter<T, E, N> => {
+): CachedStoreModuleForAdapter<T, E, N> => {
     const {cacheKey} = options;
     const {httpService, storageService} = config;
     const hashStorageKey = `${cacheKey}.cache-hash`;
@@ -144,52 +156,26 @@ export const createCachedAdapterStoreModule = <
     const localHash: Ref<string | null> = ref(initialPersistedHash);
     const currentServerHash: Ref<string | null> = ref(null);
 
-    const setCurrentHash: CacheKeySetter = (hash: string) => {
-        currentServerHash.value = hash;
-    };
-
-    // Idempotent middleware registration. The registry is keyed by
-    // HttpService instance, so multiple wrapper-factory calls sharing one
-    // httpService produce ONE response middleware that fans out to all
-    // registered cacheKey setters — not N middlewares parsing the same
-    // header N times.
-    //
-    // We treat httpService as Pick<...>-typed in config, but the registry
-    // needs a stable WeakMap key. Cast to HttpService is safe: the wrapper
-    // requires registerResponseMiddleware on the same instance, and the
-    // shape Pick captures is a subset of the live object.
-    const httpServiceAsRegistryKey = httpService as HttpService;
-    const existingSetters = httpServiceRegistry.get(httpServiceAsRegistryKey);
-    if (existingSetters) {
-        existingSetters.set(cacheKey, setCurrentHash);
-    } else {
-        const setters = new Map<string, CacheKeySetter>();
-        setters.set(cacheKey, setCurrentHash);
-        httpServiceRegistry.set(httpServiceAsRegistryKey, setters);
-        httpServiceAsRegistryKey.registerResponseMiddleware((response: Response) => {
-            try {
-                const map = parseCacheHashHeader(response);
-                if (map === null) return;
-                for (const [key, hash] of Object.entries(map)) {
-                    const setter = setters.get(key);
-                    if (setter) setter(hash);
-                }
-            } catch (error) {
-                // Defense-in-depth. parseCacheHashHeader is exception-safe by
-                // construction, but a future change to the parser or a
-                // pathological Response shape (e.g., a getter that throws on
-                // `response.headers`) must NOT abort the caller's request.
-                // fs-http does not isolate middleware throws — this catch is
-                // the wrapper's contract with its consumers.
-                // eslint-disable-next-line no-console
-                console.debug(`${LOG_PREFIX} response middleware caught error`, error);
-            }
-        });
-    }
-
     let inflight: Promise<void> | null = null;
+    let hasCompletedAtLeastOnce = false;
 
-    const retrieveAll = async (): Promise<void> => {
+    /**
+     * Shared retrieve coordinator. Both `prime()` (cold-start consumer
+     * trigger) and the response middleware (steady-state observer trigger)
+     * call into this. Owns three responsibilities:
+     *
+     * 1. In-flight dedup — any second caller awaits the same promise.
+     * 2. Skip-if-equal — if `localHash` and `currentServerHash` are both
+     *    populated and equal, the inner fetch is skipped.
+     * 3. Persist-after-success — only on a successful `inner.retrieveAll()`
+     *    do we snapshot `currentServerHash` into `localHash` +
+     *    `storageService`.
+     *
+     * Errors propagate to the caller (used by `prime()` to surface failures
+     * up to consumer code). The middleware path is fire-and-forget; it does
+     * NOT await the returned promise.
+     */
+    const triggerInnerRetrieveAll = async (): Promise<void> => {
         if (inflight) return inflight;
         // Skip only when both are populated and equal. The `localHash !== null`
         // clause is load-bearing: without it, a fresh wrapper with no
@@ -213,6 +199,7 @@ export const createCachedAdapterStoreModule = <
                     localHash.value = serverHashSnapshot;
                     storageService.put(hashStorageKey, serverHashSnapshot);
                 }
+                hasCompletedAtLeastOnce = true;
             } finally {
                 inflight = null;
             }
@@ -220,12 +207,99 @@ export const createCachedAdapterStoreModule = <
         return inflight;
     };
 
+    const handleObservedHash: CacheKeyHandler = (hash: string) => {
+        currentServerHash.value = hash;
+        // Middleware-driven invalidation. Once the new server hash differs from
+        // localHash (the most common case being a fresh wrapper with
+        // localHash === null), trigger the inner fetch. Fire-and-forget — the
+        // middleware body stays synchronous from fs-http's perspective. The
+        // outer try/catch around the middleware body (below) covers any
+        // synchronous throw `triggerInnerRetrieveAll` could emit before
+        // returning its promise; the promise itself resolves into the void
+        // return type and any async rejection is contained inside the
+        // inflight closure's try/finally — it does NOT escape back through
+        // the middleware to abort the caller's request.
+        //
+        // `triggerInnerRetrieveAll` inherits the in-flight dedup and skip-when-
+        // equal logic, so a header that arrives mid-retrieve doesn't double-fire
+        // and a header that matches localHash doesn't fire at all. Note: the
+        // skip-when-equal check happens *after* this line bumps currentServerHash,
+        // so an equal observed hash is short-circuited by the trigger itself —
+        // we do not duplicate that check here.
+        //
+        // v1 simplification: once-per-burst is the contract. If currentServerHash
+        // continues changing after this trigger fires, later mismatches are
+        // picked up on the *next* response that carries a still-mismatched hash.
+        // The middleware path does NOT pre-check `localHash !== hash` to short-
+        // circuit before calling — the trigger owns that decision.
+        void triggerInnerRetrieveAll().catch(() => {
+            // Swallowed by design. The trigger's own try/finally already
+            // clears the in-flight ref and prevents persist-on-failure; a
+            // top-level handler here exists so unhandled-rejection logs
+            // don't fire on transient inner failures observed via the
+            // middleware path. Consumers who care about middleware-driven
+            // fetch failures observe via the inner adapter-store's own
+            // failure surface, not via the wrapper.
+        });
+    };
+
+    // Idempotent middleware registration. The registry is keyed by
+    // HttpService instance, so multiple wrapper-factory calls sharing one
+    // httpService produce ONE response middleware that fans out to all
+    // registered cacheKey handlers — not N middlewares parsing the same
+    // header N times.
+    //
+    // We treat httpService as Pick<...>-typed in config, but the registry
+    // needs a stable WeakMap key. Cast to HttpService is safe: the wrapper
+    // requires registerResponseMiddleware on the same instance, and the
+    // shape Pick captures is a subset of the live object.
+    const httpServiceAsRegistryKey = httpService as HttpService;
+    const existingHandlers = httpServiceRegistry.get(httpServiceAsRegistryKey);
+    if (existingHandlers) {
+        existingHandlers.set(cacheKey, handleObservedHash);
+    } else {
+        const handlers = new Map<string, CacheKeyHandler>();
+        handlers.set(cacheKey, handleObservedHash);
+        httpServiceRegistry.set(httpServiceAsRegistryKey, handlers);
+        httpServiceAsRegistryKey.registerResponseMiddleware((response: Response) => {
+            try {
+                const map = parseCacheHashHeader(response);
+                if (map === null) return;
+                for (const [key, hash] of Object.entries(map)) {
+                    const handler = handlers.get(key);
+                    if (handler) handler(hash);
+                }
+            } catch (error) {
+                // Defense-in-depth. parseCacheHashHeader is exception-safe by
+                // construction, but a future change to the parser or a
+                // pathological Response shape (e.g., a getter that throws on
+                // `response.headers`) must NOT abort the caller's request.
+                // fs-http does not isolate middleware throws — this catch is
+                // the wrapper's contract with its consumers.
+                // eslint-disable-next-line no-console
+                console.debug(`${LOG_PREFIX} response middleware caught error`, error);
+            }
+        });
+    }
+
+    /**
+     * Idempotent bootstrap. Exists purely to cover the cold-start path:
+     * no response carrying `x-fs-cache-hashes` has yet been observed on this
+     * tab, so the middleware-driven trigger cannot fire. After the first
+     * successful inner retrieve, this becomes a no-op once `localHash !== null`
+     * — at that point the response middleware is the authoritative trigger
+     * for any subsequent re-fetches.
+     */
+    const prime = async (): Promise<void> => {
+        if (hasCompletedAtLeastOnce && localHash.value !== null) return;
+        return triggerInnerRetrieveAll();
+    };
+
     return {
         getAll: inner.getAll,
         getById: inner.getById,
         getOrFailById: inner.getOrFailById,
         generateNew: inner.generateNew,
-        retrieveById: inner.retrieveById,
-        retrieveAll,
+        prime,
     };
 };
