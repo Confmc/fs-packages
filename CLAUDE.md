@@ -9,7 +9,7 @@ Shared frontend service packages monorepo under the `@script-development` npm sc
 - **Test:** vitest 4 (100% coverage threshold) + Stryker (90% mutation threshold)
 - **Lint:** oxlint (explicit config at `.oxlintrc.json`)
 - **Format:** oxfmt
-- **Package lint:** publint + attw (Are The Types Wrong) — `lint:pkg` enforces fail-on-any-advisory via `scripts/lint-pkg.mjs` (suggestions, warnings, and errors all treat as fatal — publint CLI default and `--strict` both exit 0 on suggestions). Motivated by enforcement queue #33 + the PR #35 `git+` prefix regression that silently drifted across 10 packages because the unenforced gate only printed the suggestion.
+- **Package lint:** publint + attw (Are The Types Wrong) — `lint:pkg` enforces fail-on-any-advisory via `scripts/lint-pkg.mjs` (suggestions, warnings, and errors all treat as fatal — publint CLI default and `--strict` both exit 0 on suggestions). Motivated by enforcement queue #33 + the PR #35 `git+` prefix regression that silently drifted across 10 packages because the unenforced gate only printed the suggestion. The same wrapper also asserts `engines.node` presence across the root manifest + all workspace packages — closes enforcement queue #31 (drift-prevention gate, deployed 2026-05-12; declarations themselves landed 2026-04-22 via commit `0605d99`). Presence-only check; the value (`>=24.0.0` today) is not validated — value alignment is a separate doctrine question tracked alongside the CI `node-version`.
 - **Publish:** OIDC Trusted Publishing to public npm registry (no stored tokens)
 - **CI:** 8-gate pipeline: audit → format → lint → build → typecheck → lint:pkg → coverage → mutation
 
