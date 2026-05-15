@@ -191,15 +191,13 @@ const blobUrl = await http.previewRequest('/documents/123/preview');
 // Use in an <img> or <iframe> src
 ```
 
-### Streaming
-
-Uses the native `fetch` API for streaming responses (useful for server-sent events or AI completions):
-
-```typescript
-const response = await http.streamRequest('/ai/generate', {prompt: 'Hello'}, abortController.signal);
-
-const reader = response.body?.getReader();
-```
+::: warning `streamRequest` removed in 0.4.0
+`streamRequest` was removed in 0.4.0 — it carried four library-invariant
+violations on its option-honoring surface (XSRF cookie read, `withXSRFToken`
+config, `headers` config, `timeout` config) and had zero realized consumers
+across the war-room fleet. See [CHANGELOG](https://github.com/script-development/fs-packages/blob/main/packages/http/CHANGELOG.md#040)
+for the disposition and replacement guidance.
+:::
 
 ## Error Handling
 
@@ -239,16 +237,15 @@ try {
 
 ### Service Methods
 
-| Method                                      | Returns                     |
-| ------------------------------------------- | --------------------------- |
-| `getRequest<T>(endpoint, options?)`         | `Promise<AxiosResponse<T>>` |
-| `postRequest<T>(endpoint, data, options?)`  | `Promise<AxiosResponse<T>>` |
-| `putRequest<T>(endpoint, data, options?)`   | `Promise<AxiosResponse<T>>` |
-| `patchRequest<T>(endpoint, data, options?)` | `Promise<AxiosResponse<T>>` |
-| `deleteRequest<T>(endpoint, options?)`      | `Promise<AxiosResponse<T>>` |
-| `downloadRequest(endpoint, name, type?)`    | `Promise<AxiosResponse>`    |
-| `previewRequest(endpoint)`                  | `Promise<string>`           |
-| `streamRequest(endpoint, data, signal?)`    | `Promise<Response>`         |
+| Method                                      | Returns                        |
+| ------------------------------------------- | ------------------------------ |
+| `getRequest<T>(endpoint, options?)`         | `Promise<AxiosResponse<T>>`    |
+| `postRequest<T>(endpoint, data, options?)`  | `Promise<AxiosResponse<T>>`    |
+| `putRequest<T>(endpoint, data, options?)`   | `Promise<AxiosResponse<T>>`    |
+| `patchRequest<T>(endpoint, data, options?)` | `Promise<AxiosResponse<T>>`    |
+| `deleteRequest<T>(endpoint, options?)`      | `Promise<AxiosResponse<T>>`    |
+| `downloadRequest(endpoint, options?)`       | `Promise<AxiosResponse<Blob>>` |
+| `previewRequest(endpoint, options?)`        | `Promise<AxiosResponse<Blob>>` |
 
 ### Middleware Registration
 

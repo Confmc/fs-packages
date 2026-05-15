@@ -45,7 +45,6 @@ const createMockHttpService = () => {
         deleteRequest: vi.fn(),
         downloadRequest: vi.fn(),
         previewRequest: vi.fn(),
-        streamRequest: vi.fn(),
         registerRequestMiddleware: vi.fn((fn: RequestMiddleware) => {
             requestMiddlewares.push(fn);
             return () => {

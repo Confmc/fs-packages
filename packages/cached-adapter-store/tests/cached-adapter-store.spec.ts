@@ -97,7 +97,6 @@ const makeFakeHttpService = (): FakeHttpService => {
         deleteRequest: vi.fn(),
         downloadRequest: vi.fn(),
         previewRequest: vi.fn(),
-        streamRequest: vi.fn(),
         registerRequestMiddleware: (fn: RequestMiddlewareFunc) => {
             requestMiddlewares.push(fn);
             return unregisterFrom(requestMiddlewares, fn);

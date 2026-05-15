@@ -57,9 +57,8 @@ For Laravel Sanctum SPA consumers, `withXSRFToken: true` is required to avoid HT
 - `putRequest<T>(endpoint, data, options?)` — PUT request
 - `patchRequest<T>(endpoint, data, options?)` — PATCH request
 - `deleteRequest<T>(endpoint, options?)` — DELETE request
-- `downloadRequest(endpoint, documentName, type?)` — Download file as blob (browser-only)
-- `previewRequest(endpoint)` — Get object URL for inline preview (browser-only)
-- `streamRequest(endpoint, data, signal?)` — Streaming POST via native fetch (browser-only)
+- `downloadRequest(endpoint, options?)` — GET as `AxiosResponse<Blob>` for save-to-disk (browser-only)
+- `previewRequest(endpoint, options?)` — GET as `AxiosResponse<Blob>` for inline-display (browser-only)
 
 ### Middleware
 
