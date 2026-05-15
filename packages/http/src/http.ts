@@ -108,8 +108,12 @@ export const createHttpService = (baseURL: string, options?: HttpServiceOptions)
     const streamRequest = (endpoint: string, data: unknown, signal?: AbortSignal): Promise<Response> => {
         const headers: Record<string, string> = {'content-type': 'application/json', accept: 'application/json'};
 
-        const xsrfToken = document.cookie.match(/XSRF-TOKEN=([^;]+)/)?.[1];
-        if (xsrfToken) headers['X-XSRF-TOKEN'] = decodeURIComponent(xsrfToken);
+        // Honor the service's withXSRFToken config — symmetric with the axios methods at line 39.
+        const wantsXsrf = options?.withXSRFToken ?? false;
+        if (wantsXsrf) {
+            const xsrfToken = document.cookie.match(/XSRF-TOKEN=([^;]+)/)?.[1];
+            if (xsrfToken) headers['X-XSRF-TOKEN'] = decodeURIComponent(xsrfToken);
+        }
 
         const base = apiUrl.toString().replace(/\/+$/, '');
 

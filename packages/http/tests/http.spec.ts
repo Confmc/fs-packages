@@ -571,9 +571,9 @@ describe('createHttpService', () => {
             expect(mockFetch).toHaveBeenCalledWith('https://api.example.com/stream', expect.any(Object));
         });
 
-        it('reads XSRF token from cookies', async () => {
+        it('reads XSRF token from cookies when withXSRFToken: true', async () => {
             // Arrange
-            const service = createHttpService(BASE_URL);
+            const service = createHttpService(BASE_URL, {withXSRFToken: true});
             vi.stubGlobal('document', {createElement: vi.fn(), cookie: 'XSRF-TOKEN=abc123; other=value'});
             const mockFetch = vi.fn(() => Promise.resolve(new Response('ok')));
             vi.stubGlobal('fetch', mockFetch);
@@ -588,9 +588,9 @@ describe('createHttpService', () => {
             );
         });
 
-        it('omits XSRF header when no cookie present', async () => {
-            // Arrange
-            const service = createHttpService(BASE_URL);
+        it('omits XSRF header when withXSRFToken: true and no cookie present', async () => {
+            // Arrange — sanity-check that the gate opens cleanly when the cookie is absent.
+            const service = createHttpService(BASE_URL, {withXSRFToken: true});
             vi.stubGlobal('document', {createElement: vi.fn(), cookie: 'other=value'});
             const mockFetch = vi.fn(() => Promise.resolve(new Response('ok')));
             vi.stubGlobal('fetch', mockFetch);
@@ -604,9 +604,9 @@ describe('createHttpService', () => {
             expect(headers).not.toHaveProperty('X-XSRF-TOKEN');
         });
 
-        it('decodes URL-encoded XSRF token', async () => {
+        it('decodes URL-encoded XSRF token when withXSRFToken: true', async () => {
             // Arrange
-            const service = createHttpService(BASE_URL);
+            const service = createHttpService(BASE_URL, {withXSRFToken: true});
             vi.stubGlobal('document', {createElement: vi.fn(), cookie: 'XSRF-TOKEN=abc%3D123'});
             const mockFetch = vi.fn(() => Promise.resolve(new Response('ok')));
             vi.stubGlobal('fetch', mockFetch);
@@ -619,6 +619,40 @@ describe('createHttpService', () => {
                 expect.any(String),
                 expect.objectContaining({headers: expect.objectContaining({'X-XSRF-TOKEN': 'abc=123'})}),
             );
+        });
+
+        it('omits XSRF header when withXSRFToken: false even with cookie present', async () => {
+            // Arrange — queue #64 gate: streamRequest must honor withXSRFToken: false
+            // symmetrically with the axios methods at createHttpService:39.
+            const service = createHttpService(BASE_URL, {withXSRFToken: false});
+            vi.stubGlobal('document', {createElement: vi.fn(), cookie: 'XSRF-TOKEN=abc123'});
+            const mockFetch = vi.fn(() => Promise.resolve(new Response('ok')));
+            vi.stubGlobal('fetch', mockFetch);
+
+            // Act
+            await service.streamRequest('/stream', {});
+
+            // Assert
+            const callArgs = mockFetch.mock.calls[0]![1] as RequestInit;
+            const headers = callArgs.headers as Record<string, string>;
+            expect(headers).not.toHaveProperty('X-XSRF-TOKEN');
+        });
+
+        it('omits XSRF header by default (withXSRFToken unset) even with cookie present', async () => {
+            // Arrange — queue #64 default-resolution: ?? false matches the axios
+            // method behavior at createHttpService:39. Sanctum consumers must opt in.
+            const service = createHttpService(BASE_URL);
+            vi.stubGlobal('document', {createElement: vi.fn(), cookie: 'XSRF-TOKEN=abc123'});
+            const mockFetch = vi.fn(() => Promise.resolve(new Response('ok')));
+            vi.stubGlobal('fetch', mockFetch);
+
+            // Act
+            await service.streamRequest('/stream', {});
+
+            // Assert
+            const callArgs = mockFetch.mock.calls[0]![1] as RequestInit;
+            const headers = callArgs.headers as Record<string, string>;
+            expect(headers).not.toHaveProperty('X-XSRF-TOKEN');
         });
 
         it('honors withCredentials: false by sending same-origin credentials mode', async () => {
