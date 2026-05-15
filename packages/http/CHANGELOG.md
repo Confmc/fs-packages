@@ -1,5 +1,11 @@
 # @script-development/fs-http
 
+## 0.3.1 — 2026-05-15
+
+### Patch Changes
+
+- Gate `streamRequest`'s XSRF cookie read on `withXSRFToken` config — previously read and emitted unconditionally on every streaming POST, regardless of service configuration. The gate matches the default-resolution semantics used for the axios methods (`options?.withXSRFToken ?? false`), so the streaming transport and standard request methods now share identical XSRF behavior under the same consumer config. Closes enforcement queue #64; surfaced by the M3 staleness refresh campaign (`2026-05-15-m3-staleness-refresh-wave`).
+
 ## 0.3.0 — 2026-04-30
 
 ### Breaking Changes
