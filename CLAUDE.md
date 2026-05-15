@@ -54,6 +54,7 @@ Consumer territories must apply per-call timeouts at instantiation OR rely on th
 - **Test environment:** Browser-dependent tests use `// @vitest-environment happy-dom` file-level comments.
 - **Identical build config:** All packages share the same `tsdown.config.ts` structure.
 - **No direct axios imports in dependent packages.** Route `AxiosResponse` / `AxiosRequestConfig` / sibling types through `fs-http`'s re-exports (e.g. `Parameters<ResponseMiddlewareFunc>[0]` for response types). Direct `import type {AxiosResponse} from 'axios'` breaks rolldown's `d.cts` emission on dual-bundle packages — caught during `fs-cached-adapter-store` scaffold 2026-05-13.
+- **No top-level side effects.** Every published package declares `"sideEffects": false` in its `package.json` so bundlers can tree-shake under deep imports. The factory + barrel pattern ensures this is structurally true — every package's `src/index.ts` is either a pure re-export or a file whose top-level statements are imports, type declarations, and `const`/`function` factory declarations. The manifest entry makes it explicit and bundler-actionable. Closes enforcement queue #70 (publint 0.3.21 Suggestion, fatal-promoted by `scripts/lint-pkg.mjs`).
 
 ### Internal Dependency Coordination
 
