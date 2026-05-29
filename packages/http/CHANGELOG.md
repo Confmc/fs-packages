@@ -1,10 +1,29 @@
 # @script-development/fs-http
 
-## 0.3.1 — 2026-05-08
+## 0.4.1 — 2026-05-29
 
 ### Patch Changes
 
 - **Fail-fast guard on relative `baseURL`.** `createHttpService('/api')` now throws a library-attributed `Error` instead of an opaque native `TypeError: Invalid URL`. The new message names the package, names the function, explains that an absolute baseURL is required, and echoes the offending value — so the failure points at the consumer's call site rather than at fs-http internals. Production-bug class previously surfaced only at runtime as opaque `TypeError: Invalid URL` and remained latent in CI when consumers mock `@script-development/fs-http` in integration tests. Closes enforcement queue #21.
+
+## 0.4.0 — 2026-05-15
+
+### Breaking Changes
+
+- **Removed:** `streamRequest` from the public API. The function had **zero realized consumers** across the war-room fleet (Engineer + Sapper M3 + Liaison M3 grep convergence) and had accumulated four library-invariant violations on its option-honoring surface — all sharing the same root cause: streamRequest was a parallel transport built directly on native `fetch`, bypassing the option-honoring discipline that the axios-routed methods inherit from `axios.create()`:
+    - `headers` — service-wide `options?.headers` silently dropped (Surveyor M3 F-1).
+    - `withXSRFToken` — cookie read + `X-XSRF-TOKEN` emitted unconditionally, ignoring the config (enforcement queue #64 / queue #22 stream portion).
+    - `timeout` — Doctrine #8 silently bypassed; no timeout enforcement of any kind on the streaming path (Surveyor M3 F-2; overlaps queue #62 AbortSignal absence).
+- Closes enforcement queue #64 and the streamRequest portion of queue #22 in one structural stroke; supersedes PR #86 (which attempted to harden queue #64 in-place before the M3 evidence converged for removal).
+
+### Replacement guidance
+
+If a future streaming use case emerges in a consumer territory, prefer either:
+
+1. **axios with `responseType: 'stream'`** via the standard `getRequest` / `postRequest` methods — inherits all `HttpServiceOptions` (headers, withCredentials, withXSRFToken, smartCredentials, timeout) and the per-call `AxiosRequestConfig` override surface for free.
+2. **A deliberate `createStreamHttpService` factory** designed against the option-honoring matrix codified in fs-packages `CLAUDE.md` § Conventions (see "Transport-surface discipline"). Such a factory must enumerate every `HttpServiceOptions` field on day one with a corresponding test pinning each cell as HONORED or N/A-by-construction.
+
+The Surveyor M3 field report (`reports/fs-packages/field/2026-05-15-surveyor-library-config-honor-surface-audit.md`) carries the full matrix verdict and is the precedent record for the structural decision.
 
 ## 0.3.0 — 2026-04-30
 

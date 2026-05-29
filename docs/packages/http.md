@@ -99,6 +99,29 @@ The default is also exported as a barrel-level constant for consumers that want 
 import {DEFAULT_TIMEOUT_MS} from '@script-development/fs-http';
 ```
 
+## Authentication & XSRF
+
+`withXSRFToken` defaults to `false` because the factory does not know what authentication shape it sits in front of — Laravel Sanctum SPA, stateless API tokens, OIDC backends, and third-party API gateways all want different answers. Consumers must opt in explicitly when their backend plants an XSRF cookie.
+
+### Laravel Sanctum SPA
+
+Laravel's Sanctum stateful middleware plants an `XSRF-TOKEN` cookie on the SPA's domain during the `/sanctum/csrf-cookie` handshake. axios 1.x will only read that cookie and forward it as the `X-XSRF-TOKEN` header when `withXSRFToken: true` is passed explicitly. Without that flag every state-changing request (POST / PUT / PATCH / DELETE) returns **HTTP 419 (CSRF token mismatch)** from Sanctum's middleware.
+
+```typescript
+const http = createHttpService(`${location.origin}/api`, {
+    withXSRFToken: true, // Laravel Sanctum SPA — read XSRF-TOKEN cookie
+    withCredentials: true, // send session cookie (default true)
+});
+```
+
+::: warning Mocked transports hide this failure mode
+Page-integration test suites that mock `@script-development/fs-http` (per ADR-0017) bypass axios entirely — the XSRF cookie / `X-XSRF-TOKEN` header round-trip never executes, so a missing `withXSRFToken: true` does not surface in test output. The first signal arrives in production: every state-changing request to a Sanctum SPA backend returns 419. Set `withXSRFToken: true` at instantiation in any Sanctum SPA consumer.
+:::
+
+### Stateless / token / non-Sanctum stacks
+
+Stateless API token stacks (Bearer tokens, OAuth2 access tokens), OIDC backends that do not plant an `XSRF-TOKEN` cookie, and third-party API gateways should leave `withXSRFToken` at the default `false`. Enabling it is a no-op when no `XSRF-TOKEN` cookie exists on the request origin, but the explicit `false` documents the consumer's authentication shape and prevents drift if a Sanctum-shaped middleware is added to the same domain later.
+
 ## Middleware
 
 The middleware system lets you intercept requests at three points in the lifecycle. Every registration returns an unregister function:
@@ -168,15 +191,13 @@ const blobUrl = await http.previewRequest('/documents/123/preview');
 // Use in an <img> or <iframe> src
 ```
 
-### Streaming
-
-Uses the native `fetch` API for streaming responses (useful for server-sent events or AI completions):
-
-```typescript
-const response = await http.streamRequest('/ai/generate', {prompt: 'Hello'}, abortController.signal);
-
-const reader = response.body?.getReader();
-```
+::: warning `streamRequest` removed in 0.4.0
+`streamRequest` was removed in 0.4.0 — it carried four library-invariant
+violations on its option-honoring surface (XSRF cookie read, `withXSRFToken`
+config, `headers` config, `timeout` config) and had zero realized consumers
+across the war-room fleet. See [CHANGELOG](https://github.com/script-development/fs-packages/blob/main/packages/http/CHANGELOG.md#040)
+for the disposition and replacement guidance.
+:::
 
 ## Error Handling
 
@@ -199,14 +220,14 @@ try {
 
 ### `createHttpService(baseURL, options?)`
 
-| Parameter                  | Type                     | Description                                                                                                |
-| -------------------------- | ------------------------ | ---------------------------------------------------------------------------------------------------------- |
-| `baseURL`                  | `string`                 | Base URL for all requests. **Must be absolute** (e.g. `${location.origin}/api`); relative paths fail fast. |
-| `options.timeout`          | `number \| undefined`    | Request timeout in milliseconds (default: `30000`; pass `0` to disable)                                    |
-| `options.headers`          | `Record<string, string>` | Default headers                                                                                            |
-| `options.withCredentials`  | `boolean`                | Send cookies cross-origin (default: `true`)                                                                |
-| `options.withXSRFToken`    | `boolean`                | Include XSRF token (default: `false`)                                                                      |
-| `options.smartCredentials` | `boolean`                | Auto-toggle credentials by origin (default: `false`)                                                       |
+| Parameter                  | Type                     | Description                                                                                                                                                                                                               |
+| -------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `baseURL`                  | `string`                 | Base URL for all requests. **Must be absolute** (e.g. `${location.origin}/api`); relative paths fail fast.                                                                                                                |
+| `options.timeout`          | `number \| undefined`    | Request timeout in milliseconds (default: `30000`; pass `0` to disable)                                                                                                                                                   |
+| `options.headers`          | `Record<string, string>` | Default headers                                                                                                                                                                                                           |
+| `options.withCredentials`  | `boolean`                | Send cookies cross-origin (default: `true`)                                                                                                                                                                               |
+| `options.withXSRFToken`    | `boolean`                | Forward `XSRF-TOKEN` cookie as `X-XSRF-TOKEN` header (default: `false`). Set `true` for Laravel Sanctum SPA; leave `false` for stateless / token / non-Sanctum stacks. See [Authentication & XSRF](#authentication-xsrf). |
+| `options.smartCredentials` | `boolean`                | Auto-toggle credentials by origin (default: `false`)                                                                                                                                                                      |
 
 ### Constants
 
@@ -216,16 +237,15 @@ try {
 
 ### Service Methods
 
-| Method                                      | Returns                     |
-| ------------------------------------------- | --------------------------- |
-| `getRequest<T>(endpoint, options?)`         | `Promise<AxiosResponse<T>>` |
-| `postRequest<T>(endpoint, data, options?)`  | `Promise<AxiosResponse<T>>` |
-| `putRequest<T>(endpoint, data, options?)`   | `Promise<AxiosResponse<T>>` |
-| `patchRequest<T>(endpoint, data, options?)` | `Promise<AxiosResponse<T>>` |
-| `deleteRequest<T>(endpoint, options?)`      | `Promise<AxiosResponse<T>>` |
-| `downloadRequest(endpoint, name, type?)`    | `Promise<AxiosResponse>`    |
-| `previewRequest(endpoint)`                  | `Promise<string>`           |
-| `streamRequest(endpoint, data, signal?)`    | `Promise<Response>`         |
+| Method                                      | Returns                        |
+| ------------------------------------------- | ------------------------------ |
+| `getRequest<T>(endpoint, options?)`         | `Promise<AxiosResponse<T>>`    |
+| `postRequest<T>(endpoint, data, options?)`  | `Promise<AxiosResponse<T>>`    |
+| `putRequest<T>(endpoint, data, options?)`   | `Promise<AxiosResponse<T>>`    |
+| `patchRequest<T>(endpoint, data, options?)` | `Promise<AxiosResponse<T>>`    |
+| `deleteRequest<T>(endpoint, options?)`      | `Promise<AxiosResponse<T>>`    |
+| `downloadRequest(endpoint, options?)`       | `Promise<AxiosResponse<Blob>>` |
+| `previewRequest(endpoint, options?)`        | `Promise<AxiosResponse<Blob>>` |
 
 ### Middleware Registration
 

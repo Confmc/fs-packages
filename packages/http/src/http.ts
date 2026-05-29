@@ -123,29 +123,6 @@ export const createHttpService = (baseURL: string, options?: HttpServiceOptions)
     const previewRequest = (endpoint: string, options?: AxiosRequestConfig) =>
         http.get<Blob>(endpoint, {...options, responseType: 'blob'});
 
-    const streamRequest = (endpoint: string, data: unknown, signal?: AbortSignal): Promise<Response> => {
-        const headers: Record<string, string> = {'content-type': 'application/json', accept: 'application/json'};
-
-        const xsrfToken = document.cookie.match(/XSRF-TOKEN=([^;]+)/)?.[1];
-        if (xsrfToken) headers['X-XSRF-TOKEN'] = decodeURIComponent(xsrfToken);
-
-        const base = apiUrl.toString().replace(/\/+$/, '');
-
-        // Honor the service's withCredentials config. Previously hardcoded to
-        // "include", which silently overrode consumer opt-outs. Note: smartCredentials
-        // is a no-op here because streamRequest only accepts relative endpoints
-        // (base + endpoint is string concatenation), so requests are always same-host.
-        const includeCredentials: boolean = options?.withCredentials ?? true;
-
-        return fetch(base + endpoint, {
-            signal,
-            method: 'POST',
-            credentials: includeCredentials ? 'include' : 'same-origin',
-            headers,
-            body: JSON.stringify(data),
-        });
-    };
-
     // Middleware registration
     const registerRequestMiddleware = (fn: RequestMiddlewareFunc): UnregisterMiddleware => {
         requestMiddleware.push(fn);
@@ -173,7 +150,6 @@ export const createHttpService = (baseURL: string, options?: HttpServiceOptions)
         deleteRequest,
         downloadRequest,
         previewRequest,
-        streamRequest,
         registerRequestMiddleware,
         registerResponseMiddleware,
         registerResponseErrorMiddleware,

@@ -10,20 +10,10 @@ let mock: MockAdapter;
 
 beforeEach(() => {
     mock = new MockAdapter(axios);
-
-    // Browser globals — only those streamRequest still touches. The download
-    // and preview methods are pure transport in 0.3.0+, no DOM coupling.
-    vi.stubGlobal('document', {cookie: ''});
-
-    vi.stubGlobal(
-        'fetch',
-        vi.fn(() => Promise.resolve(new Response('streamed', {status: 200}))),
-    );
 });
 
 afterEach(() => {
     mock.restore();
-    vi.unstubAllGlobals();
 });
 
 describe('createHttpService', () => {
@@ -40,7 +30,6 @@ describe('createHttpService', () => {
             expect(service).toHaveProperty('deleteRequest');
             expect(service).toHaveProperty('downloadRequest');
             expect(service).toHaveProperty('previewRequest');
-            expect(service).toHaveProperty('streamRequest');
             expect(service).toHaveProperty('registerRequestMiddleware');
             expect(service).toHaveProperty('registerResponseMiddleware');
             expect(service).toHaveProperty('registerResponseErrorMiddleware');
@@ -556,141 +545,6 @@ describe('createHttpService', () => {
             // Assert
             expect(response.config.timeout).toBe(5000);
             expect(response.config.responseType).toBe('blob');
-        });
-    });
-
-    describe('streamRequest', () => {
-        it('calls native fetch with correct parameters', async () => {
-            // Arrange
-            const service = createHttpService(BASE_URL);
-            const mockFetch = vi.fn(() => Promise.resolve(new Response('ok')));
-            vi.stubGlobal('fetch', mockFetch);
-
-            // Act
-            await service.streamRequest('/stream', {prompt: 'hello'});
-
-            // Assert
-            expect(mockFetch).toHaveBeenCalledWith(
-                'https://api.example.com/stream',
-                expect.objectContaining({
-                    method: 'POST',
-                    credentials: 'include',
-                    body: JSON.stringify({prompt: 'hello'}),
-                    headers: expect.objectContaining({'content-type': 'application/json', accept: 'application/json'}),
-                }),
-            );
-        });
-
-        it('passes abort signal', async () => {
-            // Arrange
-            const service = createHttpService(BASE_URL);
-            const controller = new AbortController();
-            const mockFetch = vi.fn(() => Promise.resolve(new Response('ok')));
-            vi.stubGlobal('fetch', mockFetch);
-
-            // Act
-            await service.streamRequest('/stream', {}, controller.signal);
-
-            // Assert
-            expect(mockFetch).toHaveBeenCalledWith(
-                expect.any(String),
-                expect.objectContaining({signal: controller.signal}),
-            );
-        });
-
-        it('strips multiple trailing slashes from base URL', async () => {
-            // Arrange
-            const service = createHttpService('https://api.example.com///');
-            const mockFetch = vi.fn(() => Promise.resolve(new Response('ok')));
-            vi.stubGlobal('fetch', mockFetch);
-
-            // Act
-            await service.streamRequest('/stream', {});
-
-            // Assert — multiple trailing slashes collapsed
-            expect(mockFetch).toHaveBeenCalledWith('https://api.example.com/stream', expect.any(Object));
-        });
-
-        it('reads XSRF token from cookies', async () => {
-            // Arrange
-            const service = createHttpService(BASE_URL);
-            vi.stubGlobal('document', {createElement: vi.fn(), cookie: 'XSRF-TOKEN=abc123; other=value'});
-            const mockFetch = vi.fn(() => Promise.resolve(new Response('ok')));
-            vi.stubGlobal('fetch', mockFetch);
-
-            // Act
-            await service.streamRequest('/stream', {});
-
-            // Assert
-            expect(mockFetch).toHaveBeenCalledWith(
-                expect.any(String),
-                expect.objectContaining({headers: expect.objectContaining({'X-XSRF-TOKEN': 'abc123'})}),
-            );
-        });
-
-        it('omits XSRF header when no cookie present', async () => {
-            // Arrange
-            const service = createHttpService(BASE_URL);
-            vi.stubGlobal('document', {createElement: vi.fn(), cookie: 'other=value'});
-            const mockFetch = vi.fn(() => Promise.resolve(new Response('ok')));
-            vi.stubGlobal('fetch', mockFetch);
-
-            // Act
-            await service.streamRequest('/stream', {});
-
-            // Assert
-            const callArgs = mockFetch.mock.calls[0]![1] as RequestInit;
-            const headers = callArgs.headers as Record<string, string>;
-            expect(headers).not.toHaveProperty('X-XSRF-TOKEN');
-        });
-
-        it('decodes URL-encoded XSRF token', async () => {
-            // Arrange
-            const service = createHttpService(BASE_URL);
-            vi.stubGlobal('document', {createElement: vi.fn(), cookie: 'XSRF-TOKEN=abc%3D123'});
-            const mockFetch = vi.fn(() => Promise.resolve(new Response('ok')));
-            vi.stubGlobal('fetch', mockFetch);
-
-            // Act
-            await service.streamRequest('/stream', {});
-
-            // Assert
-            expect(mockFetch).toHaveBeenCalledWith(
-                expect.any(String),
-                expect.objectContaining({headers: expect.objectContaining({'X-XSRF-TOKEN': 'abc=123'})}),
-            );
-        });
-
-        it('honors withCredentials: false by sending same-origin credentials mode', async () => {
-            // Arrange
-            const service = createHttpService(BASE_URL, {withCredentials: false});
-            const mockFetch = vi.fn(() => Promise.resolve(new Response('ok')));
-            vi.stubGlobal('fetch', mockFetch);
-
-            // Act
-            await service.streamRequest('/stream', {});
-
-            // Assert
-            expect(mockFetch).toHaveBeenCalledWith(
-                expect.any(String),
-                expect.objectContaining({credentials: 'same-origin'}),
-            );
-        });
-
-        it('honors explicit withCredentials: true by sending include credentials mode', async () => {
-            // Arrange
-            const service = createHttpService(BASE_URL, {withCredentials: true});
-            const mockFetch = vi.fn(() => Promise.resolve(new Response('ok')));
-            vi.stubGlobal('fetch', mockFetch);
-
-            // Act
-            await service.streamRequest('/stream', {});
-
-            // Assert
-            expect(mockFetch).toHaveBeenCalledWith(
-                expect.any(String),
-                expect.objectContaining({credentials: 'include'}),
-            );
         });
     });
 });

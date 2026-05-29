@@ -46,6 +46,10 @@ Creates a new HTTP service instance.
 
 Per **Doctrine #8 library-author extension** (war-room CLAUDE.md, 2026-04-22), the factory applies a **30000ms default timeout** with `timeout: 0` opt-out and per-request override. See [the docs site Timeout section](https://packages.script.nl/packages/http#timeout) for the full surface contract.
 
+### Authentication & XSRF
+
+For Laravel Sanctum SPA consumers, `withXSRFToken: true` is required to avoid HTTP 419 (CSRF mismatch) on state-changing requests; mocked transports do not surface this. See [the docs site Authentication & XSRF section](https://packages.script.nl/packages/http#authentication-xsrf) for the full discussion (including stateless / non-Sanctum guidance).
+
 ### Request Methods
 
 - `getRequest<T>(endpoint, options?)` — GET request
@@ -53,9 +57,8 @@ Per **Doctrine #8 library-author extension** (war-room CLAUDE.md, 2026-04-22), t
 - `putRequest<T>(endpoint, data, options?)` — PUT request
 - `patchRequest<T>(endpoint, data, options?)` — PATCH request
 - `deleteRequest<T>(endpoint, options?)` — DELETE request
-- `downloadRequest(endpoint, documentName, type?)` — Download file as blob (browser-only)
-- `previewRequest(endpoint)` — Get object URL for inline preview (browser-only)
-- `streamRequest(endpoint, data, signal?)` — Streaming POST via native fetch (browser-only)
+- `downloadRequest(endpoint, options?)` — GET as `AxiosResponse<Blob>` for save-to-disk (browser-only)
+- `previewRequest(endpoint, options?)` — GET as `AxiosResponse<Blob>` for inline-display (browser-only)
 
 ### Middleware
 

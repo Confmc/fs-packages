@@ -9,7 +9,7 @@ Shared frontend service packages monorepo under the `@script-development` npm sc
 - **Test:** vitest 4 (100% coverage threshold) + Stryker (90% mutation threshold)
 - **Lint:** oxlint (explicit config at `.oxlintrc.json`)
 - **Format:** oxfmt
-- **Package lint:** publint + attw (Are The Types Wrong) — `lint:pkg` enforces fail-on-any-advisory via `scripts/lint-pkg.mjs` (suggestions, warnings, and errors all treat as fatal — publint CLI default and `--strict` both exit 0 on suggestions). Motivated by enforcement queue #33 + the PR #35 `git+` prefix regression that silently drifted across 10 packages because the unenforced gate only printed the suggestion.
+- **Package lint:** publint + attw (Are The Types Wrong) — `lint:pkg` enforces fail-on-any-advisory via `scripts/lint-pkg.mjs` (suggestions, warnings, and errors all treat as fatal — publint CLI default and `--strict` both exit 0 on suggestions). Motivated by enforcement queue #33 + the PR #35 `git+` prefix regression that silently drifted across 10 packages because the unenforced gate only printed the suggestion. The same wrapper also asserts `engines.node` presence across the root manifest + all workspace packages — closes enforcement queue #31 (drift-prevention gate, deployed 2026-05-12; declarations themselves landed 2026-04-22 via commit `0605d99`). Presence-only check; the value (`>=24.0.0` today) is not validated — value alignment is a separate doctrine question tracked alongside the CI `node-version`.
 - **Publish:** OIDC Trusted Publishing to public npm registry (no stored tokens)
 - **CI:** 8-gate pipeline: audit → format → lint → build → typecheck → lint:pkg → coverage → mutation
 
@@ -29,20 +29,21 @@ Shared frontend service packages monorepo under the `@script-development` npm sc
 
 Consumer territories must apply per-call timeouts at instantiation OR rely on the 30000 ms default. See `docs/packages/http.md#timeout` for usage.
 
-## Packages (10)
+## Packages (11)
 
-| Package          | Vue | Description                                                                                                      |
-| ---------------- | --- | ---------------------------------------------------------------------------------------------------------------- |
-| fs-http          | No  | HTTP service factory with middleware architecture                                                                |
-| fs-storage       | No  | localStorage service factory with prefix namespacing                                                             |
-| fs-helpers       | No  | Tree-shakeable utilities: deep copy, type guards, case conversion                                                |
-| fs-theme         | Yes | Reactive dark/light mode with storage persistence                                                                |
-| fs-loading       | Yes | Loading state service with HTTP middleware                                                                       |
-| fs-adapter-store | Yes | Reactive adapter-store pattern with CRUD resource adapters                                                       |
-| fs-toast         | Yes | Component-agnostic toast queue (FIFO)                                                                            |
-| fs-dialog        | Yes | Component-agnostic dialog stack (LIFO) with error middleware                                                     |
-| fs-translation   | Yes | Type-safe reactive i18n with dot-notation keys                                                                   |
-| fs-router        | Yes | Type-safe router service factory with CRUD navigation, middleware pipeline, and custom components for Vue Router |
+| Package                 | Vue | Description                                                                                                      |
+| ----------------------- | --- | ---------------------------------------------------------------------------------------------------------------- |
+| fs-http                 | No  | HTTP service factory with middleware architecture                                                                |
+| fs-storage              | No  | localStorage service factory with prefix namespacing                                                             |
+| fs-helpers              | No  | Tree-shakeable utilities: deep copy, type guards, case conversion                                                |
+| fs-theme                | Yes | Reactive dark/light mode with storage persistence                                                                |
+| fs-loading              | Yes | Loading state service with HTTP middleware                                                                       |
+| fs-adapter-store        | Yes | Reactive adapter-store pattern with CRUD resource adapters                                                       |
+| fs-cached-adapter-store | Yes | Hash-bumping cache wrapper around fs-adapter-store; middleware-driven invalidation with prime() bootstrap; no retrieveAll/retrieveById on the public surface |
+| fs-toast                | Yes | Component-agnostic toast queue (FIFO)                                                                            |
+| fs-dialog               | Yes | Component-agnostic dialog stack (LIFO) with error middleware                                                     |
+| fs-translation          | Yes | Type-safe reactive i18n with dot-notation keys                                                                   |
+| fs-router               | Yes | Type-safe router service factory with CRUD navigation, middleware pipeline, and custom components for Vue Router |
 
 ## Conventions
 
@@ -52,6 +53,8 @@ Consumer territories must apply per-call timeouts at instantiation OR rely on th
 - **Loose coupling:** Prefer structural typing (duck types) over direct package imports where possible. `fs-theme`'s `ThemeStorageContract` is the exemplar.
 - **Test environment:** Browser-dependent tests use `// @vitest-environment happy-dom` file-level comments.
 - **Identical build config:** All packages share the same `tsdown.config.ts` structure.
+- **No direct axios imports in dependent packages.** Route `AxiosResponse` / `AxiosRequestConfig` / sibling types through `fs-http`'s re-exports (e.g. `Parameters<ResponseMiddlewareFunc>[0]` for response types). Direct `import type {AxiosResponse} from 'axios'` breaks rolldown's `d.cts` emission on dual-bundle packages — caught during `fs-cached-adapter-store` scaffold 2026-05-13.
+- **Transport-surface discipline.** Every `fs-http` transport method must inherit option-honoring from the `axios.create()` instance. Adding a new transport path that uses native `fetch` (or any non-axios transport) requires a deliberate audit against the full `HttpServiceOptions` matrix — `headers`, `withCredentials`, `withXSRFToken`, `smartCredentials`, `timeout`, plus the per-call `AxiosRequestConfig` override surface. The Library-Config-Honor Surface Audit (Sapper M3 + Surveyor M3, 2026-05-15) is the standing checklist. The pre-1.0 `streamRequest` function violated this rule on four axes (queue #22 streamRequest portion + queue #64 XSRF + Surveyor M3 F-1 headers + F-2 timeout) and was removed in 0.4.0 with zero realized consumer impact. If a future streaming use case emerges, the right design is either axios's `responseType: 'stream'` mode via the standard methods (inherits all options for free) or a deliberate `createStreamHttpService` factory designed against the option-honoring matrix from the start — not a re-add of an axios-bypassing transport.
 
 ### Internal Dependency Coordination
 
@@ -61,7 +64,7 @@ Two packages share an internal direct-dep on `string-ts`: `fs-helpers` (`deepCam
 
 ## Versioning Discipline (Pre-1.0)
 
-While packages remain pre-1.0, npm caret semantics treat every minor bump as breaking (`^0.1.0` matches only `0.1.x`). Each `fs-http` minor bump cascades into peer-range widenings on `fs-loading` and `fs-adapter-store`. The cascade is mechanical, not avoidable on npm.
+While packages remain pre-1.0, npm caret semantics treat every minor bump as breaking (`^0.1.0` matches only `0.1.x`). Each `fs-http` minor bump cascades into peer-range widenings on `fs-loading`, `fs-adapter-store`, and `fs-cached-adapter-store`. The cascade is mechanical, not avoidable on npm.
 
 Per-bump checklist:
 
@@ -70,6 +73,12 @@ Per-bump checklist:
 3. Patch-bump the affected sibling packages — the peer-range widening is observable in published metadata and deserves its own version.
 4. Regenerate `package-lock.json` and verify every `node_modules/@script-development/*` resolves to the workspace (`"resolved": "packages/*"`, `"link": true`). No nested registry copies anywhere in the lock.
 5. CI passing `npm ci` is necessary but not sufficient — inspect the lock for nested copies after every cross-minor bump.
+
+Cascade peers as of 2026-05-13:
+
+- An `fs-http` minor bump cascades to: `fs-loading`, `fs-adapter-store`, `fs-cached-adapter-store`.
+- An `fs-adapter-store` minor bump cascades to: `fs-cached-adapter-store`.
+- An `fs-storage` minor bump cascades to: `fs-adapter-store`, `fs-cached-adapter-store`.
 
 This tax disappears once packages reach 1.0. The `workspace:*` protocol is **not** an option on npm (npm 11+ rejects it as `EUNSUPPORTEDPROTOCOL`); it is a pnpm/yarn feature.
 
