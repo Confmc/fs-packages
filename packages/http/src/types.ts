@@ -56,7 +56,6 @@ export type HttpService = {
      * to render and `URL.revokeObjectURL(...)` on cleanup.
      */
     previewRequest: (endpoint: string, options?: AxiosRequestConfig) => Promise<AxiosResponse<Blob>>;
-    streamRequest: (endpoint: string, data: unknown, signal?: AbortSignal) => Promise<Response>;
     registerRequestMiddleware: (fn: RequestMiddlewareFunc) => UnregisterMiddleware;
     registerResponseMiddleware: (fn: ResponseMiddlewareFunc) => UnregisterMiddleware;
     registerResponseErrorMiddleware: (fn: ResponseErrorMiddlewareFunc) => UnregisterMiddleware;
