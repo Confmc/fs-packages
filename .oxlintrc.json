@@ -21,7 +21,7 @@
         //   no-useless-assignment — library code intentionally pre-declares values for type inference.
         //   vitest/* test-override additions (valid-expect-in-promise, prefer-strict-boolean-matchers) — test gates already enforce strict matcher discipline via Stryker mutation testing at 90% threshold.
         //   Vue 2→3 deprecation guards, Composition-API safety, Options-API correctness — no Options API or template-API features used.
-        //   no-useless-assignment, complexity / max-* limits — library APIs are intentionally tight; existing Stryker + coverage gates govern complexity at the test-discipline layer.
+        //   complexity / max-* limits — library APIs are intentionally tight; existing Stryker + coverage gates govern complexity at the test-discipline layer.
     },
     "env": {"builtin": true}
 }
