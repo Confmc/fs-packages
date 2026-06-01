@@ -4,12 +4,25 @@
 // 1. publint + attw — treats publint suggestions/warnings/errors as fatal.
 //    publint 0.3.18 CLI does not expose a flag to fail on suggestions
 //    (--strict only promotes warnings → errors). This wrapper fills that gap:
-//    it runs publint per workspace, captures stdout, and fails the gate if any
-//    package emits a "Suggestions:", "Warnings:", or "Errors:" block.
-//    attw --pack runs after publint per package and preserves its own exit code.
+//    it runs publint per workspace, captures stdout, strips ANSI SGR codes,
+//    and fails the gate if any package emits a "Suggestions:", "Warnings:", or
+//    "Errors:" block. attw --pack runs after publint per package and preserves
+//    its own exit code.
 //    Motivated by enforcement queue #33 and the PR #35 regression: publint
 //    suggestions about the "git+" URL prefix silently re-drifted across 10
 //    packages because the gate tolerated them.
+//
+//    ANSI invariance (enforcement queue #63): publint colors its block headers
+//    when it detects a color-capable environment (TTY or FORCE_COLOR). In CI,
+//    publint emitted ANSI-wrapped headers (e.g. "\x1b[1m\x1b[34mSuggestions:\x1b[39m\x1b[22m"),
+//    so PUBLINT_BLOCK_RE — anchored on a bare "Suggestions:" line — never matched
+//    and the gate silently no-op'd (false-NEGATIVE: a real Warning/Error block
+//    would have sailed through CI undetected). Verified against raw CI logs:
+//    the gate had been a no-op in CI since publint 0.3.21 landed 2026-05-11,
+//    while locally (plain-text, non-TTY) the regex matched and the gate fired
+//    correctly. Fix: spawn publint with NO_COLOR=1 AND strip residual ANSI from
+//    captured stdout before the regex match — belt-and-suspenders so the verdict
+//    is identical in every color environment (plain, TTY, FORCE_COLOR=1).
 //
 // 2. engines.node presence — closes enforcement queue #31 (drift-prevention
 //    gate, deployed 2026-05-12). Every workspace package.json AND the root
@@ -22,18 +35,27 @@
 
 import {spawnSync} from 'node:child_process';
 import {readdirSync, readFileSync, statSync} from 'node:fs';
-import {join} from 'node:path';
+import path from 'node:path';
 
 const PACKAGES_DIR = 'packages';
 const ROOT_MANIFEST = 'package.json';
 const PUBLINT_BLOCK_RE = /^(Suggestions|Warnings|Errors):$/m;
+// SGR / ANSI escape sequences (CSI ... final-byte). publint wraps its block
+// headers in these when color is enabled (CI default, FORCE_COLOR), which
+// otherwise defeats PUBLINT_BLOCK_RE's bare-line anchors. See header note,
+// enforcement queue #63.
+const ANSI_RE = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*[a-zA-Z]`, 'g');
+
+function stripAnsi(text) {
+    return text.replace(ANSI_RE, '');
+}
 
 function listPackageDirs() {
     return readdirSync(PACKAGES_DIR)
-        .map((name) => join(PACKAGES_DIR, name))
+        .map((name) => path.join(PACKAGES_DIR, name))
         .filter((dir) => {
             try {
-                return statSync(dir).isDirectory() && statSync(join(dir, 'package.json')).isFile();
+                return statSync(dir).isDirectory() && statSync(path.join(dir, 'package.json')).isFile();
             } catch {
                 return false;
             }
@@ -46,7 +68,7 @@ function readManifest(manifestPath) {
 }
 
 function packageName(dir) {
-    return readManifest(join(dir, 'package.json')).name ?? dir;
+    return readManifest(path.join(dir, 'package.json')).name ?? dir;
 }
 
 function checkEnginesNode(manifestPath, label) {
@@ -61,8 +83,14 @@ function checkEnginesNode(manifestPath, label) {
     return null;
 }
 
-function runCaptured(cmd, args, cwd) {
-    const result = spawnSync(cmd, args, {cwd, stdio: ['ignore', 'pipe', 'pipe'], encoding: 'utf8', shell: false});
+function runCaptured(cmd, args, cwd, extraEnv) {
+    const result = spawnSync(cmd, args, {
+        cwd,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        encoding: 'utf8',
+        shell: false,
+        env: extraEnv ? {...process.env, ...extraEnv} : process.env,
+    });
     const stdout = result.stdout ?? '';
     const stderr = result.stderr ?? '';
     process.stdout.write(stdout);
@@ -89,14 +117,17 @@ function main() {
         const name = packageName(dir);
         process.stdout.write(`\n--- lint:pkg ${name} (${dir}) ---\n`);
 
-        const enginesFailure = checkEnginesNode(join(dir, 'package.json'), name);
+        const enginesFailure = checkEnginesNode(path.join(dir, 'package.json'), name);
         if (enginesFailure) {
             failures.push(enginesFailure);
             process.stderr.write(`  ${enginesFailure}\n`);
         }
 
-        const publint = runCaptured('npx', ['publint', 'run'], dir);
-        const publintBlock = PUBLINT_BLOCK_RE.exec(publint.stdout);
+        // NO_COLOR=1 keeps publint's output plain regardless of runner color
+        // settings; stripAnsi defends against any residual SGR codes so the
+        // PUBLINT_BLOCK_RE verdict is identical in every environment (queue #63).
+        const publint = runCaptured('npx', ['publint', 'run'], dir, {NO_COLOR: '1'});
+        const publintBlock = PUBLINT_BLOCK_RE.exec(stripAnsi(publint.stdout));
         if (publint.status !== 0) {
             failures.push(`${name}: publint exited ${publint.status}`);
         } else if (publintBlock) {
