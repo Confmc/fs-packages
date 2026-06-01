@@ -174,21 +174,30 @@ Other packages hook into these middleware points. `fs-loading` registers request
 
 ## File Operations
 
+`downloadRequest` and `previewRequest` are **transport-only** — they GET an endpoint as a `Blob` and return the full `AxiosResponse<Blob>`. Neither touches the DOM. There is no browser save dialog and no object-URL management inside fs-http; the consumer owns that orchestration (fs-packages issue #59). The two names share identical transport (`responseType: 'blob'`); the separate name communicates intent (download = save-to-disk, preview = inline-display).
+
 ### Download
 
-Downloads a file and triggers a browser save dialog:
+GET a file as a `Blob`, then hand the blob to a download utility such as [`triggerDownload`](/packages/helpers) from `@script-development/fs-helpers`:
 
 ```typescript
-await http.downloadRequest('/reports/annual', 'annual-report', 'application/pdf');
+import {triggerDownload} from '@script-development/fs-helpers';
+
+const response = await http.downloadRequest('/reports/annual');
+triggerDownload(response.data, 'annual-report.pdf');
 ```
+
+The response is the full `AxiosResponse<Blob>`, so headers (e.g. `content-type`) are available before the hand-off if you need to derive a filename or extension.
 
 ### Preview
 
-Creates a blob URL for inline preview (images, PDFs):
+GET a file as a `Blob` for inline display (images, PDFs). The consumer manages the object-URL lifecycle:
 
 ```typescript
-const blobUrl = await http.previewRequest('/documents/123/preview');
-// Use in an <img> or <iframe> src
+const response = await http.previewRequest('/documents/123/preview');
+const blobUrl = URL.createObjectURL(response.data);
+// Use blobUrl in an <img> or <iframe> src; revoke when done:
+// URL.revokeObjectURL(blobUrl);
 ```
 
 ::: warning `streamRequest` removed in 0.4.0
