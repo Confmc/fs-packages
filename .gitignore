@@ -8,3 +8,4 @@ reports/
 docs/.vitepress/cache/
 .changeset/*.md
 !.changeset/config.json
+.claude/worktrees/
