@@ -2,6 +2,26 @@
     "$schema": "./node_modules/oxlint/configuration_schema.json",
     "plugins": ["typescript", "unicorn", "oxc"],
     "categories": {"correctness": "error"},
-    "rules": {},
+    "rules": {
+        // Library-territory selective adoption from war-room canonical template (commit 321da5f).
+        // Per CLAUDE.md §Lint Rules, library posture is Correctness-only, opt-in per-rule for anything else.
+        // Each rule below is library-relevant correctness, security, or type-aware quality.
+        "no-implied-eval": "error",
+        "prefer-regex-literals": "error",
+        "getter-return": "error",
+        "typescript/no-unnecessary-type-conversion": "error",
+        "typescript/no-unnecessary-type-parameters": "warn",
+        "unicorn/no-useless-iterator-to-array": "warn",
+        "unicorn/import-style": "warn"
+        // Library-territory skips (per CLAUDE.md §Lint Rules Correctness-only posture):
+        //   vue/* — no SFCs in fs-packages source; published Vue-aware packages expose factories/composables only.
+        //   jsx-a11y/* — no JSX in this monorepo.
+        //   typescript/no-unsafe-* and related type-aware bulk rules — library API surface intentionally exposes `unknown`/`any` at adapter boundaries (e.g., fs-adapter-store generic constraints).
+        //   unicorn/prefer-import-meta-properties — dual ESM+CJS build target via tsdown; import.meta in CJS bundles cascades into build errors.
+        //   no-useless-assignment — library code intentionally pre-declares values for type inference.
+        //   vitest/* test-override additions (valid-expect-in-promise, prefer-strict-boolean-matchers) — test gates already enforce strict matcher discipline via Stryker mutation testing at 90% threshold.
+        //   Vue 2→3 deprecation guards, Composition-API safety, Options-API correctness — no Options API or template-API features used.
+        //   complexity / max-* limits — library APIs are intentionally tight; existing Stryker + coverage gates govern complexity at the test-discipline layer.
+    },
     "env": {"builtin": true}
 }
