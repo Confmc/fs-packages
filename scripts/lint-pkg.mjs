@@ -35,7 +35,7 @@
 
 import {spawnSync} from 'node:child_process';
 import {readdirSync, readFileSync, statSync} from 'node:fs';
-import {join} from 'node:path';
+import path from 'node:path';
 
 const PACKAGES_DIR = 'packages';
 const ROOT_MANIFEST = 'package.json';
@@ -52,10 +52,10 @@ function stripAnsi(text) {
 
 function listPackageDirs() {
     return readdirSync(PACKAGES_DIR)
-        .map((name) => join(PACKAGES_DIR, name))
+        .map((name) => path.join(PACKAGES_DIR, name))
         .filter((dir) => {
             try {
-                return statSync(dir).isDirectory() && statSync(join(dir, 'package.json')).isFile();
+                return statSync(dir).isDirectory() && statSync(path.join(dir, 'package.json')).isFile();
             } catch {
                 return false;
             }
@@ -68,7 +68,7 @@ function readManifest(manifestPath) {
 }
 
 function packageName(dir) {
-    return readManifest(join(dir, 'package.json')).name ?? dir;
+    return readManifest(path.join(dir, 'package.json')).name ?? dir;
 }
 
 function checkEnginesNode(manifestPath, label) {
@@ -117,7 +117,7 @@ function main() {
         const name = packageName(dir);
         process.stdout.write(`\n--- lint:pkg ${name} (${dir}) ---\n`);
 
-        const enginesFailure = checkEnginesNode(join(dir, 'package.json'), name);
+        const enginesFailure = checkEnginesNode(path.join(dir, 'package.json'), name);
         if (enginesFailure) {
             failures.push(enginesFailure);
             process.stderr.write(`  ${enginesFailure}\n`);
