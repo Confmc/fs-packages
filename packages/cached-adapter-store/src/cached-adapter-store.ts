@@ -28,6 +28,25 @@ const HEADER_NAME = 'x-fs-cache-hashes';
 const VERSION_PREFIX = 'v1.';
 
 /**
+ * Wire-protocol *request* header (frontend → backend, ADR-0032 Option A). The
+ * wrapper stamps this on every outbound request to declare which cache keys
+ * this SPA holds locally, so the backend can authorize + stamp only the
+ * entitled subset on the response. Value shape: `v1.${urlencoded JSON}` where
+ * the JSON is a flat **array** of cacheKey strings (e.g. `["lanes","labels"]`).
+ *
+ * Note the asymmetry against {@link HEADER_NAME}: the *response* payload is a
+ * `{cacheKey: hash}` map (object); the *request* payload is a flat array of
+ * keys. Same `v1.` version prefix, different payload shape — request declares
+ * "here are the keys I cache", response answers "here are their current hashes".
+ *
+ * Emission is additive-by-default and old-backend-safe: a backend that does
+ * not speak Option A simply ignores an unknown request header, and the
+ * wrapper's response-side parse is unchanged. No opt-out flag (ADR-0032
+ * §"Fallback semantics" — absent header is the documented degenerate case).
+ */
+const SUBSCRIBE_HEADER_NAME = 'x-fs-cache-hashes-subscribe';
+
+/**
  * Module-local debug log prefix. Consumer territories can grep for this in
  * their browser console to observe wrapper-side decisions (no-signal
  * fallthroughs, malformed-header parses, etc.). We deliberately do not call
@@ -53,6 +72,46 @@ const LOG_PREFIX = '[fs-cached-adapter-store]';
  */
 type CacheKeyHandler = (hash: string) => void;
 const httpServiceRegistry = new WeakMap<HttpService, Map<string, CacheKeyHandler>>();
+
+/**
+ * Read-only accessor over the per-`HttpService` registry (ADR-0032 D1). Given
+ * a registered `HttpService`, returns the array of cacheKeys currently
+ * registered against it — exactly the `Map`'s keys, in insertion order. This
+ * is the subscription set the outbound request middleware emits; we
+ * deliberately reuse the existing response-dispatch registry rather than
+ * maintaining a parallel `Set<string>` (D1): the registry keys already *are*
+ * "the cache keys this service caches".
+ *
+ * Read live at request-fire time (not snapshotted at registration), so a
+ * second store constructed on the same `HttpService` after the middleware was
+ * installed is reflected on subsequent requests. Returns `[]` for an
+ * unregistered service — a degenerate case the caller (the request middleware,
+ * which is only installed once a handler-map exists) does not hit, but kept
+ * total for safety. Never mutates the registry.
+ *
+ * Exported for direct unit testing under the mutation gate: the empty-registry
+ * branch is unreachable through the public factory path (the request
+ * middleware is only installed once a handler-map with ≥1 key exists), so the
+ * `undefined → []` guard must be discriminated against the accessor directly,
+ * not inferred from the factory surface.
+ */
+export const subscriptionKeysFor = (httpService: HttpService): string[] => {
+    const handlers = httpServiceRegistry.get(httpService);
+    if (handlers === undefined) return [];
+    return Array.from(handlers.keys());
+};
+
+/**
+ * Encode the subscription set into the `x-fs-cache-hashes-subscribe` request
+ * header value: `v1.${rawurlencoded JSON array}`. Mirrors the response
+ * header's `v1.` prefix + `encodeURIComponent(JSON.stringify(...))` encoding
+ * so the backend uses one decode path for both directions. Exported for
+ * direct unit testing under the mutation gate (the exact emitted string is the
+ * contract — a weakened encoding must be caught here, not inferred from a
+ * "header exists" assertion).
+ */
+export const encodeSubscribeHeader = (keys: string[]): string =>
+    `${VERSION_PREFIX}${encodeURIComponent(JSON.stringify(keys))}`;
 
 /**
  * Synchronous, exception-safe parse of the `x-fs-cache-hashes` header.
@@ -278,6 +337,40 @@ export const createCachedAdapterStoreModule = <
                 // the wrapper's contract with its consumers.
                 // eslint-disable-next-line no-console
                 console.debug(`${LOG_PREFIX} response middleware caught error`, error);
+            }
+        });
+
+        // Outbound subscribe-header emission (ADR-0032 Option A). Registered
+        // ONCE per HttpService, alongside the response middleware, on the same
+        // first-wrapper-per-service branch — so a single request middleware
+        // stamps the full subscription set for every cached store sharing this
+        // service, not N middlewares each appending its own key.
+        //
+        // Reads the registry keys *live* at fire time via `subscriptionKeysFor`
+        // (closing over `httpServiceAsRegistryKey`), so stores constructed
+        // after this registration are picked up on subsequent requests.
+        //
+        // The middleware mutates `request.headers` directly — that is the
+        // documented fs-http RequestMiddlewareFunc contract (it receives the
+        // mutable axios request config). Wrapped in a try/catch for the same
+        // reason the response middleware is: fs-http does not isolate
+        // middleware throws, so a pathological request config must not abort
+        // the caller's request.
+        httpServiceAsRegistryKey.registerRequestMiddleware((request) => {
+            try {
+                // The handler-map always carries ≥1 key by the time this fires
+                // (the request middleware is installed on the same branch that
+                // just registered the first cacheKey), so we stamp
+                // unconditionally — no empty-set guard, which would be a dead
+                // branch the mutation gate cannot discriminate. The
+                // empty-registry case lives in `subscriptionKeysFor` and is
+                // covered against the accessor directly.
+                request.headers[SUBSCRIBE_HEADER_NAME] = encodeSubscribeHeader(
+                    subscriptionKeysFor(httpServiceAsRegistryKey),
+                );
+            } catch (error) {
+                // eslint-disable-next-line no-console
+                console.debug(`${LOG_PREFIX} request middleware caught error`, error);
             }
         });
     }

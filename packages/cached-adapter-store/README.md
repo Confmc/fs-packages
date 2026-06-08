@@ -73,6 +73,20 @@ The strict `v1.` version prefix is non-negotiable. A header value not starting w
 
 The wrapper does NOT expose `retrieveById`. The hash-bumping protocol is all-or-nothing — single-item retrieval would break the invariant that `localHash` describes the data currently in `state`. If you need per-id retrieval semantics, the cached wrapper is the wrong tool — use `createAdapterStoreModule` directly.
 
+### Outbound subscribe header (ADR-0032 Option A)
+
+As of v0.2.0 the wrapper also emits an outbound request header declaring the set of cache keys it caches locally, so an Option-A backend can authorize and stamp only the entitled subset:
+
+```
+x-fs-cache-hashes-subscribe: v1.<urlencoded JSON array>
+```
+
+- The payload is a flat **array** of cacheKey strings (e.g. `["lanes","labels"]`) — asymmetric to the response header's `{cacheKey: hash}` **object**. Same `v1.` version prefix.
+- The subscription set is exactly the per-`HttpService` registry keys — every cached store constructed against the same `httpService` contributes its key (ADR-0032 D1). The keys are read **live** at request-fire time, so a store added later is reflected on subsequent requests.
+- One request middleware is installed per `HttpService` (alongside the response middleware), not one per store.
+- **Old-backend-safe and additive-by-default.** There is no opt-out flag. A backend that does not speak Option A simply ignores an unknown request header; the response-side parse is unchanged. So the wrapper release does not have to be sequenced with the backend.
+- The multi-`HttpService` case (a consumer with separate central + tenant services) is an accepted limitation — a request on one service carries only that service's keys (ADR-0032 D2).
+
 ## Operational notes
 
 ### 1. Tenancy is the consumer's responsibility
