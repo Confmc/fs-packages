@@ -3,8 +3,12 @@ name: Publish
 on:
     push:
         branches: [main]
+        # Narrowed from '**/package.json' to package manifests only: a real
+        # release signal is a version edit under packages/<pkg>/package.json.
+        # Root/devDep manifest churn (dependabot, tooling) must NOT start the
+        # OIDC-minting publish job. (Sapper M2 H1 / STALE-4.)
         paths:
-            - '**/package.json'
+            - 'packages/*/package.json'
 
 jobs:
     build:
@@ -28,6 +32,11 @@ jobs:
     publish:
         needs: build
         runs-on: ubuntu-latest
+        # Environment gate: the OIDC mint (id-token: write) is fronted by the
+        # 'npm-publish' deployment environment, whose protection rule (required
+        # reviewer / wait timer) gates the token mint behind a human/policy
+        # checkpoint. (Sapper M2 H1 / STALE-4.)
+        environment: npm-publish
         permissions:
             contents: write
             id-token: write
