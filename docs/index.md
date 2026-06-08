@@ -27,7 +27,7 @@ features:
     - title: Component Agnostic
       details: Toast and dialog services manage lifecycle and state — you bring your own Vue components. No opinionated UI. Your design system, our plumbing.
     - title: Type Safe
-      details: Built with TypeScript 5.9+ in strict mode. Router navigation is type-checked against your route definitions. Translation keys are validated at compile time. No stringly-typed APIs.
+      details: Built with TypeScript 6.0+ in strict mode. Router navigation is type-checked against your route definitions. Translation keys are validated at compile time. No stringly-typed APIs.
 ---
 
 ## The Packages

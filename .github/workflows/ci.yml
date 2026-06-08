@@ -23,3 +23,16 @@ jobs:
             - run: npm run lint:pkg
             - run: npm run test:coverage
             - run: npm run test:mutation
+            # Durable mutation-score artifact: each package's Stryker run writes
+            # JSON + HTML to packages/<pkg>/reports/mutation/. Retain them as a
+            # downloadable run artifact so the per-package score is retrievable
+            # after the run, not just ephemeral stdout. if: always() captures the
+            # report even when the break:90 gate fails (the score is the evidence).
+            - name: Upload mutation reports
+              if: always()
+              uses: actions/upload-artifact@v7
+              with:
+                  name: mutation-reports
+                  path: packages/*/reports/mutation/
+                  retention-days: 30
+                  if-no-files-found: warn
