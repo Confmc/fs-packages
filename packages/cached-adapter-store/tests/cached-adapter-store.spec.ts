@@ -16,13 +16,13 @@ import type {
 } from '@script-development/fs-http';
 import type {LoadingService} from '@script-development/fs-loading';
 import type {StorageService} from '@script-development/fs-storage';
-import type {AxiosResponse} from 'axios';
+import type {AxiosResponse, InternalAxiosRequestConfig} from 'axios';
 import type {Ref} from 'vue';
 
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 import {ref} from 'vue';
 
-import {createCachedAdapterStoreModule} from '../src/cached-adapter-store';
+import {createCachedAdapterStoreModule, encodeSubscribeHeader, subscriptionKeysFor} from '../src/cached-adapter-store';
 
 type TestStorageService = Pick<StorageService, 'get' | 'put'>;
 type TestLoadingService = Pick<LoadingService, 'ensureLoadingFinished'>;
@@ -77,7 +77,18 @@ function makeTestAdapter(
 type FakeHttpService = HttpService & {
     deliver: (response: AxiosResponse) => void;
     getResponseMiddlewares: () => ResponseMiddlewareFunc[];
+    /** Fire every registered request middleware against `request` (outbound path). */
+    fireRequest: (request: InternalAxiosRequestConfig) => void;
+    getRequestMiddlewares: () => RequestMiddlewareFunc[];
 };
+
+/**
+ * Minimal axios request config for exercising the outbound request middleware.
+ * `headers` is a plain mutable object — the middleware assigns
+ * `request.headers['x-fs-cache-hashes-subscribe'] = ...` directly.
+ */
+const makeRequest = (headers: Record<string, unknown> = {}): InternalAxiosRequestConfig =>
+    ({headers}) as unknown as InternalAxiosRequestConfig;
 
 const makeFakeHttpService = (): FakeHttpService => {
     const responseMiddlewares: ResponseMiddlewareFunc[] = [];
@@ -113,6 +124,10 @@ const makeFakeHttpService = (): FakeHttpService => {
             for (const middleware of responseMiddlewares) middleware(response);
         },
         getResponseMiddlewares: () => responseMiddlewares,
+        fireRequest: (request: InternalAxiosRequestConfig) => {
+            for (const middleware of requestMiddlewares) middleware(request);
+        },
+        getRequestMiddlewares: () => requestMiddlewares,
     };
     return service;
 };
@@ -1004,6 +1019,194 @@ describe('createCachedAdapterStoreModule', () => {
             } finally {
                 process.off('unhandledRejection', onUnhandled);
             }
+        });
+    });
+
+    describe('outbound subscribe-header emission (ADR-0032 Option A)', () => {
+        it('registers exactly one request middleware per HttpService', () => {
+            const httpService = makeFakeHttpService();
+            const storageService = makeStorageService();
+            const loadingService: TestLoadingService = {ensureLoadingFinished: vi.fn().mockResolvedValue(undefined)};
+            createCachedAdapterStoreModule<TestItem, TestAdapted, TestNewAdapted>(
+                makeConfig(httpService, storageService, loadingService, 'lanes'),
+                {cacheKey: 'lanes'},
+            );
+
+            expect(httpService.getRequestMiddlewares()).toHaveLength(1);
+        });
+
+        it('stamps the exact v1.<urlencoded JSON array> header for a single registered cacheKey', () => {
+            const httpService = makeFakeHttpService();
+            const storageService = makeStorageService();
+            const loadingService: TestLoadingService = {ensureLoadingFinished: vi.fn().mockResolvedValue(undefined)};
+            createCachedAdapterStoreModule<TestItem, TestAdapted, TestNewAdapted>(
+                makeConfig(httpService, storageService, loadingService, 'lanes'),
+                {cacheKey: 'lanes'},
+            );
+
+            const request = makeRequest();
+            httpService.fireRequest(request);
+
+            // Exact string assertion — the mutation gate must catch a weakened
+            // encoding, not just "a header exists". `["lanes"]` urlencoded.
+            expect(request.headers['x-fs-cache-hashes-subscribe']).toBe(`v1.${encodeURIComponent('["lanes"]')}`);
+            expect(request.headers['x-fs-cache-hashes-subscribe']).toBe('v1.%5B%22lanes%22%5D');
+        });
+
+        it('emits a flat ARRAY (not a {key:hash} object) — request payload shape is asymmetric to the response header', () => {
+            const httpService = makeFakeHttpService();
+            const storageService = makeStorageService();
+            const loadingService: TestLoadingService = {ensureLoadingFinished: vi.fn().mockResolvedValue(undefined)};
+            createCachedAdapterStoreModule<TestItem, TestAdapted, TestNewAdapted>(
+                makeConfig(httpService, storageService, loadingService, 'lanes'),
+                {cacheKey: 'lanes'},
+            );
+
+            const request = makeRequest();
+            httpService.fireRequest(request);
+
+            const raw = request.headers['x-fs-cache-hashes-subscribe'] as string;
+            const decoded: unknown = JSON.parse(decodeURIComponent(raw.slice('v1.'.length)));
+            expect(Array.isArray(decoded)).toBe(true);
+            expect(decoded).toEqual(['lanes']);
+        });
+
+        it('multi-store on one HttpService → BOTH keys present in the emitted array (D1: registry keys ARE the subscription set)', () => {
+            const httpService = makeFakeHttpService();
+            const storageService = makeStorageService();
+            const loadingService: TestLoadingService = {ensureLoadingFinished: vi.fn().mockResolvedValue(undefined)};
+            createCachedAdapterStoreModule<TestItem, TestAdapted, TestNewAdapted>(
+                makeConfig(httpService, storageService, loadingService, 'lanes'),
+                {cacheKey: 'lanes'},
+            );
+            createCachedAdapterStoreModule<TestItem, TestAdapted, TestNewAdapted>(
+                makeConfig(httpService, storageService, loadingService, 'labels'),
+                {cacheKey: 'labels'},
+            );
+
+            // Still exactly one request middleware despite two stores.
+            expect(httpService.getRequestMiddlewares()).toHaveLength(1);
+
+            const request = makeRequest();
+            httpService.fireRequest(request);
+
+            expect(request.headers['x-fs-cache-hashes-subscribe']).toBe(
+                `v1.${encodeURIComponent('["lanes","labels"]')}`,
+            );
+        });
+
+        it('reads registry keys LIVE at fire time — a store added after the first request is reflected on the next', () => {
+            const httpService = makeFakeHttpService();
+            const storageService = makeStorageService();
+            const loadingService: TestLoadingService = {ensureLoadingFinished: vi.fn().mockResolvedValue(undefined)};
+            createCachedAdapterStoreModule<TestItem, TestAdapted, TestNewAdapted>(
+                makeConfig(httpService, storageService, loadingService, 'lanes'),
+                {cacheKey: 'lanes'},
+            );
+
+            const first = makeRequest();
+            httpService.fireRequest(first);
+            expect(first.headers['x-fs-cache-hashes-subscribe']).toBe(`v1.${encodeURIComponent('["lanes"]')}`);
+
+            // Register a second store on the SAME httpService AFTER the first request fired.
+            createCachedAdapterStoreModule<TestItem, TestAdapted, TestNewAdapted>(
+                makeConfig(httpService, storageService, loadingService, 'labels'),
+                {cacheKey: 'labels'},
+            );
+
+            const second = makeRequest();
+            httpService.fireRequest(second);
+            expect(second.headers['x-fs-cache-hashes-subscribe']).toBe(
+                `v1.${encodeURIComponent('["lanes","labels"]')}`,
+            );
+        });
+
+        it('does not clobber pre-existing request headers (only sets the subscribe key)', () => {
+            const httpService = makeFakeHttpService();
+            const storageService = makeStorageService();
+            const loadingService: TestLoadingService = {ensureLoadingFinished: vi.fn().mockResolvedValue(undefined)};
+            createCachedAdapterStoreModule<TestItem, TestAdapted, TestNewAdapted>(
+                makeConfig(httpService, storageService, loadingService, 'lanes'),
+                {cacheKey: 'lanes'},
+            );
+
+            const request = makeRequest({authorization: 'Bearer tok', 'content-type': 'application/json'});
+            httpService.fireRequest(request);
+
+            expect(request.headers['authorization']).toBe('Bearer tok');
+            expect(request.headers['content-type']).toBe('application/json');
+            expect(request.headers['x-fs-cache-hashes-subscribe']).toBe(`v1.${encodeURIComponent('["lanes"]')}`);
+        });
+
+        it('exception-safe: a throwing headers setter does NOT propagate out of the middleware', () => {
+            const httpService = makeFakeHttpService();
+            const storageService = makeStorageService();
+            const loadingService: TestLoadingService = {ensureLoadingFinished: vi.fn().mockResolvedValue(undefined)};
+            const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => undefined);
+            createCachedAdapterStoreModule<TestItem, TestAdapted, TestNewAdapted>(
+                makeConfig(httpService, storageService, loadingService, 'lanes'),
+                {cacheKey: 'lanes'},
+            );
+
+            // A request whose headers object throws on the subscribe-key assignment.
+            const headers: Record<string, unknown> = {};
+            Object.defineProperty(headers, 'x-fs-cache-hashes-subscribe', {
+                set: () => {
+                    throw new Error('headers setter exploded');
+                },
+                configurable: true,
+            });
+            const request = makeRequest(headers);
+
+            expect(() => httpService.fireRequest(request)).not.toThrow();
+            expect(debugSpy).toHaveBeenCalledWith(
+                '[fs-cached-adapter-store] request middleware caught error',
+                expect.any(Error),
+            );
+        });
+    });
+
+    describe('subscriptionKeysFor accessor (ADR-0032 D1, direct unit — mutation gate)', () => {
+        it('returns [] for an HttpService that was never registered (empty-registry guard)', () => {
+            const unregistered = makeFakeHttpService();
+            // Never passed to createCachedAdapterStoreModule → not in the registry.
+            expect(subscriptionKeysFor(unregistered)).toEqual([]);
+        });
+
+        it('returns the registered cacheKeys in insertion order for a registered HttpService', () => {
+            const httpService = makeFakeHttpService();
+            const storageService = makeStorageService();
+            const loadingService: TestLoadingService = {ensureLoadingFinished: vi.fn().mockResolvedValue(undefined)};
+            createCachedAdapterStoreModule<TestItem, TestAdapted, TestNewAdapted>(
+                makeConfig(httpService, storageService, loadingService, 'lanes'),
+                {cacheKey: 'lanes'},
+            );
+            createCachedAdapterStoreModule<TestItem, TestAdapted, TestNewAdapted>(
+                makeConfig(httpService, storageService, loadingService, 'labels'),
+                {cacheKey: 'labels'},
+            );
+
+            expect(subscriptionKeysFor(httpService)).toEqual(['lanes', 'labels']);
+        });
+    });
+
+    describe('encodeSubscribeHeader (direct unit — mutation gate)', () => {
+        it('encodes a single key as v1.<urlencoded JSON array>', () => {
+            expect(encodeSubscribeHeader(['lanes'])).toBe('v1.%5B%22lanes%22%5D');
+            expect(encodeSubscribeHeader(['lanes'])).toBe(`v1.${encodeURIComponent('["lanes"]')}`);
+        });
+
+        it('encodes multiple keys preserving order', () => {
+            expect(encodeSubscribeHeader(['lanes', 'labels'])).toBe(`v1.${encodeURIComponent('["lanes","labels"]')}`);
+        });
+
+        it('encodes an empty array as v1.%5B%5D (the JSON empty array, urlencoded)', () => {
+            expect(encodeSubscribeHeader([])).toBe('v1.%5B%5D');
+            expect(encodeSubscribeHeader([])).toBe(`v1.${encodeURIComponent('[]')}`);
+        });
+
+        it('carries the v1. version prefix verbatim', () => {
+            expect(encodeSubscribeHeader(['x']).startsWith('v1.')).toBe(true);
         });
     });
 });

@@ -1,6 +1,6 @@
 {
     "name": "@script-development/fs-cached-adapter-store",
-    "version": "0.1.1",
+    "version": "0.2.0",
     "description": "Higher-order factory wrapping @script-development/fs-adapter-store with hash-bumping cache-check that suppresses redundant retrieveAll GETs at source",
     "homepage": "https://packages.script.nl/packages/cached-adapter-store",
     "license": "MIT",
