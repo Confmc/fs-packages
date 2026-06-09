@@ -19,6 +19,14 @@ jobs:
             - run: npm run format:check
             - run: npm run lint
             - run: npm run build
+            # PR-time dist validation (queue #107 class — validate at PR time, not
+            # only at release). Asserts each package's published tarball carries the
+            # four REQUIRED dual-format dist artifacts, present and non-empty, so an
+            # empty/missing-dist regression (the fs-http 0.1.1/0.1.2 empty-tarball
+            # incident) fails the PR check rather than surfacing only at publish.
+            # Shares scripts/validate-dist.mjs with publish.yml — the two gates
+            # cannot drift.
+            - run: npm run validate:dist
             - run: npm run typecheck
             - run: npm run lint:pkg
             - run: npm run test:coverage
