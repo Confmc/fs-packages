@@ -46,12 +46,18 @@
 //    module with the TypeScript compiler API (already a devDep — Gate 5 `tsc`,
 //    no new dependency) and asserts the top-level statement list contains only
 //    side-effect-free declaration kinds (imports WITH specifiers, re-exports,
-//    type/const/function/class declarations, and `export default` of a function
-//    or class). Any bare ExpressionStatement (call, assignment), specifier-less
-//    import, or top-level control-flow statement FAILS the gate. Scope is all
-//    `packages/*/src/**/*.ts` excluding test files — the correct match for a
-//    package-global flag (a side effect in a non-re-exported imported module is
-//    still covered by the bundler's assumption).
+//    type/function/class declarations, `const`/`let`/`var` whose INITIALIZER is
+//    load-safe, and `export default` of a function or class). A variable
+//    initializer is load-safe iff it is a literal / function-or-class
+//    definition / reference / pure construction (`new WeakMap()`) / a pure
+//    composition of those — anything that INVOKES code at load (a call,
+//    IIFE, or assignment, e.g. `export const x = register()`) FAILS, as does a
+//    bare ExpressionStatement, a specifier-less import, or top-level control
+//    flow. A package whose `src/` yields zero readable source files also fails
+//    (a vacuous assertion is not a pass). Scope is all `packages/*/src/**/*.ts`
+//    excluding test files — the correct match for a package-global flag (a side
+//    effect in a non-re-exported imported module is still covered by the
+//    bundler's assumption).
 
 import {spawnSync} from 'node:child_process';
 import {readdirSync, readFileSync, statSync} from 'node:fs';
@@ -75,10 +81,22 @@ function listPackageDirs() {
     return readdirSync(PACKAGES_DIR)
         .map((name) => path.join(PACKAGES_DIR, name))
         .filter((dir) => {
-            try {
-                return statSync(dir).isDirectory() && statSync(path.join(dir, 'package.json')).isFile();
-            } catch {
+            // A stray file in packages/ is legitimately not a package — skip it.
+            // The dir statSync is intentionally uncaught: a race/EACCES on an entry
+            // readdir just returned is a real I/O fault and must fail loud.
+            if (!statSync(dir).isDirectory()) {
                 return false;
+            }
+            try {
+                return statSync(path.join(dir, 'package.json')).isFile();
+            } catch (err) {
+                // Only a genuinely-absent manifest (ENOENT) means "not a package".
+                // EACCES / EIO / a transient race must NOT be swallowed into a skip
+                // that silently drops a package from the gate.
+                if (err.code === 'ENOENT') {
+                    return false;
+                }
+                throw err;
             }
         })
         .sort();
@@ -122,8 +140,17 @@ function listSourceFiles(srcDir) {
     let entries;
     try {
         entries = readdirSync(srcDir, {withFileTypes: true});
-    } catch {
-        return out;
+    } catch (err) {
+        // A genuinely-absent src/ (ENOENT) yields no files — the caller (main)
+        // treats a zero-file package as a failure, since a package with no
+        // readable sources cannot be ASSERTED side-effect-free. Any other error
+        // — EACCES, EIO, a transient CI I/O fault — must NOT be swallowed into an
+        // empty list that prints a green PASS: that turns the side-effect gate
+        // into the silent failure it exists to catch. Fail loud.
+        if (err.code === 'ENOENT') {
+            return out;
+        }
+        throw err;
     }
     for (const entry of entries) {
         const full = path.join(srcDir, entry.name);
@@ -146,6 +173,122 @@ function listSourceFiles(srcDir) {
         }
     }
     return out;
+}
+
+function isAssignmentOperatorKind(kind) {
+    return kind >= ts.SyntaxKind.FirstAssignment && kind <= ts.SyntaxKind.LastAssignment;
+}
+
+// Is an object-literal property load-side-effect-free? A method/get/set member
+// only DEFINES a function (not invoked at load); a shorthand references a
+// binding; a spread / property value / computed key must itself be load-safe.
+function isLoadSafeProperty(prop) {
+    switch (prop.kind) {
+        case ts.SyntaxKind.ShorthandPropertyAssignment:
+        case ts.SyntaxKind.MethodDeclaration:
+        case ts.SyntaxKind.GetAccessor:
+        case ts.SyntaxKind.SetAccessor:
+            return true;
+        case ts.SyntaxKind.SpreadAssignment:
+            return isLoadSafeExpression(prop.expression);
+        case ts.SyntaxKind.PropertyAssignment:
+            if (prop.name?.kind === ts.SyntaxKind.ComputedPropertyName && !isLoadSafeExpression(prop.name.expression)) {
+                return false;
+            }
+            return isLoadSafeExpression(prop.initializer);
+        default:
+            return false;
+    }
+}
+
+// Does evaluating this expression at module load run no observable side effect?
+// Allowlist / default-deny: a value/function/class literal, a reference, or a
+// pure composition of those is safe; anything that INVOKES code at load — a
+// CallExpression, `new`, an IIFE, an assignment, `await`, a tagged template —
+// is a side effect (`const _ = Object.defineProperty(globalThis, ...)`,
+// `export const x = register()`, `const y = (() => { patch(); return 1 })()`).
+// Unknown kinds fail closed: a side-effect gate must not pass on the unrecognized.
+function isLoadSafeExpression(expr) {
+    if (expr === undefined) {
+        return true;
+    }
+    switch (expr.kind) {
+        case ts.SyntaxKind.NumericLiteral:
+        case ts.SyntaxKind.BigIntLiteral:
+        case ts.SyntaxKind.StringLiteral:
+        case ts.SyntaxKind.NoSubstitutionTemplateLiteral:
+        case ts.SyntaxKind.RegularExpressionLiteral:
+        case ts.SyntaxKind.TrueKeyword:
+        case ts.SyntaxKind.FalseKeyword:
+        case ts.SyntaxKind.NullKeyword:
+        case ts.SyntaxKind.Identifier: // bare reference, incl. `undefined`
+        // Function / class *definitions* — declared here, not invoked at load.
+        case ts.SyntaxKind.ArrowFunction:
+        case ts.SyntaxKind.FunctionExpression:
+        case ts.SyntaxKind.ClassExpression:
+            return true;
+        // Transparent wrappers — recurse into the inner expression.
+        case ts.SyntaxKind.ParenthesizedExpression:
+        case ts.SyntaxKind.AsExpression:
+        case ts.SyntaxKind.SatisfiesExpression:
+        case ts.SyntaxKind.TypeAssertionExpression:
+        case ts.SyntaxKind.NonNullExpression:
+            return isLoadSafeExpression(expr.expression);
+        // Property / element access is pure read for tree-shaking purposes
+        // (`const x = Foo.bar`); the threat is *calling*, not referencing.
+        case ts.SyntaxKind.PropertyAccessExpression:
+            return isLoadSafeExpression(expr.expression);
+        case ts.SyntaxKind.ElementAccessExpression:
+            return isLoadSafeExpression(expr.expression) && isLoadSafeExpression(expr.argumentExpression);
+        case ts.SyntaxKind.NewExpression:
+            // Construction is a pure allocation — idiomatic module-private state
+            // (`new WeakMap()`, `new Map()`, `new Set()`). Unlike a bare call it
+            // installs nothing; the realistic load-time threats the gate guards
+            // (`Object.defineProperty(...)`, `register()`, an IIFE) are all *calls*.
+            // Still recurse into the callee + args so `new Foo(register())` and
+            // `new (getCtor())()` cannot smuggle a call through.
+            return (
+                isLoadSafeExpression(expr.expression) &&
+                (expr.arguments === undefined || expr.arguments.every(isLoadSafeExpression))
+            );
+        case ts.SyntaxKind.PrefixUnaryExpression: {
+            const op = expr.operator;
+            // -1 / +1 / !flag / ~bits are pure; ++x / --x mutate.
+            if (
+                op === ts.SyntaxKind.MinusToken ||
+                op === ts.SyntaxKind.PlusToken ||
+                op === ts.SyntaxKind.ExclamationToken ||
+                op === ts.SyntaxKind.TildeToken
+            ) {
+                return isLoadSafeExpression(expr.operand);
+            }
+            return false;
+        }
+        case ts.SyntaxKind.ConditionalExpression:
+            return (
+                isLoadSafeExpression(expr.condition) &&
+                isLoadSafeExpression(expr.whenTrue) &&
+                isLoadSafeExpression(expr.whenFalse)
+            );
+        case ts.SyntaxKind.BinaryExpression:
+            // Pure operators only; the assignment family (`=`, `+=`, `&&=`, …) mutates.
+            if (isAssignmentOperatorKind(expr.operatorToken.kind)) {
+                return false;
+            }
+            return isLoadSafeExpression(expr.left) && isLoadSafeExpression(expr.right);
+        case ts.SyntaxKind.TemplateExpression:
+            return expr.templateSpans.every((span) => isLoadSafeExpression(span.expression));
+        case ts.SyntaxKind.ArrayLiteralExpression:
+            return expr.elements.every((el) =>
+                el.kind === ts.SyntaxKind.SpreadElement
+                    ? isLoadSafeExpression(el.expression)
+                    : isLoadSafeExpression(el),
+            );
+        case ts.SyntaxKind.ObjectLiteralExpression:
+            return expr.properties.every(isLoadSafeProperty);
+        default:
+            return false;
+    }
 }
 
 // Classify a top-level statement. Returns null if the statement is
@@ -177,10 +320,23 @@ function classifyTopLevelStatement(node) {
         case ts.SyntaxKind.TypeAliasDeclaration:
         case ts.SyntaxKind.EnumDeclaration:
         case ts.SyntaxKind.ModuleDeclaration:
-        case ts.SyntaxKind.VariableStatement:
         case ts.SyntaxKind.FunctionDeclaration:
         case ts.SyntaxKind.ClassDeclaration:
             return null;
+        case ts.SyntaxKind.VariableStatement: {
+            // A `const`/`let`/`var` DECLARATION is permitted, but its INITIALIZER
+            // is evaluated at module load — `const _ = Object.defineProperty(...)`,
+            // `export const x = register()`, `const y = (() => { patch(); })()` are
+            // module-eval side effects that tree-shake away silently under
+            // sideEffects:false. Permit only load-safe initializers (literals,
+            // function/class definitions, references, and pure compositions).
+            for (const decl of node.declarationList.declarations) {
+                if (!isLoadSafeExpression(decl.initializer)) {
+                    return 'top-level variable initializer evaluates at module load (call / new / IIFE / assignment)';
+                }
+            }
+            return null;
+        }
         case ts.SyntaxKind.ExportAssignment: {
             // `export default <expr>` (ExportAssignment, isExportEquals=false).
             // Only a function- or class-expression default is side-effect-free;
@@ -270,17 +426,26 @@ function main() {
         // Module-eval side-effect freedom across every source file (queue #93).
         const srcDir = path.join(dir, 'src');
         const sourceFiles = listSourceFiles(srcDir);
-        let sideEffectFailures = 0;
-        for (const filePath of sourceFiles) {
-            const fileFailures = checkSideEffectFreedom(filePath, name);
-            for (const f of fileFailures) {
-                failures.push(f);
-                process.stderr.write(`  ${f}\n`);
-                sideEffectFailures += 1;
+        if (sourceFiles.length === 0) {
+            // No readable sources — a published package must have ≥1 src module;
+            // an empty result means src/ is absent/empty. Asserting it
+            // side-effect-free would be vacuous, so fail rather than green-PASS.
+            const msg = `${name}: no readable source files under ${srcDir} — cannot assert module-eval side-effect freedom (queue #93)`;
+            failures.push(msg);
+            process.stderr.write(`  ${msg}\n`);
+        } else {
+            let sideEffectFailures = 0;
+            for (const filePath of sourceFiles) {
+                const fileFailures = checkSideEffectFreedom(filePath, name);
+                for (const f of fileFailures) {
+                    failures.push(f);
+                    process.stderr.write(`  ${f}\n`);
+                    sideEffectFailures += 1;
+                }
             }
-        }
-        if (sideEffectFailures === 0) {
-            process.stdout.write(`  ${name}: ${sourceFiles.length} source file(s) side-effect-free OK\n`);
+            if (sideEffectFailures === 0) {
+                process.stdout.write(`  ${name}: ${sourceFiles.length} source file(s) side-effect-free OK\n`);
+            }
         }
 
         // NO_COLOR=1 keeps publint's output plain regardless of runner color
