@@ -42,10 +42,23 @@ function listPackageDirs() {
     return readdirSync(PACKAGES_DIR)
         .map((name) => path.join(PACKAGES_DIR, name))
         .filter((dir) => {
-            try {
-                return statSync(dir).isDirectory() && statSync(path.join(dir, 'package.json')).isFile();
-            } catch {
+            // A stray file in packages/ is legitimately not a package — skip it. The dir
+            // statSync is intentionally uncaught: a race/EACCES on an entry readdir just
+            // returned is a real I/O fault and must fail the gate loud, never vanish.
+            if (!statSync(dir).isDirectory()) {
                 return false;
+            }
+            try {
+                return statSync(path.join(dir, 'package.json')).isFile();
+            } catch (err) {
+                // Only a genuinely-absent manifest (ENOENT) means "not a package" — skip.
+                // EACCES / EIO / a transient race on a real package's manifest must NOT be
+                // swallowed into a silent skip: dropping a package from validation is the
+                // exact silent-pass this gate exists to prevent. Fail loud instead.
+                if (err.code === 'ENOENT') {
+                    return false;
+                }
+                throw err;
             }
         })
         .sort();
@@ -77,6 +90,18 @@ function packFileList(dir) {
 
 function main() {
     const dirs = listPackageDirs();
+
+    // Floor assertion: a zero-package result means packages/ is present but empty (a
+    // catastrophic checkout/artifact failure), or every entry was filtered out. With no
+    // dirs the loop never runs, failures stays empty, and the gate would PASS on nothing
+    // validated — a silent green. Refuse it.
+    if (dirs.length === 0) {
+        process.stderr.write(
+            '::error::validate:dist found 0 packages under packages/ — refusing to pass with nothing validated (empty checkout or missing artifact?)\n',
+        );
+        process.exit(1);
+    }
+
     const failures = [];
 
     for (const dir of dirs) {
