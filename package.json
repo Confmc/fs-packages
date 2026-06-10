@@ -20,6 +20,7 @@
         "test:coverage": "vitest run --coverage",
         "test:mutation": "npm run test:mutation --workspaces",
         "typecheck": "npm run typecheck --workspaces",
+        "validate:dist": "node scripts/validate-dist.mjs",
         "version": "changeset version"
     },
     "devDependencies": {
