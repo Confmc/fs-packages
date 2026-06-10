@@ -1,7 +1,13 @@
-import type {HttpService} from '@script-development/fs-http';
-import type {InternalAxiosRequestConfig} from 'axios';
+import type {HttpService, RequestMiddlewareFunc} from '@script-development/fs-http';
 
 import type {LoadingMiddlewareOptions, LoadingMiddlewareResult, LoadingService} from './types';
+
+// Route the request-config type through fs-http's public re-export rather than
+// importing `InternalAxiosRequestConfig` from axios directly. fs-http's
+// `RequestMiddlewareFunc` is `(request: InternalAxiosRequestConfig) => void`, so
+// this resolves to the identical type while keeping axios out of fs-loading's
+// public surface (the "no direct axios imports" discipline — see CLAUDE.md).
+type RequestConfig = Parameters<RequestMiddlewareFunc>[0];
 
 export const registerLoadingMiddleware = (
     httpService: HttpService,
@@ -10,10 +16,10 @@ export const registerLoadingMiddleware = (
 ): LoadingMiddlewareResult => {
     const {timeoutMs = 30000} = options;
 
-    const requestTimeouts = new Map<InternalAxiosRequestConfig, ReturnType<typeof setTimeout>>();
-    const completedRequests = new WeakSet<InternalAxiosRequestConfig>();
+    const requestTimeouts = new Map<RequestConfig, ReturnType<typeof setTimeout>>();
+    const completedRequests = new WeakSet<RequestConfig>();
 
-    const stopLoadingForRequest = (config: InternalAxiosRequestConfig): void => {
+    const stopLoadingForRequest = (config: RequestConfig): void => {
         if (completedRequests.has(config)) return;
         completedRequests.add(config);
 
