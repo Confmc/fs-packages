@@ -1,0 +1,16 @@
+# CODEOWNERS — fs-packages (The Armory)
+#
+# fs-packages is the OIDC Trusted-Publishing root for every @script-development/*
+# package consumed across the fleet. Every change requires review from a repo
+# admin — the CI/release surface (.github/**) is the highest-leverage supply-chain
+# path here, so the same owner set guards the whole repo.
+#
+# Mirrors phpstan-warroom-rules' CODEOWNERS shape (a single global owner rule).
+# phpstan routes to its @script-development/phpstan-warroom-admins team; fs-packages
+# has no equivalent dedicated team — its access model is the six individual admin
+# collaborators below (the "6 admins" the security baseline tracks; Sapper L5).
+# Listing them by handle keeps the rule valid (a CODEOWNERS team without repo
+# access is silently ignored). If an `fs-packages-admins` org team is later created
+# with repo access, collapse these six handles into that single team handle.
+
+* @Goosterhof @jpostema81 @jasperboerhof @bert-script @YouriLieverdink @armazade
