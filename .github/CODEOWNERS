@@ -5,12 +5,12 @@
 # admin — the CI/release surface (.github/**) is the highest-leverage supply-chain
 # path here, so the same owner set guards the whole repo.
 #
-# Mirrors phpstan-warroom-rules' CODEOWNERS shape (a single global owner rule).
-# phpstan routes to its @script-development/phpstan-warroom-admins team; fs-packages
-# has no equivalent dedicated team — its access model is the six individual admin
-# collaborators below (the "6 admins" the security baseline tracks; Sapper L5).
-# Listing them by handle keeps the rule valid (a CODEOWNERS team without repo
-# access is silently ignored). If an `fs-packages-admins` org team is later created
-# with repo access, collapse these six handles into that single team handle.
+# Routes to the @script-development/fs-packages-admins org team, mirroring
+# phpstan-warroom-rules' single-team CODEOWNERS shape. The team is the dedicated
+# Armory-admin set (a deliberately tight roster, like its phpstan sibling) rather
+# than the full repo-admin collaborator list. INVARIANT: the team MUST retain
+# write (push) access to this repo — a CODEOWNERS team without repo access is
+# silently ignored by GitHub, which would delete owner-review enforcement on the
+# supply-chain root with zero signal.
 
-* @Goosterhof @jpostema81 @jasperboerhof @bert-script @YouriLieverdink @armazade
+* @script-development/fs-packages-admins
