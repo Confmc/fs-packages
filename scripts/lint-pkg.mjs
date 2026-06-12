@@ -57,8 +57,9 @@
 //    specifier-less import, top-level control flow, a destructuring default that
 //    evaluates (`const {a = register()} = obj`), a class with a `static {}`
 //    block / `static` field initializer / computed member name / decorator that
-//    runs at class-definition time, or a non-ambient `namespace` whose body
-//    evaluates. A package whose `src/` yields zero readable source files also
+//    runs at class-definition time, a non-const `enum` with a call-bearing member
+//    initializer (`enum E { A = side() }`), or a non-ambient `namespace` whose
+//    body evaluates. A package whose `src/` yields zero readable source files also
 //    fails (a vacuous assertion is not a pass). Scope is all source modules
 //    (`.ts`/`.tsx`/`.mts`/`.cts`, declaration + test files excluded) under
 //    `packages/*/src/**` — the correct match for a package-global flag (a side
@@ -428,9 +429,24 @@ function classifyTopLevelStatement(node) {
         case ts.SyntaxKind.ExportDeclaration:
         case ts.SyntaxKind.InterfaceDeclaration:
         case ts.SyntaxKind.TypeAliasDeclaration:
-        case ts.SyntaxKind.EnumDeclaration:
         case ts.SyntaxKind.FunctionDeclaration:
             return null;
+        case ts.SyntaxKind.EnumDeclaration: {
+            // A `const enum` is fully erased — no runtime emit. A non-const enum
+            // compiles to a load-time IIFE that EVALUATES each member initializer
+            // at module eval, so a call-bearing initializer (`enum E { A = side()
+            // }`) is a module-eval side effect. Permit only load-safe initializers,
+            // mirroring the static-field / binding-default / namespace-body checks.
+            if (hasModifier(node, ts.SyntaxKind.ConstKeyword)) {
+                return null;
+            }
+            for (const member of node.members) {
+                if (!isLoadSafeExpression(member.initializer)) {
+                    return 'top-level enum member initializer evaluates at module load (call / new / IIFE / assignment)';
+                }
+            }
+            return null;
+        }
         case ts.SyntaxKind.ClassDeclaration:
             // A class declaration is inert UNLESS a member evaluates at definition
             // time — a `static {}` block, a `static` field initializer, a computed
