@@ -46,16 +46,22 @@
 //    module with the TypeScript compiler API (already a devDep — Gate 5 `tsc`,
 //    no new dependency) and asserts the top-level statement list contains only
 //    side-effect-free declaration kinds (imports WITH specifiers, re-exports,
-//    type/function/class declarations, `const`/`let`/`var` whose INITIALIZER is
-//    load-safe, and `export default` of a function or class). A variable
-//    initializer is load-safe iff it is a literal / function-or-class
-//    definition / reference / pure construction (`new WeakMap()`) / a pure
-//    composition of those — anything that INVOKES code at load (a call,
-//    IIFE, or assignment, e.g. `export const x = register()`) FAILS, as does a
-//    bare ExpressionStatement, a specifier-less import, or top-level control
-//    flow. A package whose `src/` yields zero readable source files also fails
-//    (a vacuous assertion is not a pass). Scope is all `packages/*/src/**/*.ts`
-//    excluding test files — the correct match for a package-global flag (a side
+//    type/function declarations, `const`/`let`/`var` whose INITIALIZER and
+//    binding pattern are load-safe, `export default`/`export =` of a load-safe
+//    expression, ambient-or-load-safe `namespace` declarations, and class
+//    declarations with no definition-time member effect). A variable initializer
+//    is load-safe iff it is a literal / function-or-class definition / reference
+//    / pure construction (`new WeakMap()`) / a pure composition of those —
+//    anything that INVOKES code at load (a call, IIFE, or assignment, e.g.
+//    `export const x = register()`) FAILS, as does a bare ExpressionStatement, a
+//    specifier-less import, top-level control flow, a destructuring default that
+//    evaluates (`const {a = register()} = obj`), a class with a `static {}`
+//    block / `static` field initializer / computed member name / decorator that
+//    runs at class-definition time, or a non-ambient `namespace` whose body
+//    evaluates. A package whose `src/` yields zero readable source files also
+//    fails (a vacuous assertion is not a pass). Scope is all source modules
+//    (`.ts`/`.tsx`/`.mts`/`.cts`, declaration + test files excluded) under
+//    `packages/*/src/**` — the correct match for a package-global flag (a side
 //    effect in a non-re-exported imported module is still covered by the
 //    bundler's assumption).
 
@@ -130,10 +136,16 @@ function checkEnginesNode(manifestPath, label) {
 // `src/`), so the `src/**` walk already excludes them; the suffix/dir guards
 // below are belt-and-suspenders in case a future package co-locates specs
 // under `src/`.
-const TEST_FILE_RE = /\.(spec|test)\.ts$/;
+const TEST_FILE_RE = /\.(spec|test)\.(ts|tsx|mts|cts)$/;
 const TEST_DIR_RE = /(^|[/\\])(__tests__|tests?)([/\\]|$)/;
+// A package's shippable TS sources. `sideEffects:false` is package-global, so
+// the gate must reach every transpiled module, not just `.ts` — a `.tsx` /
+// `.mts` / `.cts` source ships top-level statements just the same. Declaration
+// files (`.d.ts` / `.d.mts` / `.d.cts`) are type-only and emit no runtime.
+const SOURCE_EXT_RE = /\.(ts|tsx|mts|cts)$/;
+const DECLARATION_EXT_RE = /\.d\.(ts|mts|cts)$/;
 
-// Recursively collect `.ts` source files under a package's `src/` dir,
+// Recursively collect TS source files under a package's `src/` dir,
 // skipping declaration files and test files/dirs.
 function listSourceFiles(srcDir) {
     const out = [];
@@ -160,10 +172,10 @@ function listSourceFiles(srcDir) {
             }
             out.push(...listSourceFiles(full));
         } else if (entry.isFile()) {
-            if (!entry.name.endsWith('.ts')) {
+            if (!SOURCE_EXT_RE.test(entry.name)) {
                 continue;
             }
-            if (entry.name.endsWith('.d.ts')) {
+            if (DECLARATION_EXT_RE.test(entry.name)) {
                 continue;
             }
             if (TEST_FILE_RE.test(entry.name)) {
@@ -177,6 +189,79 @@ function listSourceFiles(srcDir) {
 
 function isAssignmentOperatorKind(kind) {
     return kind >= ts.SyntaxKind.FirstAssignment && kind <= ts.SyntaxKind.LastAssignment;
+}
+
+// In the modern TS AST, decorators live in the combined `modifiers` array
+// alongside keyword modifiers. A decorator is a CALL evaluated at the
+// declaration's definition time — for a top-level class that is module load.
+function hasModifier(node, kind) {
+    return (node.modifiers ?? []).some((m) => m.kind === kind);
+}
+
+function hasDecorator(node) {
+    return hasModifier(node, ts.SyntaxKind.Decorator);
+}
+
+// Does defining this class run no observable side effect at module load? A class
+// DECLARATION only declares — but several member shapes evaluate at
+// class-definition time (= module load for a top-level class): a `static {}`
+// block, a `static` field INITIALIZER, any computed member NAME, and any
+// decorator (class- or member-level). Methods, accessors, and instance-field
+// initializers do NOT run at definition (instance fields run at construction),
+// so they are safe.
+function isLoadSafeClass(node) {
+    if (hasDecorator(node)) {
+        return false;
+    }
+    for (const member of node.members ?? []) {
+        if (hasDecorator(member)) {
+            return false;
+        }
+        // A computed member name (`[key()]() {}`, `static [k()] = 1`) is
+        // evaluated when the class is defined, regardless of static-ness.
+        if (member.name?.kind === ts.SyntaxKind.ComputedPropertyName && !isLoadSafeExpression(member.name.expression)) {
+            return false;
+        }
+        if (member.kind === ts.SyntaxKind.ClassStaticBlockDeclaration) {
+            return false;
+        }
+        if (
+            member.kind === ts.SyntaxKind.PropertyDeclaration &&
+            hasModifier(member, ts.SyntaxKind.StaticKeyword) &&
+            !isLoadSafeExpression(member.initializer)
+        ) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// Does binding this name run no observable side effect at module load? A plain
+// identifier binds inertly; an object/array binding pattern's DEFAULT
+// initializers (`const {a = register()} = obj`) and computed property keys
+// evaluate at load, and nested patterns recurse.
+function isLoadSafeBindingName(name) {
+    if (name.kind !== ts.SyntaxKind.ObjectBindingPattern && name.kind !== ts.SyntaxKind.ArrayBindingPattern) {
+        return true;
+    }
+    for (const element of name.elements) {
+        if (element.kind === ts.SyntaxKind.OmittedExpression) {
+            continue;
+        }
+        if (
+            element.propertyName?.kind === ts.SyntaxKind.ComputedPropertyName &&
+            !isLoadSafeExpression(element.propertyName.expression)
+        ) {
+            return false;
+        }
+        if (element.initializer !== undefined && !isLoadSafeExpression(element.initializer)) {
+            return false;
+        }
+        if (!isLoadSafeBindingName(element.name)) {
+            return false;
+        }
+    }
+    return true;
 }
 
 // Is an object-literal property load-side-effect-free? A method/get/set member
@@ -222,11 +307,15 @@ function isLoadSafeExpression(expr) {
         case ts.SyntaxKind.FalseKeyword:
         case ts.SyntaxKind.NullKeyword:
         case ts.SyntaxKind.Identifier: // bare reference, incl. `undefined`
-        // Function / class *definitions* — declared here, not invoked at load.
+        // Function definitions — declared here, not invoked at load.
         case ts.SyntaxKind.ArrowFunction:
         case ts.SyntaxKind.FunctionExpression:
-        case ts.SyntaxKind.ClassExpression:
             return true;
+        // A class *definition* is inert UNLESS a member evaluates at definition
+        // time (static block / static field initializer / computed name /
+        // decorator) — `isLoadSafeClass` walks the members for exactly that.
+        case ts.SyntaxKind.ClassExpression:
+            return isLoadSafeClass(expr);
         // Transparent wrappers — recurse into the inner expression.
         case ts.SyntaxKind.ParenthesizedExpression:
         case ts.SyntaxKind.AsExpression:
@@ -291,6 +380,24 @@ function isLoadSafeExpression(expr) {
     }
 }
 
+// Top-level control-flow statement kinds — each EXECUTES at module load, so all
+// are side effects. Mapped to a human label so an ally reading a CI failure
+// needn't decode raw TS AST enum names.
+const CONTROL_FLOW_KINDS = new Set([
+    ts.SyntaxKind.IfStatement,
+    ts.SyntaxKind.ForStatement,
+    ts.SyntaxKind.ForInStatement,
+    ts.SyntaxKind.ForOfStatement,
+    ts.SyntaxKind.WhileStatement,
+    ts.SyntaxKind.DoStatement,
+    ts.SyntaxKind.SwitchStatement,
+    ts.SyntaxKind.TryStatement,
+    ts.SyntaxKind.ThrowStatement,
+    ts.SyntaxKind.LabeledStatement,
+    ts.SyntaxKind.WithStatement,
+    ts.SyntaxKind.Block,
+]);
+
 // Classify a top-level statement. Returns null if the statement is
 // side-effect-free (permitted), or a short human-readable description of the
 // offending construct if it is a module-eval side effect.
@@ -298,12 +405,15 @@ function isLoadSafeExpression(expr) {
 // Permitted at module top level:
 //   - import declarations WITH at least one specifier binding
 //   - export ... from / export * / export { ... } re-export declarations
-//   - export default of a function or class declaration
-//   - interface / type alias / enum / namespace (module) declarations
-//   - const / let / var variable declarations
-//   - function / class declarations
-// Everything else — chiefly a bare ExpressionStatement (call / assignment) or
-// top-level control flow (if/for/while/try/labeled) — is a side effect.
+//   - export default / export = of a load-safe expression (function / arrow /
+//     side-effect-free class definition / literal / reference)
+//   - interface / type alias / enum declarations
+//   - ambient or load-safe `namespace` (module) declarations
+//   - const / let / var with a load-safe initializer and binding pattern
+//   - function declarations; class declarations with no definition-time member effect
+// Everything else — a bare ExpressionStatement (call / assignment), top-level
+// control flow (if/for/while/try/labeled/block), or a class/namespace whose body
+// evaluates at definition time — is a side effect.
 function classifyTopLevelStatement(node) {
     switch (node.kind) {
         case ts.SyntaxKind.ImportDeclaration: {
@@ -319,42 +429,77 @@ function classifyTopLevelStatement(node) {
         case ts.SyntaxKind.InterfaceDeclaration:
         case ts.SyntaxKind.TypeAliasDeclaration:
         case ts.SyntaxKind.EnumDeclaration:
-        case ts.SyntaxKind.ModuleDeclaration:
         case ts.SyntaxKind.FunctionDeclaration:
-        case ts.SyntaxKind.ClassDeclaration:
             return null;
+        case ts.SyntaxKind.ClassDeclaration:
+            // A class declaration is inert UNLESS a member evaluates at definition
+            // time — a `static {}` block, a `static` field initializer, a computed
+            // member name, or any decorator (all run at module load).
+            if (!isLoadSafeClass(node)) {
+                return 'class definition runs at module load (static block / static field initializer / computed member name / decorator)';
+            }
+            return null;
+        case ts.SyntaxKind.ModuleDeclaration: {
+            // An ambient (`declare namespace`) or type-only namespace emits no
+            // runtime. A non-ambient namespace with runtime content compiles to a
+            // load-time IIFE, so recurse into its body and require every inner
+            // statement to be a load-safe declaration. `namespace A.B { … }` nests
+            // a ModuleDeclaration whose body is the ModuleBlock — walk down to it.
+            if (hasModifier(node, ts.SyntaxKind.DeclareKeyword)) {
+                return null;
+            }
+            let body = node.body;
+            while (body !== undefined && body.kind === ts.SyntaxKind.ModuleDeclaration) {
+                body = body.body;
+            }
+            if (body !== undefined && body.kind === ts.SyntaxKind.ModuleBlock) {
+                for (const statement of body.statements) {
+                    const offense = classifyTopLevelStatement(statement);
+                    if (offense !== null) {
+                        return `namespace body — ${offense}`;
+                    }
+                }
+            }
+            return null;
+        }
         case ts.SyntaxKind.VariableStatement: {
             // A `const`/`let`/`var` DECLARATION is permitted, but its INITIALIZER
             // is evaluated at module load — `const _ = Object.defineProperty(...)`,
             // `export const x = register()`, `const y = (() => { patch(); })()` are
             // module-eval side effects that tree-shake away silently under
             // sideEffects:false. Permit only load-safe initializers (literals,
-            // function/class definitions, references, and pure compositions).
+            // function/class definitions, references, and pure compositions); the
+            // binding NAME is also load-eval'd via destructuring defaults / computed
+            // keys (`const {a = register()} = obj`), so check it too.
             for (const decl of node.declarationList.declarations) {
                 if (!isLoadSafeExpression(decl.initializer)) {
                     return 'top-level variable initializer evaluates at module load (call / new / IIFE / assignment)';
+                }
+                if (!isLoadSafeBindingName(decl.name)) {
+                    return 'top-level destructuring default / computed key evaluates at module load (call / new / IIFE / assignment)';
                 }
             }
             return null;
         }
         case ts.SyntaxKind.ExportAssignment: {
-            // `export default <expr>` (ExportAssignment, isExportEquals=false).
-            // Only a function- or class-expression default is side-effect-free;
-            // `export default someCall()` evaluates at module load.
-            const expr = node.expression;
-            if (
-                expr !== undefined &&
-                (expr.kind === ts.SyntaxKind.FunctionExpression ||
-                    expr.kind === ts.SyntaxKind.ArrowFunction ||
-                    expr.kind === ts.SyntaxKind.ClassExpression)
-            ) {
-                return null;
+            // Both `export default <expr>` and `export = <expr>` (the latter has
+            // isExportEquals === true) EVALUATE <expr> at module load, so the
+            // default/assignment is side-effect-free iff the expression is
+            // load-safe — a function / arrow / inert class definition / literal /
+            // reference passes; `export default someCall()` does not.
+            if (!isLoadSafeExpression(node.expression)) {
+                return node.isExportEquals === true
+                    ? 'export = of an evaluated expression'
+                    : 'export default of an evaluated expression';
             }
-            return 'export default of an evaluated expression';
+            return null;
         }
         case ts.SyntaxKind.ExpressionStatement:
             return 'top-level expression statement (call / assignment evaluates at module load)';
         default:
+            if (CONTROL_FLOW_KINDS.has(node.kind)) {
+                return 'top-level control-flow statement (runs at module load)';
+            }
             return `top-level ${ts.SyntaxKind[node.kind] ?? 'statement'} (not a side-effect-free declaration)`;
     }
 }
@@ -363,12 +508,15 @@ function classifyTopLevelStatement(node) {
 // offending top-level statement), or [] if the file is side-effect-free.
 function checkSideEffectFreedom(filePath, label) {
     const src = readFileSync(filePath, 'utf8');
+    // A `.tsx` source must parse as TSX — under plain TS the JSX `<T>` form is
+    // mis-read as a type assertion. `.mts`/`.cts` parse fine as TS.
+    const scriptKind = filePath.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
     const sourceFile = ts.createSourceFile(
         filePath,
         src,
         ts.ScriptTarget.Latest,
         /* setParentNodes */ false,
-        ts.ScriptKind.TS,
+        scriptKind,
     );
     const fileFailures = [];
     for (const statement of sourceFile.statements) {
