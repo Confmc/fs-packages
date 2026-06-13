@@ -12,7 +12,7 @@ import type {
     StoreModuleForAdapter,
 } from './types';
 
-import {BroadcastPayloadError, EntryNotFoundError} from './errors';
+import {BroadcastPayloadError, EntryNotFoundError, ExtendKeyCollisionError, ExtendPayloadError} from './errors';
 
 export const createAdapterStoreModule = <
     T extends Item,
@@ -123,5 +123,11 @@ export const createAdapterStoreModule = <
     };
 
     const extended = extend ? extend(storeModule) : ({} as X);
+    const baseKeys = new Set(Object.keys(base));
+    for (const key of Object.keys(extended)) {
+        if (baseKeys.has(key)) {
+            throw new ExtendKeyCollisionError(key);
+        }
+    }
     return {...base, ...extended};
 };

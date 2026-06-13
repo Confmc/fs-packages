@@ -98,12 +98,14 @@ export type AdapterStoreConfig<
      * consumer-specific fetches (e.g. fetch-one-by-string-route-binding-key)
      * without app-specific concepts entering the package.
      *
-     * Returned keys must be NEW names: colliding with a built-in store method
-     * (`getAll`, `getById`, `getOrFailById`, `generateNew`, `retrieveById`,
-     * `retrieveAll`) is a compile error. Unlike `broadcast`, whose handlers never
-     * reach the public surface, `extend`'s output IS the public surface, so a
-     * collision would silently shadow the built-in at runtime — the `X` constraint
-     * forbids it.
+     * Returned keys must be NEW names. A key that collides with a built-in store
+     * method (`getAll`, `getById`, `getOrFailById`, `generateNew`, `retrieveById`,
+     * `retrieveAll`) **throws `ExtendKeyCollisionError` at construction** — on every
+     * call form. It is *additionally* a compile error when the extend return type
+     * `X` is supplied or inferred (e.g. as the 4th type argument), which is the form
+     * you use to make the extended methods callable. Unlike `broadcast`, whose
+     * handlers never reach the public surface, `extend`'s output IS the public
+     * surface, so a collision would otherwise silently shadow the built-in.
      */
     extend?: (storeModule: AdapterStoreModule<T>) => X;
 };

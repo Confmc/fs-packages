@@ -264,6 +264,8 @@ const alice = usersStore.getById(alice.id);
 
 This is the same trust model as `broadcast`, generalized: a single, narrow, construction-time door for feeding data into the store's internal mutation path, kept off the default public surface so it can't be acquired to bypass HTTP by accident.
 
+**Returned keys must be new names.** A key that collides with a built-in store method (`getAll`, `getById`, `getOrFailById`, `generateNew`, `retrieveById`, `retrieveAll`) **throws `ExtendKeyCollisionError` at construction** — always, on every call form. It is _additionally_ a compile error when you pass the extend shape as the fourth type argument (as in the example above) — which is the form you use to make the extended methods callable. Passing the type argument therefore gives you both the editor-time guarantee and a callable method; the runtime guard is the backstop that holds even on a bare `<T, E, N>` call where the extend shape is left to default.
+
 ## Custom New Types
 
 By default, `generateNew()` creates an object with all fields except `id`. You can customize this with a third type parameter:
@@ -289,12 +291,14 @@ const newUser = usersStore.generateNew();
 
 ## Error Handling
 
-The package exports three error classes:
+The package exports five error classes:
 
 ```typescript
 import {
     BroadcastPayloadError,
     EntryNotFoundError,
+    ExtendKeyCollisionError,
+    ExtendPayloadError,
     MissingResponseDataError,
 } from '@script-development/fs-adapter-store';
 ```
@@ -302,6 +306,8 @@ import {
 - **`EntryNotFoundError`** — thrown by `getOrFailById` when the resource doesn't exist in the store
 - **`MissingResponseDataError`** — thrown when a CRUD response doesn't contain a `data` field
 - **`BroadcastPayloadError`** — thrown by a `broadcast` handler when the incoming payload is malformed (`onUpdate` not given an object with an integer `id`, or `onDelete` given a non-integer id)
+- **`ExtendKeyCollisionError`** — thrown at store construction when an `extend` method's key collides with a built-in store method
+- **`ExtendPayloadError`** — thrown by an `extend`-injected mutator when given a malformed payload (`setById` not given an object with an integer `id`, or `deleteById` given a non-integer id)
 
 ## API Reference
 

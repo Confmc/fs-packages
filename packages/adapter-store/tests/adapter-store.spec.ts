@@ -19,7 +19,7 @@ import type {
 } from '../src/types';
 
 import {createAdapterStoreModule} from '../src/adapter-store';
-import {BroadcastPayloadError, EntryNotFoundError} from '../src/errors';
+import {BroadcastPayloadError, EntryNotFoundError, ExtendKeyCollisionError, ExtendPayloadError} from '../src/errors';
 
 type TestNew = Omit<TestItem, 'id'>;
 type TestStorageService = Pick<StorageService, 'get' | 'put'>;
@@ -1625,24 +1625,41 @@ describe('createAdapterStoreModule', () => {
             const storageService: TestStorageService = {put: vi.fn(), get: vi.fn().mockReturnValue({})};
             const loadingService: TestLoadingService = {ensureLoadingFinished: vi.fn().mockResolvedValue(undefined)};
 
-            // Act & Assert — the @ts-expect-error IS the assertion: a colliding extend key must not compile.
-            // The colliding shape is given as the explicit `X` type arg so the constraint is checked against it
-            // (with X left to infer from a 3-arg call it defaults to `{}` and the collision goes unseen).
-            const store = createAdapterStoreModule<
-                TestItem,
-                TestAdapted,
-                TestNewAdapted,
-                // @ts-expect-error — `retrieveAll` collides with a built-in store method; extend keys must be new names
-                {retrieveAll: () => Promise<void>}
-            >({
-                domainName: 'test-items',
-                adapter: createTestAdapter,
-                httpService,
-                storageService,
-                loadingService,
-                extend: () => ({retrieveAll: async (): Promise<void> => {}}),
-            });
-            expect(store).toBeDefined();
+            // Act & Assert — the @ts-expect-error IS the compile-time assertion: a colliding extend key
+            // must not compile when the colliding shape is given as the explicit `X` type arg. The runtime
+            // guard also throws at construction, so the call is wrapped to keep this test green.
+            expect(() =>
+                createAdapterStoreModule<
+                    TestItem,
+                    TestAdapted,
+                    TestNewAdapted,
+                    // @ts-expect-error — `retrieveAll` collides with a built-in store method; extend keys must be new names
+                    {retrieveAll: () => Promise<void>}
+                >({
+                    domainName: 'test-items',
+                    adapter: createTestAdapter,
+                    httpService,
+                    storageService,
+                    loadingService,
+                    extend: () => ({retrieveAll: async (): Promise<void> => {}}),
+                }),
+            ).toThrow(ExtendKeyCollisionError);
+        });
+
+        it('throws ExtendKeyCollisionError when an extend key collides with a built-in (runtime guard, inferred path)', () => {
+            const httpService: Pick<HttpService, 'getRequest'> = {getRequest: vi.fn()};
+            const storageService: TestStorageService = {put: vi.fn(), get: vi.fn().mockReturnValue({})};
+            const loadingService: TestLoadingService = {ensureLoadingFinished: vi.fn().mockResolvedValue(undefined)};
+            expect(() =>
+                createAdapterStoreModule<TestItem, TestAdapted, TestNewAdapted>({
+                    domainName: 'test-items',
+                    adapter: createTestAdapter,
+                    httpService,
+                    storageService,
+                    loadingService,
+                    extend: () => ({retrieveAll: async (): Promise<void> => {}}),
+                }),
+            ).toThrow(ExtendKeyCollisionError);
         });
     });
 });

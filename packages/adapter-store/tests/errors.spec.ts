@@ -1,7 +1,13 @@
 import {describe, expect, it} from 'vitest';
 
 // @vitest-environment happy-dom
-import {BroadcastPayloadError, EntryNotFoundError, MissingResponseDataError} from '../src/errors';
+import {
+    BroadcastPayloadError,
+    EntryNotFoundError,
+    ExtendKeyCollisionError,
+    ExtendPayloadError,
+    MissingResponseDataError,
+} from '../src/errors';
 
 describe('EntryNotFoundError', () => {
     it('should create error with correct message', () => {
@@ -73,5 +79,58 @@ describe('BroadcastPayloadError', () => {
         // Assert
         expect(error).toBeInstanceOf(Error);
         expect(error).toBeInstanceOf(BroadcastPayloadError);
+    });
+});
+
+describe('ExtendKeyCollisionError', () => {
+    it('should create error with correct message containing the colliding key', () => {
+        // Act
+        const error = new ExtendKeyCollisionError('retrieveAll');
+
+        // Assert
+        expect(error.message).toContain('retrieveAll');
+        expect(error.name).toBe('ExtendKeyCollisionError');
+    });
+
+    it('should be an instance of Error', () => {
+        // Act
+        const error = new ExtendKeyCollisionError('getById');
+
+        // Assert
+        expect(error).toBeInstanceOf(Error);
+        expect(error).toBeInstanceOf(ExtendKeyCollisionError);
+    });
+});
+
+describe('ExtendPayloadError', () => {
+    it('should describe an invalid setById payload, naming the expected shape and received type', () => {
+        // Act
+        const error = new ExtendPayloadError('users', 'setById', null);
+
+        // Assert
+        expect(error.message).toBe(
+            'users extend setById received an invalid payload — expected an object with an integer `id`, got object. The store rejects it rather than corrupting state.',
+        );
+        expect(error.name).toBe('ExtendPayloadError');
+    });
+
+    it('should describe an invalid deleteById payload, naming the expected shape and received type', () => {
+        // Act
+        const error = new ExtendPayloadError('users', 'deleteById', 'KD-7');
+
+        // Assert
+        expect(error.message).toBe(
+            'users extend deleteById received an invalid payload — expected an integer id, got string. The store rejects it rather than corrupting state.',
+        );
+        expect(error.name).toBe('ExtendPayloadError');
+    });
+
+    it('should be an instance of Error', () => {
+        // Act
+        const error = new ExtendPayloadError('items', 'setById', undefined);
+
+        // Assert
+        expect(error).toBeInstanceOf(Error);
+        expect(error).toBeInstanceOf(ExtendPayloadError);
     });
 });
