@@ -41,7 +41,8 @@
     "overrides": {
         "typed-rest-client": {
             "qs": "^6.15.2"
-        }
+        },
+        "esbuild": "^0.28.1"
     },
     "engines": {
         "node": ">=24.0.0"
