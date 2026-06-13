@@ -65,13 +65,29 @@ export type AdapterStoreBroadcast<T extends Item> = {
 };
 
 /** Configuration for createAdapterStoreModule. */
-export type AdapterStoreConfig<T extends Item, E extends Adapted<T, object>, N extends NewAdapted<T, object>> = {
+export type AdapterStoreConfig<
+    T extends Item,
+    E extends Adapted<T, object>,
+    N extends NewAdapted<T, object>,
+    X extends object = {},
+> = {
     domainName: string;
     adapter: Adapter<T, E, N>;
     httpService: Pick<HttpService, 'getRequest'>;
     storageService: Pick<StorageService, 'get' | 'put'>;
     loadingService: Pick<LoadingService, 'ensureLoadingFinished'>;
     broadcast?: AdapterStoreBroadcast<T>;
+    /**
+     * Optional capability-injection hook. Runs once at store construction and
+     * receives the same internal mutator tier (`AdapterStoreModule<T>`) the
+     * `adapter` factory and `broadcast.subscribe` already get. Returns an object
+     * of consumer-defined store-level methods that are merged onto the public
+     * surface. The internal `setById` stays unexposed — `extend` is the same
+     * trust model as `adapter`/`broadcast`, generalized: a sanctioned door for
+     * consumer-specific fetches (e.g. fetch-one-by-string-route-binding-key)
+     * without app-specific concepts entering the package.
+     */
+    extend?: (storeModule: AdapterStoreModule<T>) => X;
 };
 
 /** Public API of a store module. */

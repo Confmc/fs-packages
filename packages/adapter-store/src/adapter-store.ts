@@ -10,10 +10,11 @@ export const createAdapterStoreModule = <
     T extends Item,
     E extends Adapted<T, object> = Adapted<T>,
     N extends NewAdapted<T, object> = NewAdapted<T>,
+    X extends object = {},
 >(
-    config: AdapterStoreConfig<T, E, N>,
-): StoreModuleForAdapter<T, E, N> => {
-    const {domainName, adapter, httpService, storageService, loadingService, broadcast} = config;
+    config: AdapterStoreConfig<T, E, N, X>,
+): StoreModuleForAdapter<T, E, N> & X => {
+    const {domainName, adapter, httpService, storageService, loadingService, broadcast, extend} = config;
 
     const storedItems = storageService.get<{[id: number]: T}>(domainName, {});
     const frozenStoredItems = Object.fromEntries(
@@ -87,7 +88,7 @@ export const createAdapterStoreModule = <
         return computedRef;
     };
 
-    return {
+    const base: StoreModuleForAdapter<T, E, N> = {
         getAll: computed(() => Object.values(state.value).map((item) => getAdapted(item))),
         getById,
         getOrFailById: async (id: number) => {
@@ -112,4 +113,7 @@ export const createAdapterStoreModule = <
             getByIdComputedCache.clear();
         },
     };
+
+    const extended = extend ? extend(storeModule) : ({} as X);
+    return {...base, ...extended};
 };

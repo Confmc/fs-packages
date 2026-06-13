@@ -231,6 +231,39 @@ type AdapterStoreBroadcast<T> = {
 
 That's it. Any event source that can emit "updated" and "deleted" events for your resource type can implement this.
 
+## Extending the Store
+
+Some stores need a domain-specific fetch that the built-in surface doesn't cover — for example, retrieving one resource by a string route-binding key rather than its numeric `id`. The `extend` config slot is a capability-injection hook for exactly this: it lets a consumer add its own store-level methods without app-specific concepts leaking into the package and without exposing a raw mutator.
+
+`extend` runs **once at store construction** and receives the same internal `{setById, deleteById}` tier that the `adapter` factory and `broadcast.subscribe` already get. It returns an object of consumer-defined methods, which are merged onto the public store surface. The internal `setById` stays private — the consumer's method closes over it, so callers of the returned method never see it.
+
+```typescript
+const usersStore = createAdapterStoreModule<
+    User,
+    Adapted<User>,
+    NewAdapted<User>,
+    {retrieveBySlug: (slug: string) => Promise<void>}
+>({
+    domainName: 'users',
+    adapter: resourceAdapter,
+    httpService: http,
+    storageService: storage,
+    loadingService: loading,
+    extend: ({setById}) => ({
+        retrieveBySlug: async (slug: string): Promise<void> => {
+            const {data} = await http.getRequest<User>(`users/${slug}`);
+            setById(data);
+        },
+    }),
+});
+
+// The custom method is on the public surface, fully typed — no cast needed
+await usersStore.retrieveBySlug('alice');
+const alice = usersStore.getById(alice.id);
+```
+
+This is the same trust model as `broadcast`, generalized: a single, narrow, construction-time door for feeding data into the store's internal mutation path, kept off the default public surface so it can't be acquired to bypass HTTP by accident.
+
 ## Custom New Types
 
 By default, `generateNew()` creates an object with all fields except `id`. You can customize this with a third type parameter:
@@ -274,14 +307,15 @@ import {
 
 ### `createAdapterStoreModule(config)`
 
-| Parameter               | Type                                            | Description                                                 |
-| ----------------------- | ----------------------------------------------- | ----------------------------------------------------------- |
-| `config.domainName`     | `string`                                        | Resource endpoint name (e.g., `"users"`)                    |
-| `config.adapter`        | `Adapter`                                       | CRUD adapter factory (use `resourceAdapter`)                |
-| `config.httpService`    | `Pick<HttpService, "getRequest">`               | HTTP service for fetching                                   |
-| `config.storageService` | `Pick<StorageService, "get" \| "put">`          | Storage for persistence                                     |
-| `config.loadingService` | `Pick<LoadingService, "ensureLoadingFinished">` | Loading service for sync                                    |
-| `config.broadcast?`     | `AdapterStoreBroadcast<T>`                      | Optional external-event bridge for server-initiated updates |
+| Parameter               | Type                                            | Description                                                                                |
+| ----------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `config.domainName`     | `string`                                        | Resource endpoint name (e.g., `"users"`)                                                   |
+| `config.adapter`        | `Adapter`                                       | CRUD adapter factory (use `resourceAdapter`)                                               |
+| `config.httpService`    | `Pick<HttpService, "getRequest">`               | HTTP service for fetching                                                                  |
+| `config.storageService` | `Pick<StorageService, "get" \| "put">`          | Storage for persistence                                                                    |
+| `config.loadingService` | `Pick<LoadingService, "ensureLoadingFinished">` | Loading service for sync                                                                   |
+| `config.broadcast?`     | `AdapterStoreBroadcast<T>`                      | Optional external-event bridge for server-initiated updates                                |
+| `config.extend?`        | `(storeModule: AdapterStoreModule<T>) => X`     | Optional capability-injection hook; merges consumer-defined methods onto the store surface |
 
 ### Store Module Methods
 

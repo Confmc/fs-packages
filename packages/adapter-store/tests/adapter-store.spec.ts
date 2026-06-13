@@ -1529,4 +1529,94 @@ describe('createAdapterStoreModule', () => {
             expect(storageService.put).toHaveBeenCalledWith('test-items', expect.any(Object));
         });
     });
+
+    describe('extend (capability injection)', () => {
+        it('should call extend exactly once at construction with the internal store module', () => {
+            // Arrange
+            const httpService: Pick<HttpService, 'getRequest'> = {getRequest: vi.fn()};
+            const storageService: TestStorageService = {put: vi.fn(), get: vi.fn().mockReturnValue({})};
+            const loadingService: TestLoadingService = {ensureLoadingFinished: vi.fn().mockResolvedValue(undefined)};
+            let capturedStoreModule: AdapterStoreModule<TestItem> | null = null;
+            const extend = vi.fn((storeModule: AdapterStoreModule<TestItem>) => {
+                capturedStoreModule = storeModule;
+                return {};
+            });
+
+            // Act
+            createAdapterStoreModule<TestItem, TestAdapted, TestNewAdapted, object>({
+                domainName: 'test-items',
+                adapter: createTestAdapter,
+                httpService,
+                storageService,
+                loadingService,
+                extend,
+            });
+
+            // Assert
+            expect(extend).toHaveBeenCalledTimes(1);
+            const arg = capturedStoreModule as unknown as AdapterStoreModule<TestItem>;
+            expect(typeof arg.setById).toBe('function');
+            expect(typeof arg.deleteById).toBe('function');
+        });
+
+        it('should expose the extend-returned methods on the public store, typed', () => {
+            // Arrange
+            const httpService: Pick<HttpService, 'getRequest'> = {getRequest: vi.fn()};
+            const storageService: TestStorageService = {put: vi.fn(), get: vi.fn().mockReturnValue({})};
+            const loadingService: TestLoadingService = {ensureLoadingFinished: vi.fn().mockResolvedValue(undefined)};
+
+            // Act
+            const store = createAdapterStoreModule<TestItem, TestAdapted, TestNewAdapted, {pingCount: () => number}>({
+                domainName: 'test-items',
+                adapter: createTestAdapter,
+                httpService,
+                storageService,
+                loadingService,
+                extend: ({setById: _setById}) => ({pingCount: () => 1}),
+            });
+
+            // Assert — calling without any cast IS the type-safety assertion
+            expect(store.pingCount()).toBe(1);
+        });
+
+        it('should let a custom extend method drive the store via setById', async () => {
+            // Arrange
+            const httpService: Pick<HttpService, 'getRequest'> = {getRequest: vi.fn()};
+            const storageService: TestStorageService = {put: vi.fn(), get: vi.fn().mockReturnValue({})};
+            const loadingService: TestLoadingService = {ensureLoadingFinished: vi.fn().mockResolvedValue(undefined)};
+            vi.mocked(httpService.getRequest).mockResolvedValue({
+                data: {
+                    id: 7,
+                    name: 'By Slug',
+                    createdAt: '2024-01-01T00:00:00Z',
+                    updatedAt: '2024-01-01T00:00:00Z',
+                } satisfies TestItem,
+            } as AxiosResponse<TestItem>);
+            const store = createAdapterStoreModule<
+                TestItem,
+                TestAdapted,
+                TestNewAdapted,
+                {retrieveBySlug: (slug: string) => Promise<void>}
+            >({
+                domainName: 'test-items',
+                adapter: createTestAdapter,
+                httpService,
+                storageService,
+                loadingService,
+                extend: ({setById}) => ({
+                    retrieveBySlug: async (slug: string): Promise<void> => {
+                        const {data} = await httpService.getRequest<TestItem>(`test-items/${slug}`);
+                        setById(data);
+                    },
+                }),
+            });
+
+            // Act
+            await store.retrieveBySlug('KD-7');
+
+            // Assert
+            expect(httpService.getRequest).toHaveBeenCalledWith('test-items/KD-7');
+            expect(store.getById(7).value).toBeDefined();
+        });
+    });
 });
