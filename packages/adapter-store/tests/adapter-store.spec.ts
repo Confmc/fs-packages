@@ -1618,5 +1618,31 @@ describe('createAdapterStoreModule', () => {
             expect(httpService.getRequest).toHaveBeenCalledWith('test-items/KD-7');
             expect(store.getById(7).value).toBeDefined();
         });
+
+        it('rejects an extend method that collides with a built-in store key (compile error)', () => {
+            // Arrange
+            const httpService: Pick<HttpService, 'getRequest'> = {getRequest: vi.fn()};
+            const storageService: TestStorageService = {put: vi.fn(), get: vi.fn().mockReturnValue({})};
+            const loadingService: TestLoadingService = {ensureLoadingFinished: vi.fn().mockResolvedValue(undefined)};
+
+            // Act & Assert — the @ts-expect-error IS the assertion: a colliding extend key must not compile.
+            // The colliding shape is given as the explicit `X` type arg so the constraint is checked against it
+            // (with X left to infer from a 3-arg call it defaults to `{}` and the collision goes unseen).
+            const store = createAdapterStoreModule<
+                TestItem,
+                TestAdapted,
+                TestNewAdapted,
+                // @ts-expect-error — `retrieveAll` collides with a built-in store method; extend keys must be new names
+                {retrieveAll: () => Promise<void>}
+            >({
+                domainName: 'test-items',
+                adapter: createTestAdapter,
+                httpService,
+                storageService,
+                loadingService,
+                extend: () => ({retrieveAll: async (): Promise<void> => {}}),
+            });
+            expect(store).toBeDefined();
+        });
     });
 });

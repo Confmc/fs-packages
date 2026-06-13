@@ -2,7 +2,15 @@ import type {ComputedRef, Ref} from 'vue';
 
 import {computed, ref} from 'vue';
 
-import type {Adapted, AdapterStoreConfig, AdapterStoreModule, Item, NewAdapted, StoreModuleForAdapter} from './types';
+import type {
+    Adapted,
+    AdapterStoreConfig,
+    AdapterStoreModule,
+    ExtendShape,
+    Item,
+    NewAdapted,
+    StoreModuleForAdapter,
+} from './types';
 
 import {BroadcastPayloadError, EntryNotFoundError} from './errors';
 
@@ -10,7 +18,7 @@ export const createAdapterStoreModule = <
     T extends Item,
     E extends Adapted<T, object> = Adapted<T>,
     N extends NewAdapted<T, object> = NewAdapted<T>,
-    X extends object = {},
+    X extends ExtendShape<T, E, N, X> = {},
 >(
     config: AdapterStoreConfig<T, E, N, X>,
 ): StoreModuleForAdapter<T, E, N> & X => {

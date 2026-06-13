@@ -64,12 +64,23 @@ export type AdapterStoreBroadcast<T extends Item> = {
     subscribe: (handlers: {onUpdate: (item: T) => void; onDelete: (id: number) => void}) => () => void;
 };
 
+/**
+ * Constraint for the `extend` return type `X`: allows any NEW store-level method,
+ * but maps any key that collides with a built-in `StoreModuleForAdapter` method to
+ * `never`, so a colliding key fails to satisfy the constraint (compile error).
+ * Unlike `Partial<Record<keyof Store, never>>`, this admits arbitrary new keys —
+ * it only bans the base ones.
+ */
+export type ExtendShape<T extends Item, E extends Adapted<T, object>, N extends NewAdapted<T, object>, X> = {
+    [K in keyof X]: K extends keyof StoreModuleForAdapter<T, E, N> ? never : X[K];
+};
+
 /** Configuration for createAdapterStoreModule. */
 export type AdapterStoreConfig<
     T extends Item,
     E extends Adapted<T, object>,
     N extends NewAdapted<T, object>,
-    X extends object = {},
+    X extends ExtendShape<T, E, N, X> = {},
 > = {
     domainName: string;
     adapter: Adapter<T, E, N>;
@@ -86,6 +97,13 @@ export type AdapterStoreConfig<
      * trust model as `adapter`/`broadcast`, generalized: a sanctioned door for
      * consumer-specific fetches (e.g. fetch-one-by-string-route-binding-key)
      * without app-specific concepts entering the package.
+     *
+     * Returned keys must be NEW names: colliding with a built-in store method
+     * (`getAll`, `getById`, `getOrFailById`, `generateNew`, `retrieveById`,
+     * `retrieveAll`) is a compile error. Unlike `broadcast`, whose handlers never
+     * reach the public surface, `extend`'s output IS the public surface, so a
+     * collision would silently shadow the built-in at runtime — the `X` constraint
+     * forbids it.
      */
     extend?: (storeModule: AdapterStoreModule<T>) => X;
 };
