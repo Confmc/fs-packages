@@ -1,7 +1,7 @@
 import {describe, expect, it} from 'vitest';
 
 // @vitest-environment happy-dom
-import {EntryNotFoundError, MissingResponseDataError} from '../src/errors';
+import {BroadcastPayloadError, EntryNotFoundError, MissingResponseDataError} from '../src/errors';
 
 describe('EntryNotFoundError', () => {
     it('should create error with correct message', () => {
@@ -40,5 +40,38 @@ describe('MissingResponseDataError', () => {
         // Assert
         expect(error).toBeInstanceOf(Error);
         expect(error).toBeInstanceOf(MissingResponseDataError);
+    });
+});
+
+describe('BroadcastPayloadError', () => {
+    it('should describe an invalid onUpdate payload, naming the expected shape and received type', () => {
+        // Act
+        const error = new BroadcastPayloadError('users', 'onUpdate', null);
+
+        // Assert
+        expect(error.message).toBe(
+            'users broadcast onUpdate received an invalid payload — expected an object with a numeric `id`, got object. The store rejects it rather than corrupting state.',
+        );
+        expect(error.name).toBe('BroadcastPayloadError');
+    });
+
+    it('should describe an invalid onDelete payload, naming the expected shape and received type', () => {
+        // Act
+        const error = new BroadcastPayloadError('users', 'onDelete', 'KD-7');
+
+        // Assert
+        expect(error.message).toBe(
+            'users broadcast onDelete received an invalid payload — expected a numeric id, got string. The store rejects it rather than corrupting state.',
+        );
+        expect(error.name).toBe('BroadcastPayloadError');
+    });
+
+    it('should be an instance of Error', () => {
+        // Act
+        const error = new BroadcastPayloadError('items', 'onUpdate', undefined);
+
+        // Assert
+        expect(error).toBeInstanceOf(Error);
+        expect(error).toBeInstanceOf(BroadcastPayloadError);
     });
 });

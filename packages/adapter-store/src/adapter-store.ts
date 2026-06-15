@@ -4,7 +4,7 @@ import {computed, ref} from 'vue';
 
 import type {Adapted, AdapterStoreConfig, AdapterStoreModule, Item, NewAdapted, StoreModuleForAdapter} from './types';
 
-import {EntryNotFoundError} from './errors';
+import {BroadcastPayloadError, EntryNotFoundError} from './errors';
 
 export const createAdapterStoreModule = <
     T extends Item,
@@ -52,7 +52,27 @@ export const createAdapterStoreModule = <
 
     const storeModule: AdapterStoreModule<T> = {setById, deleteById};
 
-    broadcast?.subscribe({onUpdate: setById, onDelete: deleteById});
+    // Broadcast payloads arrive from an external channel (e.g. a WebSocket) and are
+    // applied to the store without an HTTP round-trip — that non-HTTP path is the
+    // feature. The trade-off is that unvalidated data would land straight in frozen
+    // state, so a malformed payload (missing/non-numeric id, non-object) would
+    // silently corrupt the store. The handlers passed to the consumer's `subscribe`
+    // are therefore validating wrappers, not the bare internal mutators: they reject
+    // a bad payload up front, and the raw `setById`/`deleteById` never leave the factory.
+    broadcast?.subscribe({
+        onUpdate: (item) => {
+            if (typeof item !== 'object' || item === null || typeof (item as {id?: unknown}).id !== 'number') {
+                throw new BroadcastPayloadError(domainName, 'onUpdate', item);
+            }
+            setById(item);
+        },
+        onDelete: (id) => {
+            if (typeof id !== 'number') {
+                throw new BroadcastPayloadError(domainName, 'onDelete', id);
+            }
+            deleteById(id);
+        },
+    });
 
     const getById = (id: number): ComputedRef<E | undefined> => {
         const cached = getByIdComputedCache.get(id);
