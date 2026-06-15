@@ -2,18 +2,28 @@ import type {ComputedRef, Ref} from 'vue';
 
 import {computed, ref} from 'vue';
 
-import type {Adapted, AdapterStoreConfig, AdapterStoreModule, Item, NewAdapted, StoreModuleForAdapter} from './types';
+import type {
+    Adapted,
+    AdapterStoreConfig,
+    AdapterStoreModule,
+    ExtendCapabilities,
+    ExtendShape,
+    Item,
+    NewAdapted,
+    StoreModuleForAdapter,
+} from './types';
 
-import {BroadcastPayloadError, EntryNotFoundError} from './errors';
+import {BroadcastPayloadError, EntryNotFoundError, ExtendKeyCollisionError, ExtendPayloadError} from './errors';
 
 export const createAdapterStoreModule = <
     T extends Item,
     E extends Adapted<T, object> = Adapted<T>,
     N extends NewAdapted<T, object> = NewAdapted<T>,
+    X extends ExtendShape<T, E, N, X> = {},
 >(
-    config: AdapterStoreConfig<T, E, N>,
-): StoreModuleForAdapter<T, E, N> => {
-    const {domainName, adapter, httpService, storageService, loadingService, broadcast} = config;
+    config: AdapterStoreConfig<T, E, N, X>,
+): StoreModuleForAdapter<T, E, N> & X => {
+    const {domainName, adapter, httpService, storageService, loadingService, broadcast, extend} = config;
 
     const storedItems = storageService.get<{[id: number]: T}>(domainName, {});
     const frozenStoredItems = Object.fromEntries(
@@ -34,6 +44,15 @@ export const createAdapterStoreModule = <
         adaptedCache.set(item.id, adapted);
         return adapted;
     };
+
+    // A value is storable only if it is an object with an integer `id`. The id must be
+    // an integer, not merely `typeof === 'number'` — `NaN` / `Infinity` / a non-integer
+    // float pass a typeof check yet corrupt the keyspace (`state.value[NaN]` stringifies
+    // to `"NaN"`, and `deleteById` could never match it since `Number("NaN") !== NaN`).
+    // Shared by every validating ingest boundary (`broadcast`'s handlers and `extend`'s
+    // `retrieveInto`), so the raw mutators below never leave the factory.
+    const isStorableItem = (item: unknown): item is T =>
+        typeof item === 'object' && item !== null && Number.isInteger((item as {id?: unknown}).id);
 
     const setById = (item: T): void => {
         state.value = {...state.value, [item.id]: Object.freeze(item)};
@@ -58,13 +77,10 @@ export const createAdapterStoreModule = <
     // state, so a malformed payload would silently corrupt the store. The handlers
     // passed to the consumer's `subscribe` are therefore validating wrappers, not the
     // bare internal mutators: they reject a bad payload up front, and the raw
-    // `setById`/`deleteById` never leave the factory. The id must be an integer, not
-    // merely `typeof === 'number'` — `NaN` / `Infinity` / a non-integer float would
-    // pass a typeof check yet corrupt the keyspace (`state.value[NaN]` stringifies to
-    // `"NaN"`, and `deleteById` could never match it since `Number("NaN") !== NaN`).
+    // `setById`/`deleteById` never leave the factory.
     broadcast?.subscribe({
         onUpdate: (item) => {
-            if (typeof item !== 'object' || item === null || !Number.isInteger((item as {id?: unknown}).id)) {
+            if (!isStorableItem(item)) {
                 throw new BroadcastPayloadError(domainName, 'onUpdate', item);
             }
             setById(item);
@@ -87,7 +103,7 @@ export const createAdapterStoreModule = <
         return computedRef;
     };
 
-    return {
+    const base: StoreModuleForAdapter<T, E, N> = {
         getAll: computed(() => Object.values(state.value).map((item) => getAdapted(item))),
         getById,
         getOrFailById: async (id: number) => {
@@ -112,4 +128,34 @@ export const createAdapterStoreModule = <
             getByIdComputedCache.clear();
         },
     };
+
+    // `extend` runs at construction and its return value becomes part of the public
+    // store surface. It is handed a response-backed ingest primitive — never the raw
+    // mutators — so a non-HTTP write path (`extend: (cap) => ({save: cap.setById})`, or
+    // a wrapper around it) is structurally unexpressible, not merely guarded. The only
+    // way data enters the store through `extend` is an HTTP response, validated before
+    // it touches state. `setById`/`deleteById` never leave the factory through this door.
+    const retrieveInto = async (
+        endpoint: string,
+        options?: Parameters<typeof httpService.getRequest>[1],
+    ): Promise<void> => {
+        const {data} = await httpService.getRequest<T | T[]>(endpoint, options);
+        const items = Array.isArray(data) ? data : [data];
+        for (const item of items) {
+            if (!isStorableItem(item)) {
+                throw new ExtendPayloadError(domainName, endpoint, item);
+            }
+            setById(item);
+        }
+    };
+
+    const extendCapabilities: ExtendCapabilities = {retrieveInto};
+    const extended = extend ? extend(extendCapabilities) : ({} as X);
+    const baseKeys = new Set(Object.keys(base));
+    for (const key of Object.keys(extended)) {
+        if (baseKeys.has(key)) {
+            throw new ExtendKeyCollisionError(key);
+        }
+    }
+    return {...base, ...extended};
 };

@@ -64,14 +64,81 @@ export type AdapterStoreBroadcast<T extends Item> = {
     subscribe: (handlers: {onUpdate: (item: T) => void; onDelete: (id: number) => void}) => () => void;
 };
 
+/**
+ * The capability surface handed to the `extend` hook. The only way data enters the
+ * store through `extend` is an HTTP response: `retrieveInto` GETs an endpoint and
+ * upserts the validated response item(s) via the internal mutators. The raw
+ * `setById`/`deleteById` are deliberately absent, so re-exporting a non-HTTP write
+ * path is structurally impossible rather than guarded against. `extend` still closes
+ * over the consumer's whole module scope, so custom endpoints, derived methods, and
+ * cross-store coordination all stay expressible — only "write state with no server
+ * response behind it" is removed, which is exactly the abuse.
+ */
+export type ExtendCapabilities = {
+    /**
+     * GET `endpoint` and upsert the response into the store — a single item or an
+     * array of items. Each must be an object with an integer `id`, or
+     * `ExtendPayloadError` is thrown (a malformed backend response cannot corrupt the
+     * keyspace). `options` is forwarded to the underlying `getRequest`. This is the
+     * sole ingest path for `extend`.
+     */
+    retrieveInto: (endpoint: string, options?: Parameters<HttpService['getRequest']>[1]) => Promise<void>;
+};
+
+/**
+ * Constraint for the `extend` return type `X`: allows any NEW store-level method,
+ * but maps any key that collides with a built-in `StoreModuleForAdapter` method to
+ * `never`, so a colliding key fails to satisfy the constraint (compile error).
+ * Unlike `Partial<Record<keyof Store, never>>`, this admits arbitrary new keys —
+ * it only bans the base ones.
+ */
+export type ExtendShape<T extends Item, E extends Adapted<T, object>, N extends NewAdapted<T, object>, X> = {
+    [K in keyof X]: K extends keyof StoreModuleForAdapter<T, E, N> ? never : X[K];
+};
+
 /** Configuration for createAdapterStoreModule. */
-export type AdapterStoreConfig<T extends Item, E extends Adapted<T, object>, N extends NewAdapted<T, object>> = {
+export type AdapterStoreConfig<
+    T extends Item,
+    E extends Adapted<T, object>,
+    N extends NewAdapted<T, object>,
+    X extends ExtendShape<T, E, N, X> = {},
+> = {
     domainName: string;
     adapter: Adapter<T, E, N>;
     httpService: Pick<HttpService, 'getRequest'>;
     storageService: Pick<StorageService, 'get' | 'put'>;
     loadingService: Pick<LoadingService, 'ensureLoadingFinished'>;
     broadcast?: AdapterStoreBroadcast<T>;
+    /**
+     * Optional capability-injection hook. Runs once at store construction and
+     * receives an {@link ExtendCapabilities} surface — **not** the raw mutator tier.
+     * Returns an object of consumer-defined store-level methods that are merged onto
+     * the public store surface — a sanctioned home for consumer-specific fetches (e.g.
+     * fetch-one-by-string-route-binding-key) without app-specific concepts entering the
+     * package.
+     *
+     * Trust model. The only ingest path `extend` is given is `retrieveInto`, which
+     * performs an HTTP GET and upserts the (validated) response. The raw
+     * `setById`/`deleteById` are deliberately **not** handed in — so a non-HTTP write
+     * path (`extend: (cap) => ({save: cap.setById})`, or a `(item) => cap.setById(item)`
+     * wrapper around it) is **structurally unexpressible**, not merely guarded against.
+     * Unlike `broadcast` — a *closed* contract whose non-HTTP write path is irreducible
+     * (it is the feature) and so can only be validated — `extend`'s leak can be designed
+     * out, and is. Every extend-driven write stays on the HTTP path, where consumer
+     * territories put authz/audit.
+     *
+     * Returned keys must be NEW names. A key that collides with a built-in store
+     * method (`getAll`, `getById`, `getOrFailById`, `generateNew`, `retrieveById`,
+     * `retrieveAll`) **throws `ExtendKeyCollisionError` at construction** — on every
+     * call form. It is *additionally* a compile error when the extend return type
+     * `X` is supplied or inferred (e.g. as the 4th type argument), which is the form
+     * you use to make the extended methods callable.
+     *
+     * Forward-compat: this guard keys on the *current* built-in set. Adding a built-in
+     * in a future release collides with any extend method already shipping that name —
+     * so a new built-in is a breaking change for extend-consumers.
+     */
+    extend?: (cap: ExtendCapabilities) => X;
 };
 
 /** Public API of a store module. */

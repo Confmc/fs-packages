@@ -21,3 +21,21 @@ export class BroadcastPayloadError extends Error {
         this.name = 'BroadcastPayloadError';
     }
 }
+
+export class ExtendKeyCollisionError extends Error {
+    constructor(key: string) {
+        super(
+            `extend() returned the key "${key}", which collides with a built-in store method. extend keys must be new names.`,
+        );
+        this.name = 'ExtendKeyCollisionError';
+    }
+}
+
+export class ExtendPayloadError extends Error {
+    constructor(domainName: string, endpoint: string, received: unknown) {
+        super(
+            `${domainName} extend retrieveInto(${endpoint}) received an invalid item — expected an object with an integer \`id\`, got ${typeof received}. The store rejects it rather than corrupting state.`,
+        );
+        this.name = 'ExtendPayloadError';
+    }
+}
