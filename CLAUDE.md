@@ -117,6 +117,7 @@ To add a rule, set it in the `rules` object (e.g. `"perf/no-accumulating-spread"
 3. Use `defineProject` from `vitest/config` in the vitest config
 4. Add 100% coverage threshold and 90% mutation threshold
 5. Bump version in the new package's `package.json` (manual — no changeset `.md` files)
+6. **Wire the Trusted Publisher on npmjs.org BEFORE the first CI publish — mandatory, not optional.** `publish.yml` authenticates purely by OIDC (no stored token), so the npm package must carry a Trusted Publisher grant (GitHub Actions · org `script-development` · repo `fs-packages` · workflow `publish.yml` · environment `npm-publish`) or every CI publish 404s. This holds **even if you manually bootstrapped `0.1.0` with a temp token** — a manual bootstrap creates the package but *not* the TP grant, leaving it permanently stuck at the bootstrap version with every later CI bump failing `E404 PUT … Not found`. The 404 is npm masking "no publish permission" as not-found; it is **not** a transient CI bug and will not self-heal on re-run. Copy the TP config from a known-good package (e.g. `fs-loading`). Two-time recurrence (`fs-cached-adapter-store` 2026-05-27; `fs-theme`/`fs-translation` 2026-06-15). See spy memory `npm-oidc-first-publish-bootstrap`.
 
 ## War Room ADR Projections
 
