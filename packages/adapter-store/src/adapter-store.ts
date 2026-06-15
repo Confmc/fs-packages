@@ -44,6 +44,15 @@ export const createAdapterStoreModule = <
         return adapted;
     };
 
+    // A value is storable only if it is an object with an integer `id`. The id must be
+    // an integer, not merely `typeof === 'number'` — `NaN` / `Infinity` / a non-integer
+    // float pass a typeof check yet corrupt the keyspace (`state.value[NaN]` stringifies
+    // to `"NaN"`, and `deleteById` could never match it since `Number("NaN") !== NaN`).
+    // Shared by every validating boundary that hands a mutator to consumer-authored code
+    // (`broadcast`, `extend`), so the raw mutators below never leave the factory.
+    const isStorableItem = (item: unknown): item is T =>
+        typeof item === 'object' && item !== null && Number.isInteger((item as {id?: unknown}).id);
+
     const setById = (item: T): void => {
         state.value = {...state.value, [item.id]: Object.freeze(item)};
         storageService.put(domainName, state.value);
@@ -67,13 +76,10 @@ export const createAdapterStoreModule = <
     // state, so a malformed payload would silently corrupt the store. The handlers
     // passed to the consumer's `subscribe` are therefore validating wrappers, not the
     // bare internal mutators: they reject a bad payload up front, and the raw
-    // `setById`/`deleteById` never leave the factory. The id must be an integer, not
-    // merely `typeof === 'number'` — `NaN` / `Infinity` / a non-integer float would
-    // pass a typeof check yet corrupt the keyspace (`state.value[NaN]` stringifies to
-    // `"NaN"`, and `deleteById` could never match it since `Number("NaN") !== NaN`).
+    // `setById`/`deleteById` never leave the factory.
     broadcast?.subscribe({
         onUpdate: (item) => {
-            if (typeof item !== 'object' || item === null || !Number.isInteger((item as {id?: unknown}).id)) {
+            if (!isStorableItem(item)) {
                 throw new BroadcastPayloadError(domainName, 'onUpdate', item);
             }
             setById(item);
@@ -122,7 +128,28 @@ export const createAdapterStoreModule = <
         },
     };
 
-    const extended = extend ? extend(storeModule) : ({} as X);
+    // `extend` runs at construction and its return value becomes part of the public
+    // store surface, so — like `broadcast` — it gets validating wrappers, not the raw
+    // mutators. A consumer's extend method (e.g. `retrieveBySlug`) calls `setById` with
+    // an HTTP-fetched item; the wrapper rejects a malformed payload (throwing
+    // `ExtendPayloadError`) rather than letting it corrupt the keyspace. The raw
+    // `setById`/`deleteById` never leave the factory through this door.
+    const extendStoreModule: AdapterStoreModule<T> = {
+        setById: (item) => {
+            if (!isStorableItem(item)) {
+                throw new ExtendPayloadError(domainName, 'setById', item);
+            }
+            setById(item);
+        },
+        deleteById: (id) => {
+            if (!Number.isInteger(id)) {
+                throw new ExtendPayloadError(domainName, 'deleteById', id);
+            }
+            deleteById(id);
+        },
+    };
+
+    const extended = extend ? extend(extendStoreModule) : ({} as X);
     const baseKeys = new Set(Object.keys(base));
     for (const key of Object.keys(extended)) {
         if (baseKeys.has(key)) {

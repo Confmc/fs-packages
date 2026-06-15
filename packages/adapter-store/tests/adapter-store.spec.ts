@@ -972,6 +972,7 @@ describe('createAdapterStoreModule', () => {
 
             // Act & Assert
             expect(() => getHandlers().onUpdate(payload as unknown as TestItem)).toThrow(BroadcastPayloadError);
+            expect(() => getHandlers().onUpdate(payload as unknown as TestItem)).toThrow('onUpdate');
             expect(storageService.put).not.toHaveBeenCalled();
             expect(store.getAll.value).toEqual([]);
         });
@@ -1025,6 +1026,7 @@ describe('createAdapterStoreModule', () => {
 
             // Act & Assert
             expect(() => getHandlers().onDelete(id as unknown as number)).toThrow(BroadcastPayloadError);
+            expect(() => getHandlers().onDelete(id as unknown as number)).toThrow('onDelete');
             expect(storageService.put).not.toHaveBeenCalled();
         });
 
@@ -1531,7 +1533,7 @@ describe('createAdapterStoreModule', () => {
     });
 
     describe('extend (capability injection)', () => {
-        it('should call extend exactly once at construction with the internal store module', () => {
+        it('should hand the extend hook the validating mutator tier once at construction', () => {
             // Arrange
             const httpService: Pick<HttpService, 'getRequest'> = {getRequest: vi.fn()};
             const storageService: TestStorageService = {put: vi.fn(), get: vi.fn().mockReturnValue({})};
@@ -1617,6 +1619,84 @@ describe('createAdapterStoreModule', () => {
             // Assert
             expect(httpService.getRequest).toHaveBeenCalledWith('test-items/KD-7');
             expect(store.getById(7).value).toBeDefined();
+        });
+
+        const makeStoreWithRawExtend = () => {
+            const httpService: Pick<HttpService, 'getRequest'> = {getRequest: vi.fn()};
+            const storageService: TestStorageService = {put: vi.fn(), get: vi.fn().mockReturnValue({})};
+            const loadingService: TestLoadingService = {ensureLoadingFinished: vi.fn().mockResolvedValue(undefined)};
+            return createAdapterStoreModule<
+                TestItem,
+                TestAdapted,
+                TestNewAdapted,
+                {pushRaw: (item: unknown) => void; removeRaw: (id: unknown) => void}
+            >({
+                domainName: 'test-items',
+                adapter: createTestAdapter,
+                httpService,
+                storageService,
+                loadingService,
+                extend: ({setById, deleteById}) => ({
+                    pushRaw: (item: unknown) => setById(item as TestItem),
+                    removeRaw: (id: unknown) => deleteById(id as number),
+                }),
+            });
+        };
+
+        it.each([
+            ['a non-object', 'not-an-object'],
+            ['null', null],
+            ['undefined', undefined],
+            ['an object without an id', {name: 'x'}],
+            ['a non-numeric id', {id: 'KD-7'}],
+            ['a NaN id', {id: Number.NaN}],
+            ['a non-integer id', {id: 1.5}],
+        ])('rejects setById via extend when the payload is %s, without corrupting state', (_label, payload) => {
+            // Arrange
+            const store = makeStoreWithRawExtend();
+
+            // Act & Assert
+            expect(() => store.pushRaw(payload)).toThrow(ExtendPayloadError);
+            expect(() => store.pushRaw(payload)).toThrow('setById');
+            expect(store.getAll.value).toEqual([]);
+        });
+
+        it.each([
+            ['a non-numeric id', 'KD-7'],
+            ['a NaN id', Number.NaN],
+            ['a non-integer id', 1.5],
+            ['undefined', undefined],
+        ])('rejects deleteById via extend when the id is %s', (_label, id) => {
+            // Arrange
+            const store = makeStoreWithRawExtend();
+
+            // Act & Assert
+            expect(() => store.removeRaw(id)).toThrow(ExtendPayloadError);
+            expect(() => store.removeRaw(id)).toThrow('deleteById');
+        });
+
+        it('passes a well-formed payload through the extend setById wrapper into state', () => {
+            // Arrange
+            const store = makeStoreWithRawExtend();
+
+            // Act
+            store.pushRaw({id: 3, name: 'Valid', createdAt: '2024-01-01T00:00:00Z', updatedAt: '2024-01-01T00:00:00Z'});
+
+            // Assert
+            expect(store.getById(3).value?.name).toBe('Valid');
+        });
+
+        it('passes a valid integer id through the extend deleteById wrapper, removing the entry', () => {
+            // Arrange
+            const store = makeStoreWithRawExtend();
+            store.pushRaw({id: 3, name: 'Valid', createdAt: '2024-01-01T00:00:00Z', updatedAt: '2024-01-01T00:00:00Z'});
+            expect(store.getById(3).value).toBeDefined();
+
+            // Act
+            store.removeRaw(3);
+
+            // Assert
+            expect(store.getById(3).value).toBeUndefined();
         });
 
         it('rejects an extend method that collides with a built-in store key (compile error)', () => {

@@ -97,17 +97,21 @@ export type AdapterStoreConfig<
      * fetch-one-by-string-route-binding-key) without app-specific concepts
      * entering the package.
      *
-     * Trust model — note the asymmetry with `broadcast`. All three hooks
-     * (`adapter`, `broadcast`, `extend`) are handed the raw `setById`/`deleteById`
-     * tier at construction. `broadcast` is a *closed* contract: its handlers are
-     * consumed internally and never reach the public surface. `extend` is *open*:
-     * its return value IS the public surface. An extend method that re-exports a raw
-     * mutator under a new name (`extend: ({setById}) => ({save: setById})`) therefore
-     * publishes the bare setter on the store's public API, letting any caller write
-     * state with no HTTP round-trip. The collision guard below blocks built-in *name*
-     * collisions only — not a renamed re-export — so keeping the mutator unexposed is
-     * the consumer's responsibility. Use `extend` to *wrap* an HTTP fetch and then
-     * call `setById` (as `retrieveBySlug` does), not to surface the setter itself.
+     * Trust model. `extend` — like `broadcast` — receives **validating wrappers**, not
+     * the raw mutators. Only `adapter` (the trusted, package-internal factory) gets the
+     * bare `setById`/`deleteById`. The wrappers reject a malformed payload (`setById`
+     * requires an object with an integer `id`; `deleteById` an integer id), throwing
+     * `ExtendPayloadError` so a bad write cannot corrupt the keyspace — and the raw
+     * mutators never leave the factory through this door.
+     *
+     * Note the residual asymmetry with `broadcast`, though: `broadcast` is a *closed*
+     * contract (its handlers are consumed internally, never returned), whereas
+     * `extend`'s return value IS the public surface. A consumer can still re-export a
+     * wrapper under a new name (`extend: ({setById}) => ({save: setById})`) and publish
+     * a non-HTTP write path for *well-formed* data — validation stops corruption, not
+     * deliberate re-export. The collision guard below blocks built-in *name* collisions
+     * only, not a renamed re-export. Use `extend` to *wrap* an HTTP fetch and then call
+     * `setById` (as `retrieveBySlug` does), not to surface the setter itself.
      *
      * Returned keys must be NEW names. A key that collides with a built-in store
      * method (`getAll`, `getById`, `getOrFailById`, `generateNew`, `retrieveById`,
