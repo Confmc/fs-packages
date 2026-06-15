@@ -262,9 +262,11 @@ await usersStore.retrieveBySlug('alice');
 const alice = usersStore.getById(alice.id);
 ```
 
-This is the same trust model as `broadcast`, generalized: a single, narrow, construction-time door for feeding data into the store's internal mutation path, kept off the default public surface so it can't be acquired to bypass HTTP by accident.
+`extend` is handed the same `{setById, deleteById}` tier as `adapter` and `broadcast` — but note the asymmetry. `broadcast` is a **closed** contract: its handlers are consumed internally and never reach the public surface. `extend` is **open**: its return value _is_ the public surface. Re-exporting a raw mutator under a new name (`extend: ({setById}) => ({save: setById})`) therefore publishes the bare setter on the store's public API, letting any caller write state without an HTTP round-trip. The collision guard below blocks built-in _name_ collisions only — not a renamed re-export — so keeping the mutator unexposed is the consumer's responsibility. Use `extend` to **wrap** a fetch and then `setById` (as `retrieveBySlug` does above), not to surface the setter itself.
 
 **Returned keys must be new names.** A key that collides with a built-in store method (`getAll`, `getById`, `getOrFailById`, `generateNew`, `retrieveById`, `retrieveAll`) **throws `ExtendKeyCollisionError` at construction** — always, on every call form. It is _additionally_ a compile error when you pass the extend shape as the fourth type argument (as in the example above) — which is the form you use to make the extended methods callable. Passing the type argument therefore gives you both the editor-time guarantee and a callable method; the runtime guard is the backstop that holds even on a bare `<T, E, N>` call where the extend shape is left to default.
+
+The guard keys on the _current_ built-in set, so it carries a forward-compat consequence: adding a built-in method in a future release will collide with any `extend` method already shipping that name — i.e. a new built-in is a breaking change for extend-consumers. Worth keeping in mind when naming extend methods (and when evolving the built-in surface).
 
 ## Custom New Types
 

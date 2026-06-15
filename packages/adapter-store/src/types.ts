@@ -93,19 +93,32 @@ export type AdapterStoreConfig<
      * receives the same internal mutator tier (`AdapterStoreModule<T>`) the
      * `adapter` factory and `broadcast.subscribe` already get. Returns an object
      * of consumer-defined store-level methods that are merged onto the public
-     * surface. The internal `setById` stays unexposed — `extend` is the same
-     * trust model as `adapter`/`broadcast`, generalized: a sanctioned door for
-     * consumer-specific fetches (e.g. fetch-one-by-string-route-binding-key)
-     * without app-specific concepts entering the package.
+     * surface — a sanctioned door for consumer-specific fetches (e.g.
+     * fetch-one-by-string-route-binding-key) without app-specific concepts
+     * entering the package.
+     *
+     * Trust model — note the asymmetry with `broadcast`. All three hooks
+     * (`adapter`, `broadcast`, `extend`) are handed the raw `setById`/`deleteById`
+     * tier at construction. `broadcast` is a *closed* contract: its handlers are
+     * consumed internally and never reach the public surface. `extend` is *open*:
+     * its return value IS the public surface. An extend method that re-exports a raw
+     * mutator under a new name (`extend: ({setById}) => ({save: setById})`) therefore
+     * publishes the bare setter on the store's public API, letting any caller write
+     * state with no HTTP round-trip. The collision guard below blocks built-in *name*
+     * collisions only — not a renamed re-export — so keeping the mutator unexposed is
+     * the consumer's responsibility. Use `extend` to *wrap* an HTTP fetch and then
+     * call `setById` (as `retrieveBySlug` does), not to surface the setter itself.
      *
      * Returned keys must be NEW names. A key that collides with a built-in store
      * method (`getAll`, `getById`, `getOrFailById`, `generateNew`, `retrieveById`,
      * `retrieveAll`) **throws `ExtendKeyCollisionError` at construction** — on every
      * call form. It is *additionally* a compile error when the extend return type
      * `X` is supplied or inferred (e.g. as the 4th type argument), which is the form
-     * you use to make the extended methods callable. Unlike `broadcast`, whose
-     * handlers never reach the public surface, `extend`'s output IS the public
-     * surface, so a collision would otherwise silently shadow the built-in.
+     * you use to make the extended methods callable.
+     *
+     * Forward-compat: this guard keys on the *current* built-in set. Adding a built-in
+     * in a future release collides with any extend method already shipping that name —
+     * so a new built-in is a breaking change for extend-consumers.
      */
     extend?: (storeModule: AdapterStoreModule<T>) => X;
 };
