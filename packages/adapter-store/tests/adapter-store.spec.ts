@@ -952,7 +952,9 @@ describe('createAdapterStoreModule', () => {
             ['a non-object payload', 'not-an-object'],
             ['an undefined payload', undefined],
             ['a null payload', null],
-            ['an object without a numeric id', {id: 'KD-7', name: 'Bad'}],
+            ['an object with a non-numeric id', {id: 'KD-7', name: 'Bad'}],
+            ['an object with a NaN id', {id: NaN, name: 'Bad'}],
+            ['an object with a non-integer id', {id: 1.5, name: 'Bad'}],
         ])('should reject onUpdate given %s without corrupting state', (_label, payload) => {
             // Arrange
             const httpService: Pick<HttpService, 'getRequest'> = {getRequest: vi.fn()};
@@ -1002,7 +1004,11 @@ describe('createAdapterStoreModule', () => {
             expect(storageService.put).toHaveBeenCalled();
         });
 
-        it('should reject onDelete given a non-numeric id without corrupting state', () => {
+        it.each([
+            ['a non-numeric id', 'KD-7'],
+            ['a NaN id', NaN],
+            ['a non-integer id', 1.5],
+        ])('should reject onDelete given %s without corrupting state', (_label, id) => {
             // Arrange
             const httpService: Pick<HttpService, 'getRequest'> = {getRequest: vi.fn()};
             const storageService: TestStorageService = {put: vi.fn(), get: vi.fn().mockReturnValue({})};
@@ -1018,7 +1024,7 @@ describe('createAdapterStoreModule', () => {
             });
 
             // Act & Assert
-            expect(() => getHandlers().onDelete('KD-7' as unknown as number)).toThrow(BroadcastPayloadError);
+            expect(() => getHandlers().onDelete(id as unknown as number)).toThrow(BroadcastPayloadError);
             expect(storageService.put).not.toHaveBeenCalled();
         });
 

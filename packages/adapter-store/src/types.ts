@@ -52,9 +52,11 @@ export type Adapter<T extends Item, E extends Adapted<T, object>, N extends NewA
  * `subscribe` body (wired to an event source) and are never returned, so they do
  * not reach the public store surface. The handlers the store passes are validating
  * wrappers, not the bare internal mutators — `onUpdate` rejects a payload that is
- * not an object with a numeric `id`, and `onDelete` rejects a non-numeric id, each
+ * not an object with an integer `id`, and `onDelete` rejects a non-integer id, each
  * throwing `BroadcastPayloadError` so a malformed broadcast cannot corrupt store
- * state. Because the channel applies events without an HTTP round-trip, do not
+ * state (`NaN` / `Infinity` / a non-integer float pass a `typeof === 'number'` check
+ * yet break the keyspace, so the guard requires an integer). Because the channel
+ * applies events without an HTTP round-trip, do not
  * re-export the handlers onto your own public surface — that would publish a
  * non-HTTP write path for arbitrary callers.
  */

@@ -50,7 +50,7 @@ describe('BroadcastPayloadError', () => {
 
         // Assert
         expect(error.message).toBe(
-            'users broadcast onUpdate received an invalid payload — expected an object with a numeric `id`, got object. The store rejects it rather than corrupting state.',
+            'users broadcast onUpdate received an invalid payload — expected an object with an integer `id`, got object. The store rejects it rather than corrupting state.',
         );
         expect(error.name).toBe('BroadcastPayloadError');
     });
@@ -61,7 +61,7 @@ describe('BroadcastPayloadError', () => {
 
         // Assert
         expect(error.message).toBe(
-            'users broadcast onDelete received an invalid payload — expected a numeric id, got string. The store rejects it rather than corrupting state.',
+            'users broadcast onDelete received an invalid payload — expected an integer id, got string. The store rejects it rather than corrupting state.',
         );
         expect(error.name).toBe('BroadcastPayloadError');
     });

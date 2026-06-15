@@ -213,7 +213,7 @@ The store calls `subscribe` exactly once at construction and wires the handlers 
 By design. Exposing a raw mutation method would let any caller bypass HTTP, which is almost always a bug (you'd end up with stale server state). The `broadcast` contract forces the bridge to be declared explicitly at store construction, scoped to one event source per store.
 :::
 
-The handlers the store passes to your `subscribe` are **validating wrappers**, not the raw internal mutators. Because broadcast payloads come from an external channel and are applied without an HTTP round-trip, they are checked before they touch state: `onUpdate` requires an object with a numeric `id`, `onDelete` requires a numeric id. A payload that fails throws [`BroadcastPayloadError`](#error-handling) rather than corrupting the store. The raw mutators never leave the factory — and since this is a closed contract, don't re-export the handlers onto your own public surface, which would publish a non-HTTP write path for arbitrary callers.
+The handlers the store passes to your `subscribe` are **validating wrappers**, not the raw internal mutators. Because broadcast payloads come from an external channel and are applied without an HTTP round-trip, they are checked before they touch state: `onUpdate` requires an object with an integer `id`, `onDelete` requires an integer id (`NaN` / `Infinity` / non-integer floats are rejected — they pass a `typeof === 'number'` check but corrupt the keyspace). A payload that fails throws [`BroadcastPayloadError`](#error-handling) rather than corrupting the store. The raw mutators never leave the factory — and since this is a closed contract, don't re-export the handlers onto your own public surface, which would publish a non-HTTP write path for arbitrary callers.
 
 ### Lifecycle
 
@@ -268,7 +268,7 @@ import {
 
 - **`EntryNotFoundError`** — thrown by `getOrFailById` when the resource doesn't exist in the store
 - **`MissingResponseDataError`** — thrown when a CRUD response doesn't contain a `data` field
-- **`BroadcastPayloadError`** — thrown by a `broadcast` handler when the incoming payload is malformed (`onUpdate` not given an object with a numeric `id`, or `onDelete` given a non-numeric id)
+- **`BroadcastPayloadError`** — thrown by a `broadcast` handler when the incoming payload is malformed (`onUpdate` not given an object with an integer `id`, or `onDelete` given a non-integer id)
 
 ## API Reference
 

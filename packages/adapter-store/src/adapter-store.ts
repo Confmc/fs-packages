@@ -55,19 +55,22 @@ export const createAdapterStoreModule = <
     // Broadcast payloads arrive from an external channel (e.g. a WebSocket) and are
     // applied to the store without an HTTP round-trip — that non-HTTP path is the
     // feature. The trade-off is that unvalidated data would land straight in frozen
-    // state, so a malformed payload (missing/non-numeric id, non-object) would
-    // silently corrupt the store. The handlers passed to the consumer's `subscribe`
-    // are therefore validating wrappers, not the bare internal mutators: they reject
-    // a bad payload up front, and the raw `setById`/`deleteById` never leave the factory.
+    // state, so a malformed payload would silently corrupt the store. The handlers
+    // passed to the consumer's `subscribe` are therefore validating wrappers, not the
+    // bare internal mutators: they reject a bad payload up front, and the raw
+    // `setById`/`deleteById` never leave the factory. The id must be an integer, not
+    // merely `typeof === 'number'` — `NaN` / `Infinity` / a non-integer float would
+    // pass a typeof check yet corrupt the keyspace (`state.value[NaN]` stringifies to
+    // `"NaN"`, and `deleteById` could never match it since `Number("NaN") !== NaN`).
     broadcast?.subscribe({
         onUpdate: (item) => {
-            if (typeof item !== 'object' || item === null || typeof (item as {id?: unknown}).id !== 'number') {
+            if (typeof item !== 'object' || item === null || !Number.isInteger((item as {id?: unknown}).id)) {
                 throw new BroadcastPayloadError(domainName, 'onUpdate', item);
             }
             setById(item);
         },
         onDelete: (id) => {
-            if (typeof id !== 'number') {
+            if (!Number.isInteger(id)) {
                 throw new BroadcastPayloadError(domainName, 'onDelete', id);
             }
             deleteById(id);
