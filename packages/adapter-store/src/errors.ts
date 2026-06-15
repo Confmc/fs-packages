@@ -32,10 +32,9 @@ export class ExtendKeyCollisionError extends Error {
 }
 
 export class ExtendPayloadError extends Error {
-    constructor(domainName: string, mutator: 'setById' | 'deleteById', received: unknown) {
-        const expected = mutator === 'setById' ? 'an object with an integer `id`' : 'an integer id';
+    constructor(domainName: string, endpoint: string, received: unknown) {
         super(
-            `${domainName} extend ${mutator} received an invalid payload — expected ${expected}, got ${typeof received}. The store rejects it rather than corrupting state.`,
+            `${domainName} extend retrieveInto(${endpoint}) received an invalid item — expected an object with an integer \`id\`, got ${typeof received}. The store rejects it rather than corrupting state.`,
         );
         this.name = 'ExtendPayloadError';
     }

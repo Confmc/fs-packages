@@ -103,31 +103,31 @@ describe('ExtendKeyCollisionError', () => {
 });
 
 describe('ExtendPayloadError', () => {
-    it('should describe an invalid setById payload, naming the expected shape and received type', () => {
+    it('should describe an invalid retrieveInto response, naming the endpoint and received type', () => {
         // Act
-        const error = new ExtendPayloadError('users', 'setById', null);
+        const error = new ExtendPayloadError('users', 'users/KD-7', null);
 
         // Assert
         expect(error.message).toBe(
-            'users extend setById received an invalid payload — expected an object with an integer `id`, got object. The store rejects it rather than corrupting state.',
+            'users extend retrieveInto(users/KD-7) received an invalid item — expected an object with an integer `id`, got object. The store rejects it rather than corrupting state.',
         );
         expect(error.name).toBe('ExtendPayloadError');
     });
 
-    it('should describe an invalid deleteById payload, naming the expected shape and received type', () => {
+    it('should report the received type for a non-object response', () => {
         // Act
-        const error = new ExtendPayloadError('users', 'deleteById', 'KD-7');
+        const error = new ExtendPayloadError('users', 'users/KD-7', 'KD-7');
 
         // Assert
         expect(error.message).toBe(
-            'users extend deleteById received an invalid payload — expected an integer id, got string. The store rejects it rather than corrupting state.',
+            'users extend retrieveInto(users/KD-7) received an invalid item — expected an object with an integer `id`, got string. The store rejects it rather than corrupting state.',
         );
         expect(error.name).toBe('ExtendPayloadError');
     });
 
     it('should be an instance of Error', () => {
         // Act
-        const error = new ExtendPayloadError('items', 'setById', undefined);
+        const error = new ExtendPayloadError('items', 'items/1', undefined);
 
         // Assert
         expect(error).toBeInstanceOf(Error);

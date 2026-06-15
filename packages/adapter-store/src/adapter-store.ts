@@ -6,6 +6,7 @@ import type {
     Adapted,
     AdapterStoreConfig,
     AdapterStoreModule,
+    ExtendCapabilities,
     ExtendShape,
     Item,
     NewAdapted,
@@ -48,8 +49,8 @@ export const createAdapterStoreModule = <
     // an integer, not merely `typeof === 'number'` — `NaN` / `Infinity` / a non-integer
     // float pass a typeof check yet corrupt the keyspace (`state.value[NaN]` stringifies
     // to `"NaN"`, and `deleteById` could never match it since `Number("NaN") !== NaN`).
-    // Shared by every validating boundary that hands a mutator to consumer-authored code
-    // (`broadcast`, `extend`), so the raw mutators below never leave the factory.
+    // Shared by every validating ingest boundary (`broadcast`'s handlers and `extend`'s
+    // `retrieveInto`), so the raw mutators below never leave the factory.
     const isStorableItem = (item: unknown): item is T =>
         typeof item === 'object' && item !== null && Number.isInteger((item as {id?: unknown}).id);
 
@@ -129,27 +130,27 @@ export const createAdapterStoreModule = <
     };
 
     // `extend` runs at construction and its return value becomes part of the public
-    // store surface, so — like `broadcast` — it gets validating wrappers, not the raw
-    // mutators. A consumer's extend method (e.g. `retrieveBySlug`) calls `setById` with
-    // an HTTP-fetched item; the wrapper rejects a malformed payload (throwing
-    // `ExtendPayloadError`) rather than letting it corrupt the keyspace. The raw
-    // `setById`/`deleteById` never leave the factory through this door.
-    const extendStoreModule: AdapterStoreModule<T> = {
-        setById: (item) => {
+    // store surface. It is handed a response-backed ingest primitive — never the raw
+    // mutators — so a non-HTTP write path (`extend: (cap) => ({save: cap.setById})`, or
+    // a wrapper around it) is structurally unexpressible, not merely guarded. The only
+    // way data enters the store through `extend` is an HTTP response, validated before
+    // it touches state. `setById`/`deleteById` never leave the factory through this door.
+    const retrieveInto = async (
+        endpoint: string,
+        options?: Parameters<typeof httpService.getRequest>[1],
+    ): Promise<void> => {
+        const {data} = await httpService.getRequest<T | T[]>(endpoint, options);
+        const items = Array.isArray(data) ? data : [data];
+        for (const item of items) {
             if (!isStorableItem(item)) {
-                throw new ExtendPayloadError(domainName, 'setById', item);
+                throw new ExtendPayloadError(domainName, endpoint, item);
             }
             setById(item);
-        },
-        deleteById: (id) => {
-            if (!Number.isInteger(id)) {
-                throw new ExtendPayloadError(domainName, 'deleteById', id);
-            }
-            deleteById(id);
-        },
+        }
     };
 
-    const extended = extend ? extend(extendStoreModule) : ({} as X);
+    const extendCapabilities: ExtendCapabilities = {retrieveInto};
+    const extended = extend ? extend(extendCapabilities) : ({} as X);
     const baseKeys = new Set(Object.keys(base));
     for (const key of Object.keys(extended)) {
         if (baseKeys.has(key)) {

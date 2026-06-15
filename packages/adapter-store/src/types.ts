@@ -65,6 +65,27 @@ export type AdapterStoreBroadcast<T extends Item> = {
 };
 
 /**
+ * The capability surface handed to the `extend` hook. The only way data enters the
+ * store through `extend` is an HTTP response: `retrieveInto` GETs an endpoint and
+ * upserts the validated response item(s) via the internal mutators. The raw
+ * `setById`/`deleteById` are deliberately absent, so re-exporting a non-HTTP write
+ * path is structurally impossible rather than guarded against. `extend` still closes
+ * over the consumer's whole module scope, so custom endpoints, derived methods, and
+ * cross-store coordination all stay expressible — only "write state with no server
+ * response behind it" is removed, which is exactly the abuse.
+ */
+export type ExtendCapabilities = {
+    /**
+     * GET `endpoint` and upsert the response into the store — a single item or an
+     * array of items. Each must be an object with an integer `id`, or
+     * `ExtendPayloadError` is thrown (a malformed backend response cannot corrupt the
+     * keyspace). `options` is forwarded to the underlying `getRequest`. This is the
+     * sole ingest path for `extend`.
+     */
+    retrieveInto: (endpoint: string, options?: Parameters<HttpService['getRequest']>[1]) => Promise<void>;
+};
+
+/**
  * Constraint for the `extend` return type `X`: allows any NEW store-level method,
  * but maps any key that collides with a built-in `StoreModuleForAdapter` method to
  * `never`, so a colliding key fails to satisfy the constraint (compile error).
@@ -90,28 +111,21 @@ export type AdapterStoreConfig<
     broadcast?: AdapterStoreBroadcast<T>;
     /**
      * Optional capability-injection hook. Runs once at store construction and
-     * receives the same internal mutator tier (`AdapterStoreModule<T>`) the
-     * `adapter` factory and `broadcast.subscribe` already get. Returns an object
-     * of consumer-defined store-level methods that are merged onto the public
-     * surface — a sanctioned door for consumer-specific fetches (e.g.
-     * fetch-one-by-string-route-binding-key) without app-specific concepts
-     * entering the package.
+     * receives an {@link ExtendCapabilities} surface — **not** the raw mutator tier.
+     * Returns an object of consumer-defined store-level methods that are merged onto
+     * the public store surface — a sanctioned home for consumer-specific fetches (e.g.
+     * fetch-one-by-string-route-binding-key) without app-specific concepts entering the
+     * package.
      *
-     * Trust model. `extend` — like `broadcast` — receives **validating wrappers**, not
-     * the raw mutators. Only `adapter` (the trusted, package-internal factory) gets the
-     * bare `setById`/`deleteById`. The wrappers reject a malformed payload (`setById`
-     * requires an object with an integer `id`; `deleteById` an integer id), throwing
-     * `ExtendPayloadError` so a bad write cannot corrupt the keyspace — and the raw
-     * mutators never leave the factory through this door.
-     *
-     * Note the residual asymmetry with `broadcast`, though: `broadcast` is a *closed*
-     * contract (its handlers are consumed internally, never returned), whereas
-     * `extend`'s return value IS the public surface. A consumer can still re-export a
-     * wrapper under a new name (`extend: ({setById}) => ({save: setById})`) and publish
-     * a non-HTTP write path for *well-formed* data — validation stops corruption, not
-     * deliberate re-export. The collision guard below blocks built-in *name* collisions
-     * only, not a renamed re-export. Use `extend` to *wrap* an HTTP fetch and then call
-     * `setById` (as `retrieveBySlug` does), not to surface the setter itself.
+     * Trust model. The only ingest path `extend` is given is `retrieveInto`, which
+     * performs an HTTP GET and upserts the (validated) response. The raw
+     * `setById`/`deleteById` are deliberately **not** handed in — so a non-HTTP write
+     * path (`extend: (cap) => ({save: cap.setById})`, or a `(item) => cap.setById(item)`
+     * wrapper around it) is **structurally unexpressible**, not merely guarded against.
+     * Unlike `broadcast` — a *closed* contract whose non-HTTP write path is irreducible
+     * (it is the feature) and so can only be validated — `extend`'s leak can be designed
+     * out, and is. Every extend-driven write stays on the HTTP path, where consumer
+     * territories put authz/audit.
      *
      * Returned keys must be NEW names. A key that collides with a built-in store
      * method (`getAll`, `getById`, `getOrFailById`, `generateNew`, `retrieveById`,
@@ -124,7 +138,7 @@ export type AdapterStoreConfig<
      * in a future release collides with any extend method already shipping that name —
      * so a new built-in is a breaking change for extend-consumers.
      */
-    extend?: (storeModule: AdapterStoreModule<T>) => X;
+    extend?: (cap: ExtendCapabilities) => X;
 };
 
 /** Public API of a store module. */

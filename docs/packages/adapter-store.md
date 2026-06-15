@@ -233,9 +233,9 @@ That's it. Any event source that can emit "updated" and "deleted" events for you
 
 ## Extending the Store
 
-Some stores need a domain-specific fetch that the built-in surface doesn't cover — for example, retrieving one resource by a string route-binding key rather than its numeric `id`. The `extend` config slot is a capability-injection hook for exactly this: it lets a consumer add its own store-level methods without app-specific concepts leaking into the package and without exposing a raw mutator.
+Some stores need a domain-specific fetch that the built-in surface doesn't cover — for example, retrieving one resource by a string route-binding key rather than its numeric `id`. The `extend` config slot is a capability-injection hook for exactly this: it lets a consumer add its own store-level methods without app-specific concepts leaking into the package, and without ever exposing a raw mutator.
 
-`extend` runs **once at store construction** and receives a `{setById, deleteById}` tier — like `broadcast`, these are **validating wrappers**, not the raw internal mutators (only `adapter` gets those). It returns an object of consumer-defined methods, which are merged onto the public store surface. The consumer's method closes over the injected `setById`, so callers of the returned method never see it.
+`extend` runs **once at store construction** and receives an `ExtendCapabilities<T>` surface whose only ingest path is **`retrieveInto(endpoint, options?)`** — it performs an HTTP `GET` and upserts the (validated) response into the store. It returns an object of consumer-defined methods, which are merged onto the public store surface.
 
 ```typescript
 const usersStore = createAdapterStoreModule<
@@ -249,12 +249,7 @@ const usersStore = createAdapterStoreModule<
     httpService: http,
     storageService: storage,
     loadingService: loading,
-    extend: ({setById}) => ({
-        retrieveBySlug: async (slug: string): Promise<void> => {
-            const {data} = await http.getRequest<User>(`users/${slug}`);
-            setById(data);
-        },
-    }),
+    extend: ({retrieveInto}) => ({retrieveBySlug: (slug: string): Promise<void> => retrieveInto(`users/${slug}`)}),
 });
 
 // The custom method is on the public surface, fully typed — no cast needed
@@ -262,9 +257,11 @@ await usersStore.retrieveBySlug('alice');
 const alice = usersStore.getById(alice.id);
 ```
 
-**Validation.** The injected wrappers mirror `broadcast`'s: `setById` requires an object with an integer `id`, `deleteById` an integer id (`NaN` / `Infinity` / non-integer floats are rejected — they pass a `typeof === 'number'` check but corrupt the keyspace). A malformed payload throws [`ExtendPayloadError`](#error-handling) rather than corrupting state — so a buggy backend response landing in a custom fetch can't silently poison the store. The raw mutators never leave the factory.
+**Why `retrieveInto`, not raw `setById`.** `extend`'s return value _is_ the public store surface. Were it handed the bare `setById`, a consumer could re-export a non-HTTP write path — `extend: (cap) => ({save: cap.setById})`, or a `(item) => cap.setById(item)` wrapper that no runtime guard can tell apart from a legitimate fetch-then-set. Routing the only ingest through `retrieveInto` makes that **structurally unexpressible**, not merely guarded: the sole way data enters the store via `extend` is an HTTP response. This matters for consumer territories under ISO 27001 / NEN 7510, where the HTTP path is where authz and audit live. `extend` still closes over the consumer's whole module scope, so custom endpoints, derived methods, and cross-store coordination all stay expressible — only "write state with no server response behind it" is removed.
 
-**Residual asymmetry with `broadcast`.** `broadcast` is a **closed** contract — its handlers are consumed internally and never reach the public surface. `extend` is **open**: its return value _is_ the public surface. Validation stops _corruption_, but not _deliberate re-export_ — a consumer can still alias a wrapper under a new name (`extend: ({setById}) => ({save: setById})`) and publish a non-HTTP write path for well-formed data. The collision guard below blocks built-in _name_ collisions only, not a renamed re-export. Use `extend` to **wrap** a fetch and then `setById` (as `retrieveBySlug` does above), not to surface the setter itself.
+This is the asymmetry with `broadcast`: `broadcast`'s non-HTTP write path is irreducible (it _is_ the feature — applying server-pushed events without a round-trip), so it can only be **validated**; `extend`'s isn't, so it is **designed out**.
+
+**Validation.** `retrieveInto` validates every item the response yields (a single item or an array): each must be an object with an integer `id` (`NaN` / `Infinity` / non-integer floats are rejected — they pass a `typeof === 'number'` check but corrupt the keyspace). A malformed item throws [`ExtendPayloadError`](#error-handling) rather than corrupting state — so a buggy backend response can't silently poison the store.
 
 **Returned keys must be new names.** A key that collides with a built-in store method (`getAll`, `getById`, `getOrFailById`, `generateNew`, `retrieveById`, `retrieveAll`) **throws `ExtendKeyCollisionError` at construction** — always, on every call form. It is _additionally_ a compile error when you pass the extend shape as the fourth type argument (as in the example above) — which is the form you use to make the extended methods callable. Passing the type argument therefore gives you both the editor-time guarantee and a callable method; the runtime guard is the backstop that holds even on a bare `<T, E, N>` call where the extend shape is left to default.
 
@@ -311,21 +308,21 @@ import {
 - **`MissingResponseDataError`** — thrown when a CRUD response doesn't contain a `data` field
 - **`BroadcastPayloadError`** — thrown by a `broadcast` handler when the incoming payload is malformed (`onUpdate` not given an object with an integer `id`, or `onDelete` given a non-integer id)
 - **`ExtendKeyCollisionError`** — thrown at store construction when an `extend` method's key collides with a built-in store method
-- **`ExtendPayloadError`** — thrown by an `extend`-injected mutator when given a malformed payload (`setById` not given an object with an integer `id`, or `deleteById` given a non-integer id)
+- **`ExtendPayloadError`** — thrown by `extend`'s `retrieveInto` when a fetched item is not an object with an integer `id` (a malformed backend response cannot corrupt the keyspace)
 
 ## API Reference
 
 ### `createAdapterStoreModule(config)`
 
-| Parameter               | Type                                            | Description                                                                                |
-| ----------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `config.domainName`     | `string`                                        | Resource endpoint name (e.g., `"users"`)                                                   |
-| `config.adapter`        | `Adapter`                                       | CRUD adapter factory (use `resourceAdapter`)                                               |
-| `config.httpService`    | `Pick<HttpService, "getRequest">`               | HTTP service for fetching                                                                  |
-| `config.storageService` | `Pick<StorageService, "get" \| "put">`          | Storage for persistence                                                                    |
-| `config.loadingService` | `Pick<LoadingService, "ensureLoadingFinished">` | Loading service for sync                                                                   |
-| `config.broadcast?`     | `AdapterStoreBroadcast<T>`                      | Optional external-event bridge for server-initiated updates                                |
-| `config.extend?`        | `(storeModule: AdapterStoreModule<T>) => X`     | Optional capability-injection hook; merges consumer-defined methods onto the store surface |
+| Parameter               | Type                                            | Description                                                                                                                                                |
+| ----------------------- | ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `config.domainName`     | `string`                                        | Resource endpoint name (e.g., `"users"`)                                                                                                                   |
+| `config.adapter`        | `Adapter`                                       | CRUD adapter factory (use `resourceAdapter`)                                                                                                               |
+| `config.httpService`    | `Pick<HttpService, "getRequest">`               | HTTP service for fetching                                                                                                                                  |
+| `config.storageService` | `Pick<StorageService, "get" \| "put">`          | Storage for persistence                                                                                                                                    |
+| `config.loadingService` | `Pick<LoadingService, "ensureLoadingFinished">` | Loading service for sync                                                                                                                                   |
+| `config.broadcast?`     | `AdapterStoreBroadcast<T>`                      | Optional external-event bridge for server-initiated updates                                                                                                |
+| `config.extend?`        | `(cap: ExtendCapabilities<T>) => X`             | Optional capability-injection hook; `cap.retrieveInto(endpoint, options?)` is the sole ingest path. Merges consumer-defined methods onto the store surface |
 
 ### Store Module Methods
 

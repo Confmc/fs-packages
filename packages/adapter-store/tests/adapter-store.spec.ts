@@ -14,6 +14,7 @@ import type {
     AdapterStoreBroadcast,
     AdapterStoreConfig,
     AdapterStoreModule,
+    ExtendCapabilities,
     Item,
     NewAdapted,
 } from '../src/types';
@@ -1533,14 +1534,14 @@ describe('createAdapterStoreModule', () => {
     });
 
     describe('extend (capability injection)', () => {
-        it('should hand the extend hook the validating mutator tier once at construction', () => {
+        it('should hand the extend hook a retrieveInto-only capability once at construction, with the raw mutators unreachable', () => {
             // Arrange
             const httpService: Pick<HttpService, 'getRequest'> = {getRequest: vi.fn()};
             const storageService: TestStorageService = {put: vi.fn(), get: vi.fn().mockReturnValue({})};
             const loadingService: TestLoadingService = {ensureLoadingFinished: vi.fn().mockResolvedValue(undefined)};
-            let capturedStoreModule: AdapterStoreModule<TestItem> | null = null;
-            const extend = vi.fn((storeModule: AdapterStoreModule<TestItem>) => {
-                capturedStoreModule = storeModule;
+            let capturedCapabilities: ExtendCapabilities | null = null;
+            const extend = vi.fn((cap: ExtendCapabilities) => {
+                capturedCapabilities = cap;
                 return {};
             });
 
@@ -1554,11 +1555,13 @@ describe('createAdapterStoreModule', () => {
                 extend,
             });
 
-            // Assert
+            // Assert — retrieveInto is the sole ingest path; the raw mutators are
+            // structurally absent, so a non-HTTP write path cannot be re-exported.
             expect(extend).toHaveBeenCalledTimes(1);
-            const arg = capturedStoreModule as unknown as AdapterStoreModule<TestItem>;
-            expect(typeof arg.setById).toBe('function');
-            expect(typeof arg.deleteById).toBe('function');
+            const cap = capturedCapabilities as unknown as Record<string, unknown>;
+            expect(typeof cap.retrieveInto).toBe('function');
+            expect('setById' in cap).toBe(false);
+            expect('deleteById' in cap).toBe(false);
         });
 
         it('should expose the extend-returned methods on the public store, typed', () => {
@@ -1574,14 +1577,14 @@ describe('createAdapterStoreModule', () => {
                 httpService,
                 storageService,
                 loadingService,
-                extend: ({setById: _setById}) => ({pingCount: () => 1}),
+                extend: () => ({pingCount: () => 1}),
             });
 
             // Assert — calling without any cast IS the type-safety assertion
             expect(store.pingCount()).toBe(1);
         });
 
-        it('should let a custom extend method drive the store via setById', async () => {
+        it('should let a custom extend method drive the store via retrieveInto', async () => {
             // Arrange
             const httpService: Pick<HttpService, 'getRequest'> = {getRequest: vi.fn()};
             const storageService: TestStorageService = {put: vi.fn(), get: vi.fn().mockReturnValue({})};
@@ -1605,11 +1608,8 @@ describe('createAdapterStoreModule', () => {
                 httpService,
                 storageService,
                 loadingService,
-                extend: ({setById}) => ({
-                    retrieveBySlug: async (slug: string): Promise<void> => {
-                        const {data} = await httpService.getRequest<TestItem>(`test-items/${slug}`);
-                        setById(data);
-                    },
+                extend: ({retrieveInto}) => ({
+                    retrieveBySlug: (slug: string): Promise<void> => retrieveInto(`test-items/${slug}`),
                 }),
             });
 
@@ -1617,30 +1617,28 @@ describe('createAdapterStoreModule', () => {
             await store.retrieveBySlug('KD-7');
 
             // Assert
-            expect(httpService.getRequest).toHaveBeenCalledWith('test-items/KD-7');
+            expect(httpService.getRequest).toHaveBeenCalledWith('test-items/KD-7', undefined);
             expect(store.getById(7).value).toBeDefined();
         });
 
-        const makeStoreWithRawExtend = () => {
+        const makeStoreWithRetrieveInto = () => {
             const httpService: Pick<HttpService, 'getRequest'> = {getRequest: vi.fn()};
             const storageService: TestStorageService = {put: vi.fn(), get: vi.fn().mockReturnValue({})};
             const loadingService: TestLoadingService = {ensureLoadingFinished: vi.fn().mockResolvedValue(undefined)};
-            return createAdapterStoreModule<
+            const store = createAdapterStoreModule<
                 TestItem,
                 TestAdapted,
                 TestNewAdapted,
-                {pushRaw: (item: unknown) => void; removeRaw: (id: unknown) => void}
+                {pull: (endpoint: string, options?: Parameters<HttpService['getRequest']>[1]) => Promise<void>}
             >({
                 domainName: 'test-items',
                 adapter: createTestAdapter,
                 httpService,
                 storageService,
                 loadingService,
-                extend: ({setById, deleteById}) => ({
-                    pushRaw: (item: unknown) => setById(item as TestItem),
-                    removeRaw: (id: unknown) => deleteById(id as number),
-                }),
+                extend: ({retrieveInto}) => ({pull: (endpoint, options) => retrieveInto(endpoint, options)}),
             });
+            return {store, httpService};
         };
 
         it.each([
@@ -1651,52 +1649,75 @@ describe('createAdapterStoreModule', () => {
             ['a non-numeric id', {id: 'KD-7'}],
             ['a NaN id', {id: Number.NaN}],
             ['a non-integer id', {id: 1.5}],
-        ])('rejects setById via extend when the payload is %s, without corrupting state', (_label, payload) => {
+        ])('rejects a retrieveInto response that is %s, without corrupting state', async (_label, payload) => {
             // Arrange
-            const store = makeStoreWithRawExtend();
+            const {store, httpService} = makeStoreWithRetrieveInto();
+            vi.mocked(httpService.getRequest).mockResolvedValue({data: payload} as AxiosResponse<TestItem>);
 
             // Act & Assert
-            expect(() => store.pushRaw(payload)).toThrow(ExtendPayloadError);
-            expect(() => store.pushRaw(payload)).toThrow('setById');
+            await expect(store.pull('test-items/x')).rejects.toThrow(ExtendPayloadError);
+            await expect(store.pull('test-items/x')).rejects.toThrow('retrieveInto');
             expect(store.getAll.value).toEqual([]);
         });
 
-        it.each([
-            ['a non-numeric id', 'KD-7'],
-            ['a NaN id', Number.NaN],
-            ['a non-integer id', 1.5],
-            ['undefined', undefined],
-        ])('rejects deleteById via extend when the id is %s', (_label, id) => {
+        it('rejects a retrieveInto array response if any item is malformed, without corrupting state', async () => {
             // Arrange
-            const store = makeStoreWithRawExtend();
+            const {store, httpService} = makeStoreWithRetrieveInto();
+            vi.mocked(httpService.getRequest).mockResolvedValue({
+                data: [
+                    {id: 1, name: 'Good', createdAt: '2024-01-01T00:00:00Z', updatedAt: '2024-01-01T00:00:00Z'},
+                    {id: Number.NaN, name: 'Bad', createdAt: '2024-01-01T00:00:00Z', updatedAt: '2024-01-01T00:00:00Z'},
+                ],
+            } as AxiosResponse<TestItem[]>);
 
             // Act & Assert
-            expect(() => store.removeRaw(id)).toThrow(ExtendPayloadError);
-            expect(() => store.removeRaw(id)).toThrow('deleteById');
+            await expect(store.pull('test-items?filter=x')).rejects.toThrow(ExtendPayloadError);
         });
 
-        it('passes a well-formed payload through the extend setById wrapper into state', () => {
+        it('upserts a single well-formed item from a retrieveInto response into state', async () => {
             // Arrange
-            const store = makeStoreWithRawExtend();
+            const {store, httpService} = makeStoreWithRetrieveInto();
+            vi.mocked(httpService.getRequest).mockResolvedValue({
+                data: {id: 3, name: 'Valid', createdAt: '2024-01-01T00:00:00Z', updatedAt: '2024-01-01T00:00:00Z'},
+            } as AxiosResponse<TestItem>);
 
             // Act
-            store.pushRaw({id: 3, name: 'Valid', createdAt: '2024-01-01T00:00:00Z', updatedAt: '2024-01-01T00:00:00Z'});
+            await store.pull('test-items/3');
 
             // Assert
             expect(store.getById(3).value?.name).toBe('Valid');
         });
 
-        it('passes a valid integer id through the extend deleteById wrapper, removing the entry', () => {
+        it('upserts every item when retrieveInto receives an array response', async () => {
             // Arrange
-            const store = makeStoreWithRawExtend();
-            store.pushRaw({id: 3, name: 'Valid', createdAt: '2024-01-01T00:00:00Z', updatedAt: '2024-01-01T00:00:00Z'});
-            expect(store.getById(3).value).toBeDefined();
+            const {store, httpService} = makeStoreWithRetrieveInto();
+            vi.mocked(httpService.getRequest).mockResolvedValue({
+                data: [
+                    {id: 1, name: 'A', createdAt: '2024-01-01T00:00:00Z', updatedAt: '2024-01-01T00:00:00Z'},
+                    {id: 2, name: 'B', createdAt: '2024-01-01T00:00:00Z', updatedAt: '2024-01-01T00:00:00Z'},
+                ],
+            } as AxiosResponse<TestItem[]>);
 
             // Act
-            store.removeRaw(3);
+            await store.pull('test-items?filter=x');
 
             // Assert
-            expect(store.getById(3).value).toBeUndefined();
+            expect(store.getById(1).value?.name).toBe('A');
+            expect(store.getById(2).value?.name).toBe('B');
+        });
+
+        it('forwards retrieveInto options to the underlying getRequest', async () => {
+            // Arrange
+            const {store, httpService} = makeStoreWithRetrieveInto();
+            vi.mocked(httpService.getRequest).mockResolvedValue({
+                data: {id: 5, name: 'X', createdAt: '2024-01-01T00:00:00Z', updatedAt: '2024-01-01T00:00:00Z'},
+            } as AxiosResponse<TestItem>);
+
+            // Act
+            await store.pull('test-items/5', {params: {include: 'meta'}});
+
+            // Assert
+            expect(httpService.getRequest).toHaveBeenCalledWith('test-items/5', {params: {include: 'meta'}});
         });
 
         it('rejects an extend method that collides with a built-in store key (compile error)', () => {

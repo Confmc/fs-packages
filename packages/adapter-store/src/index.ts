@@ -16,5 +16,6 @@ export type {
     AdapterStoreModule,
     AdapterStoreConfig,
     AdapterStoreBroadcast,
+    ExtendCapabilities,
     StoreModuleForAdapter,
 } from './types';
