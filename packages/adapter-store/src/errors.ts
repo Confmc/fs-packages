@@ -11,3 +11,13 @@ export class MissingResponseDataError extends Error {
         this.name = 'MissingResponseDataError';
     }
 }
+
+export class BroadcastPayloadError extends Error {
+    constructor(domainName: string, handler: 'onUpdate' | 'onDelete', received: unknown) {
+        const expected = handler === 'onUpdate' ? 'an object with an integer `id`' : 'an integer id';
+        super(
+            `${domainName} broadcast ${handler} received an invalid payload — expected ${expected}, got ${typeof received}. The store rejects it rather than corrupting state.`,
+        );
+        this.name = 'BroadcastPayloadError';
+    }
+}

@@ -46,9 +46,19 @@ export type Adapter<T extends Item, E extends Adapted<T, object>, N extends NewA
 /**
  * Contract for binding server-initiated events (e.g. WebSocket broadcasts)
  * to an adapter-store. The store calls `subscribe` once at construction and
- * routes incoming events straight into its internal mutation path. The
- * handlers are never exposed on the public store API, so consumers cannot
- * acquire them to bypass HTTP.
+ * routes incoming events straight into its internal mutation path.
+ *
+ * This is a **closed** contract: the handlers are consumed inside the consumer's
+ * `subscribe` body (wired to an event source) and are never returned, so they do
+ * not reach the public store surface. The handlers the store passes are validating
+ * wrappers, not the bare internal mutators — `onUpdate` rejects a payload that is
+ * not an object with an integer `id`, and `onDelete` rejects a non-integer id, each
+ * throwing `BroadcastPayloadError` so a malformed broadcast cannot corrupt store
+ * state (`NaN` / `Infinity` / a non-integer float pass a `typeof === 'number'` check
+ * yet break the keyspace, so the guard requires an integer). Because the channel
+ * applies events without an HTTP round-trip, do not
+ * re-export the handlers onto your own public surface — that would publish a
+ * non-HTTP write path for arbitrary callers.
  */
 export type AdapterStoreBroadcast<T extends Item> = {
     subscribe: (handlers: {onUpdate: (item: T) => void; onDelete: (id: number) => void}) => () => void;

@@ -19,7 +19,7 @@ import type {
 } from '../src/types';
 
 import {createAdapterStoreModule} from '../src/adapter-store';
-import {EntryNotFoundError} from '../src/errors';
+import {BroadcastPayloadError, EntryNotFoundError} from '../src/errors';
 
 type TestNew = Omit<TestItem, 'id'>;
 type TestStorageService = Pick<StorageService, 'get' | 'put'>;
@@ -946,6 +946,121 @@ describe('createAdapterStoreModule', () => {
                     loadingService,
                 }),
             ).not.toThrow();
+        });
+
+        it.each([
+            ['a non-object payload', 'not-an-object'],
+            ['an undefined payload', undefined],
+            ['a null payload', null],
+            ['an object with a non-numeric id', {id: 'KD-7', name: 'Bad'}],
+            ['an object with a NaN id', {id: NaN, name: 'Bad'}],
+            ['an object with a non-integer id', {id: 1.5, name: 'Bad'}],
+        ])('should reject onUpdate given %s without corrupting state', (_label, payload) => {
+            // Arrange
+            const httpService: Pick<HttpService, 'getRequest'> = {getRequest: vi.fn()};
+            const storageService: TestStorageService = {put: vi.fn(), get: vi.fn().mockReturnValue({})};
+            const loadingService: TestLoadingService = {ensureLoadingFinished: vi.fn().mockResolvedValue(undefined)};
+            const {broadcast, getHandlers} = captureBroadcast();
+            const store = createAdapterStoreModule<TestItem, TestAdapted, TestNewAdapted>({
+                domainName: 'test-items',
+                adapter: createTestAdapter,
+                httpService,
+                storageService,
+                loadingService,
+                broadcast,
+            });
+
+            // Act & Assert
+            expect(() => getHandlers().onUpdate(payload as unknown as TestItem)).toThrow(BroadcastPayloadError);
+            expect(storageService.put).not.toHaveBeenCalled();
+            expect(store.getAll.value).toEqual([]);
+        });
+
+        it('should accept a well-formed onUpdate payload through the validating wrapper', () => {
+            // Arrange
+            const httpService: Pick<HttpService, 'getRequest'> = {getRequest: vi.fn()};
+            const storageService: TestStorageService = {put: vi.fn(), get: vi.fn().mockReturnValue({})};
+            const loadingService: TestLoadingService = {ensureLoadingFinished: vi.fn().mockResolvedValue(undefined)};
+            const {broadcast, getHandlers} = captureBroadcast();
+            const store = createAdapterStoreModule<TestItem, TestAdapted, TestNewAdapted>({
+                domainName: 'test-items',
+                adapter: createTestAdapter,
+                httpService,
+                storageService,
+                loadingService,
+                broadcast,
+            });
+
+            // Act
+            getHandlers().onUpdate({
+                id: 9,
+                name: 'Valid',
+                createdAt: '2024-01-01T00:00:00Z',
+                updatedAt: '2024-01-01T00:00:00Z',
+            });
+
+            // Assert
+            expect(store.getById(9).value).toBeDefined();
+            expect(storageService.put).toHaveBeenCalled();
+        });
+
+        it.each([
+            ['a non-numeric id', 'KD-7'],
+            ['a NaN id', NaN],
+            ['a non-integer id', 1.5],
+        ])('should reject onDelete given %s without corrupting state', (_label, id) => {
+            // Arrange
+            const httpService: Pick<HttpService, 'getRequest'> = {getRequest: vi.fn()};
+            const storageService: TestStorageService = {put: vi.fn(), get: vi.fn().mockReturnValue({})};
+            const loadingService: TestLoadingService = {ensureLoadingFinished: vi.fn().mockResolvedValue(undefined)};
+            const {broadcast, getHandlers} = captureBroadcast();
+            createAdapterStoreModule<TestItem, TestAdapted, TestNewAdapted>({
+                domainName: 'test-items',
+                adapter: createTestAdapter,
+                httpService,
+                storageService,
+                loadingService,
+                broadcast,
+            });
+
+            // Act & Assert
+            expect(() => getHandlers().onDelete(id as unknown as number)).toThrow(BroadcastPayloadError);
+            expect(storageService.put).not.toHaveBeenCalled();
+        });
+
+        it('should accept a numeric id through the onDelete validating wrapper', () => {
+            // Arrange
+            const httpService: Pick<HttpService, 'getRequest'> = {getRequest: vi.fn()};
+            const storageService: TestStorageService = {
+                put: vi.fn(),
+                get: vi
+                    .fn()
+                    .mockReturnValue({
+                        5: {
+                            id: 5,
+                            name: 'Existing',
+                            createdAt: '2024-01-01T00:00:00Z',
+                            updatedAt: '2024-01-01T00:00:00Z',
+                        },
+                    }),
+            };
+            const loadingService: TestLoadingService = {ensureLoadingFinished: vi.fn().mockResolvedValue(undefined)};
+            const {broadcast, getHandlers} = captureBroadcast();
+            const store = createAdapterStoreModule<TestItem, TestAdapted, TestNewAdapted>({
+                domainName: 'test-items',
+                adapter: createTestAdapter,
+                httpService,
+                storageService,
+                loadingService,
+                broadcast,
+            });
+
+            // Act
+            getHandlers().onDelete(5);
+
+            // Assert
+            expect(store.getById(5).value).toBeUndefined();
+            expect(storageService.put).toHaveBeenCalled();
         });
     });
 
