@@ -15,7 +15,13 @@ jobs:
               with:
                   node-version: 24
             - run: npm ci --ignore-scripts
-            - run: npm audit
+            # Scoped to HIGH+ per Commander disposition 2026-06-19: the unscoped
+            # gate fails RED on 13 residual MODERATE @changesets/* → js-yaml
+            # dev-chain advisories with no non-major fix (@changesets/cli v3 is a
+            # rejected breaking bump). --audit-level=high clears that unfixable
+            # moderate noise while preserving HIGH+ detection across prod + dev
+            # trees (a future form-data/vite-class HIGH still trips the gate).
+            - run: npm audit --audit-level=high
             - run: npm run format:check
             - run: npm run lint
             - run: npm run build
