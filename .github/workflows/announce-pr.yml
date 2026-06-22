@@ -30,8 +30,8 @@ on:
 jobs:
     announce:
         if: >-
-          (github.event.action == 'labeled' && github.event.label.name == 'Agent Review Requested') ||
-          (github.event.action == 'synchronize' && contains(github.event.pull_request.labels.*.name, 'Agent Review Requested'))
+            (github.event.action == 'labeled' && github.event.label.name == 'Agent Review Requested') ||
+            (github.event.action == 'synchronize' && contains(github.event.pull_request.labels.*.name, 'Agent Review Requested'))
         runs-on: ubuntu-latest
         steps:
             - name: Announce to the crier
