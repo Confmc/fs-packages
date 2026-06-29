@@ -211,7 +211,19 @@ export const createCachedAdapterStoreModule = <
 
     const inner = createAdapterStoreModule<T, E, N>(config);
 
-    const initialPersistedHash = storageService.get<string | null>(hashStorageKey, null);
+    // Read the persisted hash with a STRING default so fs-storage returns the
+    // raw stored value verbatim. fs-storage's `get` only returns the raw string
+    // for a *string* default; any non-string default (e.g. `null`) sends it
+    // down the `JSON.parse` branch, which coerces an all-numeric, no-leading-
+    // zero hash — exactly the `crc32b(uuid())` shape kendo's backend emits,
+    // e.g. `'55776784'` — into a Number. A numeric `localHash` then never
+    // strict-equals the string server hash, defeating skip-when-equal and
+    // forcing a spurious cold-load `retrieveAll()`. We cannot use `''` itself
+    // as the persisted sentinel ('' would masquerade as "I have a hash" and
+    // defeat the `localHash !== null` cold-start guard below), so we read as a
+    // string and normalize empty→null. (enforcement queue #130; mirrors wijs #122)
+    const rawPersistedHash = storageService.get<string>(hashStorageKey, '');
+    const initialPersistedHash: string | null = rawPersistedHash === '' ? null : rawPersistedHash;
     const localHash: Ref<string | null> = ref(initialPersistedHash);
     const currentServerHash: Ref<string | null> = ref(null);
 
