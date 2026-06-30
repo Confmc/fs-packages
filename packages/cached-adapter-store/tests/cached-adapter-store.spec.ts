@@ -19,6 +19,7 @@ import type {StorageService} from '@script-development/fs-storage';
 import type {AxiosResponse, InternalAxiosRequestConfig} from 'axios';
 import type {Ref} from 'vue';
 
+import {createStorageService} from '@script-development/fs-storage';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 import {ref} from 'vue';
 
@@ -1207,6 +1208,50 @@ describe('createCachedAdapterStoreModule', () => {
 
         it('carries the v1. version prefix verbatim', () => {
             expect(encodeSubscribeHeader(['x']).startsWith('v1.')).toBe(true);
+        });
+    });
+
+    describe('numeric-hash coercion regression (enforcement queue #130; mirrors wijs #122)', () => {
+        it('an all-numeric persisted hash round-trips through REAL fs-storage as a STRING → an equal server hash skips inner fetch (no spurious cold-load)', async () => {
+            // Exercises the real fs-storage put(raw) → get(string-default → raw)
+            // contract rather than the stub above (which ignores the default and
+            // is therefore blind to this bug). A `crc32b(uuid())` hash like
+            // '55776784' is all-numeric with no leading zero. Under the OLD
+            // `get(hashStorageKey, null)` read, the non-string default drove
+            // fs-storage's JSON.parse branch, coercing '55776784' → Number
+            // 55776784. `localHash` (Number) then never strict-equals the string
+            // server hash, so skip-when-equal never matched → a redundant
+            // retrieveAll() on every cold load. kendo is live-exposed (its
+            // backend emits crc32b(uuid()) hashes). The fix reads with a string
+            // default so the raw string is returned verbatim.
+            localStorage.clear();
+            const numericHash = '55776784';
+            const cacheKey = 'lanes';
+            // Real fs-storage, persisted via the SAME service the wrapper reads.
+            const storageService = createStorageService('fs-cas-numeric-test');
+            storageService.put(`${cacheKey}.cache-hash`, numericHash);
+
+            const httpService = makeFakeHttpService();
+            const loadingService: TestLoadingService = {ensureLoadingFinished: vi.fn().mockResolvedValue(undefined)};
+            vi.mocked(httpService.getRequest).mockResolvedValue({data: []} as AxiosResponse<TestItem[]>);
+            const store = createCachedAdapterStoreModule<TestItem, TestAdapted, TestNewAdapted>(
+                makeConfig(httpService, storageService, loadingService, cacheKey),
+                {cacheKey},
+            );
+
+            // Server reports the SAME all-numeric hash (as a JSON string in the header).
+            httpService.deliver(makeResponse({'x-fs-cache-hashes': encodeHashHeader({[cacheKey]: numericHash})}));
+            await store.prime();
+            // Drain the fire-and-forget middleware trigger.
+            await new Promise((resolve) => setTimeout(resolve, 0));
+
+            // Equal string hashes → skip-when-equal short-circuits BOTH the
+            // middleware-triggered fetch and prime(). Under the old numeric
+            // coercion, localHash would be Number 55776784 !== String
+            // '55776784' → fetch fires and this assertion fails.
+            expect(httpService.getRequest).not.toHaveBeenCalled();
+
+            localStorage.clear();
         });
     });
 });
