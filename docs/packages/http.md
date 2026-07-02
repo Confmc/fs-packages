@@ -172,6 +172,58 @@ const unregister = http.registerResponseErrorMiddleware((error) => {
 Other packages hook into these middleware points. `fs-loading` registers request + response + error middleware to track loading state. `fs-dialog` can register error middleware to show error dialogs. You can stack as many middleware handlers as you need — they all run independently.
 :::
 
+## Middleware guard (`guarded`)
+
+`fs-http` invokes middleware **synchronously and un-caught, by design** — the library stays loud so a bug in a middleware body is never silently eaten inside the transport layer. The consequence: if a middleware body throws (a toast that blows up, a store write, a router push, a `JSON.parse` of a cache hash), that throw escapes into the interceptor chain. On the response path it **rejects a resolved 200**; on the error path it **replaces the original `AxiosError` with the middleware's throw**, masking the real API failure.
+
+`guarded()` is the **consumer-side, opt-in** defense. Wrap a middleware body at its registration site and a throw from the body is caught, reported, and swallowed — the interceptor chain is never corrupted. Loud library, defensive consumer.
+
+```typescript
+import {createHttpService, guarded} from '@script-development/fs-http';
+
+const http = createHttpService(`${location.origin}/api`);
+
+// A throwing response body would otherwise reject a resolved 200 — guarded()
+// contains it so the successful response still resolves.
+http.registerResponseMiddleware(
+    guarded((response) => {
+        showToast(`Loaded ${response.config.url}`); // may throw — no longer fatal
+    }),
+);
+
+// A throwing error body would otherwise mask the real AxiosError — guarded()
+// contains it so the caller still rejects with the original error.
+http.registerResponseErrorMiddleware(
+    guarded((error) => {
+        openErrorDialog(error); // may throw — the 500 still surfaces to the caller
+    }),
+);
+```
+
+All three middleware types share the `(arg) => void` shape, so one generic wraps any of them and stays assignable to the source type with **zero casts** — `guarded(reqBody)`, `guarded(resBody)`, and `guarded(errBody)` each infer their argument type from the body you pass.
+
+### Custom error handling
+
+By default a swallowed throw is logged loudly via `console.error` (visible to any error tracker that hooks `console`). It is never re-thrown — re-throwing would re-open the exact failure `guarded()` closes. Pass a custom `GuardedMiddlewareErrorHandler` to route the failure elsewhere:
+
+```typescript
+import {guarded, type GuardedMiddlewareErrorHandler} from '@script-development/fs-http';
+
+const reportToTracker: GuardedMiddlewareErrorHandler = (error) => {
+    errorTracker.capture(error); // must not re-throw
+};
+
+http.registerResponseMiddleware(
+    guarded((response) => {
+        analytics.record(response.status);
+    }, reportToTracker),
+);
+```
+
+::: tip Why opt-in, not library-side
+Wrapping the interceptor loops in try/catch inside `fs-http` was rejected (2026-05-13): it would swallow every consumer's middleware bug silently, at the library layer, with no way to opt back into loud behaviour. `guarded()` inverts that — the library stays loud, and each consumer decides, explicitly at each registration site, which bodies to protect.
+:::
+
 ## File Operations
 
 `downloadRequest` and `previewRequest` are **transport-only** — they GET an endpoint as a `Blob` and return the full `AxiosResponse<Blob>`. Neither touches the DOM. There is no browser save dialog and no object-URL management inside fs-http; the consumer owns that orchestration (fs-packages issue #59). The two names share identical transport (`responseType: 'blob'`); the separate name communicates intent (download = save-to-disk, preview = inline-display).
@@ -263,3 +315,10 @@ try {
 | `registerRequestMiddleware(fn)`       | `UnregisterMiddleware` |
 | `registerResponseMiddleware(fn)`      | `UnregisterMiddleware` |
 | `registerResponseErrorMiddleware(fn)` | `UnregisterMiddleware` |
+
+### Middleware Guard
+
+| Export                          | Type                                                      | Description                                                                                                                                                           |
+| ------------------------------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `guarded(fn, onError?)`         | `<T>(fn: (arg: T) => void, onError?) => (arg: T) => void` | Wraps a middleware body so a throw is caught, reported, and swallowed instead of corrupting the interceptor chain. See [Middleware guard](#middleware-guard-guarded). |
+| `GuardedMiddlewareErrorHandler` | `(error: unknown) => void`                                | Handler type for `guarded`'s optional second argument; defaults to a loud `console.error`. Must not re-throw.                                                         |

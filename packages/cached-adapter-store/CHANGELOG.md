@@ -1,5 +1,11 @@
 # @script-development/fs-cached-adapter-store
 
+## 0.2.4 — 2026-07-02
+
+### Patch Changes
+
+- **Peer-range widening for `@script-development/fs-http` `^0.5.0`.** `fs-http` published a minor (0.5.0, the additive `guarded()` middleware guard). Pre-1.0 caret semantics require every `fs-http` consumer to widen its accepted range; no behavioural change. Mechanical cascade per fs-packages `CLAUDE.md` § Versioning Discipline.
+
 ## 0.2.3 — 2026-06-29
 
 ### Patch Changes

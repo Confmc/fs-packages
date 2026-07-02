@@ -1,5 +1,15 @@
 # @script-development/fs-http
 
+## 0.5.0 — 2026-07-02
+
+### Minor Changes
+
+- **New export: `guarded()` — consumer-side middleware guard wrapper.** A higher-order function that wraps an `fs-http` middleware body in try/catch so a side-effect throw (toast, store write, router push, cache-hash parse) cannot corrupt the interceptor chain — it can no longer reject a resolved 200 nor mask the original API error on the error path. All three middleware types (`RequestMiddlewareFunc`, `ResponseMiddlewareFunc`, `ResponseErrorMiddlewareFunc`) share the `(arg) => void` shape, so one generic wraps any of them and stays assignable to the source type with zero casts: `service.registerResponseMiddleware(guarded((response) => { ... }))`.
+    - The library stays **sync-only and loud** — `createHttpService` and the interceptor loops are unchanged (the 2026-05-13 rejection of library-side try/catch holds). `guarded()` is **opt-in at the consumer's registration site**: loud library, defensive consumer.
+    - The default error handler surfaces the swallowed failure via `console.error` (visible to error trackers) and never re-throws. Pass a custom `GuardedMiddlewareErrorHandler` to route the failure elsewhere.
+    - Also exports the `GuardedMiddlewareErrorHandler` type.
+    - Additive and non-breaking — no existing API changed.
+
 ## 0.4.1 — 2026-05-29
 
 ### Patch Changes
