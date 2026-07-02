@@ -29,6 +29,21 @@ Shared frontend service packages monorepo under the `@script-development` npm sc
 
 Consumer territories must apply per-call timeouts at instantiation OR rely on the 30000 ms default. See `docs/packages/http.md#timeout` for usage.
 
+## Middleware Sync Contract (fs-http)
+
+`fs-http` runs its request, response, and response-error middleware as **synchronous** loops directly inside the axios interceptors — **no `try`/`catch` around the loop and no `await` of middleware return values**. See `packages/http/src/http.ts`: request loop `for (const middleware of requestMiddleware) middleware(request);` (`:79`), response-success loop (`:86`), response-error loop (`:93`). *(These line numbers churn — anchor on the symbol, not the literal line.)*
+
+**Consequence — a throwing middleware body propagates out of the interceptor:**
+
+- **Success path** (request/response loops): a throw turns a resolved 200 into a **rejected** promise.
+- **Error path** (response-error loop): a throw at `:93` propagates *before* the `Promise.reject(error)` at `:95`, **masking the real API error** with the middleware's own throw.
+
+**Design stance — the library stays sync-only and loud.** A library-side try/catch was **rejected by the Commander 2026-05-13** (silent middleware failure is worse than a loud throw) and the rejection **HELD at n=2 on 2026-06-15**. fs-http does not swallow middleware throws and does not await middleware returns — by deliberate disposition, not omission.
+
+**Consumer contract — the guard lives at the consumer boundary.** Every fs-http consumer **MUST** wrap its own middleware bodies (try/catch + fail-safe swallow) so a side-effect throw — a toast, a store write, a cache-hash parse — cannot reject the request promise or mask an API error. Loud library, defensive consumer.
+
+**Precedent + latency.** kendo WR-0078 (PR [#1538](https://github.com/script-development/kendo/pull/1538)) independently re-derived this mechanism against fs-http source and guarded **both** kendo central + tenant middleware (try/catch + fail-safe swallow, 100% coverage, 2026-06-15). See the war-room `deferred.md [adr] fs-packages-fs-http-async-aware-middleware-rejection-doctrine` entry (promoted, n=2). **entreezuil / ublgenie / emmie / BIO carry the latent exposure** until their middleware is likewise guarded.
+
 ## Packages (11)
 
 | Package                 | Vue | Description                                                                                                      |
