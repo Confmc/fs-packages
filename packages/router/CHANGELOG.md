@@ -1,1 +1,10 @@
 # @script-development/fs-router
+
+## 0.2.0 — 2026-07-06
+
+### Minor Changes
+
+- **Middleware redirect-return.** A before-route middleware may now return a typed redirect object instead of just a boolean. Returning `{name, id?, query?, parentId?, replace?}` **cancels the pending navigation and navigates to the target in one step** — `goToRoute` (push) by default, or a replace when `replace: true`. A boolean return keeps its exact meaning (truthy cancels, falsy continues), and an object return short-circuits the middleware chain identically to a truthy boolean. This retires the hand-rolled cancel-then-`goToRoute` two-step consumers wrote against `registerBeforeRouteMiddleware`. Additive and backward-compatible: widening the middleware's return union is assignability-safe, so every existing `(to, from) => boolean` middleware still satisfies the type. New exports: `MiddlewareRedirect` and `BeforeRouteMiddlewareResult`.
+- **New export: `replaceRoute`.** A replace-semantics sibling of `goToRoute` with the identical signature (`name, id?, query?, parentId?`), delegating to `router.replace` with the same param resolution. Use it for landings that should not pollute the history stack (OAuth callbacks, 404-home bounces, dead-read redirects) — where a push would leave the consumed URL reachable via Back.
+- **New option: `notFoundComponent`.** `createRouterService(routes, { notFoundComponent })` lets `RouterView` render a declared component in place of the bare `404` fallback when no route matches at the requested depth. The default (a bare `404`) is unchanged when the option is omitted.
+- **`RouterLink` attribute fallthrough.** `RouterLink` now forwards consumer-set attributes (`class`, `style`, `data-*`, `aria-*`, …) onto the rendered `<a>`. A styled `<RouterLink class="…">` previously dropped its class; those attributes now land on the anchor. The owned `href` and `onClick` stay authoritative (fallthrough attrs are merged first, so a consumer-supplied `href` cannot override the computed one).

@@ -1,9 +1,9 @@
-import type {NavigationHookAfter, RouteLocationRaw, RouteRecordRaw} from 'vue-router';
+import type {LocationQueryRaw, NavigationHookAfter, RouteLocationRaw, RouteRecordRaw} from 'vue-router';
 
 import {computed} from 'vue';
 import {createRouter, createWebHistory} from 'vue-router';
 
-import type {BeforeRouteMiddleware, RouterService, RouterServiceOptions} from './types';
+import type {BeforeRouteMiddleware, RouteName, RouterService, RouterServiceOptions} from './types';
 
 import {createRouterLink, createRouterView} from './components';
 import {CREATE_PAGE_NAME, EDIT_PAGE_NAME, OVERVIEW_PAGE_NAME, SHOW_PAGE_NAME} from './routes';
@@ -45,14 +45,27 @@ export const createRouterService = <Routes extends RouteRecordRaw[]>(
         return Object.fromEntries(Object.entries(params).filter(([key]) => targetPath.includes(`:${key}`)));
     };
 
-    const goToRoute: RouterService<Routes>['goToRoute'] = async (name, id, query, parentId) => {
+    const buildRouteLocation = (
+        name: RouteName<Routes>,
+        id?: number | string,
+        query?: LocationQueryRaw,
+        parentId?: number,
+    ): RouteLocationRaw => {
         const route: RouteLocationRaw = {name};
         const params = resolveRouteParams(name as string, id, parentId);
 
         if (Object.keys(params).length > 0) route.params = params;
         if (query) route.query = query;
 
-        await router.push(route);
+        return route;
+    };
+
+    const goToRoute: RouterService<Routes>['goToRoute'] = async (name, id, query, parentId) => {
+        await router.push(buildRouteLocation(name, id, query, parentId));
+    };
+
+    const replaceRoute: RouterService<Routes>['replaceRoute'] = async (name, id, query, parentId) => {
+        await router.replace(buildRouteLocation(name, id, query, parentId));
     };
 
     const normalizedRouteToSpecificRoute: RouterService<Routes>['normalizedRouteToSpecificRoute'] = (route) => {
@@ -71,8 +84,20 @@ export const createRouterService = <Routes extends RouteRecordRaw[]>(
         const toNormalized = normalizedRouteToSpecificRoute(to);
         const fromNormalized = from.name ? normalizedRouteToSpecificRoute(from) : toNormalized;
 
-        for (const middleware of beforeRouteMiddleware)
-            if (await middleware(toNormalized, fromNormalized)) return false;
+        for (const middleware of beforeRouteMiddleware) {
+            const result = await middleware(toNormalized, fromNormalized);
+            if (result === false) continue;
+
+            // A truthy object return cancels the pending hop and navigates to the target in
+            // one step — replace when `replace: true`, push otherwise. A boolean `true` just
+            // cancels. Either short-circuits the chain (return false stops beforeEach).
+            if (result !== true) {
+                if (result.replace) void replaceRoute(result.name, result.id, result.query, result.parentId);
+                else void goToRoute(result.name, result.id, result.query, result.parentId);
+            }
+
+            return false;
+        }
     });
 
     const afterRouteMiddleware: NavigationHookAfter[] = [...(options?.afterRouteCallbacks ?? [])];
@@ -99,6 +124,7 @@ export const createRouterService = <Routes extends RouteRecordRaw[]>(
         normalizedRouteToSpecificRoute,
 
         goToRoute,
+        replaceRoute,
         goToCreatePage: (name) => goToRoute(`${name}${CREATE_PAGE_NAME}`),
         goToOverviewPage: (name) => goToRoute(`${name}${OVERVIEW_PAGE_NAME}`),
         goToEditPage: (name, id) => goToRoute(`${name}${EDIT_PAGE_NAME}`, id),
@@ -160,7 +186,7 @@ export const createRouterService = <Routes extends RouteRecordRaw[]>(
             }
         },
 
-        RouterView: createRouterView(currentRouteRef),
+        RouterView: createRouterView(currentRouteRef, options?.notFoundComponent),
         RouterLink: createRouterLink(getUrlForRouteName, goToRoute),
     };
 };

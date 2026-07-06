@@ -137,6 +137,44 @@ describe('createRouterView', () => {
         // Assert
         expect(wrapper.text()).toBe('404');
     });
+
+    it('should render a custom notFoundComponent in place of the bare 404 when unmatched', () => {
+        // Arrange
+        const NotFound = defineComponent({name: 'NotFound', render: () => h('div', {class: 'custom-404'}, 'Not here')});
+        const routeRef = ref({matched: [], path: '/nope', params: {}} as unknown as RouteLocationNormalizedLoaded);
+        const RouterView = createRouterView(routeRef, NotFound);
+
+        // Act
+        const wrapper = mount(RouterView);
+
+        // Assert — the custom component renders, not the bare '404'
+        expect(wrapper.text()).toBe('Not here');
+        expect(wrapper.find('.custom-404').exists()).toBe(true);
+    });
+
+    it('should render the bare 404 fallback when no notFoundComponent is provided', () => {
+        // Arrange
+        const routeRef = ref({matched: [], path: '/nope', params: {}} as unknown as RouteLocationNormalizedLoaded);
+        const RouterView = createRouterView(routeRef);
+
+        // Act
+        const wrapper = mount(RouterView);
+
+        // Assert
+        expect(wrapper.text()).toBe('404');
+    });
+
+    it('should thread notFoundComponent from createRouterService options into RouterView', () => {
+        // Arrange — an unmatched depth renders the option-provided fallback
+        const NotFound = defineComponent({name: 'NotFound', render: () => h('div', 'service-404')});
+        const service = createRouterService(createTestRoutes(), {notFoundComponent: NotFound});
+
+        // Act — depth 5 never matches, forcing the fallback path
+        const wrapper = mount(service.RouterView, {props: {depth: 5}});
+
+        // Assert
+        expect(wrapper.text()).toBe('service-404');
+    });
 });
 
 describe('createRouterLink', () => {
@@ -245,6 +283,42 @@ describe('createRouterLink', () => {
 
         // Assert
         expect(goTo).not.toHaveBeenCalled();
+    });
+
+    it('should forward class, style, data-*, and aria-* attributes to the anchor', () => {
+        // Arrange
+        const getUrl = vi.fn().mockReturnValue('/about');
+        const goTo = vi.fn();
+        const RouterLink = createRouterLink(getUrl, goTo);
+
+        // Act
+        const wrapper = mount(RouterLink, {
+            props: {to: {name: 'about'}},
+            attrs: {class: 'nav-link active', style: 'color: red;', 'data-testid': 'home-link', 'aria-current': 'page'},
+        });
+
+        // Assert — consumer attributes land on the anchor
+        const anchor = wrapper.find('a');
+        expect(anchor.classes()).toContain('nav-link');
+        expect(anchor.classes()).toContain('active');
+        expect(anchor.attributes('style')).toContain('color: red');
+        expect(anchor.attributes('data-testid')).toBe('home-link');
+        expect(anchor.attributes('aria-current')).toBe('page');
+        // ...and the owned href stays present
+        expect(anchor.attributes('href')).toBe('/about');
+    });
+
+    it('should keep the owned href authoritative over a fallthrough href attribute', () => {
+        // Arrange
+        const getUrl = vi.fn().mockReturnValue('/canonical');
+        const goTo = vi.fn();
+        const RouterLink = createRouterLink(getUrl, goTo);
+
+        // Act — a consumer-supplied href must not override the computed one
+        const wrapper = mount(RouterLink, {props: {to: {name: 'about'}}, attrs: {href: '/consumer-supplied'}});
+
+        // Assert — attrs spread first, so the owned href wins
+        expect(wrapper.find('a').attributes('href')).toBe('/canonical');
     });
 
     it('should pass name, id, query, and parentId to getUrlForRouteName', () => {

@@ -256,6 +256,80 @@ describe('router service', () => {
         });
     });
 
+    describe('replaceRoute', () => {
+        it('should navigate to named route', async () => {
+            // Arrange
+            const service = createRouterService(createTestRoutes());
+
+            // Act
+            await service.replaceRoute('about');
+            await flushPromises();
+
+            // Assert
+            expect(service.currentRouteRef.value.name).toBe('about');
+        });
+
+        it('should navigate with id param', async () => {
+            // Arrange
+            const service = createRouterService(createTestRoutes());
+
+            // Act
+            await service.replaceRoute('items.show', 42);
+            await flushPromises();
+
+            // Assert
+            expect(service.currentRouteRef.value.params.id).toBe('42');
+        });
+
+        it('should navigate with query params', async () => {
+            // Arrange
+            const service = createRouterService(createTestRoutes());
+
+            // Act
+            await service.replaceRoute('about', undefined, {page: '3'});
+            await flushPromises();
+
+            // Assert
+            expect(service.currentRouteRef.value.query.page).toBe('3');
+        });
+
+        it('should navigate with parentId override', async () => {
+            // Arrange
+            const routes: RouteRecordRaw[] = [
+                {path: '/', name: 'home', component: TestPage},
+                {path: '/parent/:parentId/child/:id', name: 'nested', component: TestPage},
+            ];
+            const service = createRouterService(routes);
+
+            // Act
+            await service.replaceRoute('nested', 10, undefined, 5);
+            await flushPromises();
+
+            // Assert
+            expect(service.currentRouteRef.value.params.id).toBe('10');
+            expect(service.currentRouteRef.value.params.parentId).toBe('5');
+        });
+
+        it('should replace the current history entry instead of pushing', async () => {
+            // Arrange — build a two-entry history, then replace the top
+            const service = createRouterService(createTestRoutes());
+            await service.goToRoute('home');
+            await flushPromises();
+            await service.goToRoute('about');
+            await flushPromises();
+
+            // Act
+            await service.replaceRoute('items.overview');
+            await flushPromises();
+            expect(service.currentRouteRef.value.name).toBe('items.overview');
+
+            // Assert — 'about' was replaced (not pushed over), so Back lands on 'home'
+            service.goBack();
+            await flushPromises();
+            expect(service.currentRouteRef.value.name).toBe('home');
+        });
+    });
+
     describe('CRUD navigation shortcuts', () => {
         it('goToCreatePage should navigate to .create route', async () => {
             // Arrange
@@ -481,13 +555,19 @@ describe('router service', () => {
 
             const middleware = vi.fn<() => boolean>().mockReturnValue(true);
             service.registerBeforeRouteMiddleware(middleware);
+            const pushSpy = vi.spyOn(window.history, 'pushState');
+            const replaceSpy = vi.spyOn(window.history, 'replaceState');
 
             // Act
             await service.goToRoute('about');
             await flushPromises();
 
-            // Assert
+            // Assert — a pure boolean cancel neither commits the hop nor kicks off any
+            // redirect navigation, so no history mutation happens at all
             expect(service.currentRouteRef.value.name).not.toBe('about');
+            expect(service.currentRouteRef.value.name).toBe('home');
+            expect(pushSpy).not.toHaveBeenCalled();
+            expect(replaceSpy).not.toHaveBeenCalled();
         });
 
         it('should not execute middleware after unregistering', async () => {
@@ -551,6 +631,137 @@ describe('router service', () => {
 
             // Assert — from should equal to since initial route has no name
             expect(fromRoute).toBe(toRoute);
+        });
+
+        it('should let navigation complete when middleware returns false', async () => {
+            // Arrange
+            const service = createRouterService(createTestRoutes());
+            service.registerBeforeRouteMiddleware(() => false);
+
+            // Act
+            await service.goToRoute('about');
+            await flushPromises();
+
+            // Assert — a falsy return does not cancel or redirect
+            expect(service.currentRouteRef.value.name).toBe('about');
+        });
+
+        it('should cancel the hop and navigate to the target when middleware returns a redirect object', async () => {
+            // Arrange
+            const service = createRouterService(createTestRoutes());
+            await service.goToRoute('home');
+            await flushPromises();
+            service.registerBeforeRouteMiddleware((to) => (to.name === 'about' ? {name: 'items.overview'} : false));
+
+            // Act
+            await service.goToRoute('about');
+            await flushPromises();
+
+            // Assert — the redirect target committed, not the blocked 'about' hop
+            expect(service.currentRouteRef.value.name).toBe('items.overview');
+        });
+
+        it('should short-circuit later middleware when a redirect object is returned', async () => {
+            // Arrange
+            const service = createRouterService(createTestRoutes());
+            await service.goToRoute('home');
+            await flushPromises();
+            service.registerBeforeRouteMiddleware((to) => (to.name === 'about' ? {name: 'items.overview'} : false));
+            const observed: string[] = [];
+            service.registerBeforeRouteMiddleware((to) => {
+                observed.push(String(to.name));
+                return false;
+            });
+
+            // Act
+            await service.goToRoute('about');
+            await flushPromises();
+
+            // Assert — the redirecting middleware returns object → chain stops, blocked hop never
+            // reaches the follow-on middleware (a dropped `return false` would let it through)
+            expect(observed).not.toContain('about');
+            expect(service.currentRouteRef.value.name).toBe('items.overview');
+        });
+
+        it('should carry id, query, and parentId from the redirect object to the target', async () => {
+            // Arrange
+            const routes: RouteRecordRaw[] = [
+                {path: '/', name: 'home', component: TestPage},
+                {path: '/parent/:parentId/child/:id', name: 'nested', component: TestPage},
+                {path: '/start', name: 'start', component: TestPage},
+            ];
+            const service = createRouterService(routes);
+            await service.goToRoute('home');
+            await flushPromises();
+            service.registerBeforeRouteMiddleware((to) =>
+                to.name === 'start' ? {name: 'nested', id: 10, query: {tab: 'x'}, parentId: 5} : false,
+            );
+
+            // Act
+            await service.goToRoute('start');
+            await flushPromises();
+
+            // Assert
+            expect(service.currentRouteRef.value.name).toBe('nested');
+            expect(service.currentRouteRef.value.params.id).toBe('10');
+            expect(service.currentRouteRef.value.params.parentId).toBe('5');
+            expect(service.currentRouteRef.value.query.tab).toBe('x');
+        });
+
+        it('should use push semantics when the redirect omits replace', async () => {
+            // Arrange
+            const service = createRouterService(createTestRoutes());
+            await service.goToRoute('home');
+            await flushPromises();
+            service.registerBeforeRouteMiddleware((to) => (to.name === 'about' ? {name: 'items.overview'} : false));
+            const pushSpy = vi.spyOn(window.history, 'pushState');
+
+            // Act
+            await service.goToRoute('about');
+            await flushPromises();
+
+            // Assert — a push navigation calls history.pushState (vue-router also replaceStates to
+            // save scroll on every hop, so pushState is the discriminator between push and replace)
+            expect(service.currentRouteRef.value.name).toBe('items.overview');
+            expect(pushSpy).toHaveBeenCalled();
+        });
+
+        it('should use replace semantics when the redirect sets replace:true', async () => {
+            // Arrange
+            const service = createRouterService(createTestRoutes());
+            await service.goToRoute('home');
+            await flushPromises();
+            service.registerBeforeRouteMiddleware((to) =>
+                to.name === 'about' ? {name: 'items.overview', replace: true} : false,
+            );
+            const pushSpy = vi.spyOn(window.history, 'pushState');
+            const replaceSpy = vi.spyOn(window.history, 'replaceState');
+
+            // Act
+            await service.goToRoute('about');
+            await flushPromises();
+
+            // Assert — a replace navigation replaceStates but never pushStates (the discriminator)
+            expect(service.currentRouteRef.value.name).toBe('items.overview');
+            expect(replaceSpy).toHaveBeenCalled();
+            expect(pushSpy).not.toHaveBeenCalled();
+        });
+
+        it('should redirect when an async middleware resolves a redirect object', async () => {
+            // Arrange
+            const service = createRouterService(createTestRoutes());
+            await service.goToRoute('home');
+            await flushPromises();
+            service.registerBeforeRouteMiddleware(async (to) =>
+                to.name === 'about' ? {name: 'items.overview'} : false,
+            );
+
+            // Act
+            await service.goToRoute('about');
+            await flushPromises();
+
+            // Assert — the awaited object return redirects just like a sync one
+            expect(service.currentRouteRef.value.name).toBe('items.overview');
         });
     });
 
