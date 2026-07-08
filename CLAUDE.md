@@ -44,7 +44,7 @@ Consumer territories must apply per-call timeouts at instantiation OR rely on th
 
 **Precedent + latency.** kendo WR-0078 (PR [#1538](https://github.com/script-development/kendo/pull/1538)) independently re-derived this mechanism against fs-http source and guarded **both** kendo central + tenant middleware (try/catch + fail-safe swallow, 100% coverage, 2026-06-15). See the war-room `deferred.md [adr] fs-packages-fs-http-async-aware-middleware-rejection-doctrine` entry (promoted, n=2). **entreezuil / ublgenie / emmie / BIO carry the latent exposure** until their middleware is likewise guarded.
 
-## Packages (11)
+## Packages (12)
 
 | Package                 | Vue | Description                                                                                                      |
 | ----------------------- | --- | ---------------------------------------------------------------------------------------------------------------- |
@@ -57,6 +57,7 @@ Consumer territories must apply per-call timeouts at instantiation OR rely on th
 | fs-cached-adapter-store | Yes | Hash-bumping cache wrapper around fs-adapter-store; middleware-driven invalidation with prime() bootstrap; no retrieveAll/retrieveById on the public surface |
 | fs-toast                | Yes | Component-agnostic toast queue (FIFO)                                                                            |
 | fs-dialog               | Yes | Component-agnostic dialog stack (LIFO) with error middleware                                                     |
+| fs-form                 | Yes | Form-submit helpers: double-submit guard + 422 validation-error binding (guarded fs-http middleware); `keyMapper` seam for raw/camel field keys |
 | fs-translation          | Yes | Type-safe reactive i18n with dot-notation keys                                                                   |
 | fs-router               | Yes | Type-safe router service factory with CRUD navigation, middleware pipeline, and custom components for Vue Router |
 
