@@ -86,6 +86,12 @@ const validation = useValidationErrors<Field>(http);
 const {handleSubmit, submitting} = useFormSubmit(validation);
 ```
 
+## Scoping & Backend Contract
+
+**One error-scope per form.** `useValidationErrors` (and therefore `useForm`) registers a 422 observer on the `HttpService` you pass and keeps its own error bag. If two forms share **one** `HttpService` instance, a 422 from either fills **both** bags — cross-form bleed, with green types. Give each form its own error scope: one form per `HttpService` instance, or don't share a service across concurrently-mounted forms. (The single-form-per-scope shape matches the source territories; a multi-form-per-service layout is the case to watch.)
+
+**Laravel 422 contract.** `fs-form` targets **Laravel**'s validation-error response shape — `{ message?: string, errors: Record<string, string[]> }` — and binds the first message per field. It deliberately does **not** defensively handle other backends' error shapes: a field whose value is not a `string[]` is passed through unguarded (Laravel guarantees arrays, so the cast is safe against every intended consumer). If you point `fs-form` at a non-Laravel backend, revisit the parse in `useValidationErrors` first.
+
 ## Middleware Safety (Principle #8)
 
 `useValidationErrors` wraps its response-error middleware body with `fs-http`'s `guarded()`. A throwing `keyMapper` — or any parse hiccup — is caught and surfaced loudly (via `guarded`'s default `console.error`) **without** rejecting a resolved request or masking the real API error. `fs-form` is a compliant `fs-http` consumer out of the box per the [Middleware Sync Contract](../architecture#middleware-sync-contract).
