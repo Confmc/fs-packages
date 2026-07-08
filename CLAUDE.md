@@ -57,7 +57,7 @@ Consumer territories must apply per-call timeouts at instantiation OR rely on th
 | fs-cached-adapter-store | Yes | Hash-bumping cache wrapper around fs-adapter-store; middleware-driven invalidation with prime() bootstrap; no retrieveAll/retrieveById on the public surface |
 | fs-toast                | Yes | Component-agnostic toast queue (FIFO)                                                                            |
 | fs-dialog               | Yes | Component-agnostic dialog stack (LIFO) with error middleware                                                     |
-| fs-form                 | Yes | Form-submit helpers: double-submit guard + 422 validation-error binding (guarded fs-http middleware); `keyMapper` seam for raw/camel field keys |
+| fs-form                 | Yes | One-call `useForm`: double-submit guard + `submitting` loading flag + 422 validation-error binding (guarded fs-http middleware); `keyMapper` seam for raw/camel field keys. `useValidationErrors`/`useFormSubmit` primitives still exported |
 | fs-translation          | Yes | Type-safe reactive i18n with dot-notation keys                                                                   |
 | fs-router               | Yes | Type-safe router service factory with CRUD navigation, middleware pipeline, and custom components for Vue Router |
 

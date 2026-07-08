@@ -32,6 +32,16 @@ export type UseFormSubmit = {
      * other rejection is re-thrown to the caller / error boundary.
      */
     handleSubmit: (action: () => Promise<void>) => Promise<void>;
-    /** `true` while a submit action is in flight. */
+    /** `true` while a submit action is in flight — the form's loading state. */
     submitting: Ref<boolean>;
 };
+
+/** Options for `useForm` (currently the validation options). */
+export type UseFormOptions = UseValidationErrorsOptions;
+
+/**
+ * Everything `useForm` returns: the field-error bag and `clearErrors` from
+ * `useValidationErrors`, plus `handleSubmit` and the `submitting` loading flag
+ * from `useFormSubmit` — wired together so a page composes one call, not two.
+ */
+export type UseForm<T extends string = string> = UseValidationErrors<T> & UseFormSubmit;
