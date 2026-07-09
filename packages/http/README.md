@@ -41,6 +41,7 @@ Creates a new HTTP service instance.
 - `withXSRFToken` — Include XSRF token header (default: `false`)
 - `smartCredentials` — Auto-toggle `withCredentials` based on request host matching base URL host (default: `false`)
 - `timeout` — Request timeout in milliseconds (default: `30000`). Pass `0` to disable; pass any positive number to override.
+- `onMiddlewareError` — Handler (`GuardedMiddlewareErrorHandler`) for a throw from any auto-guarded middleware on this service (default: a loud `console.error`). Must not re-throw.
 
 ### Timeout
 
@@ -62,9 +63,12 @@ For Laravel Sanctum SPA consumers, `withXSRFToken: true` is required to avoid HT
 
 ### Middleware
 
-- `registerRequestMiddleware(fn)` — Returns unregister function
-- `registerResponseMiddleware(fn)` — Returns unregister function
-- `registerResponseErrorMiddleware(fn)` — Returns unregister function
+Every registered middleware body is wrapped in `guarded()` **by default** (ADR-0037, since 0.6.0) so a side-effect throw cannot reject a resolved 200 nor mask the real API error. Pass `{guard: false}` as the second argument to register the raw body unguarded (throws propagate). Route the loud signal via `createHttpService(url, {onMiddlewareError})`.
+
+- `registerRequestMiddleware(fn, opts?)` — Returns unregister function
+- `registerResponseMiddleware(fn, opts?)` — Returns unregister function
+- `registerResponseErrorMiddleware(fn, opts?)` — Returns unregister function
+- `guarded(fn, onError?)` — Manual middleware-body guard; still exported for the `{guard: false}` + manual-wrap case
 
 ### Utilities
 

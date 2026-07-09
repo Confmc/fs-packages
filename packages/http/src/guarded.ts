@@ -20,9 +20,12 @@ const defaultOnError: GuardedMiddlewareErrorHandler = (error) => {
  * cannot reject a resolved 200 nor mask the real API error on the error path.
  *
  * `fs-http` invokes middleware synchronously and un-caught **by design** (the
- * library stays loud; the 2026-05-13 rejection of library-side try/catch holds).
- * `guarded` is the **consumer-side, opt-in** defense: apply it at the
- * registration site. Loud library, defensive consumer.
+ * library stays loud; the loops are never awaited). Since ADR-0037 the
+ * `register*Middleware` functions apply `guarded` **by default** — every
+ * registered body is loud-swallow-protected without the consumer doing
+ * anything, and a consumer opts *out* per call with `{guard: false}`. This
+ * export remains public for that opt-out escape hatch, for manual wrapping, and
+ * for consumers on older fs-http where guarding was opt-in.
  *
  * All three middleware types (`RequestMiddlewareFunc`, `ResponseMiddlewareFunc`,
  * `ResponseErrorMiddlewareFunc`) share the `(arg) => void` shape, so this one
