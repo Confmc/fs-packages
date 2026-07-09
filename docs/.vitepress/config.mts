@@ -40,6 +40,7 @@ export default defineConfig({
                         {text: 'fs-loading', link: '/packages/loading'},
                         {text: 'fs-toast', link: '/packages/toast'},
                         {text: 'fs-dialog', link: '/packages/dialog'},
+                        {text: 'fs-form', link: '/packages/form'},
                         {text: 'fs-translation', link: '/packages/translation'},
                     ],
                 },

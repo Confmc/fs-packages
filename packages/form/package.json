@@ -1,0 +1,58 @@
+{
+    "name": "@script-development/fs-form",
+    "version": "0.1.0",
+    "description": "Reactive form-submit helpers: double-submit guard plus 422 validation-error binding for fs-http",
+    "homepage": "https://packages.script.nl/packages/form",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/script-development/fs-packages.git",
+        "directory": "packages/form"
+    },
+    "files": [
+        "dist"
+    ],
+    "type": "module",
+    "sideEffects": false,
+    "main": "./dist/index.cjs",
+    "module": "./dist/index.mjs",
+    "types": "./dist/index.d.mts",
+    "exports": {
+        ".": {
+            "import": {
+                "types": "./dist/index.d.mts",
+                "default": "./dist/index.mjs"
+            },
+            "require": {
+                "types": "./dist/index.d.cts",
+                "default": "./dist/index.cjs"
+            }
+        }
+    },
+    "publishConfig": {
+        "access": "public",
+        "registry": "https://registry.npmjs.org"
+    },
+    "scripts": {
+        "build": "tsdown",
+        "lint:pkg": "publint && attw --pack",
+        "test": "vitest run",
+        "test:coverage": "vitest run --coverage",
+        "test:mutation": "stryker run",
+        "typecheck": "tsc --noEmit"
+    },
+    "devDependencies": {
+        "@script-development/fs-http": "^0.5.0",
+        "@vue/test-utils": "^2.4.11",
+        "axios": "^1.18.1",
+        "happy-dom": "^20.10.3",
+        "vue": "^3.5.39"
+    },
+    "peerDependencies": {
+        "@script-development/fs-http": "^0.5.0",
+        "vue": "^3.5.39"
+    },
+    "engines": {
+        "node": ">=24.0.0"
+    }
+}
