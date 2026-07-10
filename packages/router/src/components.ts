@@ -1,5 +1,5 @@
 import type {Ref} from 'vue';
-import type {LocationQueryRaw, RouteLocationNormalizedLoaded, RouteRecordRaw} from 'vue-router';
+import type {LocationQueryRaw, RouteComponent, RouteLocationNormalizedLoaded, RouteRecordRaw} from 'vue-router';
 
 import {computed, defineComponent, h} from 'vue';
 
@@ -15,7 +15,10 @@ const buildRouteKey = (route: RouteLocationNormalizedLoaded, depth: number): str
     return key;
 };
 
-export const createRouterView = (currentRouteRef: Ref<RouteLocationNormalizedLoaded>): RouterViewComponent =>
+export const createRouterView = (
+    currentRouteRef: Ref<RouteLocationNormalizedLoaded>,
+    notFoundComponent?: RouteComponent,
+): RouterViewComponent =>
     defineComponent<{depth?: number}>(
         ({depth = 0}) => {
             const component = computed(() => {
@@ -24,7 +27,7 @@ export const createRouterView = (currentRouteRef: Ref<RouteLocationNormalizedLoa
             });
 
             return () => {
-                if (!component.value) return h('p', ['404']);
+                if (!component.value) return notFoundComponent ? h(notFoundComponent) : h('p', ['404']);
 
                 return h(component.value, {key: buildRouteKey(currentRouteRef.value, depth)});
             };
@@ -39,11 +42,14 @@ export const createRouterLink = <Routes extends RouteRecordRaw[]>(
     goToRoute: RouterService<Routes>['goToRoute'],
 ): RouterLinkComponent<Routes> =>
     defineComponent<{to: {name: RouteName<Routes>; query?: LocationQueryRaw; id?: number | string; parentId?: number}}>(
-        (props, {slots}) =>
+        (props, {slots, attrs}) =>
             () =>
                 h(
                     'a',
                     {
+                        // Merge consumer-set fallthrough attrs (class/style/data-*/aria-*) onto the
+                        // anchor; spread first so the owned href/onClick stay authoritative.
+                        ...attrs,
                         href: getUrlForRouteName(props.to.name, props.to.id, props.to.query, props.to.parentId),
                         onClick: (event: MouseEvent) => {
                             if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
@@ -56,5 +62,5 @@ export const createRouterLink = <Routes extends RouteRecordRaw[]>(
                 ),
         // https://vuejs.org/api/general.html#function-signature
         // manual runtime props declaration is currently still needed
-        {props: ['to']},
+        {props: ['to'], inheritAttrs: false},
     );

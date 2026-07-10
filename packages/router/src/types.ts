@@ -44,10 +44,47 @@ export type OverviewRouteName<T extends RouteRecordName | undefined> = ExtractNa
 export type EditRouteName<T extends RouteRecordName | undefined> = ExtractNameFromRoutes<T, '.edit'>;
 export type ShowRouteName<T extends RouteRecordName | undefined> = ExtractNameFromRoutes<T, '.show'>;
 
+/**
+ * A typed redirect returned from a before-route middleware. Returning one from a
+ * middleware cancels the pending hop and navigates to the target in a single step —
+ * `goToRoute` (push) by default, `replaceRoute` when `replace: true`.
+ */
+export type MiddlewareRedirect<Routes extends RouteRecordRaw[]> = {
+    name: RouteName<Routes>;
+    id?: number | string;
+    query?: LocationQueryRaw;
+    parentId?: number;
+    /** Replace the current history entry instead of pushing a new one. Defaults to `false`. */
+    replace?: boolean;
+};
+
+/**
+ * The return of a before-route middleware: a boolean (truthy = cancel the hop,
+ * falsy = continue) or a typed {@link MiddlewareRedirect} (cancel-and-navigate).
+ * The first middleware returning truthy — boolean or object — short-circuits the chain.
+ */
+export type BeforeRouteMiddlewareResult<Routes extends RouteRecordRaw[]> = boolean | MiddlewareRedirect<Routes>;
+
 export type BeforeRouteMiddleware<Routes extends RouteRecordRaw[]> = (
     to: ActualRoute<Routes>,
     from: ActualRoute<Routes>,
-) => boolean | Promise<boolean>;
+) => BeforeRouteMiddlewareResult<Routes> | Promise<BeforeRouteMiddlewareResult<Routes>>;
+
+/**
+ * Compile-time compat proof for the 0.2.0 middleware redirect-return widening.
+ * `BeforeRouteMiddleware`'s return union grew from `boolean | Promise<boolean>` to
+ * also admit a typed {@link MiddlewareRedirect}; widening a function's RETURN is
+ * assignability-safe, so every existing `(to, from) => boolean` middleware still
+ * satisfies the type. `tsc` fails here if that guarantee ever regresses.
+ */
+type AssertTrue<T extends true> = T;
+export type LegacyBooleanMiddlewareStillSatisfies = AssertTrue<
+    ((to: ActualRoute<RouteRecordRaw[]>, from: ActualRoute<RouteRecordRaw[]>) => boolean) extends BeforeRouteMiddleware<
+        RouteRecordRaw[]
+    >
+        ? true
+        : false
+>;
 
 export type UnregisterMiddleware = () => void;
 
@@ -59,12 +96,20 @@ export type RouterLinkComponent<Routes extends RouteRecordRaw[]> = DefineSetupFn
 export interface RouterServiceOptions {
     base?: string;
     afterRouteCallbacks?: NavigationHookAfter[];
+    /** Component rendered by `RouterView` in place of the bare `404` fallback when no route matches. */
+    notFoundComponent?: RouteComponent;
 }
 
 export interface RouterService<Routes extends RouteRecordRaw[]> {
     install: () => void;
     normalizedRouteToSpecificRoute: (route: Pick<RouteLocationNormalized, 'name' | 'path'>) => ActualRoute<Routes>;
     goToRoute: (
+        name: RouteName<Routes>,
+        id?: number | string,
+        query?: LocationQueryRaw,
+        parentId?: number,
+    ) => Promise<void>;
+    replaceRoute: (
         name: RouteName<Routes>,
         id?: number | string,
         query?: LocationQueryRaw,

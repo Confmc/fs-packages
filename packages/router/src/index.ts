@@ -19,6 +19,8 @@ export type {
     OverviewRouteName,
     EditRouteName,
     ShowRouteName,
+    MiddlewareRedirect,
+    BeforeRouteMiddlewareResult,
     BeforeRouteMiddleware,
     UnregisterMiddleware,
     RouterViewComponent,

@@ -155,16 +155,37 @@ Register navigation guards that run before or after route changes:
 
 ### Before Navigation
 
+A before-route middleware returns either a **boolean** or a **typed redirect object**. The first middleware that returns something truthy (a `true` or an object) short-circuits the chain — later middleware do not run.
+
+**Boolean form** — `true` cancels the pending navigation, a falsy value lets it continue:
+
 ```typescript
-const unregister = router.registerBeforeRouteMiddleware(async (to, from) => {
-    // Check authentication
-    if (to.meta.requiresAuth && !isAuthenticated()) {
-        router.goToRoute('login');
-        return false; // prevent navigation
-    }
-    return true; // allow navigation
+const unregister = router.registerBeforeRouteMiddleware((to, from) => {
+    // Cancel navigation into a locked section
+    if (to.meta.locked) return true;
+    return false; // allow navigation
 });
 ```
+
+**Redirect form** — return `{name, id?, query?, parentId?, replace?}` to **cancel the pending hop and navigate to the target in one step**. This is the type-safe replacement for the old cancel-then-`goToRoute` two-step (return a redirect object instead of calling `goToRoute` yourself and returning `true`):
+
+```typescript
+const unregister = router.registerBeforeRouteMiddleware((to) => {
+    // Bounce unauthenticated visitors to login
+    if (to.meta.requiresAuth && !isAuthenticated()) {
+        return {name: 'login'};
+    }
+    return false;
+});
+```
+
+The redirect **pushes** by default (a new history entry). Set `replace: true` to replace the current entry instead — use it for bounces that should not be reachable via Back (a consumed OAuth callback, a 404-home redirect):
+
+```typescript
+router.registerBeforeRouteMiddleware((to) => (to.meta.deadLink ? {name: 'dashboard', replace: true} : false));
+```
+
+`id`, `query`, and `parentId` on the redirect object thread through to the target exactly as they do for `goToRoute`. The redirect object short-circuits the middleware chain identically to a truthy boolean.
 
 ### After Navigation
 
@@ -193,6 +214,14 @@ import {router} from '@/services';
     <router.RouterLink to="/users">Users</router.RouterLink>
 </template>
 ```
+
+`RouterLink` forwards consumer-set attributes (`class`, `style`, `data-*`, `aria-*`, …) onto the rendered `<a>`, so a styled link keeps its styling:
+
+```vue
+<router.RouterLink :to="{name: 'users.overview'}" class="nav-link" aria-current="page">Users</router.RouterLink>
+```
+
+The computed `href` and the navigation `onClick` stay authoritative — a fallthrough `href` attribute cannot override them.
 
 ## URL Generation
 
@@ -227,29 +256,34 @@ const router = createRouterService(routes, {
             /* ... */
         },
     ],
+    notFoundComponent: NotFoundPage, // rendered by RouterView when no route matches
 });
 ```
+
+Without `notFoundComponent`, `RouterView` renders a bare `404` string for an unmatched depth. Provide a component to render your own designed not-found page instead — pair it with a catch-all route (`{path: '/:pathMatch(.*)*', ...}`) to also own the URL.
 
 ## API Reference
 
 ### `createRouterService(routes, options?)`
 
-| Parameter                     | Type                    | Description                   |
-| ----------------------------- | ----------------------- | ----------------------------- |
-| `routes`                      | `RouteRecordRaw[]`      | Route definitions             |
-| `options.base`                | `string`                | Base path for routing         |
-| `options.afterRouteCallbacks` | `NavigationHookAfter[]` | Global after-navigation hooks |
+| Parameter                     | Type                    | Description                                                          |
+| ----------------------------- | ----------------------- | -------------------------------------------------------------------- |
+| `routes`                      | `RouteRecordRaw[]`      | Route definitions                                                    |
+| `options.base`                | `string`                | Base path for routing                                                |
+| `options.afterRouteCallbacks` | `NavigationHookAfter[]` | Global after-navigation hooks                                        |
+| `options.notFoundComponent`   | `RouteComponent`        | Rendered by `RouterView` on an unmatched route (default: bare `404`) |
 
 ### Navigation Methods
 
-| Method                                    | Description                        |
-| ----------------------------------------- | ---------------------------------- |
-| `goToRoute(name, id?, query?, parentId?)` | Navigate to any named route        |
-| `goToOverviewPage(name)`                  | Navigate to `name.overview`        |
-| `goToCreatePage(name)`                    | Navigate to `name.create`          |
-| `goToEditPage(name, id)`                  | Navigate to `name.edit` with `:id` |
-| `goToShowPage(name, id, query?)`          | Navigate to `name.show` with `:id` |
-| `goBack()`                                | Navigate back in history           |
+| Method                                       | Description                                   |
+| -------------------------------------------- | --------------------------------------------- |
+| `goToRoute(name, id?, query?, parentId?)`    | Navigate to any named route (push)            |
+| `replaceRoute(name, id?, query?, parentId?)` | Navigate, replacing the current history entry |
+| `goToOverviewPage(name)`                     | Navigate to `name.overview`                   |
+| `goToCreatePage(name)`                       | Navigate to `name.create`                     |
+| `goToEditPage(name, id)`                     | Navigate to `name.edit` with `:id`            |
+| `goToShowPage(name, id, query?)`             | Navigate to `name.show` with `:id`            |
+| `goBack()`                                   | Navigate back in history                      |
 
 ### Route State
 
