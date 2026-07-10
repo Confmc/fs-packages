@@ -1,5 +1,16 @@
 # @script-development/fs-http
 
+## 0.6.0 — 2026-07-09
+
+### Minor Changes
+
+- **Middleware is now guarded by default (ADR-0037).** `registerRequestMiddleware`, `registerResponseMiddleware`, and `registerResponseErrorMiddleware` wrap the supplied body in `guarded()` internally, so a side-effect throw (toast, store write, router push, cache-hash parse) can no longer reject a resolved 200 nor mask the real API error on the error path — without the consumer doing anything. This supersedes the consumer-side obligation to hand-wrap every middleware body (war-room Architectural Principle #8, "every consumer MUST wrap its own middleware bodies"). The library stays **loud** (surfaces via `console.error` or a service-level handler, never silent) and **sync-only** (the interceptor loops are unchanged and un-awaited; async middleware remains out of contract).
+    - **Per-call opt-out:** `register*Middleware(fn, { guard: false })` registers the raw body unguarded (throws propagate) — the deliberate escape hatch. No known consumer today; kept as insurance against a one-way door.
+    - **Service-level error routing:** `createHttpService(baseURL, { onMiddlewareError })` sets the handler passed to the internal `guarded()` for every middleware on that service, so a consumer can route the swallowed failure to an error tracker instead of `console.error`. Unset ⇒ the default loud `console.error` stands.
+    - `guarded()` remains a public export for the `{ guard: false }` + manual-wrap case and for consumers on older fs-http.
+    - New exported type: `RegisterMiddlewareOptions`.
+    - Existing explicit `guarded()` wraps at consumers become redundant-but-harmless double-wraps (inner catches, outer never fires) — strip in a later, unhurried cleanup.
+
 ## 0.5.0 — 2026-07-02
 
 ### Minor Changes

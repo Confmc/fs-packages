@@ -1,5 +1,7 @@
 import type {AxiosError, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig} from 'axios';
 
+import type {GuardedMiddlewareErrorHandler} from './guarded';
+
 export type AxiosResponseError = Record<string, unknown>;
 
 export type RequestMiddlewareFunc = (request: InternalAxiosRequestConfig) => void;
@@ -7,6 +9,16 @@ export type ResponseMiddlewareFunc = (response: AxiosResponse) => void;
 export type ResponseErrorMiddlewareFunc = (error: AxiosError<AxiosResponseError>) => void;
 
 export type UnregisterMiddleware = () => void;
+
+/**
+ * Options for a `register*Middleware` call (ADR-0037).
+ *
+ * `guard` (default `true`): wrap the middleware body in `guarded()` so a
+ * side-effect throw cannot corrupt the interceptor chain. Pass `{guard: false}`
+ * to register the raw body unguarded — the deliberate escape hatch for a case
+ * that genuinely wants a throw to propagate. No such case exists today.
+ */
+export type RegisterMiddlewareOptions = {guard?: boolean};
 
 export type HttpServiceOptions = {
     headers?: Record<string, string>;
@@ -20,6 +32,15 @@ export type HttpServiceOptions = {
      * parameter on each method.
      */
     timeout?: number;
+    /**
+     * Handler invoked when an auto-guarded middleware body throws (ADR-0037).
+     * Becomes the `onError` passed to `guarded()` for every middleware
+     * registered on this service (unless the middleware opts out with
+     * `{guard: false}`). Unset ⇒ `guarded()`'s default loud `console.error`.
+     * Route it to an error tracker (Sentry, kendo-error-tracker) to surface the
+     * swallowed failure elsewhere. Must not re-throw.
+     */
+    onMiddlewareError?: GuardedMiddlewareErrorHandler;
 };
 
 export type HttpService = {
@@ -56,7 +77,10 @@ export type HttpService = {
      * to render and `URL.revokeObjectURL(...)` on cleanup.
      */
     previewRequest: (endpoint: string, options?: AxiosRequestConfig) => Promise<AxiosResponse<Blob>>;
-    registerRequestMiddleware: (fn: RequestMiddlewareFunc) => UnregisterMiddleware;
-    registerResponseMiddleware: (fn: ResponseMiddlewareFunc) => UnregisterMiddleware;
-    registerResponseErrorMiddleware: (fn: ResponseErrorMiddlewareFunc) => UnregisterMiddleware;
+    registerRequestMiddleware: (fn: RequestMiddlewareFunc, opts?: RegisterMiddlewareOptions) => UnregisterMiddleware;
+    registerResponseMiddleware: (fn: ResponseMiddlewareFunc, opts?: RegisterMiddlewareOptions) => UnregisterMiddleware;
+    registerResponseErrorMiddleware: (
+        fn: ResponseErrorMiddlewareFunc,
+        opts?: RegisterMiddlewareOptions,
+    ) => UnregisterMiddleware;
 };

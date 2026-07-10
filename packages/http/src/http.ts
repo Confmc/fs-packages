@@ -5,6 +5,7 @@ import axios from 'axios';
 import type {
     HttpService,
     HttpServiceOptions,
+    RegisterMiddlewareOptions,
     RequestMiddlewareFunc,
     ResponseErrorMiddlewareFunc,
     ResponseMiddlewareFunc,
@@ -12,6 +13,7 @@ import type {
     AxiosResponseError,
 } from './types';
 
+import {guarded} from './guarded';
 import {isAxiosError} from './utils';
 
 /**
@@ -50,6 +52,11 @@ const parseBaseURL = (baseURL: string): URL => {
 
 export const createHttpService = (baseURL: string, options?: HttpServiceOptions): HttpService => {
     const apiUrl = parseBaseURL(baseURL);
+
+    // Service-level handler for auto-guarded middleware throws (ADR-0037).
+    // Passed to guarded() for every registered middleware; undefined ⇒ guarded()'s
+    // default loud console.error.
+    const onMiddlewareError = options?.onMiddlewareError;
 
     const http = axios.create({
         baseURL: apiUrl.toString(),
@@ -123,23 +130,40 @@ export const createHttpService = (baseURL: string, options?: HttpServiceOptions)
     const previewRequest = (endpoint: string, options?: AxiosRequestConfig) =>
         http.get<Blob>(endpoint, {...options, responseType: 'blob'});
 
-    // Middleware registration
-    const registerRequestMiddleware = (fn: RequestMiddlewareFunc): UnregisterMiddleware => {
-        requestMiddleware.push(fn);
+    // Middleware registration. Bodies are wrapped in guarded() by default
+    // (ADR-0037) so a side-effect throw cannot reject a resolved 200 nor mask
+    // the real API error. Pass `{guard: false}` to register the raw body
+    // unguarded (throws propagate — the deliberate escape hatch). The stored
+    // (possibly wrapped) function is what's pushed AND what unregister removes,
+    // so reference identity holds.
+    const registerRequestMiddleware = (
+        fn: RequestMiddlewareFunc,
+        opts?: RegisterMiddlewareOptions,
+    ): UnregisterMiddleware => {
+        const middleware = opts?.guard === false ? fn : guarded(fn, onMiddlewareError);
+        requestMiddleware.push(middleware);
 
-        return unregister(requestMiddleware, fn);
+        return unregister(requestMiddleware, middleware);
     };
 
-    const registerResponseMiddleware = (fn: ResponseMiddlewareFunc): UnregisterMiddleware => {
-        responseMiddleware.push(fn);
+    const registerResponseMiddleware = (
+        fn: ResponseMiddlewareFunc,
+        opts?: RegisterMiddlewareOptions,
+    ): UnregisterMiddleware => {
+        const middleware = opts?.guard === false ? fn : guarded(fn, onMiddlewareError);
+        responseMiddleware.push(middleware);
 
-        return unregister(responseMiddleware, fn);
+        return unregister(responseMiddleware, middleware);
     };
 
-    const registerResponseErrorMiddleware = (fn: ResponseErrorMiddlewareFunc): UnregisterMiddleware => {
-        responseErrorMiddleware.push(fn);
+    const registerResponseErrorMiddleware = (
+        fn: ResponseErrorMiddlewareFunc,
+        opts?: RegisterMiddlewareOptions,
+    ): UnregisterMiddleware => {
+        const middleware = opts?.guard === false ? fn : guarded(fn, onMiddlewareError);
+        responseErrorMiddleware.push(middleware);
 
-        return unregister(responseErrorMiddleware, fn);
+        return unregister(responseErrorMiddleware, middleware);
     };
 
     return {

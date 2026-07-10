@@ -4,6 +4,7 @@ export type {GuardedMiddlewareErrorHandler} from './guarded';
 export type {
     HttpService,
     HttpServiceOptions,
+    RegisterMiddlewareOptions,
     RequestMiddlewareFunc,
     ResponseMiddlewareFunc,
     ResponseErrorMiddlewareFunc,

@@ -172,56 +172,72 @@ const unregister = http.registerResponseErrorMiddleware((error) => {
 Other packages hook into these middleware points. `fs-loading` registers request + response + error middleware to track loading state. `fs-dialog` can register error middleware to show error dialogs. You can stack as many middleware handlers as you need — they all run independently.
 :::
 
-## Middleware guard (`guarded`)
+## Middleware guarding (default-on since 0.6.0 — ADR-0037)
 
-`fs-http` invokes middleware **synchronously and un-caught, by design** — the library stays loud so a bug in a middleware body is never silently eaten inside the transport layer. The consequence: if a middleware body throws (a toast that blows up, a store write, a router push, a `JSON.parse` of a cache hash), that throw escapes into the interceptor chain. On the response path it **rejects a resolved 200**; on the error path it **replaces the original `AxiosError` with the middleware's throw**, masking the real API failure.
+`fs-http` invokes middleware **synchronously and un-awaited, by design** — the interceptor loops are never `await`ed, so async middleware is out of contract. The hazard: if a middleware body throws (a toast that blows up, a store write, a router push, a `JSON.parse` of a cache hash), that throw would escape into the interceptor chain — on the response path **rejecting a resolved 200**, on the error path **replacing the original `AxiosError` with the middleware's throw** and masking the real API failure.
 
-`guarded()` is the **consumer-side, opt-in** defense. Wrap a middleware body at its registration site and a throw from the body is caught, reported, and swallowed — the interceptor chain is never corrupted. Loud library, defensive consumer.
+**Since 0.6.0, `fs-http` guards every registered middleware body by default.** `register*Middleware` wraps the supplied body in `guarded()` internally, so a side-effect throw is caught, reported loudly, and swallowed — the interceptor chain is never corrupted — **without you doing anything**. The library stays **loud** (it surfaces the failure, never silently eats it) and **sync-only**.
 
 ```typescript
-import {createHttpService, guarded} from '@script-development/fs-http';
+import {createHttpService} from '@script-development/fs-http';
 
 const http = createHttpService(`${location.origin}/api`);
 
-// A throwing response body would otherwise reject a resolved 200 — guarded()
-// contains it so the successful response still resolves.
-http.registerResponseMiddleware(
-    guarded((response) => {
-        showToast(`Loaded ${response.config.url}`); // may throw — no longer fatal
-    }),
-);
+// Guarded automatically: a throw here no longer rejects the resolved 200.
+http.registerResponseMiddleware((response) => {
+    showToast(`Loaded ${response.config.url}`); // may throw — contained
+});
 
-// A throwing error body would otherwise mask the real AxiosError — guarded()
-// contains it so the caller still rejects with the original error.
-http.registerResponseErrorMiddleware(
-    guarded((error) => {
-        openErrorDialog(error); // may throw — the 500 still surfaces to the caller
-    }),
-);
+// Guarded automatically: a throw here no longer masks the real AxiosError.
+http.registerResponseErrorMiddleware((error) => {
+    openErrorDialog(error); // may throw — the 500 still surfaces to the caller
+});
 ```
 
-All three middleware types share the `(arg) => void` shape, so one generic wraps any of them and stays assignable to the source type with **zero casts** — `guarded(reqBody)`, `guarded(resBody)`, and `guarded(errBody)` each infer their argument type from the body you pass.
+### Routing the loud signal (`onMiddlewareError`)
 
-### Custom error handling
-
-By default a swallowed throw is logged loudly via `console.error` (visible to any error tracker that hooks `console`). It is never re-thrown — re-throwing would re-open the exact failure `guarded()` closes. Pass a custom `GuardedMiddlewareErrorHandler` to route the failure elsewhere:
+By default a swallowed throw is logged loudly via `console.error` (visible to any error tracker that hooks `console`). Pass a service-level `onMiddlewareError` handler to route every auto-guarded middleware failure on that service elsewhere. It receives the thrown value and **must not re-throw** — re-throwing re-opens the exact failure the guard closes.
 
 ```typescript
-import {guarded, type GuardedMiddlewareErrorHandler} from '@script-development/fs-http';
+import {createHttpService, type GuardedMiddlewareErrorHandler} from '@script-development/fs-http';
 
 const reportToTracker: GuardedMiddlewareErrorHandler = (error) => {
     errorTracker.capture(error); // must not re-throw
 };
 
-http.registerResponseMiddleware(
-    guarded((response) => {
-        analytics.record(response.status);
-    }, reportToTracker),
+const http = createHttpService(`${location.origin}/api`, {onMiddlewareError: reportToTracker});
+
+// Any throw from this body is routed to reportToTracker, not console.error.
+http.registerResponseMiddleware((response) => {
+    analytics.record(response.status);
+});
+```
+
+### Opting out (`{guard: false}`)
+
+For the rare body that genuinely wants a throw to propagate, register it unguarded. No such consumer exists today; the option is insurance against a one-way door, not a feature with a known use.
+
+```typescript
+http.registerRequestMiddleware(
+    (config) => {
+        assertInvariant(config); // a throw here WILL reject the request
+    },
+    {guard: false},
 );
 ```
 
-::: tip Why opt-in, not library-side
-Wrapping the interceptor loops in try/catch inside `fs-http` was rejected (2026-05-13): it would swallow every consumer's middleware bug silently, at the library layer, with no way to opt back into loud behaviour. `guarded()` inverts that — the library stays loud, and each consumer decides, explicitly at each registration site, which bodies to protect.
+### `guarded()` (manual wrap)
+
+`guarded()` remains a public export for the `{guard: false}` case, for manual composition, and for consumers still on older fs-http where guarding was opt-in. All three middleware types share the `(arg) => void` shape, so one generic wraps any of them and stays assignable with **zero casts** — `guarded(reqBody)`, `guarded(resBody)`, `guarded(errBody)`. Note that wrapping a body you then register through the default path double-wraps it (inner catches, outer auto-guard never fires) — harmless, but redundant.
+
+```typescript
+import {guarded} from '@script-development/fs-http';
+
+const wrapped = guarded((response) => analytics.record(response.status), reportToTracker);
+```
+
+::: tip Why default-on, not opt-in
+The 2026-05-13 ruling rejected a _silent_ library-side try/catch (silent middleware failure is worse than a loud throw). `guarded()` is a third option that did not exist then — **loud swallow**: it surfaces the failure _and_ lets the request complete correctly. Making it the default (ADR-0037) serves the "be loud, never silent" value strictly better than a loud throw, which still corrupts the request outcome. The fleet-wide WR-0290 wave proved an opt-in consumer obligation is unmet by default — so the guard moved to the substrate.
 :::
 
 ## File Operations
@@ -281,14 +297,15 @@ try {
 
 ### `createHttpService(baseURL, options?)`
 
-| Parameter                  | Type                     | Description                                                                                                                                                                                                               |
-| -------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `baseURL`                  | `string`                 | Base URL for all requests. **Must be absolute** (e.g. `${location.origin}/api`); relative paths fail fast.                                                                                                                |
-| `options.timeout`          | `number \| undefined`    | Request timeout in milliseconds (default: `30000`; pass `0` to disable)                                                                                                                                                   |
-| `options.headers`          | `Record<string, string>` | Default headers                                                                                                                                                                                                           |
-| `options.withCredentials`  | `boolean`                | Send cookies cross-origin (default: `true`)                                                                                                                                                                               |
-| `options.withXSRFToken`    | `boolean`                | Forward `XSRF-TOKEN` cookie as `X-XSRF-TOKEN` header (default: `false`). Set `true` for Laravel Sanctum SPA; leave `false` for stateless / token / non-Sanctum stacks. See [Authentication & XSRF](#authentication-xsrf). |
-| `options.smartCredentials` | `boolean`                | Auto-toggle credentials by origin (default: `false`)                                                                                                                                                                      |
+| Parameter                   | Type                            | Description                                                                                                                                                                                                                            |
+| --------------------------- | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `baseURL`                   | `string`                        | Base URL for all requests. **Must be absolute** (e.g. `${location.origin}/api`); relative paths fail fast.                                                                                                                             |
+| `options.timeout`           | `number \| undefined`           | Request timeout in milliseconds (default: `30000`; pass `0` to disable)                                                                                                                                                                |
+| `options.headers`           | `Record<string, string>`        | Default headers                                                                                                                                                                                                                        |
+| `options.withCredentials`   | `boolean`                       | Send cookies cross-origin (default: `true`)                                                                                                                                                                                            |
+| `options.withXSRFToken`     | `boolean`                       | Forward `XSRF-TOKEN` cookie as `X-XSRF-TOKEN` header (default: `false`). Set `true` for Laravel Sanctum SPA; leave `false` for stateless / token / non-Sanctum stacks. See [Authentication & XSRF](#authentication-xsrf).              |
+| `options.smartCredentials`  | `boolean`                       | Auto-toggle credentials by origin (default: `false`)                                                                                                                                                                                   |
+| `options.onMiddlewareError` | `GuardedMiddlewareErrorHandler` | Handler for a throw from any auto-guarded middleware on this service (default: a loud `console.error`). Route to an error tracker. Must not re-throw. See [Middleware guarding](#middleware-guarding-default-on-since-0-6-0-adr-0037). |
 
 ### Constants
 
@@ -310,15 +327,17 @@ try {
 
 ### Middleware Registration
 
-| Method                                | Returns                |
-| ------------------------------------- | ---------------------- |
-| `registerRequestMiddleware(fn)`       | `UnregisterMiddleware` |
-| `registerResponseMiddleware(fn)`      | `UnregisterMiddleware` |
-| `registerResponseErrorMiddleware(fn)` | `UnregisterMiddleware` |
+| Method                                       | Returns                | Notes                                                                                      |
+| -------------------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------ |
+| `registerRequestMiddleware(fn, opts?)`       | `UnregisterMiddleware` | Auto-guarded by default; pass `{guard: false}` to register the raw body (throws propagate) |
+| `registerResponseMiddleware(fn, opts?)`      | `UnregisterMiddleware` | Auto-guarded by default; pass `{guard: false}` to register the raw body (throws propagate) |
+| `registerResponseErrorMiddleware(fn, opts?)` | `UnregisterMiddleware` | Auto-guarded by default; pass `{guard: false}` to register the raw body (throws propagate) |
+
+`opts` type: `RegisterMiddlewareOptions` = `{ guard?: boolean }` (default `guard: true`).
 
 ### Middleware Guard
 
-| Export                          | Type                                                      | Description                                                                                                                                                           |
-| ------------------------------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `guarded(fn, onError?)`         | `<T>(fn: (arg: T) => void, onError?) => (arg: T) => void` | Wraps a middleware body so a throw is caught, reported, and swallowed instead of corrupting the interceptor chain. See [Middleware guard](#middleware-guard-guarded). |
-| `GuardedMiddlewareErrorHandler` | `(error: unknown) => void`                                | Handler type for `guarded`'s optional second argument; defaults to a loud `console.error`. Must not re-throw.                                                         |
+| Export                          | Type                                                      | Description                                                                                                                                                                                                                                                                                                           |
+| ------------------------------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `guarded(fn, onError?)`         | `<T>(fn: (arg: T) => void, onError?) => (arg: T) => void` | Wraps a middleware body so a throw is caught, reported, and swallowed instead of corrupting the interceptor chain. Applied automatically by `register*Middleware` since 0.6.0; exported for the `{guard: false}` + manual-wrap case. See [Middleware guarding](#middleware-guarding-default-on-since-0-6-0-adr-0037). |
+| `GuardedMiddlewareErrorHandler` | `(error: unknown) => void`                                | Handler type for `guarded`'s optional second argument and `createHttpService`'s `onMiddlewareError` option; defaults to a loud `console.error`. Must not re-throw.                                                                                                                                                    |

@@ -547,6 +547,168 @@ describe('createHttpService', () => {
             expect(response.config.responseType).toBe('blob');
         });
     });
+
+    describe('middleware guarding by default (ADR-0037)', () => {
+        // fs-http auto-wraps every registered middleware body in guarded() so a
+        // side-effect throw cannot corrupt the interceptor chain. Consumers opt
+        // OUT per-call with {guard: false}. The library stays loud (console.error
+        // by default, or a service-level onMiddlewareError handler) — never silent.
+
+        let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+
+        beforeEach(() => {
+            consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        });
+
+        afterEach(() => {
+            consoleErrorSpy.mockRestore();
+        });
+
+        it('default-guards a throwing request middleware — the resolved request is NOT rejected', async () => {
+            // Arrange
+            mock.onGet(/.*/).reply(200, {ok: true});
+            const service = createHttpService(BASE_URL);
+            const boom = new Error('request middleware boom');
+            service.registerRequestMiddleware(() => {
+                throw boom;
+            });
+
+            // Act & Assert — a throwing request body would otherwise reject a
+            // resolved 200; guarded() default keeps the request whole.
+            const response = await service.getRequest('/test');
+            expect(response.status).toBe(200);
+            // ...and the throw is surfaced loudly via the default console.error handler.
+            expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('[fs-http]'), boom);
+        });
+
+        it('default-guards a throwing response middleware — the resolved 200 is NOT rejected', async () => {
+            // Arrange
+            mock.onGet(/.*/).reply(200, {ok: true});
+            const service = createHttpService(BASE_URL);
+            const boom = new Error('response middleware boom');
+            service.registerResponseMiddleware(() => {
+                throw boom;
+            });
+
+            // Act & Assert
+            const response = await service.getRequest('/test');
+            expect(response.status).toBe(200);
+            expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('[fs-http]'), boom);
+        });
+
+        it('default-guards a throwing response-error middleware — the REAL API error is preserved, not masked', async () => {
+            // Arrange — an unguarded throw here propagates before Promise.reject(error)
+            // and masks the real AxiosError. guarded() default swallows it so the
+            // original 500 surfaces to the caller.
+            mock.onGet(/.*/).reply(500, {error: 'server'});
+            const service = createHttpService(BASE_URL);
+            service.registerResponseErrorMiddleware(() => {
+                throw new Error('error middleware boom');
+            });
+
+            // Act & Assert — rejection is the original API error, not the middleware throw.
+            await expect(service.getRequest('/fail')).rejects.toMatchObject({response: {status: 500}});
+        });
+
+        it('routes an auto-guarded throw to a service-level onMiddlewareError instead of console.error', async () => {
+            // Arrange
+            mock.onGet(/.*/).reply(200, {ok: true});
+            const onMiddlewareError = vi.fn();
+            const service = createHttpService(BASE_URL, {onMiddlewareError});
+            const boom = new Error('routed boom');
+            service.registerResponseMiddleware(() => {
+                throw boom;
+            });
+
+            // Act
+            const response = await service.getRequest('/test');
+
+            // Assert — custom handler receives the thrown value; default console.error does NOT fire.
+            expect(response.status).toBe(200);
+            expect(onMiddlewareError).toHaveBeenCalledTimes(1);
+            expect(onMiddlewareError).toHaveBeenCalledWith(boom);
+            expect(consoleErrorSpy).not.toHaveBeenCalled();
+        });
+
+        it('{guard: false} on a request middleware lets the throw propagate (opt-out escape hatch)', async () => {
+            // Arrange
+            mock.onGet(/.*/).reply(200, {ok: true});
+            const service = createHttpService(BASE_URL);
+            service.registerRequestMiddleware(
+                () => {
+                    throw new Error('unguarded request boom');
+                },
+                {guard: false},
+            );
+
+            // Act & Assert — unguarded body throws into the interceptor, rejecting the request.
+            await expect(service.getRequest('/test')).rejects.toThrow('unguarded request boom');
+        });
+
+        it('{guard: false} on a response-error middleware masks the API error (unguarded propagation proven)', async () => {
+            // Arrange
+            mock.onGet(/.*/).reply(500, {error: 'server'});
+            const service = createHttpService(BASE_URL);
+            service.registerResponseErrorMiddleware(
+                () => {
+                    throw new Error('unguarded error boom');
+                },
+                {guard: false},
+            );
+
+            // Act & Assert — the middleware throw replaces the original AxiosError.
+            await expect(service.getRequest('/fail')).rejects.toThrow('unguarded error boom');
+        });
+
+        it('{guard: true} (explicit) still guards — a throwing body does NOT reject (kills the boolean-literal mutant)', async () => {
+            // Arrange — pins that only `=== false` opts out; an explicit `true` (and by
+            // extension the undefined default) takes the guarded path.
+            mock.onGet(/.*/).reply(200, {ok: true});
+            const service = createHttpService(BASE_URL);
+            service.registerResponseMiddleware(
+                () => {
+                    throw new Error('explicit-true boom');
+                },
+                {guard: true},
+            );
+
+            // Act & Assert
+            const response = await service.getRequest('/test');
+            expect(response.status).toBe(200);
+        });
+
+        it('unregister removes the auto-guarded wrapper (reference identity holds through the guard)', async () => {
+            // Arrange — the wrapper stored in the array is what unregister must splice.
+            mock.onGet(/.*/).reply(200, {ok: true});
+            const service = createHttpService(BASE_URL);
+            const middlewareFn = vi.fn();
+            const unregister = service.registerResponseMiddleware(middlewareFn);
+
+            // Act
+            await service.getRequest('/first');
+            unregister();
+            await service.getRequest('/second');
+
+            // Assert — called once (guarded wrapper removed on unregister).
+            expect(middlewareFn).toHaveBeenCalledTimes(1);
+        });
+
+        it('unregister removes an unguarded ({guard: false}) middleware by raw reference', async () => {
+            // Arrange
+            mock.onGet(/.*/).reply(200, {ok: true});
+            const service = createHttpService(BASE_URL);
+            const middlewareFn = vi.fn();
+            const unregister = service.registerRequestMiddleware(middlewareFn, {guard: false});
+
+            // Act
+            await service.getRequest('/first');
+            unregister();
+            await service.getRequest('/second');
+
+            // Assert
+            expect(middlewareFn).toHaveBeenCalledTimes(1);
+        });
+    });
 });
 
 describe('isAxiosError', () => {

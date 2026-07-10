@@ -220,13 +220,19 @@ describe('guarded', () => {
             mock.restore();
         });
 
-        it('CONTRAST: an UN-guarded throwing response body rejects the resolved 200', async () => {
-            // Arrange — demonstrates the exposure guarded() closes.
+        it('CONTRAST: an UN-guarded ({guard: false}) throwing response body rejects the resolved 200', async () => {
+            // Arrange — demonstrates the exposure guarded() closes. Since ADR-0037
+            // (fs-http 0.6.0) register* auto-guards by default, so the exposure is now
+            // only reachable via the deliberate {guard: false} opt-out — which is
+            // exactly what this CONTRAST must exercise to stay meaningful.
             mock.onGet(/.*/).reply(200, {ok: true});
             const service = createHttpService(BASE_URL);
-            service.registerResponseMiddleware(() => {
-                throw new Error('toast blew up');
-            });
+            service.registerResponseMiddleware(
+                () => {
+                    throw new Error('toast blew up');
+                },
+                {guard: false},
+            );
 
             // Act & Assert — the successful 200 is turned into a rejection
             await expect(service.getRequest('/ok')).rejects.toThrow('toast blew up');
