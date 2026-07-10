@@ -79,25 +79,63 @@ export const createRouterService = <Routes extends RouteRecordRaw[]>(
     const getUrlForRouteName: RouterService<Routes>['getUrlForRouteName'] = (name, id, query, parentId) =>
         router.resolve({name, params: resolveRouteParams(name as string, id, parentId), query}).fullPath;
 
+    // Bounds the middleware redirect-return chain. Each returned `MiddlewareRedirect` cancels the
+    // pending hop and dispatches a fresh navigation, which re-enters `beforeEach` and re-runs the
+    // whole chain — so two middleware that redirect into each other's guarded routes (a
+    // misconfigured login↔dashboard guard) would recurse without bound. `redirectDepth` counts
+    // consecutive redirects and is reset to 0 the moment a chain terminates — a navigation is
+    // allowed to proceed, or a middleware cancels without redirecting — so the cap only ever trips
+    // on a genuine loop, never on unrelated back-to-back navigations. Mirrors vue-router's own
+    // internal max-redirect ceiling.
+    const MAX_REDIRECT_DEPTH = 10;
+    let redirectDepth = 0;
+
     const beforeRouteMiddleware: BeforeRouteMiddleware<Routes>[] = [];
     router.beforeEach(async (to, from) => {
         const toNormalized = normalizedRouteToSpecificRoute(to);
         const fromNormalized = from.name ? normalizedRouteToSpecificRoute(from) : toNormalized;
 
+        let cancelled = false;
         for (const middleware of beforeRouteMiddleware) {
             const result = await middleware(toNormalized, fromNormalized);
             if (result === false) continue;
 
-            // A truthy object return cancels the pending hop and navigates to the target in
-            // one step — replace when `replace: true`, push otherwise. A boolean `true` just
-            // cancels. Either short-circuits the chain (return false stops beforeEach).
+            // A truthy object return cancels the pending hop and navigates to the target in one
+            // step — replace when `replace: true`, push otherwise. A boolean `true` just cancels.
             if (result !== true) {
-                if (result.replace) void replaceRoute(result.name, result.id, result.query, result.parentId);
-                else void goToRoute(result.name, result.id, result.query, result.parentId);
+                if (redirectDepth >= MAX_REDIRECT_DEPTH) {
+                    redirectDepth = 0;
+                    console.error(
+                        `fs-router: middleware redirect chain exceeded ${MAX_REDIRECT_DEPTH} hops — aborting to break a redirect loop`,
+                    );
+
+                    return false;
+                }
+
+                redirectDepth += 1;
+                // Fire-and-forget: the dispatch resolves once the redirect navigation settles.
+                // `router.push`/`replace` resolve (not reject) for NavigationDuplicated/Aborted, but
+                // they DO reject when a guard or lazy component further down the redirected chain
+                // throws — attach a reporter so that surfaces instead of an unhandled rejection.
+                const dispatch = result.replace ? replaceRoute : goToRoute;
+                void dispatch(result.name, result.id, result.query, result.parentId).catch((error: unknown) => {
+                    console.error('fs-router: middleware redirect navigation failed', error);
+                });
+
+                // The chain continues in the dispatched navigation — do NOT reset the depth here.
+                return false;
             }
 
-            return false;
+            // Plain `true` cancels the hop without redirecting; the chain terminates.
+            cancelled = true;
+            break;
         }
+
+        // The chain terminated without dispatching a redirect (a `true` cancel or a clean proceed),
+        // so reset the depth for the next, unrelated navigation.
+        redirectDepth = 0;
+
+        return cancelled ? false : undefined;
     });
 
     const afterRouteMiddleware: NavigationHookAfter[] = [...(options?.afterRouteCallbacks ?? [])];

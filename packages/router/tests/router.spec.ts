@@ -763,6 +763,127 @@ describe('router service', () => {
             // Assert — the awaited object return redirects just like a sync one
             expect(service.currentRouteRef.value.name).toBe('items.overview');
         });
+
+        it('should not commit the blocked hop when a middleware returns a redirect', async () => {
+            // Arrange — a single redirect (about → items.overview) with an afterEach recorder that
+            // logs only *successful* commits (failure === undefined).
+            const service = createRouterService(createTestRoutes());
+            await service.goToRoute('home');
+            await flushPromises();
+            const committed: (string | symbol | undefined)[] = [];
+            service.registerAfterRouteMiddleware((to, _from, failure) => {
+                if (!failure) committed.push(to.name);
+            });
+            service.registerBeforeRouteMiddleware((to) => (to.name === 'about' ? {name: 'items.overview'} : false));
+
+            // Act
+            await service.goToRoute('about');
+            await flushPromises();
+
+            // Assert — the blocked 'about' hop is aborted, never committed; only the redirect target
+            // lands (a redirect that returned `true` instead of `false` would commit 'about' first)
+            expect(committed).not.toContain('about');
+            expect(committed).toContain('items.overview');
+            expect(service.currentRouteRef.value.name).toBe('items.overview');
+        });
+
+        it('should abort a self-redirecting middleware loop instead of recursing without bound', async () => {
+            // Arrange — a middleware that redirects 'about' back to 'about'. The blocked hop never
+            // commits, so 'from' stays 'home' and every re-dispatch redirects again — an unbounded
+            // loop without the depth cap.
+            const service = createRouterService(createTestRoutes());
+            await service.goToRoute('home');
+            await flushPromises();
+            const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+            service.registerBeforeRouteMiddleware((to) => (to.name === 'about' ? {name: 'about'} : false));
+
+            // Act
+            await service.goToRoute('about');
+
+            // Assert — the chain hits the depth cap, logs, and stops (a broken guard would hang here)
+            await vi.waitFor(() => {
+                expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('redirect chain exceeded'));
+            });
+            await flushPromises();
+
+            // ...and the aborted hop is cancelled, not committed — the router stays on 'home'
+            // (a cap branch that returned `true` would let the final blocked 'about' hop through)
+            expect(service.currentRouteRef.value.name).toBe('home');
+        });
+
+        it('should resume normal redirects after a loop has been aborted', async () => {
+            // Arrange — trip the loop guard once...
+            const service = createRouterService(createTestRoutes());
+            await service.goToRoute('home');
+            await flushPromises();
+            const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+            const unregisterLoop = service.registerBeforeRouteMiddleware((to) =>
+                to.name === 'about' ? {name: 'about'} : false,
+            );
+            await service.goToRoute('about');
+            await vi.waitFor(() => expect(consoleErrorSpy).toHaveBeenCalled());
+            await flushPromises();
+
+            // ...then tear the loop down and install a single clean redirect.
+            unregisterLoop();
+            consoleErrorSpy.mockClear();
+            service.registerBeforeRouteMiddleware((to) =>
+                to.name === 'items.create' ? {name: 'items.edit', id: 7} : false,
+            );
+
+            // Act
+            await service.goToRoute('items.create');
+            await flushPromises();
+
+            // Assert — the depth was reset when the loop aborted, so a fresh redirect still works
+            // (a dropped reset-on-cap would leave the counter pinned at the cap and abort this too)
+            expect(service.currentRouteRef.value.name).toBe('items.edit');
+            expect(consoleErrorSpy).not.toHaveBeenCalled();
+        });
+
+        it('should not accumulate redirect depth across independent navigations', async () => {
+            // Arrange — a single-hop redirect, exercised far more times than the cap allows.
+            const service = createRouterService(createTestRoutes());
+            const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+            service.registerBeforeRouteMiddleware((to) => (to.name === 'about' ? {name: 'items.overview'} : false));
+
+            // Act — 15 unrelated redirects; each chain terminates cleanly and must reset the depth
+            for (let index = 0; index < 15; index += 1) {
+                await service.goToRoute('home');
+                await flushPromises();
+                await service.goToRoute('about');
+                await flushPromises();
+            }
+
+            // Assert — the last redirect still fires and the cap never trips (a dropped reset would
+            // let the depth climb across the 15 hops and falsely abort after ten)
+            expect(service.currentRouteRef.value.name).toBe('items.overview');
+            expect(consoleErrorSpy).not.toHaveBeenCalled();
+        });
+
+        it('should report a rejected redirect dispatch instead of leaving an unhandled rejection', async () => {
+            // Arrange — the redirect target's own guard throws, so the dispatched navigation rejects.
+            const service = createRouterService(createTestRoutes());
+            await service.goToRoute('home');
+            await flushPromises();
+            const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+            service.registerBeforeRouteMiddleware((to) => {
+                if (to.name === 'items.overview') throw new Error('downstream guard boom');
+
+                return to.name === 'about' ? {name: 'items.overview'} : false;
+            });
+
+            // Act
+            await service.goToRoute('about');
+
+            // Assert — the fire-and-forget dispatch's rejection is caught and reported
+            await vi.waitFor(() => {
+                expect(consoleErrorSpy).toHaveBeenCalledWith(
+                    'fs-router: middleware redirect navigation failed',
+                    expect.any(Error),
+                );
+            });
+        });
     });
 
     describe('registerAfterRouteMiddleware', () => {
