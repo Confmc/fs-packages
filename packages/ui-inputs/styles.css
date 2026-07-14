@@ -1,0 +1,174 @@
+/*
+ * @script-development/ui-inputs — shipped stylesheet.
+ *
+ *   import '@script-development/ui-inputs/style.css';
+ *
+ * Every rule is keyed on a --fs-* custom property. The component ships NO token
+ * vocabulary and NO hard-coded colour: a consuming territory maps its own tokens
+ * onto the --fs-* contract once (see the :where(:root) defaults below for the full
+ * surface), and every component follows. The defaults use :where() so they carry
+ * zero specificity and are trivially overridden by a territory theme.
+ */
+
+:where(:root) {
+    /* field / label */
+    --fs-field-gap: 0.4rem;
+    --fs-field-margin: 0 0 1.25rem;
+    --fs-label-color: #374151;
+    --fs-label-size: 0.875rem;
+    --fs-label-weight: 500;
+    --fs-label-transform: none;
+    --fs-label-tracking: normal;
+
+    /* control (input + select trigger) */
+    --fs-control-bg: #ffffff;
+    --fs-control-bg-disabled: #f3f4f6;
+    --fs-control-text: #111827;
+    --fs-control-text-muted: #6b7280;
+    --fs-control-border-width: 1px;
+    --fs-control-border-color: #d1d5db;
+    --fs-control-border-open: #2563eb;
+    --fs-control-radius: 8px;
+    --fs-control-pad-x: 0.75rem;
+    --fs-control-pad-y: 0.55rem;
+    --fs-control-shadow: none;
+    --fs-control-shadow-hover: none;
+    --fs-focus-ring: 0 0 0 3px rgba(37, 99, 235, 0.35);
+
+    /* listbox menu */
+    --fs-menu-bg: #ffffff;
+    --fs-menu-border-width: 1px;
+    --fs-menu-border-color: #d1d5db;
+    --fs-menu-radius: 8px;
+    --fs-menu-pad: 0.375rem;
+    --fs-menu-shadow: 0 8px 32px rgba(0, 0, 0, 0.16);
+
+    /* option */
+    --fs-option-radius: 6px;
+    --fs-option-bg-active: #f3f4f6;
+
+    /* error / danger */
+    --fs-danger-text: #dc2626;
+    --fs-danger-border: #dc2626;
+    --fs-danger-shadow: 0 0 0 3px rgba(220, 38, 38, 0.2);
+    --fs-error-weight: 400;
+}
+
+.fs-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fs-field-gap);
+    margin: var(--fs-field-margin);
+}
+
+.fs-label {
+    color: var(--fs-label-color);
+    font-size: var(--fs-label-size);
+    font-weight: var(--fs-label-weight);
+    text-transform: var(--fs-label-transform);
+    letter-spacing: var(--fs-label-tracking);
+}
+.fs-label__req {
+    color: var(--fs-danger-text);
+    margin-left: 2px;
+}
+
+.fs-control {
+    font: inherit;
+    width: 100%;
+    box-sizing: border-box;
+    padding: var(--fs-control-pad-y) var(--fs-control-pad-x);
+    background: var(--fs-control-bg);
+    color: var(--fs-control-text);
+    border-style: solid;
+    border-width: var(--fs-control-border-width);
+    border-color: var(--fs-control-border-color);
+    border-radius: var(--fs-control-radius);
+    box-shadow: var(--fs-control-shadow);
+    transition:
+        box-shadow 0.12s ease,
+        border-color 0.12s ease;
+}
+.fs-control:hover:not(:disabled) {
+    box-shadow: var(--fs-control-shadow-hover);
+}
+.fs-control:focus-visible {
+    outline: none;
+    box-shadow: var(--fs-focus-ring);
+}
+.fs-control.is-open {
+    border-color: var(--fs-control-border-open);
+    box-shadow: var(--fs-focus-ring);
+}
+.fs-control.is-invalid {
+    border-color: var(--fs-danger-border);
+    box-shadow: var(--fs-danger-shadow);
+}
+.fs-control:disabled {
+    background: var(--fs-control-bg-disabled);
+    color: var(--fs-control-text-muted);
+    box-shadow: none;
+    cursor: not-allowed;
+}
+
+.fs-select {
+    position: relative;
+}
+.fs-select__trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    text-align: left;
+    cursor: pointer;
+}
+.fs-select__placeholder {
+    color: var(--fs-control-text-muted);
+}
+.fs-select__chevron {
+    width: 1.1em;
+    height: 1.1em;
+    flex: none;
+    transition: transform 0.12s ease;
+}
+.fs-select__trigger.is-open .fs-select__chevron {
+    transform: rotate(180deg);
+}
+
+.fs-select__menu {
+    list-style: none;
+    margin: 0.25rem 0 0;
+    padding: var(--fs-menu-pad);
+    position: absolute;
+    z-index: 50;
+    min-width: 100%;
+    box-sizing: border-box;
+    background: var(--fs-menu-bg);
+    border-style: solid;
+    border-width: var(--fs-menu-border-width);
+    border-color: var(--fs-menu-border-color);
+    border-radius: var(--fs-menu-radius);
+    box-shadow: var(--fs-menu-shadow);
+    max-height: 15rem;
+    overflow-y: auto;
+}
+.fs-select__option {
+    padding: 0.5rem 0.625rem;
+    border-radius: var(--fs-option-radius);
+    cursor: pointer;
+    color: var(--fs-control-text);
+}
+.fs-select__option.is-active {
+    background: var(--fs-option-bg-active);
+}
+.fs-select__empty {
+    padding: 0.5rem 0.625rem;
+    color: var(--fs-control-text-muted);
+}
+
+.fs-error {
+    margin: 0;
+    color: var(--fs-danger-text);
+    font-size: 0.8125rem;
+    font-weight: var(--fs-error-weight);
+}
