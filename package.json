@@ -24,7 +24,7 @@
         "version": "changeset version"
     },
     "devDependencies": {
-        "@arethetypeswrong/cli": "^0.18.4",
+        "@arethetypeswrong/cli": "^0.18.5",
         "@changesets/cli": "^2",
         "@stryker-mutator/core": "^9",
         "@stryker-mutator/vitest-runner": "^9",
