@@ -1,6 +1,6 @@
 {
     "name": "@script-development/ui-inputs",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "description": "Headless, themeable Vue 3 form input components (field, label, error, text input, select) styled entirely through --fs-* CSS custom properties.",
     "homepage": "https://packages.script.nl/packages/ui-inputs",
     "license": "MIT",
