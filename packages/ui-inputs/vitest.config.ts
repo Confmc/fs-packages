@@ -1,9 +1,13 @@
-import Vue from 'unplugin-vue/vite';
+import Vue from '@vitejs/plugin-vue';
 import {defineProject} from 'vitest/config';
 
 export default defineProject({
-    // The SFC specs import `.vue` files, so the test runner needs the Vue plugin
-    // (vitest runs on vite — unplugin-vue/vite, not the /rolldown build variant).
+    // The SFC specs import `.vue` files, so the test runner needs the Vue plugin.
+    // Uses @vitejs/plugin-vue (the canonical vite-side transform) rather than
+    // unplugin-vue/vite: the latter applies on a per-package run but is NOT applied
+    // when this config is loaded as a workspace project by the root `vitest run`
+    // (vitest.workspace.ts), which is the path CI exercises. tsdown still uses
+    // unplugin-vue/rolldown for the build.
     plugins: [Vue()],
     test: {
         name: 'ui-inputs',

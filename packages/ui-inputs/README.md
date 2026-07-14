@@ -18,15 +18,15 @@ import '@script-development/ui-inputs/style.css';
 
 ## Components
 
-| Component | Purpose |
-| --- | --- |
-| `FsField` | Label + error + required-marker composition wrapper (error-as-prop) |
-| `FsLabel` / `FsError` | The atoms `FsField` composes |
-| `FsTextInput` | Native `text` / `email` / `password` / `search` / `tel` / `url` input |
-| `FsSelect` | Accessible listbox/combobox over `@floating-ui/vue`, generic over your option type |
+| Component             | Purpose                                                                            |
+| --------------------- | ---------------------------------------------------------------------------------- |
+| `FsField`             | Label + error + required-marker composition wrapper (error-as-prop)                |
+| `FsLabel` / `FsError` | The atoms `FsField` composes                                                       |
+| `FsTextInput`         | Native `text` / `email` / `password` / `search` / `tel` / `url` input              |
+| `FsSelect`            | Accessible listbox/combobox over `@floating-ui/vue`, generic over your option type |
 
 ```vue
-<FsField label="Fruit" :error="errors.fruit" #default="{ controlId, describedby, invalid }">
+<FsField label="Fruit" :error="errors.fruit" #default="{controlId, describedby, invalid}">
     <FsSelect :id="controlId" v-model="fruit" :options="fruits" label="name" :invalid="invalid" :describedby="describedby" />
 </FsField>
 ```
