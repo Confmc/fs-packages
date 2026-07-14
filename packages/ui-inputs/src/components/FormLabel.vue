@@ -1,7 +1,7 @@
 <template>
-    <label class="fs-label" :for="htmlFor">
+    <label class="ui-label" :for="htmlFor">
         <slot />
-        <span v-if="required" class="fs-label__req" aria-hidden="true">*</span>
+        <span v-if="required" class="ui-label__req" aria-hidden="true">*</span>
     </label>
 </template>
 

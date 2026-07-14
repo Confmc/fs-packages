@@ -2,22 +2,22 @@
 import {mount} from '@vue/test-utils';
 import {describe, expect, it} from 'vitest';
 
-import FsTextInput from '../src/components/FsTextInput.vue';
+import TextInput from '../src/components/TextInput.vue';
 
-describe('FsTextInput', () => {
+describe('TextInput', () => {
     it('renders a text input by default, reflecting the model and valid state', () => {
-        const wrapper = mount(FsTextInput, {props: {id: 'name', modelValue: 'hi'}});
+        const wrapper = mount(TextInput, {props: {id: 'name', modelValue: 'hi'}});
         const input = wrapper.find('input');
 
         expect(input.attributes('type')).toBe('text');
         expect((input.element as HTMLInputElement).value).toBe('hi');
-        expect(input.classes()).toContain('fs-control');
+        expect(input.classes()).toContain('ui-control');
         expect(input.classes()).not.toContain('is-invalid');
         expect(input.attributes('aria-invalid')).toBeUndefined();
     });
 
     it('honours type/placeholder/invalid/describedby and emits on input', async () => {
-        const wrapper = mount(FsTextInput, {
+        const wrapper = mount(TextInput, {
             props: {
                 id: 'pw',
                 type: 'password',
@@ -40,7 +40,7 @@ describe('FsTextInput', () => {
     });
 
     it('renders the disabled attribute when disabled', () => {
-        const wrapper = mount(FsTextInput, {props: {id: 'd', disabled: true, modelValue: ''}});
+        const wrapper = mount(TextInput, {props: {id: 'd', disabled: true, modelValue: ''}});
         expect(wrapper.find('input').attributes('disabled')).toBeDefined();
     });
 });

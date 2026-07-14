@@ -1,5 +1,5 @@
 <template>
-    <p v-if="error" :id="id" class="fs-error" role="alert">{{ error }}</p>
+    <p v-if="error" :id="id" class="ui-error" role="alert">{{ error }}</p>
 </template>
 
 <script setup lang="ts">

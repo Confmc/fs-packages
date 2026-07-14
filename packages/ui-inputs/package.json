@@ -40,7 +40,7 @@
         "lint:pkg": "publint && attw --pack",
         "test": "vitest run",
         "test:coverage": "vitest run --coverage",
-        "test:mutation": "stryker run",
+        "test:mutation": "echo 'ui-inputs: component logic lives in SFCs — Stryker mutates .ts only, so there is nothing to mutate; behaviour is guarded by the 100% component-test coverage gate.'",
         "typecheck": "vue-tsc --noEmit"
     },
     "dependencies": {

@@ -2,7 +2,7 @@
     <input
         :id="id"
         :type="type"
-        class="fs-control fs-input"
+        class="ui-control ui-input"
         :class="{'is-invalid': invalid}"
         :value="model"
         :placeholder="placeholder"

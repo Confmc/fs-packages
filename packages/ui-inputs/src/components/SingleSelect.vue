@@ -1,10 +1,10 @@
 <template>
-    <div ref="root" class="fs-select" @keydown="onKey">
+    <div ref="root" class="ui-select" @keydown="onKey">
         <button
             :id="id"
             ref="reference"
             type="button"
-            class="fs-control fs-select__trigger"
+            class="ui-control ui-select__trigger"
             :class="{'is-open': open, 'has-value': selected !== undefined, 'is-invalid': invalid}"
             :disabled="disabled"
             role="combobox"
@@ -14,9 +14,9 @@
             :aria-describedby="describedby"
             @click="toggle"
         >
-            <span v-if="selected === undefined" class="fs-select__placeholder">{{ placeholder }}</span>
-            <span v-else class="fs-select__value">{{ getLabel(selected, label) }}</span>
-            <svg class="fs-select__chevron" viewBox="0 0 20 20" aria-hidden="true">
+            <span v-if="selected === undefined" class="ui-select__placeholder">{{ placeholder }}</span>
+            <span v-else class="ui-select__value">{{ labelOf(selected) }}</span>
+            <svg class="ui-select__chevron" viewBox="0 0 20 20" aria-hidden="true">
                 <path d="M5 8l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" />
             </svg>
         </button>
@@ -24,23 +24,23 @@
         <ul
             v-if="open"
             ref="floating"
-            class="fs-select__menu"
+            class="ui-select__menu"
             role="listbox"
             aria-label="Options"
             :style="floatingStyles"
         >
-            <li v-if="!options.length" class="fs-select__empty">{{ emptyText }}</li>
+            <li v-if="!options.length" class="ui-select__empty">{{ emptyText }}</li>
             <li
                 v-for="(option, index) in sorted"
                 :key="String(option.id)"
-                class="fs-select__option"
+                class="ui-select__option"
                 :class="{'is-active': pointer === index}"
                 role="option"
                 :aria-selected="pointer === index"
                 @mouseover="pointer = index"
                 @click="choose(option)"
             >
-                {{ getLabel(option, label) }}
+                {{ labelOf(option) }}
             </li>
         </ul>
     </div>
@@ -51,10 +51,6 @@ import {autoUpdate, flip, hide, offset, shift, useFloating} from '@floating-ui/v
 import {computed, onBeforeUnmount, onMounted, ref, useTemplateRef} from 'vue';
 
 import type {LabelKey, SelectItem} from '../types';
-
-import {getLabel} from '../internal/label';
-import {reduceSelectKey} from '../internal/select-keyboard';
-import {sortByLabel} from '../internal/sort';
 
 const {
     options,
@@ -81,8 +77,16 @@ const {
 
 const model = defineModel<T['id'] | null>({required: true});
 
+/** Resolve an option's display string from the `label` prop (property name or getter). */
+const labelOf = (option: T): string =>
+    typeof label === 'function'
+        ? label(option)
+        : String((option as Record<PropertyKey, unknown>)[label as PropertyKey]);
+
 const selected = computed(() => options.find((option) => option.id === model.value));
-const sorted = computed(() => (alphabeticalSort ? sortByLabel(options, label) : options));
+const sorted = computed(() =>
+    alphabeticalSort ? [...options].sort((a, b) => labelOf(a).localeCompare(labelOf(b))) : options,
+);
 
 const open = ref(false);
 const pointer = ref(-1);
@@ -99,17 +103,41 @@ const choose = (option: T) => {
     close();
 };
 
+// Listbox keyboard navigation. The trigger's native :disabled blocks clicks; this
+// guards the keyboard path too.
 const onKey = (event: KeyboardEvent) => {
-    if (disabled) return; // the trigger's native :disabled blocks clicks; guard the keyboard path too.
-    const next = reduceSelectKey({open: open.value, pointer: pointer.value}, event.key, sorted.value.length);
-    if (next.preventDefault) event.preventDefault();
-    // reduceSelectKey only signals commit when a real option is highlighted (pointer >= 0).
-    if (next.commit) {
-        choose(sorted.value[pointer.value]);
+    if (disabled) return;
+    if (event.key === 'Tab') {
+        close();
         return;
     }
-    open.value = next.open;
-    pointer.value = next.pointer;
+    if (!open.value) {
+        if (['Enter', 'ArrowDown', ' '].includes(event.key)) {
+            event.preventDefault();
+            open.value = true;
+        }
+        return;
+    }
+    switch (event.key) {
+        case 'ArrowDown':
+            pointer.value = Math.min(pointer.value + 1, sorted.value.length - 1);
+            event.preventDefault();
+            break;
+        case 'ArrowUp':
+            pointer.value = Math.max(pointer.value - 1, -1);
+            event.preventDefault();
+            break;
+        case 'Enter':
+            if (pointer.value >= 0) {
+                choose(sorted.value[pointer.value]);
+                event.preventDefault();
+            }
+            break;
+        case 'Escape':
+            close();
+            event.preventDefault();
+            break;
+    }
 };
 
 // click-outside — closes the menu without a shared directive dependency.

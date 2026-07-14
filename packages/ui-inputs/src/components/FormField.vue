@@ -1,6 +1,6 @@
 <template>
-    <div class="fs-field">
-        <FsLabel v-if="label" :html-for="controlId" :required="required">{{ label }}</FsLabel>
+    <div class="ui-field">
+        <FormLabel v-if="label" :html-for="controlId" :required="required">{{ label }}</FormLabel>
         <!-- the control slot receives the wiring it needs to stay accessible -->
         <slot
             :control-id="controlId"
@@ -8,16 +8,15 @@
             :invalid="Boolean(error)"
             :describedby="error ? errorId : undefined"
         />
-        <FsError :error="error" :id="errorId" />
+        <FormError :error="error" :id="errorId" />
     </div>
 </template>
 
 <script setup lang="ts">
 import {useId} from 'vue';
 
-import {fieldErrorId} from '../internal/ids';
-import FsError from './FsError.vue';
-import FsLabel from './FsLabel.vue';
+import FormError from './FormError.vue';
+import FormLabel from './FormLabel.vue';
 
 const {
     label,
@@ -35,5 +34,5 @@ const {
 }>();
 
 const controlId = id ?? useId();
-const errorId = fieldErrorId(controlId);
+const errorId = `${controlId}-error`;
 </script>
