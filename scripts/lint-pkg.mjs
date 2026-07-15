@@ -623,7 +623,19 @@ function main() {
             failures.push(`${name}: publint emitted "${publintBlock[1]}:" block (fail-on-suggestion gate)`);
         }
 
-        const attw = runCaptured('npx', ['attw', '--pack'], dir);
+        // Asset exports (a shipped stylesheet, etc.) are intentionally untyped, so
+        // attw's type-resolution check does not apply to them. Derive any *.css
+        // export subpaths from the manifest and exclude them — otherwise a package
+        // with a CSS export (ui-inputs, the first component package) fails attw for
+        // a non-JS entrypoint legitimately having no type declarations.
+        const attwArgs = ['attw', '--pack'];
+        const exportsMap = JSON.parse(readFileSync(path.join(dir, 'package.json'), 'utf8')).exports ?? {};
+        const cssEntrypoints = Object.entries(exportsMap)
+            .filter(([, target]) => typeof target === 'string' && target.endsWith('.css'))
+            .map(([key]) => key.replace(/^\.\//, ''));
+        if (cssEntrypoints.length > 0) attwArgs.push('--exclude-entrypoints', ...cssEntrypoints);
+
+        const attw = runCaptured('npx', attwArgs, dir);
         if (attw.status !== 0) {
             failures.push(`${name}: attw exited ${attw.status}`);
         }

@@ -28,6 +28,7 @@
         "@changesets/cli": "^2",
         "@stryker-mutator/core": "^9",
         "@stryker-mutator/vitest-runner": "^9",
+        "@vitejs/plugin-vue": "^6.0.8",
         "@vitest/coverage-v8": "^4",
         "happy-dom": "^20.10.3",
         "oxfmt": "^0.57.0",
