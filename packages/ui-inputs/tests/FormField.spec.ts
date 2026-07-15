@@ -31,12 +31,10 @@ describe('FormField', () => {
         expect(wrapper.text()).toContain('inv:true|db:email-error');
     });
 
-    it('omits the label when none is given and falls back to a generated id', () => {
-        const wrapper = mount(FormField, {slots: {default: wiringSlot}});
+    it('omits the label when none is given, keeping the wiring on the provided id', () => {
+        const wrapper = mount(FormField, {props: {id: 'search'}, slots: {default: wiringSlot}});
 
         expect(wrapper.find('label').exists()).toBe(false);
-        // useId() yields a non-empty string; the control id is not the literal 'undefined'.
-        expect(wrapper.text()).toMatch(/ctl:[^|]+\|/);
-        expect(wrapper.text()).not.toContain('ctl:undefined');
+        expect(wrapper.text()).toContain('ctl:search|err:search-error');
     });
 });

@@ -15,7 +15,7 @@
 
 <script setup lang="ts">
 const {type = 'text'} = defineProps<{
-    id?: string;
+    id: string;
     type?: 'text' | 'email' | 'password' | 'search' | 'tel' | 'url';
     placeholder?: string;
     disabled?: boolean;
@@ -25,5 +25,5 @@ const {type = 'text'} = defineProps<{
     describedby?: string;
 }>();
 
-const model = defineModel<string>({default: ''});
+const model = defineModel<string>({required: true});
 </script>

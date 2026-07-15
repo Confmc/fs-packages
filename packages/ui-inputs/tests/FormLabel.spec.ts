@@ -13,7 +13,7 @@ describe('FormLabel', () => {
     });
 
     it('renders the required marker when required', () => {
-        const wrapper = mount(FormLabel, {props: {required: true}, slots: {default: 'Name'}});
+        const wrapper = mount(FormLabel, {props: {htmlFor: 'name', required: true}, slots: {default: 'Name'}});
         expect(wrapper.find('.ui-label__req').exists()).toBe(true);
     });
 });

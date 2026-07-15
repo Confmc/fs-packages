@@ -26,7 +26,7 @@ import '@script-development/ui-inputs/style.css';
 | `SingleSelect`            | Accessible listbox/combobox over `@floating-ui/vue`, generic over your option type |
 
 ```vue
-<FormField label="Fruit" :error="errors.fruit" #default="{controlId, describedby, invalid}">
+<FormField id="fruit" label="Fruit" :error="errors.fruit" #default="{controlId, describedby, invalid}">
     <SingleSelect :id="controlId" v-model="fruit" :options="fruits" label="name" :invalid="invalid" :describedby="describedby" />
 </FormField>
 ```

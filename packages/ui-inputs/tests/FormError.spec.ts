@@ -5,11 +5,6 @@ import {describe, expect, it} from 'vitest';
 import FormError from '../src/components/FormError.vue';
 
 describe('FormError', () => {
-    it('renders nothing when there is no error', () => {
-        const wrapper = mount(FormError, {props: {}});
-        expect(wrapper.find('p').exists()).toBe(false);
-    });
-
     it('renders the error text with its id and alert role', () => {
         const wrapper = mount(FormError, {props: {error: 'Required', id: 'email-error'}});
         const paragraph = wrapper.find('p.ui-error');

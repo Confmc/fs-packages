@@ -1,20 +1,18 @@
 <template>
     <div class="ui-field">
-        <FormLabel v-if="label" :html-for="controlId" :required="required">{{ label }}</FormLabel>
+        <FormLabel v-if="label" :html-for="id" :required="required">{{ label }}</FormLabel>
         <!-- the control slot receives the wiring it needs to stay accessible -->
         <slot
-            :control-id="controlId"
+            :control-id="id"
             :error-id="errorId"
             :invalid="Boolean(error)"
             :describedby="error ? errorId : undefined"
         />
-        <FormError :error="error" :id="errorId" />
+        <FormError v-if="error" :error="error" :id="errorId" />
     </div>
 </template>
 
 <script setup lang="ts">
-import {useId} from 'vue';
-
 import FormError from './FormError.vue';
 import FormLabel from './FormLabel.vue';
 
@@ -29,10 +27,9 @@ const {
     required?: boolean;
     /** resolved error string, supplied by the consumer (error-as-prop). */
     error?: string;
-    /** override the generated control id. */
-    id?: string;
+    /** stable control id — pass `useId()` at the call site if you have no natural one. */
+    id: string;
 }>();
 
-const controlId = id ?? useId();
-const errorId = `${controlId}-error`;
+const errorId = `${id}-error`;
 </script>

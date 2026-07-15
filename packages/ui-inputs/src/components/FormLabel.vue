@@ -8,7 +8,7 @@
 <script setup lang="ts">
 defineProps<{
     /** id of the control this label describes (`for` attribute). */
-    htmlFor?: string;
+    htmlFor: string;
     /** render the required marker. */
     required?: boolean;
 }>();
