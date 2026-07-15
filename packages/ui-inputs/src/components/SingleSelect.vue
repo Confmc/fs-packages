@@ -10,6 +10,7 @@
             role="combobox"
             aria-haspopup="listbox"
             :aria-expanded="open"
+            :aria-required="required || undefined"
             :aria-invalid="invalid || undefined"
             :aria-describedby="describedby"
             @click="toggle"
@@ -26,7 +27,7 @@
             ref="floating"
             class="ui-select__menu"
             role="listbox"
-            aria-label="Options"
+            :aria-label="optionsLabel"
             :style="floatingStyles"
         >
             <li v-if="!options.length" class="ui-select__empty">{{ emptyText }}</li>
@@ -58,9 +59,11 @@ const {
     placeholder = 'Select…',
     disabled = false,
     alphabeticalSort = true,
+    required = false,
     invalid = false,
     describedby,
     emptyText = 'No options',
+    optionsLabel = 'Options',
 } = defineProps<{
     options: T[];
     /** property name or getter for an option's display string. */
@@ -70,9 +73,13 @@ const {
     placeholder?: string;
     disabled?: boolean;
     alphabeticalSort?: boolean;
+    /** conveys the required state to assistive tech via `aria-required`. */
+    required?: boolean;
     invalid?: boolean;
     describedby?: string;
     emptyText?: string;
+    /** accessible name for the listbox popup (`aria-label`). */
+    optionsLabel?: string;
 }>();
 
 const model = defineModel<T['id'] | null>({required: true});

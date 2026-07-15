@@ -14,14 +14,16 @@ describe('TextInput', () => {
         expect(input.classes()).toContain('ui-control');
         expect(input.classes()).not.toContain('is-invalid');
         expect(input.attributes('aria-invalid')).toBeUndefined();
+        expect(input.attributes('aria-required')).toBeUndefined();
     });
 
-    it('honours type/placeholder/invalid/describedby and emits on input', async () => {
+    it('honours type/placeholder/required/invalid/describedby and emits on input', async () => {
         const wrapper = mount(TextInput, {
             props: {
                 id: 'pw',
                 type: 'password',
                 placeholder: 'Password',
+                required: true,
                 invalid: true,
                 describedby: 'pw-error',
                 modelValue: '',
@@ -33,6 +35,7 @@ describe('TextInput', () => {
         expect(input.attributes('placeholder')).toBe('Password');
         expect(input.classes()).toContain('is-invalid');
         expect(input.attributes('aria-invalid')).toBe('true');
+        expect(input.attributes('aria-required')).toBe('true');
         expect(input.attributes('aria-describedby')).toBe('pw-error');
 
         await input.setValue('secret');

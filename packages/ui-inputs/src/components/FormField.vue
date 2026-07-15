@@ -5,6 +5,7 @@
         <slot
             :control-id="id"
             :error-id="errorId"
+            :required="required"
             :invalid="Boolean(error)"
             :describedby="error ? errorId : undefined"
         />

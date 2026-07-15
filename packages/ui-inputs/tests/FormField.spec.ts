@@ -5,8 +5,13 @@ import {describe, expect, it} from 'vitest';
 import FormField from '../src/components/FormField.vue';
 
 // A slot stub that renders the wiring the field exposes, so we can assert it.
-const wiringSlot = (scope: {controlId: string; errorId: string; invalid: boolean; describedby?: string}) =>
-    `ctl:${scope.controlId}|err:${scope.errorId}|inv:${scope.invalid}|db:${scope.describedby}`;
+const wiringSlot = (scope: {
+    controlId: string;
+    errorId: string;
+    required: boolean;
+    invalid: boolean;
+    describedby?: string;
+}) => `ctl:${scope.controlId}|err:${scope.errorId}|req:${scope.required}|inv:${scope.invalid}|db:${scope.describedby}`;
 
 describe('FormField', () => {
     it('renders a label, generates matching control/error ids, and reports valid state', () => {
@@ -17,7 +22,7 @@ describe('FormField', () => {
 
         expect(wrapper.find('label.ui-label').text()).toContain('Email');
         expect(wrapper.find('.ui-label__req').exists()).toBe(true);
-        expect(wrapper.text()).toContain('ctl:email|err:email-error|inv:false|db:undefined');
+        expect(wrapper.text()).toContain('ctl:email|err:email-error|req:true|inv:false|db:undefined');
         expect(wrapper.find('.ui-error').exists()).toBe(false);
     });
 

@@ -7,6 +7,7 @@
         :value="model"
         :placeholder="placeholder"
         :disabled="disabled"
+        :aria-required="required || undefined"
         :aria-invalid="invalid || undefined"
         :aria-describedby="describedby"
         @input="model = ($event.target as HTMLInputElement).value"
@@ -19,6 +20,8 @@ const {type = 'text'} = defineProps<{
     type?: 'text' | 'email' | 'password' | 'search' | 'tel' | 'url';
     placeholder?: string;
     disabled?: boolean;
+    /** conveys the required state to assistive tech via `aria-required`. */
+    required?: boolean;
     /** invalid styling + aria; drive it from the field's error. */
     invalid?: boolean;
     /** id of the paired error element for `aria-describedby`. */

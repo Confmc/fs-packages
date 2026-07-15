@@ -31,22 +31,32 @@ describe('SingleSelect', () => {
         expect(wrapper.find('.ui-select__trigger').classes()).not.toContain('has-value');
         expect(wrapper.find('.ui-select__menu').exists()).toBe(false);
 
+        expect(wrapper.find('.ui-select__trigger').attributes('aria-required')).toBeUndefined();
+
         await wrapper.find('.ui-select__trigger').trigger('click');
 
         const options = wrapper.findAll('.ui-select__option');
         expect(options.map((o) => o.text())).toEqual(['Apricot', 'Mango', 'Watermelon']);
         expect(wrapper.find('.ui-select__trigger').classes()).toContain('is-open');
+        expect(wrapper.find('.ui-select__menu').attributes('aria-label')).toBe('Options');
     });
 
-    it('renders the selected value, has-value and invalid state', () => {
-        const wrapper = mountSelect({modelValue: 3, invalid: true, describedby: 'fruit-error'});
+    it('renders the selected value, has-value, required and invalid state', () => {
+        const wrapper = mountSelect({modelValue: 3, required: true, invalid: true, describedby: 'fruit-error'});
         const trigger = wrapper.find('.ui-select__trigger');
 
         expect(wrapper.find('.ui-select__value').text()).toBe('Mango');
         expect(trigger.classes()).toContain('has-value');
         expect(trigger.classes()).toContain('is-invalid');
+        expect(trigger.attributes('aria-required')).toBe('true');
         expect(trigger.attributes('aria-invalid')).toBe('true');
         expect(trigger.attributes('aria-describedby')).toBe('fruit-error');
+    });
+
+    it('uses a custom optionsLabel as the listbox accessible name', async () => {
+        const wrapper = mountSelect({optionsLabel: 'Fruits'});
+        await wrapper.find('.ui-select__trigger').trigger('click');
+        expect(wrapper.find('.ui-select__menu').attributes('aria-label')).toBe('Fruits');
     });
 
     it('resolves the display value via a getter label', () => {
