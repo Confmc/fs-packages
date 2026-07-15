@@ -44,7 +44,9 @@ Consumer territories must apply per-call timeouts at instantiation OR rely on th
 
 **Precedent + residue.** The prior consumer-side obligation ("every consumer MUST wrap its own middleware bodies") is **superseded** by the default guard. kendo WR-0078 (PR [#1538](https://github.com/script-development/kendo/pull/1538), 2026-06-15) and the WR-0290 fleet wave hand-wrapped consumer middleware under the old contract; those explicit `guarded()`/try-catch wraps (and fs-form's own `guarded()`) become **redundant-but-harmless double-wraps** (inner catches, outer auto-guard never fires) — strip in a later, unhurried cleanup, not a blocker. See the war-room `deferred.md [adr] fs-packages-fs-http-async-aware-middleware-rejection-doctrine` entry and ADR-0037.
 
-## Packages (12)
+## Packages (13)
+
+`fs-*` are frontend **service** packages; `ui-*` (new family, ADR-0043) are headless, themeable Vue **UI components**.
 
 | Package                 | Vue | Description                                                                                                      |
 | ----------------------- | --- | ---------------------------------------------------------------------------------------------------------------- |
@@ -60,6 +62,7 @@ Consumer territories must apply per-call timeouts at instantiation OR rely on th
 | fs-form                 | Yes | One-call `useForm`: double-submit guard + `submitting` loading flag + 422 validation-error binding (guarded fs-http middleware); `keyMapper` seam for raw/camel field keys. `useValidationErrors`/`useFormSubmit` primitives still exported |
 | fs-translation          | Yes | Type-safe reactive i18n with dot-notation keys                                                                   |
 | fs-router               | Yes | Type-safe router service factory with CRUD navigation, middleware pipeline, and custom components for Vue Router |
+| ui-inputs               | Yes | Headless, themeable form inputs (`FormField`/`FormLabel`/`FormError`/`TextInput`/`SingleSelect`) styled purely through `--ui-*` CSS vars; error-as-prop, `aria-*` a11y wiring. First `ui-*`-family package (ADR-0043); SFC + coverage-only gate (Stryker mutates `.ts`, so the mutation gate is a no-op for this package) |
 
 ## Conventions
 
