@@ -117,6 +117,8 @@ describe('fs-http middleware contract', () => {
         });
 
         it('does not reuse the response object across responses — a mutation does not bleed into the next request', async () => {
+            // Pins axios's own per-request object-identity guarantee, not an fs-http
+            // invariant — if this ever fails, triage upstream (axios), not src/http.ts.
             // Arrange
             const service = createHttpService(BASE_URL);
             const seen: AxiosResponse[] = [];
