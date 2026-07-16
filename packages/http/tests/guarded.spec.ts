@@ -91,6 +91,25 @@ describe('guarded', () => {
             expect(onError).toHaveBeenCalledWith('string failure');
         });
 
+        it('is synchronous-only — a body returning a rejected promise is NOT caught (no onError)', () => {
+            // Arrange — guarded()'s try/catch is synchronous. A body that returns a
+            // rejected promise (i.e. an `async () => { throw }` body from the loop's
+            // perspective) does NOT throw synchronously, so the catch never fires.
+            // The promise is pre-handled so it never floats as an unhandled rejection
+            // in the runner — this is a leak-safe stand-in for the async body, not a
+            // suppression of the behavior under test.
+            const onError = vi.fn<(error: unknown) => void>();
+            const rejected = Promise.reject(new Error('async body'));
+            rejected.catch(() => {});
+            const wrapped = guarded<string>(() => rejected, onError);
+
+            // Act
+            wrapped('x');
+
+            // Assert — the async rejection is invisible to guarded's sync try/catch.
+            expect(onError).not.toHaveBeenCalled();
+        });
+
         describe('default onError', () => {
             let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
 

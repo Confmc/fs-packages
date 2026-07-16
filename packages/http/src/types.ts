@@ -77,8 +77,46 @@ export type HttpService = {
      * to render and `URL.revokeObjectURL(...)` on cleanup.
      */
     previewRequest: (endpoint: string, options?: AxiosRequestConfig) => Promise<AxiosResponse<Blob>>;
+    /**
+     * Register a request middleware. The body runs synchronously in FIFO order
+     * before each request leaves the service. See the shared middleware contract
+     * below — the same invariants govern all three `register*` functions.
+     *
+     * Middleware contract (fs-http 0.6.0, ADR-0037; pinned by
+     * `tests/middleware-contract.spec.ts`):
+     * - **Guarded by default.** The body is wrapped in `guarded()`, so a
+     *   synchronous throw is loud-swallowed (`onMiddlewareError` / `console.error`)
+     *   and cannot reject a resolved 200 nor mask the real API error. Pass
+     *   `{guard: false}` to run the raw body — then a sync throw propagates.
+     * - **Sync-only, fire-and-forget.** The loop never `await`s the body. A
+     *   Promise-returning body is not awaited; `guarded()` catches sync throws
+     *   only — an async rejection escapes as an unhandled rejection. Keep bodies
+     *   synchronous.
+     * - **FIFO, per-instance, not idempotent.** Runs in registration order;
+     *   each service instance owns independent stacks; registering the same
+     *   reference twice fires it twice.
+     * - **Mutation visible down the chain; response objects are not reused.**
+     * @returns an idempotent `unregister` that removes this registration.
+     */
     registerRequestMiddleware: (fn: RequestMiddlewareFunc, opts?: RegisterMiddlewareOptions) => UnregisterMiddleware;
+    /**
+     * Register a response (success-path) middleware. Runs synchronously in FIFO
+     * order on every resolved response, before the caller's `await` resumes. Same
+     * middleware contract as {@link HttpService.registerRequestMiddleware}
+     * (guarded-by-default, sync-only/fire-and-forget, FIFO, per-instance,
+     * not idempotent, mutation-visible, response-not-reused).
+     * @returns an idempotent `unregister` that removes this registration.
+     */
     registerResponseMiddleware: (fn: ResponseMiddlewareFunc, opts?: RegisterMiddlewareOptions) => UnregisterMiddleware;
+    /**
+     * Register a response-error middleware. Runs synchronously in FIFO order for
+     * **axios errors only** (non-axios errors reject without invoking any error
+     * middleware). Guarded by default: with the guard, a throwing body cannot
+     * mask the original `AxiosError`; under `{guard: false}` a sync throw
+     * replaces it. Same middleware contract as
+     * {@link HttpService.registerRequestMiddleware}.
+     * @returns an idempotent `unregister` that removes this registration.
+     */
     registerResponseErrorMiddleware: (
         fn: ResponseErrorMiddlewareFunc,
         opts?: RegisterMiddlewareOptions,
