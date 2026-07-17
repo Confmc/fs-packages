@@ -1,25 +1,25 @@
 <template>
-    <input
+    <textarea
         :id="id"
-        :type="type"
-        class="ui-control ui-input"
+        class="ui-control ui-textarea"
         :class="{'is-invalid': invalid}"
         :value="model"
         :placeholder="placeholder"
         :disabled="disabled"
+        :rows="rows"
         :aria-required="required || undefined"
         :aria-invalid="invalid || undefined"
         :aria-describedby="describedby"
-        @input="model = ($event.target as HTMLInputElement).value"
+        @input="model = ($event.target as HTMLTextAreaElement).value"
     />
 </template>
 
 <script setup lang="ts">
-const {type = 'text'} = defineProps<{
+defineProps<{
     id: string;
-    type?: 'text' | 'email' | 'password' | 'search' | 'tel' | 'url';
     placeholder?: string;
     disabled?: boolean;
+    rows?: number;
     /** conveys the required state to assistive tech via `aria-required`. */
     required?: boolean;
     /** invalid styling + aria; drive it from the field's error. */
@@ -28,8 +28,8 @@ const {type = 'text'} = defineProps<{
     describedby?: string;
 }>();
 
-// Accepts null so it binds a nullable backend field directly (Vue renders null as
-// an empty control); a cleared input emits '', which the fleet's
+// Accepts null so it binds a nullable text column directly (Vue renders null as an
+// empty control); a cleared textarea emits '', which the fleet's
 // ConvertEmptyStringsToNull middleware converts back to null on submit.
 const model = defineModel<string | null>({required: true});
 </script>

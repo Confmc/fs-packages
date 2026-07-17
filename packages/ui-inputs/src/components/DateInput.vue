@@ -1,12 +1,13 @@
 <template>
     <input
         :id="id"
-        :type="type"
+        type="date"
         class="ui-control ui-input"
         :class="{'is-invalid': invalid}"
         :value="model"
-        :placeholder="placeholder"
         :disabled="disabled"
+        :min="min"
+        :max="max"
         :aria-required="required || undefined"
         :aria-invalid="invalid || undefined"
         :aria-describedby="describedby"
@@ -15,11 +16,12 @@
 </template>
 
 <script setup lang="ts">
-const {type = 'text'} = defineProps<{
+defineProps<{
     id: string;
-    type?: 'text' | 'email' | 'password' | 'search' | 'tel' | 'url';
-    placeholder?: string;
     disabled?: boolean;
+    /** ISO date bound (`YYYY-MM-DD`) for the native picker. */
+    min?: string;
+    max?: string;
     /** conveys the required state to assistive tech via `aria-required`. */
     required?: boolean;
     /** invalid styling + aria; drive it from the field's error. */
@@ -28,8 +30,8 @@ const {type = 'text'} = defineProps<{
     describedby?: string;
 }>();
 
-// Accepts null so it binds a nullable backend field directly (Vue renders null as
-// an empty control); a cleared input emits '', which the fleet's
+// Accepts null so it binds a nullable date column directly (Vue renders null as an
+// empty control); a cleared date emits '', which the fleet's
 // ConvertEmptyStringsToNull middleware converts back to null on submit.
 const model = defineModel<string | null>({required: true});
 </script>

@@ -22,6 +22,10 @@
 
     /* control (input + select trigger) */
     --ui-control-bg: #ffffff;
+    /* background-on-state hooks — default to the resting background so they are a
+       no-op until a territory opts in (brick fills the control on focus/invalid). */
+    --ui-control-bg-focus: var(--ui-control-bg);
+    --ui-control-bg-invalid: var(--ui-control-bg);
     --ui-control-bg-disabled: #f3f4f6;
     --ui-control-text: #111827;
     --ui-control-text-muted: #6b7280;
@@ -97,6 +101,7 @@
 }
 .ui-control:focus-visible {
     outline: none;
+    background: var(--ui-control-bg-focus);
     box-shadow: var(--ui-focus-ring);
 }
 .ui-control.is-open {
@@ -104,8 +109,13 @@
     box-shadow: var(--ui-focus-ring);
 }
 .ui-control.is-invalid {
+    background: var(--ui-control-bg-invalid);
     border-color: var(--ui-danger-border);
     box-shadow: var(--ui-danger-shadow);
+}
+
+.ui-textarea {
+    resize: vertical;
 }
 .ui-control:disabled {
     background: var(--ui-control-bg-disabled);

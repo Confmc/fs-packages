@@ -23,6 +23,9 @@ import '@script-development/ui-inputs/style.css';
 | `FormField`               | Label + error + required-marker composition wrapper (error-as-prop)                |
 | `FormLabel` / `FormError` | The atoms `FormField` composes                                                     |
 | `TextInput`               | Native `text` / `email` / `password` / `search` / `tel` / `url` input              |
+| `NumberInput`             | Native `number` input; owns the `NaN`→`null` empty-value guard                     |
+| `DateInput`               | Native `date` input                                                                |
+| `Textarea`                | Native `textarea` with `rows`                                                      |
 | `SingleSelect`            | Accessible listbox/combobox over `@floating-ui/vue`, generic over your option type |
 
 ```vue
@@ -34,6 +37,10 @@ import '@script-development/ui-inputs/style.css';
 ## Theming
 
 Every visual rule keys on a `--ui-*` custom property — colours **and** structure (`--ui-control-border-width`, `--ui-control-radius`, `--ui-control-shadow`, `--ui-label-transform`, …). Remap them under any selector to theme the whole set; the shipped defaults render out of the box. Dark/light is orthogonal — pair with `@script-development/fs-theme`'s `data-theme` switching.
+
+## Nullable values
+
+Every text-like input (`TextInput`, `DateInput`, `Textarea`) models `string | null`, and `NumberInput` models `number | null`. A `null` from a nullable backend column binds directly — the control renders empty, no `?? ''` at the call site. When the user clears the field, the string inputs emit `''` (the raw native value); a Laravel backend's `ConvertEmptyStringsToNull` middleware maps that back to `null` on submit. `NumberInput` is the one exception: an empty number input emits `null` (not `NaN`, not `''`), since a `number` model can never hold `''` honestly — so it round-trips to `null` without relying on the middleware.
 
 ## Errors are a prop, never a service
 
