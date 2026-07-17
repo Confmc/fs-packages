@@ -11,7 +11,7 @@
         :aria-required="required || undefined"
         :aria-invalid="invalid || undefined"
         :aria-describedby="describedby"
-        @input="onInput"
+        @input="model = ($event.target as HTMLInputElement).value"
     />
 </template>
 
@@ -30,12 +30,8 @@ defineProps<{
     describedby?: string;
 }>();
 
+// Accepts null so it binds a nullable date column directly (Vue renders null as an
+// empty control); a cleared date emits '', which the fleet's
+// ConvertEmptyStringsToNull middleware converts back to null on submit.
 const model = defineModel<string | null>({required: true});
-
-// Coerce a cleared date to null (not the empty string), so a nullable date column
-// receives null rather than "" — the latter fails backend date validation.
-function onInput(event: Event) {
-    const {value} = event.target as HTMLInputElement;
-    model.value = value === '' ? null : value;
-}
 </script>

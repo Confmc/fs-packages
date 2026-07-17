@@ -50,10 +50,10 @@ describe('DateInput', () => {
         expect(wrapper.emitted('update:modelValue')?.[0]).toEqual(['2026-03-01']);
     });
 
-    it('emits null when the date is cleared', async () => {
+    it("emits '' when the date is cleared (raw native value; middleware maps to null)", async () => {
         const wrapper = mount(DateInput, {props: {id: 'dob', modelValue: '2026-07-17'}});
         await wrapper.find('input').setValue('');
-        expect(wrapper.emitted('update:modelValue')?.[0]).toEqual([null]);
+        expect(wrapper.emitted('update:modelValue')?.[0]).toEqual(['']);
     });
 
     it('renders the disabled attribute when disabled', () => {

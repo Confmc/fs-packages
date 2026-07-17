@@ -28,5 +28,8 @@ const {type = 'text'} = defineProps<{
     describedby?: string;
 }>();
 
-const model = defineModel<string>({required: true});
+// Accepts null so it binds a nullable backend field directly (Vue renders null as
+// an empty control); a cleared input emits '', which the fleet's
+// ConvertEmptyStringsToNull middleware converts back to null on submit.
+const model = defineModel<string | null>({required: true});
 </script>

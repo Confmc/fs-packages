@@ -50,10 +50,10 @@ describe('Textarea', () => {
         expect(wrapper.emitted('update:modelValue')?.[0]).toEqual(['a note']);
     });
 
-    it('emits null when the textarea is cleared', async () => {
+    it("emits '' when the textarea is cleared (raw native value; middleware maps to null)", async () => {
         const wrapper = mount(Textarea, {props: {id: 'notes', modelValue: 'hi'}});
         await wrapper.find('textarea').setValue('');
-        expect(wrapper.emitted('update:modelValue')?.[0]).toEqual([null]);
+        expect(wrapper.emitted('update:modelValue')?.[0]).toEqual(['']);
     });
 
     it('renders the disabled attribute when disabled', () => {

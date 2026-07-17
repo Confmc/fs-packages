@@ -46,4 +46,9 @@ describe('TextInput', () => {
         const wrapper = mount(TextInput, {props: {id: 'd', disabled: true, modelValue: ''}});
         expect(wrapper.find('input').attributes('disabled')).toBeDefined();
     });
+
+    it('renders empty for a null model (binds a nullable backend field directly)', () => {
+        const wrapper = mount(TextInput, {props: {id: 'name', modelValue: null}});
+        expect((wrapper.find('input').element as HTMLInputElement).value).toBe('');
+    });
 });

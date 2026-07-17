@@ -3,14 +3,14 @@
         :id="id"
         class="ui-control ui-textarea"
         :class="{'is-invalid': invalid}"
-        :value="model ?? ''"
+        :value="model"
         :placeholder="placeholder"
         :disabled="disabled"
         :rows="rows"
         :aria-required="required || undefined"
         :aria-invalid="invalid || undefined"
         :aria-describedby="describedby"
-        @input="onInput"
+        @input="model = ($event.target as HTMLTextAreaElement).value"
     />
 </template>
 
@@ -28,12 +28,8 @@ defineProps<{
     describedby?: string;
 }>();
 
+// Accepts null so it binds a nullable text column directly (Vue renders null as an
+// empty control); a cleared textarea emits '', which the fleet's
+// ConvertEmptyStringsToNull middleware converts back to null on submit.
 const model = defineModel<string | null>({required: true});
-
-// Coerce a cleared textarea to null (not the empty string), mirroring DateInput,
-// so a nullable text column receives null rather than "".
-function onInput(event: Event) {
-    const {value} = event.target as HTMLTextAreaElement;
-    model.value = value === '' ? null : value;
-}
 </script>
