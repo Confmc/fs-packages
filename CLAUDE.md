@@ -62,7 +62,7 @@ Consumer territories must apply per-call timeouts at instantiation OR rely on th
 | fs-form                 | Yes | One-call `useForm`: double-submit guard + `submitting` loading flag + 422 validation-error binding (guarded fs-http middleware); `keyMapper` seam for raw/camel field keys. `useValidationErrors`/`useFormSubmit` primitives still exported |
 | fs-translation          | Yes | Type-safe reactive i18n with dot-notation keys                                                                   |
 | fs-router               | Yes | Type-safe router service factory with CRUD navigation, middleware pipeline, and custom components for Vue Router |
-| ui-inputs               | Yes | Headless, themeable form inputs (`FormField`/`FormLabel`/`FormError`/`TextInput`/`SingleSelect`) styled purely through `--ui-*` CSS vars; error-as-prop, `aria-*` a11y wiring. First `ui-*`-family package (ADR-0043); SFC + coverage-only gate (Stryker mutates `.ts`, so the mutation gate is a no-op for this package) |
+| ui-inputs               | Yes | Headless, themeable form inputs (`FormField`/`FormLabel`/`FormError`/`TextInput`/`NumberInput`/`DateInput`/`Textarea`/`SingleSelect`) styled purely through `--ui-*` CSS vars; error-as-prop, `aria-*` a11y wiring. The nullable atoms (Number/Date/Textarea) own their empty-value→`null` coercion once. First `ui-*`-family package (ADR-0043); SFC + coverage-only gate (Stryker mutates `.ts`, so the mutation gate is a no-op for this package) |
 
 ## Conventions
 

@@ -23,6 +23,9 @@ import '@script-development/ui-inputs/style.css';
 | `FormField`               | Label + error + required-marker composition wrapper (error-as-prop)                |
 | `FormLabel` / `FormError` | The atoms `FormField` composes                                                     |
 | `TextInput`               | Native `text` / `email` / `password` / `search` / `tel` / `url` input              |
+| `NumberInput`             | Native `number` input; nullable model, owns the `NaN`→`null` empty-value coercion  |
+| `DateInput`               | Native `date` input; nullable model, coerces a cleared date to `null`              |
+| `Textarea`                | Native `textarea`; nullable model, coerces a cleared value to `null`               |
 | `SingleSelect`            | Accessible listbox/combobox over `@floating-ui/vue`, generic over your option type |
 
 ```vue
