@@ -13,6 +13,8 @@
             :aria-required="required || undefined"
             :aria-invalid="invalid || undefined"
             :aria-describedby="describedby"
+            :aria-controls="open ? listboxId : undefined"
+            :aria-activedescendant="activeDescendant"
             @click="toggle"
         >
             <span v-if="selected === undefined" class="ui-select__placeholder">{{ placeholder }}</span>
@@ -24,6 +26,7 @@
 
         <ul
             v-if="open"
+            :id="listboxId"
             ref="floating"
             class="ui-select__menu"
             role="listbox"
@@ -33,11 +36,12 @@
             <li v-if="!options.length" class="ui-select__empty">{{ emptyText }}</li>
             <li
                 v-for="(option, index) in sorted"
+                :id="optionId(option)"
                 :key="String(option.id)"
                 class="ui-select__option"
                 :class="{'is-active': pointer === index}"
                 role="option"
-                :aria-selected="pointer === index"
+                :aria-selected="option.id === model"
                 @mouseover="pointer = index"
                 @click="choose(option)"
             >
@@ -56,6 +60,7 @@ import type {LabelKey, SelectItem} from '../types';
 const {
     options,
     label,
+    id,
     placeholder = 'Select…',
     disabled = false,
     alphabeticalSort = true,
@@ -97,6 +102,17 @@ const sorted = computed(() =>
 
 const open = ref(false);
 const pointer = ref(-1);
+
+// Keyboard focus lives on the trigger, so the focused option is conveyed to assistive
+// tech via aria-activedescendant rather than real DOM focus. That IDREF only resolves
+// if the referenced element sits inside the listbox the trigger owns, which is why the
+// trigger also carries aria-controls while open.
+const listboxId = computed(() => `${id}-listbox`);
+const optionId = (option: T): string => `${id}-opt-${option.id}`;
+// Absent (not empty) when there is nothing focused — a dangling IDREF is worse than none.
+const activeDescendant = computed(() =>
+    open.value && pointer.value >= 0 ? optionId(sorted.value[pointer.value]) : undefined,
+);
 
 const toggle = () => {
     open.value = !open.value;

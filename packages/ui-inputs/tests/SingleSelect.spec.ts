@@ -82,13 +82,67 @@ describe('SingleSelect', () => {
         await root.trigger('keydown', {key: 'ArrowDown'}); // opens (pointer stays -1)
         await root.trigger('keydown', {key: 'ArrowDown'}); // pointer → 0 (Apricot)
         expect(wrapper.findAll('.ui-select__option')[0].classes()).toContain('is-active');
-        expect(wrapper.findAll('.ui-select__option')[0].attributes('aria-selected')).toBe('true');
+        // Keyboard focus is visual + activedescendant only — it must NOT claim selection,
+        // because nothing is committed until Enter.
+        expect(wrapper.findAll('.ui-select__option')[0].attributes('aria-selected')).toBe('false');
 
         await root.trigger('keydown', {key: 'ArrowDown'}); // pointer → 1
         await root.trigger('keydown', {key: 'ArrowUp'}); // pointer → 0
         await root.trigger('keydown', {key: 'Enter'});
         expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([2]); // Apricot
         expect(wrapper.find('.ui-select__menu').exists()).toBe(false); // closed
+    });
+
+    it('exposes keyboard focus to assistive tech via aria-activedescendant', async () => {
+        const wrapper = mountSelect({});
+        const root = wrapper.find('.ui-select');
+        const trigger = () => wrapper.find('.ui-select__trigger');
+
+        // Closed: nothing owned, nothing focused.
+        expect(trigger().attributes('aria-controls')).toBeUndefined();
+        expect(trigger().attributes('aria-activedescendant')).toBeUndefined();
+
+        await root.trigger('keydown', {key: 'ArrowDown'}); // opens, pointer stays -1
+        expect(trigger().attributes('aria-controls')).toBe('fruit-listbox');
+        expect(wrapper.find('.ui-select__menu').attributes('id')).toBe('fruit-listbox');
+        // Open but nothing highlighted yet — the IDREF must be absent, not empty.
+        expect(trigger().attributes('aria-activedescendant')).toBeUndefined();
+
+        // Sorted order is Apricot(2), Mango(3), Watermelon(1).
+        await root.trigger('keydown', {key: 'ArrowDown'}); // → Apricot
+        expect(trigger().attributes('aria-activedescendant')).toBe('fruit-opt-2');
+
+        await root.trigger('keydown', {key: 'ArrowDown'}); // → Mango
+        expect(trigger().attributes('aria-activedescendant')).toBe('fruit-opt-3');
+
+        await root.trigger('keydown', {key: 'ArrowUp'}); // back to Apricot
+        expect(trigger().attributes('aria-activedescendant')).toBe('fruit-opt-2');
+
+        // Every referenced id must actually exist in the listbox, and be unique.
+        const ids = wrapper.findAll('.ui-select__option').map((o) => o.attributes('id'));
+        expect(ids).toEqual(['fruit-opt-2', 'fruit-opt-3', 'fruit-opt-1']);
+        expect(new Set(ids).size).toBe(ids.length);
+
+        await root.trigger('keydown', {key: 'Escape'});
+        expect(trigger().attributes('aria-activedescendant')).toBeUndefined();
+        expect(trigger().attributes('aria-controls')).toBeUndefined();
+    });
+
+    it('marks the committed value as aria-selected, not the hovered option', async () => {
+        const wrapper = mountSelect({modelValue: 3}); // Mango
+        await wrapper.find('.ui-select__trigger').trigger('click');
+
+        const options = wrapper.findAll('.ui-select__option'); // Apricot, Mango, Watermelon
+        expect(options.map((o) => o.attributes('aria-selected'))).toEqual(['false', 'true', 'false']);
+
+        // Hovering a different option moves the visual pointer but must not move selection.
+        await options[2].trigger('mouseover');
+        expect(options[2].classes()).toContain('is-active');
+        expect(wrapper.findAll('.ui-select__option').map((o) => o.attributes('aria-selected'))).toEqual([
+            'false',
+            'true',
+            'false',
+        ]);
     });
 
     it('does nothing on Enter with no highlight, and ignores unhandled keys while open', async () => {
