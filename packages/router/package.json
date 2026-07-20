@@ -45,11 +45,11 @@
         "@vue/test-utils": "^2.4.11",
         "happy-dom": "^20.10.3",
         "vue": "^3.5.39",
-        "vue-router": "^5.1.0"
+        "vue-router": "^5.2.0"
     },
     "peerDependencies": {
         "vue": "^3.5.39",
-        "vue-router": "^5.1.0"
+        "vue-router": "^5.2.0"
     },
     "engines": {
         "node": ">=24.0.0"
