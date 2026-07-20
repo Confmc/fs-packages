@@ -44,7 +44,7 @@
         "typecheck": "vue-tsc --noEmit"
     },
     "dependencies": {
-        "@floating-ui/vue": "^1.1.6"
+        "@floating-ui/vue": "^2.0.1"
     },
     "devDependencies": {
         "@vitejs/plugin-vue": "^6.0.8",
