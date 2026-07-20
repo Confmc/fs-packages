@@ -36,7 +36,7 @@
             <li v-if="!options.length" class="ui-select__empty">{{ emptyText }}</li>
             <li
                 v-for="(option, index) in sorted"
-                :id="optionId(option)"
+                :id="optionId(index)"
                 :key="String(option.id)"
                 class="ui-select__option"
                 :class="{'is-active': pointer === index}"
@@ -53,7 +53,7 @@
 
 <script setup lang="ts" generic="T extends SelectItem">
 import {autoUpdate, flip, hide, offset, shift, useFloating} from '@floating-ui/vue';
-import {computed, onBeforeUnmount, onMounted, ref, useTemplateRef} from 'vue';
+import {computed, onBeforeUnmount, onMounted, ref, useTemplateRef, watch} from 'vue';
 
 import type {LabelKey, SelectItem} from '../types';
 
@@ -108,10 +108,28 @@ const pointer = ref(-1);
 // if the referenced element sits inside the listbox the trigger owns, which is why the
 // trigger also carries aria-controls while open.
 const listboxId = computed(() => `${id}-listbox`);
-const optionId = (option: T): string => `${id}-opt-${option.id}`;
+// Keyed by POSITION, not by option.id: `SelectItem['id']` is an unconstrained
+// `string | number`, and an id containing ASCII whitespace is not a valid IDREF —
+// aria-activedescendant would silently resolve to nothing. Slugifying would trade that
+// for a worse bug (`red apple` and `red-apple` would collide onto one id, making the
+// IDREF ambiguous rather than absent). The position is consistent within a render, which
+// is the only window in which the trigger's IDREF and the option's id are read together.
+const optionId = (index: number): string => `${id}-opt-${index}`;
 // Absent (not empty) when there is nothing focused — a dangling IDREF is worse than none.
+// The upper bound is load-bearing: `options` is a reactive prop and can shrink while the
+// listbox is open, leaving `pointer` past the end.
 const activeDescendant = computed(() =>
-    open.value && pointer.value >= 0 ? optionId(sorted.value[pointer.value]) : undefined,
+    open.value && pointer.value >= 0 && pointer.value < sorted.value.length ? optionId(pointer.value) : undefined,
+);
+
+// `options` shrinking while open leaves `pointer` dangling. Clamping here (flush: 'pre',
+// so it lands before the re-render that would read a stale index) keeps the highlight
+// honest AND keeps Enter safe — `choose()` indexes the same array.
+watch(
+    () => sorted.value.length,
+    (length) => {
+        if (pointer.value >= length) pointer.value = length - 1;
+    },
 );
 
 const toggle = () => {
@@ -150,12 +168,17 @@ const onKey = (event: KeyboardEvent) => {
             pointer.value = Math.max(pointer.value - 1, -1);
             event.preventDefault();
             break;
-        case 'Enter':
-            if (pointer.value >= 0) {
-                choose(sorted.value[pointer.value]);
+        case 'Enter': {
+            // Read through a local rather than indexing blind: the clamp watcher normally
+            // keeps `pointer` in range, but a keypress landing between an `options` change
+            // and the watcher flush would otherwise index off the end.
+            const highlighted = pointer.value >= 0 ? sorted.value[pointer.value] : undefined;
+            if (highlighted) {
+                choose(highlighted);
                 event.preventDefault();
             }
             break;
+        }
         case 'Escape':
             close();
             event.preventDefault();
