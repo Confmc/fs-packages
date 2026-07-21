@@ -82,13 +82,116 @@ describe('SingleSelect', () => {
         await root.trigger('keydown', {key: 'ArrowDown'}); // opens (pointer stays -1)
         await root.trigger('keydown', {key: 'ArrowDown'}); // pointer → 0 (Apricot)
         expect(wrapper.findAll('.ui-select__option')[0].classes()).toContain('is-active');
-        expect(wrapper.findAll('.ui-select__option')[0].attributes('aria-selected')).toBe('true');
+        // Keyboard focus is visual + activedescendant only — it must NOT claim selection,
+        // because nothing is committed until Enter.
+        expect(wrapper.findAll('.ui-select__option')[0].attributes('aria-selected')).toBe('false');
 
         await root.trigger('keydown', {key: 'ArrowDown'}); // pointer → 1
         await root.trigger('keydown', {key: 'ArrowUp'}); // pointer → 0
         await root.trigger('keydown', {key: 'Enter'});
         expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([2]); // Apricot
         expect(wrapper.find('.ui-select__menu').exists()).toBe(false); // closed
+    });
+
+    it('exposes keyboard focus to assistive tech via aria-activedescendant', async () => {
+        const wrapper = mountSelect({});
+        const root = wrapper.find('.ui-select');
+        const trigger = () => wrapper.find('.ui-select__trigger');
+
+        // Closed: nothing owned, nothing focused.
+        expect(trigger().attributes('aria-controls')).toBeUndefined();
+        expect(trigger().attributes('aria-activedescendant')).toBeUndefined();
+
+        await root.trigger('keydown', {key: 'ArrowDown'}); // opens, pointer stays -1
+        expect(trigger().attributes('aria-controls')).toBe('fruit-listbox');
+        expect(wrapper.find('.ui-select__menu').attributes('id')).toBe('fruit-listbox');
+        // Open but nothing highlighted yet — the IDREF must be absent, not empty.
+        expect(trigger().attributes('aria-activedescendant')).toBeUndefined();
+
+        // Sorted order is Apricot, Mango, Watermelon; ids are keyed by POSITION, not by
+        // option.id — an unconstrained option.id could contain whitespace and yield an
+        // invalid IDREF.
+        await root.trigger('keydown', {key: 'ArrowDown'}); // → Apricot
+        expect(trigger().attributes('aria-activedescendant')).toBe('fruit-opt-0');
+
+        await root.trigger('keydown', {key: 'ArrowDown'}); // → Mango
+        expect(trigger().attributes('aria-activedescendant')).toBe('fruit-opt-1');
+
+        await root.trigger('keydown', {key: 'ArrowUp'}); // back to Apricot
+        expect(trigger().attributes('aria-activedescendant')).toBe('fruit-opt-0');
+
+        // Every referenced id must actually exist in the listbox, and be unique.
+        const ids = wrapper.findAll('.ui-select__option').map((o) => o.attributes('id'));
+        expect(ids).toEqual(['fruit-opt-0', 'fruit-opt-1', 'fruit-opt-2']);
+        expect(new Set(ids).size).toBe(ids.length);
+
+        await root.trigger('keydown', {key: 'Escape'});
+        expect(trigger().attributes('aria-activedescendant')).toBeUndefined();
+        expect(trigger().attributes('aria-controls')).toBeUndefined();
+    });
+
+    it('survives options shrinking under the pointer while the listbox is open', async () => {
+        const wrapper = mountSelect({});
+        const root = wrapper.find('.ui-select');
+        const trigger = () => wrapper.find('.ui-select__trigger');
+
+        await root.trigger('keydown', {key: 'ArrowDown'}); // open
+        await root.trigger('keydown', {key: 'ArrowDown'}); // → index 0
+
+        // A shrink that stays clear of the pointer must leave the highlight alone.
+        await wrapper.setProps({options: FRUITS.slice(0, 2)});
+        expect(trigger().attributes('aria-activedescendant')).toBe('fruit-opt-0');
+
+        await wrapper.setProps({options: FRUITS});
+        await root.trigger('keydown', {key: 'ArrowDown'}); // → index 1
+        await root.trigger('keydown', {key: 'ArrowDown'}); // → index 2 (last)
+        expect(trigger().attributes('aria-activedescendant')).toBe('fruit-opt-2');
+
+        // A dependent list narrowing (e.g. City reloading on a Country change) must not
+        // leave the pointer past the end — the computed re-evaluates on render, so an
+        // unguarded index would throw here with no user input at all.
+        await wrapper.setProps({options: FRUITS.slice(0, 1)});
+
+        expect(wrapper.findAll('.ui-select__option')).toHaveLength(1);
+        const active = trigger().attributes('aria-activedescendant');
+        // Whatever it points at must actually exist in the listbox.
+        if (active !== undefined) expect(wrapper.find(`#${active}`).exists()).toBe(true);
+
+        // Enter must commit the surviving option rather than index off the end.
+        await root.trigger('keydown', {key: 'Enter'});
+        expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([FRUITS[0].id]);
+    });
+
+    it('empties the highlight when options drain to nothing while open', async () => {
+        const wrapper = mountSelect({});
+        const root = wrapper.find('.ui-select');
+
+        await root.trigger('keydown', {key: 'ArrowDown'}); // open
+        await root.trigger('keydown', {key: 'ArrowDown'}); // → index 0
+
+        await wrapper.setProps({options: []});
+
+        expect(wrapper.find('.ui-select__trigger').attributes('aria-activedescendant')).toBeUndefined();
+        // Enter on an empty list is a no-op, not a crash.
+        await root.trigger('keydown', {key: 'Enter'});
+        expect(wrapper.emitted('update:modelValue')).toBeUndefined();
+    });
+
+    it('marks the committed value as aria-selected, not the hovered option', async () => {
+        const wrapper = mountSelect({modelValue: 3}); // Mango
+        await wrapper.find('.ui-select__trigger').trigger('click');
+
+        const options = wrapper.findAll('.ui-select__option'); // Apricot, Mango, Watermelon
+        expect(options.map((o) => o.attributes('aria-selected'))).toEqual(['false', 'true', 'false']);
+
+        // Hovering a different option moves the visual pointer but must not move selection.
+        await options[2].trigger('mouseover');
+        expect(options[2].classes()).toContain('is-active');
+        expect(wrapper.findAll('.ui-select__option').map((o) => o.attributes('aria-selected'))).toEqual([
+            'false',
+            'true',
+            'false',
+        ]);
     });
 
     it('does nothing on Enter with no highlight, and ignores unhandled keys while open', async () => {

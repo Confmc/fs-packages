@@ -42,6 +42,19 @@ Every visual rule keys on a `--ui-*` custom property — colours **and** structu
 
 Every text-like input (`TextInput`, `DateInput`, `Textarea`) models `string | null`, and `NumberInput` models `number | null`. A `null` from a nullable backend column binds directly — the control renders empty, no `?? ''` at the call site. When the user clears the field, the string inputs emit `''` (the raw native value); a Laravel backend's `ConvertEmptyStringsToNull` middleware maps that back to `null` on submit. `NumberInput` is the one exception: an empty number input emits `null` (not `NaN`, not `''`), since a `number` model can never hold `''` honestly — so it round-trips to `null` without relying on the middleware.
 
+## SingleSelect and assistive tech
+
+The listbox keeps DOM focus on the trigger and conveys the keyboard-focused option with
+`aria-activedescendant`, so arrow-key navigation is announced rather than silent. The trigger
+carries `aria-controls` while open (the IDREF only resolves inside the listbox it owns), and each
+option gets a stable `${id}-opt-${index}` keyed on its **position** in the rendered list, not on
+`option.id`.
+
+`aria-selected` marks the **committed** value — not the option under the keyboard pointer or the
+mouse. Keyboard/hover focus is visual (`.is-active`) plus `aria-activedescendant`; selection only
+moves on Enter or click. Because the IDREF is position-derived, a non-unique or
+whitespace-containing `option.id` never breaks the `aria-activedescendant` linkage.
+
 ## Errors are a prop, never a service
 
 The components never import an error service. Resolve the message in your app and pass `error` (to `FormField`) or `invalid` + `describedby` (to the inputs). That keeps the package agnostic to how your territory produces validation errors.
