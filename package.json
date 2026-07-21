@@ -30,11 +30,11 @@
         "@stryker-mutator/vitest-runner": "^9",
         "@vitejs/plugin-vue": "^6.0.8",
         "@vitest/coverage-v8": "^4",
-        "happy-dom": "^20.10.3",
+        "happy-dom": "^20.11.0",
         "oxfmt": "^0.57.0",
         "oxlint": "^1.72",
         "publint": "^0.3.21",
-        "tsdown": "^0.22.7",
+        "tsdown": "^0.22.12",
         "typescript": "^6.0",
         "vitepress": "^2.0.0-alpha.18",
         "vitest": "^4"
