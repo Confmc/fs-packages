@@ -47,12 +47,13 @@ Every text-like input (`TextInput`, `DateInput`, `Textarea`) models `string | nu
 The listbox keeps DOM focus on the trigger and conveys the keyboard-focused option with
 `aria-activedescendant`, so arrow-key navigation is announced rather than silent. The trigger
 carries `aria-controls` while open (the IDREF only resolves inside the listbox it owns), and each
-option gets a stable `${id}-opt-${option.id}`.
+option gets a stable `${id}-opt-${index}` keyed on its **position** in the rendered list, not on
+`option.id`.
 
 `aria-selected` marks the **committed** value — not the option under the keyboard pointer or the
 mouse. Keyboard/hover focus is visual (`.is-active`) plus `aria-activedescendant`; selection only
-moves on Enter or click. Passing a non-unique `option.id` breaks the IDREFs, so option ids must be
-unique within a single select.
+moves on Enter or click. Because the IDREF is position-derived, a non-unique or
+whitespace-containing `option.id` never breaks the `aria-activedescendant` linkage.
 
 ## Errors are a prop, never a service
 
