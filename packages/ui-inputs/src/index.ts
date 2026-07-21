@@ -6,5 +6,6 @@ export {default as NumberInput} from './components/NumberInput.vue';
 export {default as DateInput} from './components/DateInput.vue';
 export {default as Textarea} from './components/Textarea.vue';
 export {default as SingleSelect} from './components/SingleSelect.vue';
+export {default as Combobox} from './components/Combobox.vue';
 
 export type {SelectItem, LabelKey} from './types';

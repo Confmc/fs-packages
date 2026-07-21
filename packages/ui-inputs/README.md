@@ -18,21 +18,42 @@ import '@script-development/ui-inputs/style.css';
 
 ## Components
 
-| Component                 | Purpose                                                                            |
-| ------------------------- | ---------------------------------------------------------------------------------- |
-| `FormField`               | Label + error + required-marker composition wrapper (error-as-prop)                |
-| `FormLabel` / `FormError` | The atoms `FormField` composes                                                     |
-| `TextInput`               | Native `text` / `email` / `password` / `search` / `tel` / `url` input              |
-| `NumberInput`             | Native `number` input; owns the `NaN`→`null` empty-value guard                     |
-| `DateInput`               | Native `date` input                                                                |
-| `Textarea`                | Native `textarea` with `rows`                                                      |
-| `SingleSelect`            | Accessible listbox/combobox over `@floating-ui/vue`, generic over your option type |
+| Component                 | Purpose                                                                                                                                       |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `FormField`               | Label + error + required-marker composition wrapper (error-as-prop)                                                                           |
+| `FormLabel` / `FormError` | The atoms `FormField` composes                                                                                                                |
+| `TextInput`               | Native `text` / `email` / `password` / `search` / `tel` / `url` input                                                                         |
+| `NumberInput`             | Native `number` input; owns the `NaN`→`null` empty-value guard                                                                                |
+| `DateInput`               | Native `date` input                                                                                                                           |
+| `Textarea`                | Native `textarea` with `rows`                                                                                                                 |
+| `SingleSelect`            | Accessible button-triggered listbox over `@floating-ui/vue`, generic over your option type                                                    |
+| `Combobox`                | Accessible **searchable/filtering** single-select — a text input that filters the listbox as you type; exposes an imperative `focus()` handle |
 
 ```vue
 <FormField id="fruit" label="Fruit" :error="errors.fruit" #default="{controlId, describedby, invalid}">
     <SingleSelect :id="controlId" v-model="fruit" :options="fruits" label="name" :invalid="invalid" :describedby="describedby" />
 </FormField>
 ```
+
+### Combobox
+
+`Combobox` shares `SingleSelect`'s generic contract (`:options`, `label`, `v-model`, `alphabeticalSort`,
+`optionsLabel`, `emptyText`, `invalid`, `describedby`, `required`) but the trigger is a text `<input>`.
+As the user types, the listbox filters to options whose label contains the query
+(`labelOf(o).toLowerCase().includes(query)`), then the same optional alphabetical sort applies; an empty
+query shows everything. Arrow keys and Enter navigate/commit the **filtered** list. On commit the input
+shows the chosen label; on Escape, Tab, or a click outside the control the input snaps back to the
+committed label so a half-typed non-match never lingers.
+
+```vue
+<FormField id="city" label="City" :error="errors.city" #default="{controlId, describedby, invalid}">
+    <Combobox ref="cityBox" :id="controlId" v-model="city" :options="cities" label="name" :invalid="invalid" :describedby="describedby" />
+</FormField>
+```
+
+**Imperative focus handle.** `Combobox` exposes `focus()` via `defineExpose`, so a parent can move DOM
+focus onto the input programmatically (`cityBox.value?.focus()`) — the piece a focus-trap / command-palette
+integration needs.
 
 ## Theming
 
