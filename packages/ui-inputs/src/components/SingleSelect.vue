@@ -52,10 +52,11 @@
 </template>
 
 <script setup lang="ts" generic="T extends SelectItem">
-import {autoUpdate, flip, hide, offset, shift, useFloating} from '@floating-ui/vue';
-import {computed, onBeforeUnmount, onMounted, ref, useTemplateRef, watch} from 'vue';
+import {computed, useTemplateRef} from 'vue';
 
 import type {LabelKey, SelectItem} from '../types';
+
+import {useListbox} from '../composables/useListbox';
 
 const {
     options,
@@ -100,37 +101,31 @@ const sorted = computed(() =>
     alphabeticalSort ? [...options].sort((a, b) => labelOf(a).localeCompare(labelOf(b))) : options,
 );
 
-const open = ref(false);
-const pointer = ref(-1);
+const root = useTemplateRef<HTMLElement>('root');
+const reference = useTemplateRef<HTMLElement>('reference');
+const floating = useTemplateRef<HTMLElement>('floating');
 
-// Keyboard focus lives on the trigger, so the focused option is conveyed to assistive
-// tech via aria-activedescendant rather than real DOM focus. That IDREF only resolves
-// if the referenced element sits inside the listbox the trigger owns, which is why the
-// trigger also carries aria-controls while open.
-const listboxId = computed(() => `${id}-listbox`);
-// Keyed by POSITION, not by option.id: `SelectItem['id']` is an unconstrained
-// `string | number`, and an id containing ASCII whitespace is not a valid IDREF —
-// aria-activedescendant would silently resolve to nothing. Slugifying would trade that
-// for a worse bug (`red apple` and `red-apple` would collide onto one id, making the
-// IDREF ambiguous rather than absent). The position is consistent within a render, which
-// is the only window in which the trigger's IDREF and the option's id are read together.
-const optionId = (index: number): string => `${id}-opt-${index}`;
-// Absent (not empty) when there is nothing focused — a dangling IDREF is worse than none.
-// The upper bound is load-bearing: `options` is a reactive prop and can shrink while the
-// listbox is open, leaving `pointer` past the end.
-const activeDescendant = computed(() =>
-    open.value && pointer.value >= 0 && pointer.value < sorted.value.length ? optionId(pointer.value) : undefined,
-);
-
-// `options` shrinking while open leaves `pointer` dangling. Clamping here (flush: 'pre',
-// so it lands before the re-render that would read a stale index) keeps the highlight
-// honest AND keeps Enter safe — `choose()` indexes the same array.
-watch(
-    () => sorted.value.length,
-    (length) => {
-        if (pointer.value >= length) pointer.value = length - 1;
+const {open, pointer, listboxId, optionId, activeDescendant, floatingStyles, onKey} = useListbox({
+    root,
+    reference,
+    floating,
+    id: () => id,
+    disabled: () => disabled,
+    listLength: () => sorted.value.length,
+    // A closed SingleSelect opens on Enter, ArrowDown, or Space.
+    openKeys: (key) => ['Enter', 'ArrowDown', ' '].includes(key),
+    onCommit: (index) => {
+        // Read through a local rather than indexing blind: the clamp watcher normally keeps
+        // `pointer` in range, but a keypress landing between an `options` change and the
+        // watcher flush would otherwise index off the end.
+        const highlighted = sorted.value[index];
+        if (!highlighted) return false;
+        choose(highlighted);
+        return true;
     },
-);
+    onDismiss: () => close(),
+    onOutside: () => close(),
+});
 
 const toggle = () => {
     open.value = !open.value;
@@ -143,63 +138,4 @@ const choose = (option: T) => {
     model.value = option.id;
     close();
 };
-
-// Listbox keyboard navigation. The trigger's native :disabled blocks clicks; this
-// guards the keyboard path too.
-const onKey = (event: KeyboardEvent) => {
-    if (disabled) return;
-    if (event.key === 'Tab') {
-        close();
-        return;
-    }
-    if (!open.value) {
-        if (['Enter', 'ArrowDown', ' '].includes(event.key)) {
-            event.preventDefault();
-            open.value = true;
-        }
-        return;
-    }
-    switch (event.key) {
-        case 'ArrowDown':
-            pointer.value = Math.min(pointer.value + 1, sorted.value.length - 1);
-            event.preventDefault();
-            break;
-        case 'ArrowUp':
-            pointer.value = Math.max(pointer.value - 1, -1);
-            event.preventDefault();
-            break;
-        case 'Enter': {
-            // Read through a local rather than indexing blind: the clamp watcher normally
-            // keeps `pointer` in range, but a keypress landing between an `options` change
-            // and the watcher flush would otherwise index off the end.
-            const highlighted = pointer.value >= 0 ? sorted.value[pointer.value] : undefined;
-            if (highlighted) {
-                choose(highlighted);
-                event.preventDefault();
-            }
-            break;
-        }
-        case 'Escape':
-            close();
-            event.preventDefault();
-            break;
-    }
-};
-
-// click-outside — closes the menu without a shared directive dependency.
-const root = useTemplateRef<HTMLElement>('root');
-const onDocumentPointer = (event: MouseEvent) => {
-    // The listener is attached only between mount and unmount, so the ref is non-null here.
-    if (!root.value!.contains(event.target as Node)) close();
-};
-onMounted(() => document.addEventListener('click', onDocumentPointer));
-onBeforeUnmount(() => document.removeEventListener('click', onDocumentPointer));
-
-const reference = useTemplateRef<HTMLElement>('reference');
-const floating = useTemplateRef<HTMLElement>('floating');
-const {floatingStyles} = useFloating(reference, floating, {
-    placement: 'bottom-start',
-    middleware: [offset(4), flip({fallbackPlacements: ['top-start']}), shift({padding: 8}), hide()],
-    whileElementsMounted: autoUpdate,
-});
 </script>
