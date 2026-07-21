@@ -144,12 +144,15 @@ watch(
     },
 );
 
-// The input text is local, but it must still track the committed value when the model
-// changes from OUTSIDE (e.g. a form reset to null) while the control is idle. While the
-// menu is open the user is actively typing, so an external change must not yank the text
-// out from under them.
-watch(model, () => {
-    if (!open.value) query.value = selectedLabel.value;
+// The input text is local, but it must still track the committed label when it changes
+// from OUTSIDE while the control is idle. Watch `selectedLabel` (not `model`): the label
+// depends on BOTH the model AND `options`, so this also re-syncs when a pre-set model's
+// option arrives asynchronously (the edit-form pattern — model set before an async
+// options load, where `selected` is briefly undefined and the label would otherwise stay
+// blank). While the menu is open the user is actively typing, so an external change must
+// not yank the text out from under them.
+watch(selectedLabel, (label) => {
+    if (!open.value) query.value = label;
 });
 
 const close = () => {

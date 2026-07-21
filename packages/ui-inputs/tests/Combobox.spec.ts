@@ -253,6 +253,18 @@ describe('Combobox', () => {
         expect(input.element.value).toBe('Watermelon');
     });
 
+    it('shows the committed label once a pre-set model’s option arrives asynchronously (edit-form pattern)', async () => {
+        // Model committed before the options load: `selected` is undefined at mount, so the
+        // input starts blank — but the moment the matching option arrives the input must show
+        // its label, even though `model` never changed.
+        const wrapper = mountCombobox({modelValue: 3, options: []});
+        const input = wrapper.find('input');
+        expect(input.element.value).toBe(''); // options empty → nothing to render yet
+
+        await wrapper.setProps({options: FRUITS}); // async options arrive, model unchanged
+        expect(input.element.value).toBe('Mango'); // committed label now resolves
+    });
+
     it('does not disrupt the typed query when the model changes from outside while the menu is open', async () => {
         const wrapper = mountCombobox({});
         const input = wrapper.find('input');
