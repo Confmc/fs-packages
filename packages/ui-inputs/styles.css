@@ -151,7 +151,8 @@
     cursor: not-allowed;
 }
 
-.ui-select {
+.ui-select,
+.ui-combobox {
     position: relative;
 }
 .ui-select__trigger {
@@ -175,7 +176,10 @@
     transform: rotate(180deg);
 }
 
-.ui-select__menu {
+/* The listbox popup is shared verbatim between the button-triggered SingleSelect and the
+   text-input-triggered Combobox — one rule body, both class families, same --ui-* vars. */
+.ui-select__menu,
+.ui-combobox__menu {
     list-style: none;
     margin: 0.25rem 0 0;
     padding: var(--ui-menu-pad);
@@ -192,16 +196,19 @@
     max-height: var(--ui-menu-max-height);
     overflow-y: auto;
 }
-.ui-select__option {
+.ui-select__option,
+.ui-combobox__option {
     padding: var(--ui-option-pad);
     border-radius: var(--ui-option-radius);
     cursor: pointer;
     color: var(--ui-control-text);
 }
-.ui-select__option.is-active {
+.ui-select__option.is-active,
+.ui-combobox__option.is-active {
     background: var(--ui-option-bg-active);
 }
-.ui-select__empty {
+.ui-select__empty,
+.ui-combobox__empty {
     padding: var(--ui-option-pad);
     color: var(--ui-control-text-muted);
 }
