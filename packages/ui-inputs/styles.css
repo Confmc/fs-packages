@@ -28,10 +28,24 @@
     --ui-control-bg-invalid: var(--ui-control-bg);
     --ui-control-bg-disabled: #f3f4f6;
     --ui-control-text: #111827;
+    /* text-on-state hooks — default to the resting text colour so they are a no-op
+       until a territory opts in (a strong bg-focus/bg-invalid fill needs a text
+       partner for contrast). */
+    --ui-control-text-focus: var(--ui-control-text);
+    --ui-control-text-invalid: var(--ui-control-text);
     --ui-control-text-muted: #6b7280;
+    /* typography escape hatch — `inherit` reproduces the historical `font: inherit`
+       size; a territory sizes control text through this var (which the package
+       reads) instead of a utility that loses the source-order tie. */
+    --ui-control-font-size: inherit;
     --ui-control-border-width: 1px;
     --ui-control-border-color: #d1d5db;
     --ui-control-border-open: #2563eb;
+    /* border-on-focus hooks — default to the resting border so they are a no-op
+       until a territory opts in. .is-open / .is-invalid follow in source order and
+       keep winning their border where they did before. */
+    --ui-control-border-color-focus: var(--ui-control-border-color);
+    --ui-control-border-width-focus: var(--ui-control-border-width);
     --ui-control-radius: 8px;
     --ui-control-pad-x: 0.75rem;
     --ui-control-pad-y: 0.55rem;
@@ -81,7 +95,16 @@
 }
 
 .ui-control {
-    font: inherit;
+    /* decomposed from `font: inherit` so font-size becomes a var hook while every
+       other longhand the shorthand set still inherits — keeps the default byte-
+       identical to the prior `font: inherit`. */
+    font-family: inherit;
+    font-size: var(--ui-control-font-size);
+    font-style: inherit;
+    font-variant: inherit;
+    font-weight: inherit;
+    font-stretch: inherit;
+    line-height: inherit;
     width: 100%;
     box-sizing: border-box;
     padding: var(--ui-control-pad-y) var(--ui-control-pad-x);
@@ -101,7 +124,10 @@
 }
 .ui-control:focus-visible {
     outline: none;
+    color: var(--ui-control-text-focus);
     background: var(--ui-control-bg-focus);
+    border-color: var(--ui-control-border-color-focus);
+    border-width: var(--ui-control-border-width-focus);
     box-shadow: var(--ui-focus-ring);
 }
 .ui-control.is-open {
@@ -110,6 +136,7 @@
 }
 .ui-control.is-invalid {
     background: var(--ui-control-bg-invalid);
+    color: var(--ui-control-text-invalid);
     border-color: var(--ui-danger-border);
     box-shadow: var(--ui-danger-shadow);
 }
