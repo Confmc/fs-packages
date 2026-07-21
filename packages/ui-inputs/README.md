@@ -38,6 +38,25 @@ import '@script-development/ui-inputs/style.css';
 
 Every visual rule keys on a `--ui-*` custom property — colours **and** structure (`--ui-control-border-width`, `--ui-control-radius`, `--ui-control-shadow`, `--ui-label-transform`, …). Remap them under any selector to theme the whole set; the shipped defaults render out of the box. Dark/light is orthogonal — pair with `@script-development/fs-theme`'s `data-theme` switching.
 
+### State-variant hooks
+
+The control has a background/text/border hook for each interactive state, so a strong focus or invalid treatment stays a one-line remap instead of a hand-written `:focus-visible` override block. Every hook **defaults to its resting counterpart**, so the contract is a no-op until you opt in:
+
+| Var                               | Fires on         | Default                          |
+| --------------------------------- | ---------------- | -------------------------------- |
+| `--ui-control-bg-focus`           | `:focus-visible` | `var(--ui-control-bg)`           |
+| `--ui-control-text-focus`         | `:focus-visible` | `var(--ui-control-text)`         |
+| `--ui-control-border-color-focus` | `:focus-visible` | `var(--ui-control-border-color)` |
+| `--ui-control-border-width-focus` | `:focus-visible` | `var(--ui-control-border-width)` |
+| `--ui-control-bg-invalid`         | `.is-invalid`    | `var(--ui-control-bg)`           |
+| `--ui-control-text-invalid`       | `.is-invalid`    | `var(--ui-control-text)`         |
+
+The `.is-open` and `.is-invalid` state classes follow `:focus-visible` in source order, so they keep winning their border/background where they did before — the focus hooks only take effect on a plain focused control.
+
+### Typography escape hatch
+
+`--ui-control-font-size` (default `inherit`) sizes control text. The control's `font` is decomposed into longhands (`font-family`/`font-size`/`font-style`/`font-variant`/`font-weight`/`font-stretch`/`line-height`, all inheriting except size), so `font-size` reads from this var rather than from a consumer utility class — which would otherwise lose the source-order tie against the package stylesheet. The default `inherit` is byte-identical to the historical `font: inherit`.
+
 ## Nullable values
 
 Every text-like input (`TextInput`, `DateInput`, `Textarea`) models `string | null`, and `NumberInput` models `number | null`. A `null` from a nullable backend column binds directly — the control renders empty, no `?? ''` at the call site. When the user clears the field, the string inputs emit `''` (the raw native value); a Laravel backend's `ConvertEmptyStringsToNull` middleware maps that back to `null` on submit. `NumberInput` is the one exception: an empty number input emits `null` (not `NaN`, not `''`), since a `number` model can never hold `''` honestly — so it round-trips to `null` without relying on the middleware.
