@@ -53,12 +53,8 @@ Props are type-checked against your component's definitions — same pattern as 
 Dialogs are managed as a **LIFO stack** (last in, first out). Opening a new dialog pushes it on top of the stack:
 
 ```typescript
-dialog.open(SettingsDialog, {
-    /* ... */
-}); // stack: [Settings]
-dialog.open(ConfirmDialog, {
-    /* ... */
-}); // stack: [Settings, Confirm]
+dialog.open(SettingsDialog, {/* ... */}); // stack: [Settings]
+dialog.open(ConfirmDialog, {/* ... */}); // stack: [Settings, Confirm]
 
 // Confirm is on top, Settings is behind it
 ```
@@ -192,13 +188,7 @@ dialog.open(
 For dialogs without a visible title element, use `ariaLabel` instead:
 
 ```typescript
-dialog.open(
-    IconOnlyDialog,
-    {
-        /* … */
-    },
-    {ariaLabel: 'Delete confirmation'},
-);
+dialog.open(IconOnlyDialog, {/* … */}, {ariaLabel: 'Delete confirmation'});
 ```
 
 All three options are independent and optional — pass any combination. Options omitted leave the corresponding attribute off the `<dialog>` element entirely (no empty-string attributes).
