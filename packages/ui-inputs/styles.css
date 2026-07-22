@@ -67,6 +67,13 @@
     --ui-option-pad: 0.5rem 0.625rem;
     --ui-option-bg-active: #f3f4f6;
 
+    /* chip (MultiSelect) — every default derives from an existing resting token, so the
+       chip contract is neutral until a territory opts in. */
+    --ui-chip-bg: var(--ui-option-bg-active);
+    --ui-chip-text: var(--ui-control-text);
+    --ui-chip-radius: var(--ui-option-radius);
+    --ui-chip-pad: 0.1rem 0.45rem;
+
     /* error / danger */
     --ui-danger-text: #dc2626;
     --ui-danger-border: #dc2626;
@@ -122,7 +129,12 @@
 .ui-control:hover:not(:disabled) {
     box-shadow: var(--ui-control-shadow-hover);
 }
-.ui-control:focus-visible {
+/* The MultiSelect control is a flex box whose focus lives on the inner trigger button, so
+   its focus treatment keys on :focus-within — declared in the same rule, BEFORE .is-open /
+   .is-invalid, so those state classes keep winning their properties over focus exactly as
+   they do over :focus-visible on the sibling controls. */
+.ui-control:focus-visible,
+.ui-multiselect__box:focus-within {
     outline: none;
     color: var(--ui-control-text-focus);
     background: var(--ui-control-bg-focus);
@@ -144,7 +156,10 @@
 .ui-textarea {
     resize: vertical;
 }
-.ui-control:disabled {
+/* The MultiSelect box is a div, so :disabled cannot match it — the component mirrors the
+   state as .is-disabled (every focusable child inside carries the native :disabled). */
+.ui-control:disabled,
+.ui-multiselect__box.is-disabled {
     background: var(--ui-control-bg-disabled);
     color: var(--ui-control-text-muted);
     box-shadow: none;
@@ -152,7 +167,8 @@
 }
 
 .ui-select,
-.ui-combobox {
+.ui-combobox,
+.ui-multiselect {
     position: relative;
 }
 .ui-select__trigger {
@@ -176,10 +192,95 @@
     transform: rotate(180deg);
 }
 
-/* The listbox popup is shared verbatim between the button-triggered SingleSelect and the
-   text-input-triggered Combobox — one rule body, both class families, same --ui-* vars. */
+/* MultiSelect — the control chrome sits on the flex box; the chips and the (chrome-less,
+   flex-filling) trigger button live inside it, so clicking the empty part of the chip bar
+   is clicking the trigger. */
+.ui-multiselect__box {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem;
+}
+.ui-multiselect__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: var(--ui-chip-pad);
+    background: var(--ui-chip-bg);
+    color: var(--ui-chip-text);
+    border-radius: var(--ui-chip-radius);
+    font-size: 0.875em;
+}
+.ui-multiselect__chip-remove {
+    display: inline-flex;
+    align-items: center;
+    padding: 0;
+    margin: 0;
+    background: none;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+}
+.ui-multiselect__chip-remove:disabled {
+    cursor: not-allowed;
+}
+.ui-multiselect__chip-x {
+    width: 0.9em;
+    height: 0.9em;
+}
+.ui-multiselect__trigger {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0;
+    margin: 0;
+    background: none;
+    border: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    /* focus is conveyed on the box via :focus-within (rule above, with :focus-visible) */
+    outline: none;
+}
+.ui-multiselect__box.is-disabled .ui-multiselect__trigger {
+    cursor: not-allowed;
+}
+.ui-multiselect__placeholder {
+    color: var(--ui-control-text-muted);
+}
+/* Screen-reader-only trigger value (the clip pattern — display:none/visibility:hidden would
+   remove it from the accessibility tree, defeating its purpose). */
+.ui-multiselect__sr-value {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+}
+.ui-multiselect__chevron {
+    width: 1.1em;
+    height: 1.1em;
+    flex: none;
+    margin-left: auto;
+    transition: transform 0.12s ease;
+}
+.ui-multiselect__box.is-open .ui-multiselect__chevron {
+    transform: rotate(180deg);
+}
+
+/* The listbox popup is shared verbatim across the button-triggered SingleSelect, the
+   text-input-triggered Combobox, and the chip-bar MultiSelect — one rule body, all three
+   class families, same --ui-* vars. */
 .ui-select__menu,
-.ui-combobox__menu {
+.ui-combobox__menu,
+.ui-multiselect__menu {
     list-style: none;
     margin: 0.25rem 0 0;
     padding: var(--ui-menu-pad);
@@ -197,18 +298,21 @@
     overflow-y: auto;
 }
 .ui-select__option,
-.ui-combobox__option {
+.ui-combobox__option,
+.ui-multiselect__option {
     padding: var(--ui-option-pad);
     border-radius: var(--ui-option-radius);
     cursor: pointer;
     color: var(--ui-control-text);
 }
 .ui-select__option.is-active,
-.ui-combobox__option.is-active {
+.ui-combobox__option.is-active,
+.ui-multiselect__option.is-active {
     background: var(--ui-option-bg-active);
 }
 .ui-select__empty,
-.ui-combobox__empty {
+.ui-combobox__empty,
+.ui-multiselect__empty {
     padding: var(--ui-option-pad);
     color: var(--ui-control-text-muted);
 }
