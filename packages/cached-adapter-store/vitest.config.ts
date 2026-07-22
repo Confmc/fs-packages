@@ -1,7 +1,11 @@
-import {defineProject} from 'vitest/config';
+import {configDefaults, defineProject} from 'vitest/config';
 
 export default defineProject({
     test: {
+        // Leftover Stryker sandboxes (crash-abandoned .stryker-tmp/) are a full package
+        // copy whose specs the default include glob would sweep in twice. Carried from
+        // the pre-`test.projects` root config — root test.exclude is not inherited here.
+        exclude: [...configDefaults.exclude, '**/.stryker-tmp/**'],
         name: 'cached-adapter-store',
         coverage: {
             provider: 'v8',

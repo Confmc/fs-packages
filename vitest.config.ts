@@ -1,26 +1,55 @@
-import Vue from '@vitejs/plugin-vue';
-import {configDefaults, defineConfig} from 'vitest/config';
+import {defineConfig} from 'vitest/config';
 
-// Root-level Vue plugin so the workspace run (vitest.workspace.ts) transforms the
-// `.vue` SFCs in @script-development/ui-inputs. A plugin declared in a workspace
-// *project* config is not applied to `.vue` import analysis in the aggregated root
-// `vitest run` (the path CI exercises), so the transform is hoisted here. No-op for
-// the `.vue`-free service packages.
+// Per-package 100% coverage gate, one glob group per package. Vitest 4 removed
+// `defineWorkspace` (the old vitest.workspace.ts was silently inert — WR-0532), and
+// coverage is a ROOT-ONLY concern under `test.projects`: the `coverage.thresholds`
+// blocks in packages/*/vitest.config.ts are ignored on the root run (verified
+// empirically 2026-07-22 — an uncovered branch in packages/helpers exited 0 with
+// projects loaded). Each glob key below is an independent threshold group, so a dip
+// in one package fails the gate by name instead of drowning in a fleet aggregate.
+// The per-package config blocks stay load-bearing for in-package runs (Stryker's
+// vitest runner + `vitest run` from a package dir).
+const PACKAGE_THRESHOLDS = Object.fromEntries(
+    [
+        'adapter-store',
+        'cached-adapter-store',
+        'dialog',
+        'form',
+        'helpers',
+        'http',
+        'loading',
+        'router',
+        'storage',
+        'theme',
+        'toast',
+        'translation',
+        'ui-inputs',
+    ].map((pkg) => [`packages/${pkg}/src/**`, {lines: 100, branches: 100, functions: 100, statements: 100}]),
+);
+
 export default defineConfig({
-    plugins: [Vue()],
     test: {
-        exclude: [
-            ...configDefaults.exclude,
-            // Browser-mode layer (real Chromium; packages/ui-inputs/vitest.browser.config.ts,
-            // run via `npm run test:browser`) — its specs import `vitest/browser`, which only
-            // resolves inside Browser Mode, so the default happy-dom/node run must skip them.
-            '**/tests/browser/**',
-            // Agent worktrees (war-room concurrency): a checked-out worktree under .claude/
-            // is a full second copy of the repo, and the default include glob would sweep
-            // its specs into this run twice — with broken workspace links.
-            '**/.claude/**',
-            // Leftover Stryker sandboxes are a third full-copy source of duplicate specs.
-            '**/.stryker-tmp/**',
-        ],
+        // vitest 4 project discovery (replaces the removed defineWorkspace):
+        // each packages/* dir contributes its own vitest.config.ts as a project
+        // config — including the ui-inputs Vue plugin (SFC transform) and its
+        // tests/browser exclusion. The glob is root-anchored, so full repo
+        // copies under .claude/ agent worktrees are never swept in as projects.
+        projects: ['packages/*'],
+        coverage: {
+            provider: 'v8',
+            // Explicit include so a src file no spec ever imports still counts
+            // (0%) instead of silently escaping the gate.
+            include: ['packages/*/src/**/*.{ts,vue}'],
+            thresholds: {
+                ...PACKAGE_THRESHOLDS,
+                // Global backstop: a future package added without a glob entry
+                // above falls into this group and still faces the 100% bar
+                // (files matched by the globs are subtracted from this group).
+                lines: 100,
+                branches: 100,
+                functions: 100,
+                statements: 100,
+            },
+        },
     },
 });
