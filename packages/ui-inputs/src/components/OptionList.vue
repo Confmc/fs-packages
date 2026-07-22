@@ -1,5 +1,12 @@
 <template>
-    <ul :id="listboxId" :class="`${variant}__menu`" role="listbox" :aria-label="optionsLabel" :style="floatingStyles">
+    <ul
+        :id="listboxId"
+        :class="`${variant}__menu`"
+        role="listbox"
+        :aria-label="optionsLabel"
+        :aria-multiselectable="multiselectable || undefined"
+        :style="floatingStyles"
+    >
         <li v-if="!labels.length" :class="`${variant}__empty`">{{ emptyText }}</li>
         <li
             v-for="(optionLabel, index) in labels"
@@ -37,29 +44,42 @@ import type {CSSProperties} from 'vue';
  * family reserves for public imperative handles, never internal plumbing. A second root node
  * (or a root comment outside the `<ul>`) would break `$el` resolution for every consumer.
  */
-const {labels, keys, pointer, listboxId, optionId, isSelected, floatingStyles, variant, optionsLabel, emptyText} =
-    defineProps<{
-        /** display strings, in render order — parallel to `keys`. */
-        labels: string[];
-        /** stable `v-for` keys (stringified option ids), parallel to `labels`. */
-        keys: string[];
-        /** the highlighted index (`-1` for none) — owned by the parent, moved via `hover`. */
-        pointer: number;
-        /** the listbox `id` the trigger's `aria-controls` points at. */
-        listboxId: string;
-        /** position-keyed option-id scheme from `useListbox` (`${id}-opt-${index}`). */
-        optionId: (index: number) => string;
-        /** whether the option at an index is the COMMITTED value (`aria-selected`), never the pointer. */
-        isSelected: (index: number) => boolean;
-        /** floating-ui positioning styles for the popup. */
-        floatingStyles: CSSProperties;
-        /** class prefix of the owning control — the only visual divergence across the family. */
-        variant: 'ui-select' | 'ui-combobox';
-        /** accessible name for the listbox popup (`aria-label`). */
-        optionsLabel: string;
-        /** shown when `labels` is empty. */
-        emptyText: string;
-    }>();
+const {
+    labels,
+    keys,
+    pointer,
+    listboxId,
+    optionId,
+    isSelected,
+    floatingStyles,
+    variant,
+    optionsLabel,
+    emptyText,
+    multiselectable = false,
+} = defineProps<{
+    /** display strings, in render order — parallel to `keys`. */
+    labels: string[];
+    /** stable `v-for` keys (stringified option ids), parallel to `labels`. */
+    keys: string[];
+    /** the highlighted index (`-1` for none) — owned by the parent, moved via `hover`. */
+    pointer: number;
+    /** the listbox `id` the trigger's `aria-controls` points at. */
+    listboxId: string;
+    /** position-keyed option-id scheme from `useListbox` (`${id}-opt-${index}`). */
+    optionId: (index: number) => string;
+    /** whether the option at an index is the COMMITTED value (`aria-selected`), never the pointer. */
+    isSelected: (index: number) => boolean;
+    /** floating-ui positioning styles for the popup. */
+    floatingStyles: CSSProperties;
+    /** class prefix of the owning control — the only visual divergence across the family. */
+    variant: 'ui-select' | 'ui-combobox' | 'ui-multiselect';
+    /** accessible name for the listbox popup (`aria-label`). */
+    optionsLabel: string;
+    /** shown when `labels` is empty. */
+    emptyText: string;
+    /** marks the listbox `aria-multiselectable` (MultiSelect) — absent, not "false", otherwise. */
+    multiselectable?: boolean;
+}>();
 
 const emit = defineEmits<{hover: [index: number]; commit: [index: number]}>();
 </script>

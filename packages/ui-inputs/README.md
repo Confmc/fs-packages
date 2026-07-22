@@ -18,16 +18,17 @@ import '@script-development/ui-inputs/style.css';
 
 ## Components
 
-| Component                 | Purpose                                                                                                                                       |
-| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `FormField`               | Label + error + required-marker composition wrapper (error-as-prop)                                                                           |
-| `FormLabel` / `FormError` | The atoms `FormField` composes                                                                                                                |
-| `TextInput`               | Native `text` / `email` / `password` / `search` / `tel` / `url` input                                                                         |
-| `NumberInput`             | Native `number` input; owns the `NaN`→`null` empty-value guard                                                                                |
-| `DateInput`               | Native `date` input                                                                                                                           |
-| `Textarea`                | Native `textarea` with `rows`                                                                                                                 |
-| `SingleSelect`            | Accessible button-triggered listbox over `@floating-ui/vue`, generic over your option type                                                    |
-| `Combobox`                | Accessible **searchable/filtering** single-select — a text input that filters the listbox as you type; exposes an imperative `focus()` handle |
+| Component                 | Purpose                                                                                                                                                    |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `FormField`               | Label + error + required-marker composition wrapper (error-as-prop)                                                                                        |
+| `FormLabel` / `FormError` | The atoms `FormField` composes                                                                                                                             |
+| `TextInput`               | Native `text` / `email` / `password` / `search` / `tel` / `url` input                                                                                      |
+| `NumberInput`             | Native `number` input; owns the `NaN`→`null` empty-value guard                                                                                             |
+| `DateInput`               | Native `date` input                                                                                                                                        |
+| `Textarea`                | Native `textarea` with `rows`                                                                                                                              |
+| `SingleSelect`            | Accessible button-triggered listbox over `@floating-ui/vue`, generic over your option type                                                                 |
+| `Combobox`                | Accessible **searchable/filtering** single-select — a text input that filters the listbox as you type; exposes an imperative `focus()` handle              |
+| `MultiSelect`             | Accessible **multi-value** select — models an array of option ids; toggle-in-place listbox that stays open on commit, inline chip bar with per-chip remove |
 
 ```vue
 <FormField id="fruit" label="Fruit" :error="errors.fruit" #default="{controlId, describedby, invalid}">
@@ -54,6 +55,33 @@ committed label so a half-typed non-match never lingers.
 **Imperative focus handle.** `Combobox` exposes `focus()` via `defineExpose`, so a parent can move DOM
 focus onto the input programmatically (`cityBox.value?.focus()`) — the piece a focus-trap / command-palette
 integration needs.
+
+### MultiSelect
+
+`MultiSelect` shares the family's generic contract (`:options`, `label`, `alphabeticalSort`,
+`optionsLabel`, `emptyText`, `invalid`, `describedby`, `required`) but models **an array of option
+ids** (`v-model="tagIds"`). Committing an option — Enter or click — **toggles its membership and the
+listbox stays open**, so picking several values is one open/close cycle, not five. The committed
+values render as an inline chip bar inside the control; every chip carries its own remove button
+(`aria-label="${removeLabel} <label>"` — `removeLabel` defaults to `'Remove'` and is a prop so Dutch
+territories can localise it, like `optionsLabel`), and **Backspace on the focused trigger pops the
+last committed value**. There is no text input and no filtering — that stays `Combobox`'s job.
+
+```vue
+<FormField id="tags" label="Tags" :error="errors.tags" #default="{controlId, describedby, invalid}">
+    <MultiSelect :id="controlId" v-model="tagIds" :options="tags" label="name" :invalid="invalid" :describedby="describedby" />
+</FormField>
+```
+
+The listbox is marked `aria-multiselectable="true"`; `aria-selected` marks committed **membership**
+(selected options remain listed, toggled in place), while the keyboard pointer stays conveyed by
+`aria-activedescendant` — the same position-keyed `${id}-opt-${index}` option-id scheme as
+`SingleSelect` (see below), so an unusual `option.id` can never break the IDREF linkage. An id whose
+option has not loaded yet (async options) stays in the model but renders no chip until it resolves.
+
+Chips theme through `--ui-chip-bg` / `--ui-chip-text` / `--ui-chip-radius` / `--ui-chip-pad`, each
+defaulting to an existing resting token (`--ui-option-bg-active`, `--ui-control-text`,
+`--ui-option-radius`) — neutral out of the box, remap to opt in.
 
 ## Theming
 
