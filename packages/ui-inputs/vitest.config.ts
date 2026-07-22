@@ -1,5 +1,5 @@
 import Vue from '@vitejs/plugin-vue';
-import {defineProject} from 'vitest/config';
+import {configDefaults, defineProject} from 'vitest/config';
 
 export default defineProject({
     // The SFC specs import `.vue` files, so the test runner needs the Vue plugin.
@@ -11,6 +11,10 @@ export default defineProject({
     plugins: [Vue()],
     test: {
         name: 'ui-inputs',
+        // The browser-mode layer (vitest.browser.config.ts — real Chromium, run via the root
+        // `test:browser` script) names its specs `*.browser.spec.ts`, which the default include
+        // glob would otherwise sweep into this happy-dom project on the root `vitest run`.
+        exclude: [...configDefaults.exclude, 'tests/browser/**'],
         coverage: {
             provider: 'v8',
             // Stricter than the service-package siblings (which cover `.ts` only):

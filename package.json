@@ -17,6 +17,7 @@
         "lint:pkg": "node scripts/lint-pkg.mjs",
         "release": "npm run build && changeset publish",
         "test": "vitest run",
+        "test:browser": "vitest run --config packages/ui-inputs/vitest.browser.config.ts",
         "test:coverage": "vitest run --coverage",
         "test:mutation": "npm run test:mutation --workspaces",
         "typecheck": "npm run typecheck --workspaces",
@@ -29,15 +30,19 @@
         "@stryker-mutator/core": "^9",
         "@stryker-mutator/vitest-runner": "^9",
         "@vitejs/plugin-vue": "^6.0.8",
+        "@vitest/browser-playwright": "^4.1.10",
         "@vitest/coverage-v8": "^4",
+        "axe-core": "^4.12.1",
         "happy-dom": "^20.11.0",
         "oxfmt": "^0.59.0",
         "oxlint": "^1.74",
+        "playwright": "^1.61.1",
         "publint": "^0.3.21",
         "tsdown": "^0.22.12",
         "typescript": "^6.0",
         "vitepress": "^2.0.0-alpha.18",
-        "vitest": "^4"
+        "vitest": "^4",
+        "vitest-browser-vue": "^2.1.0"
     },
     "overrides": {
         "esbuild": "^0.28.1",

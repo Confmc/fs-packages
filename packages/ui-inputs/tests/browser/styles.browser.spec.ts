@@ -1,0 +1,214 @@
+// Browser-mode CONTRACT spec (real Chromium) — scope: contract + interaction only; unit
+// behaviour stays in the happy-dom suite; never duplicate a happy-dom spec here.
+//
+// First-ever coverage of styles.css: the shipped stylesheet applied in a real layout engine,
+// asserted through getComputedStyle — the layer no happy-dom spec can see. Includes the
+// WR-0512 regression pins (font-size source-order fight) and the state-variant hooks on a
+// real keyboard :focus-visible.
+import {afterEach, describe, expect, it} from 'vitest';
+import {userEvent} from 'vitest/browser';
+
+// `?inline` yields the stylesheet as text so each test controls WHERE in the cascade the
+// package sheet sits — the WR-0512 pins need both orderings, which a plain side-effect
+// import (one fixed <style> position) cannot express.
+import uiCss from '../../styles.css?inline';
+
+const cleanupTargets: Element[] = [];
+
+/** Append a stylesheet at the CURRENT end of <head> — later calls sit later in the cascade. */
+const addStyle = (css: string): void => {
+    const style = document.createElement('style');
+    style.textContent = css;
+    document.head.append(style);
+    cleanupTargets.push(style);
+};
+
+/** A bare `<input class="ui-control">` inside a parent div (for inheritance assertions). */
+const addControl = (parentStyle = ''): HTMLInputElement => {
+    const parent = document.createElement('div');
+    if (parentStyle) parent.setAttribute('style', parentStyle);
+    const control = document.createElement('input');
+    control.className = 'ui-control';
+    parent.append(control);
+    document.body.append(parent);
+    cleanupTargets.push(parent);
+    return control;
+};
+
+afterEach(() => {
+    for (const el of cleanupTargets.splice(0)) el.remove();
+    document.documentElement.removeAttribute('style');
+});
+
+describe('styles.css — resting defaults', () => {
+    it('renders the documented resting --ui-* defaults on .ui-control', () => {
+        addStyle(uiCss);
+        const control = addControl();
+        const computed = getComputedStyle(control);
+
+        expect(computed.backgroundColor).toBe('rgb(255, 255, 255)'); // --ui-control-bg
+        expect(computed.color).toBe('rgb(17, 24, 39)'); // --ui-control-text
+        expect(computed.borderTopWidth).toBe('1px'); // --ui-control-border-width
+        expect(computed.borderTopColor).toBe('rgb(209, 213, 219)'); // --ui-control-border-color
+        expect(computed.borderTopLeftRadius).toBe('8px'); // --ui-control-radius
+        expect(computed.boxShadow).toBe('none'); // --ui-control-shadow
+    });
+
+    it('renders the documented resting defaults on .ui-label and .ui-error', () => {
+        addStyle(uiCss);
+        const label = document.createElement('label');
+        label.className = 'ui-label';
+        const error = document.createElement('p');
+        error.className = 'ui-error';
+        document.body.append(label, error);
+        cleanupTargets.push(label, error);
+
+        expect(getComputedStyle(label).color).toBe('rgb(55, 65, 81)'); // --ui-label-color
+        expect(getComputedStyle(label).fontSize).toBe('14px'); // --ui-label-size 0.875rem
+        expect(getComputedStyle(error).color).toBe('rgb(220, 38, 38)'); // --ui-danger-text
+        expect(getComputedStyle(error).fontSize).toBe('13px'); // --ui-error-size 0.8125rem
+    });
+});
+
+describe('styles.css — :root overrides (the --ui-* contract)', () => {
+    it('overriding --ui-* vars on :root changes computed values', () => {
+        addStyle(uiCss);
+        const control = addControl();
+
+        document.documentElement.style.setProperty('--ui-control-bg', 'rgb(1, 2, 3)');
+        document.documentElement.style.setProperty('--ui-control-border-color', 'rgb(4, 5, 6)');
+        document.documentElement.style.setProperty('--ui-control-radius', '3px');
+
+        const computed = getComputedStyle(control);
+        expect(computed.backgroundColor).toBe('rgb(1, 2, 3)');
+        expect(computed.borderTopColor).toBe('rgb(4, 5, 6)');
+        expect(computed.borderTopLeftRadius).toBe('3px');
+    });
+
+    it('accepts a border-width SHORTHAND value (`0 0 1px` — the isms underline idiom)', () => {
+        addStyle(uiCss);
+        const control = addControl();
+        document.documentElement.style.setProperty('--ui-control-border-width', '0 0 1px');
+
+        const computed = getComputedStyle(control);
+        expect(computed.borderTopWidth).toBe('0px');
+        expect(computed.borderRightWidth).toBe('0px');
+        expect(computed.borderLeftWidth).toBe('0px');
+        expect(computed.borderBottomWidth).toBe('1px');
+    });
+
+    it('overriding --ui-menu-* vars changes the shared listbox popup', () => {
+        addStyle(uiCss);
+        const menu = document.createElement('ul');
+        menu.className = 'ui-select__menu';
+        document.body.append(menu);
+        cleanupTargets.push(menu);
+
+        expect(getComputedStyle(menu).maxHeight).toBe('240px'); // --ui-menu-max-height 15rem
+        document.documentElement.style.setProperty('--ui-menu-max-height', '100px');
+        expect(getComputedStyle(menu).maxHeight).toBe('100px');
+    });
+});
+
+describe('styles.css — WR-0512 font-size source-order regression pins', () => {
+    it('the default reproduces the historical `font: inherit` (control text follows the parent)', () => {
+        addStyle(uiCss);
+        const control = addControl('font-size: 18px');
+        expect(getComputedStyle(control).fontSize).toBe('18px');
+    });
+
+    it('pins the trap: a declaration utility EARLIER in source order silently loses to the package sheet', () => {
+        // Utility first, package sheet last — the arrangement WR-0512 documented: both
+        // selectors are one class (0,1,0), so the later sheet wins the tie and the
+        // utility's font-size silently vanishes under the package's font reset.
+        addStyle('.text-sm { font-size: 13px; }');
+        addStyle(uiCss);
+        const control = addControl('font-size: 18px');
+        control.classList.add('text-sm');
+
+        expect(getComputedStyle(control).fontSize).toBe('18px');
+    });
+
+    it('the --ui-control-font-size var wins by contract, regardless of source order', () => {
+        // The escape hatch WR-0511/WR-0512 shipped: the utility sets the VAR the package
+        // rule reads instead of fighting the declaration tie — so it survives even when the
+        // package sheet comes last (where a plain font-size utility loses, pinned above).
+        addStyle('.size-sm { --ui-control-font-size: 13px; }');
+        addStyle(uiCss);
+        const control = addControl('font-size: 18px');
+        control.classList.add('size-sm');
+
+        expect(getComputedStyle(control).fontSize).toBe('13px');
+    });
+
+    it('the same declaration utility LATER in source order wins — order-dependence is what makes the trap silent', () => {
+        addStyle(uiCss);
+        addStyle('.text-sm { font-size: 13px; }');
+        const control = addControl('font-size: 18px');
+        control.classList.add('text-sm');
+
+        expect(getComputedStyle(control).fontSize).toBe('13px');
+    });
+});
+
+describe('styles.css — state-variant hooks on real states', () => {
+    it('focus hooks fire on real keyboard :focus-visible', async () => {
+        addStyle(uiCss);
+        const control = addControl();
+        document.documentElement.style.setProperty('--ui-control-bg-focus', 'rgb(10, 20, 30)');
+        document.documentElement.style.setProperty('--ui-control-text-focus', 'rgb(3, 4, 5)');
+        document.documentElement.style.setProperty('--ui-control-border-color-focus', 'rgb(7, 8, 9)');
+        document.documentElement.style.setProperty('--ui-control-border-width-focus', '3px');
+
+        expect(getComputedStyle(control).backgroundColor).toBe('rgb(255, 255, 255)');
+
+        // Real keyboard focus (Tab), not element.focus() — :focus-visible must match.
+        await userEvent.tab();
+        expect(document.activeElement).toBe(control);
+
+        const focused = getComputedStyle(control);
+        expect(focused.backgroundColor).toBe('rgb(10, 20, 30)');
+        expect(focused.color).toBe('rgb(3, 4, 5)');
+        expect(focused.borderTopWidth).toBe('3px');
+        // border-color (and box-shadow) sit in .ui-control's 0.12s transition — poll past it.
+        await expect.poll(() => getComputedStyle(control).borderTopColor).toBe('rgb(7, 8, 9)');
+        await expect.poll(() => getComputedStyle(control).boxShadow).not.toBe('none'); // --ui-focus-ring applied
+    });
+
+    it('focus hooks are a no-op until a territory opts in (defaults chain to the resting vars)', async () => {
+        addStyle(uiCss);
+        const control = addControl();
+
+        await userEvent.tab();
+        expect(document.activeElement).toBe(control);
+
+        const focused = getComputedStyle(control);
+        expect(focused.backgroundColor).toBe('rgb(255, 255, 255)'); // --ui-control-bg-focus → --ui-control-bg
+        expect(focused.color).toBe('rgb(17, 24, 39)'); // --ui-control-text-focus → --ui-control-text
+        expect(focused.borderTopWidth).toBe('1px'); // --ui-control-border-width-focus → resting width
+    });
+
+    it('.is-invalid keys on the danger vars and honors the bg/text invalid hooks', () => {
+        addStyle(uiCss);
+        const control = addControl();
+        control.classList.add('is-invalid');
+
+        expect(getComputedStyle(control).borderTopColor).toBe('rgb(220, 38, 38)'); // --ui-danger-border
+        expect(getComputedStyle(control).backgroundColor).toBe('rgb(255, 255, 255)'); // hook no-op by default
+
+        document.documentElement.style.setProperty('--ui-control-bg-invalid', 'rgb(9, 9, 9)');
+        document.documentElement.style.setProperty('--ui-control-text-invalid', 'rgb(8, 7, 6)');
+        expect(getComputedStyle(control).backgroundColor).toBe('rgb(9, 9, 9)');
+        expect(getComputedStyle(control).color).toBe('rgb(8, 7, 6)');
+    });
+
+    it('a disabled control renders the disabled background and not-allowed cursor', () => {
+        addStyle(uiCss);
+        const control = addControl();
+        control.disabled = true;
+
+        expect(getComputedStyle(control).backgroundColor).toBe('rgb(243, 244, 246)'); // --ui-control-bg-disabled
+        expect(getComputedStyle(control).color).toBe('rgb(107, 114, 128)'); // --ui-control-text-muted
+        expect(getComputedStyle(control).cursor).toBe('not-allowed');
+    });
+});
