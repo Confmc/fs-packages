@@ -14,10 +14,14 @@ import {render} from 'vitest-browser-vue';
 import {userEvent} from 'vitest/browser';
 import {defineComponent, h, ref} from 'vue';
 
+import Checkbox from '../../src/components/Checkbox.vue';
+import CheckboxGroup from '../../src/components/CheckboxGroup.vue';
 import Combobox from '../../src/components/Combobox.vue';
 import FormField from '../../src/components/FormField.vue';
 import MultiSelect from '../../src/components/MultiSelect.vue';
+import RadioGroup from '../../src/components/RadioGroup.vue';
 import SingleSelect from '../../src/components/SingleSelect.vue';
+import Switch from '../../src/components/Switch.vue';
 import TextInput from '../../src/components/TextInput.vue';
 import '../../styles.css';
 
@@ -163,5 +167,124 @@ describe('axe-core audits — zero violations, closed and open', () => {
         expect(style.height).toBe('1px');
         expect(style.display).not.toBe('none');
         expect(style.visibility).not.toBe('hidden');
+    });
+});
+
+describe('axe-core audits — checkbox family, zero violations', () => {
+    it('Checkbox — self-labelled, unchecked / checked / indeterminate', async () => {
+        const checked = ref(false);
+        const indeterminate = ref(true);
+        const screen = render(
+            defineComponent(
+                () => () =>
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFC in a render-fn host
+                    h(Checkbox as any, {
+                        id: 'terms',
+                        label: 'Accept the terms',
+                        indeterminate: indeterminate.value,
+                        modelValue: checked.value,
+                        'onUpdate:modelValue': (value: boolean) => {
+                            checked.value = value;
+                        },
+                    }),
+            ),
+        );
+        await expectNoViolations(screen.container);
+
+        indeterminate.value = false;
+        await userEvent.click(document.getElementById('terms') as HTMLElement);
+        expect(checked.value).toBe(true);
+        await expectNoViolations(screen.container);
+    });
+
+    it('Checkbox — inside FormField (no field label; own label) with a rendered error', async () => {
+        const screen = renderInField(
+            (slot) =>
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFC in a render-fn host
+                h(Checkbox as any, {
+                    id: slot.controlId,
+                    label: 'Accept the terms',
+                    modelValue: false,
+                    'onUpdate:modelValue': noop,
+                    required: slot.required,
+                    invalid: slot.invalid,
+                    describedby: slot.describedby,
+                }),
+            // The checkbox brings its own inline label — FormField contributes error wiring only.
+            {label: undefined, required: true, error: 'You must accept the terms'},
+        );
+        await expectNoViolations(screen.container);
+    });
+
+    it('Switch — role="switch" on the native checkbox, off and on', async () => {
+        const on = ref(false);
+        const screen = render(
+            defineComponent(
+                () => () =>
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFC in a render-fn host
+                    h(Switch as any, {
+                        id: 'notify',
+                        label: 'Email notifications',
+                        modelValue: on.value,
+                        'onUpdate:modelValue': (value: boolean) => {
+                            on.value = value;
+                        },
+                    }),
+            ),
+        );
+        await expectNoViolations(screen.container);
+
+        await userEvent.click(document.getElementById('notify') as HTMLElement);
+        expect(on.value).toBe(true);
+        await expectNoViolations(screen.container);
+    });
+
+    it('CheckboxGroup — fieldset/legend, required (sr-only conveyance) and invalid with an error', async () => {
+        const screen = renderInField(
+            (slot) =>
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFC in a render-fn host
+                h(CheckboxGroup as any, {
+                    id: slot.controlId,
+                    options: FRUITS,
+                    optionLabel: 'name',
+                    label: 'Fruits',
+                    modelValue: [2],
+                    'onUpdate:modelValue': noop,
+                    required: slot.required,
+                    invalid: slot.invalid,
+                    describedby: slot.describedby,
+                }),
+            // The group self-labels via its legend — FormField contributes error wiring only.
+            // This composition also proves the aria-required-free fieldset passes
+            // aria-allowed-attr (role=group forbids aria-required — the legend conveys it).
+            {label: undefined, required: true, error: 'Pick at least one fruit'},
+        );
+        await expectNoViolations(screen.container);
+    });
+
+    it('RadioGroup — role=radiogroup fieldset with aria-required, none and one selected', async () => {
+        const choice = ref<number | null>(null);
+        const screen = render(
+            defineComponent(
+                () => () =>
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFC in a render-fn host
+                    h(RadioGroup as any, {
+                        id: 'fruit-choice',
+                        options: FRUITS,
+                        optionLabel: 'name',
+                        label: 'Favourite fruit',
+                        required: true,
+                        modelValue: choice.value,
+                        'onUpdate:modelValue': (value: number | null) => {
+                            choice.value = value;
+                        },
+                    }),
+            ),
+        );
+        await expectNoViolations(screen.container);
+
+        await userEvent.click(document.getElementById('fruit-choice-opt-1') as HTMLElement);
+        expect(choice.value).toBe(2);
+        await expectNoViolations(screen.container);
     });
 });

@@ -26,6 +26,10 @@ import '@script-development/ui-inputs/style.css';
 | `NumberInput`             | Native `number` input; owns the `NaN`→`null` empty-value guard                                                                                             |
 | `DateInput`               | Native `date` input                                                                                                                                        |
 | `Textarea`                | Native `textarea` with `rows`                                                                                                                              |
+| `Checkbox`                | Native checkbox, visually restyled; non-nullable `boolean` model, `indeterminate` as a visual prop                                                         |
+| `CheckboxGroup`           | Fieldset/legend group of checkboxes — models an array of option ids in **options order**                                                                   |
+| `Switch`                  | The checkbox chassis with `role="switch"` — an on/off toggle with a themeable track + thumb                                                                |
+| `RadioGroup`              | Fieldset/legend radio group (`role="radiogroup"`) — models `T['id'] \| null`; **native** roving focus and arrow-key selection                              |
 | `SingleSelect`            | Accessible button-triggered listbox over `@floating-ui/vue`, generic over your option type                                                                 |
 | `Combobox`                | Accessible **searchable/filtering** single-select — a text input that filters the listbox as you type; exposes an imperative `focus()` handle              |
 | `MultiSelect`             | Accessible **multi-value** select — models an array of option ids; toggle-in-place listbox that stays open on commit, inline chip bar with per-chip remove |
@@ -82,6 +86,54 @@ option has not loaded yet (async options) stays in the model but renders no chip
 Chips theme through `--ui-chip-bg` / `--ui-chip-text` / `--ui-chip-radius` / `--ui-chip-pad`, each
 defaulting to an existing resting token (`--ui-option-bg-active`, `--ui-control-text`,
 `--ui-option-radius`) — neutral out of the box, remap to opt in.
+
+### Checkbox family
+
+`Checkbox`, `CheckboxGroup`, `Switch`, and `RadioGroup` all sit on a **native input chassis** —
+a real `<input type="checkbox">` / `<input type="radio">` restyled with `appearance: none`, never
+a div-with-role — so keyboard and assistive-tech semantics come from the platform.
+
+**`Checkbox`** models a non-nullable `boolean` (`v-model="accepted"`) — a checkbox is never
+"empty", unchecked IS `false`. The label renders inline via the `label` prop (the default slot
+overrides it for rich content); the whole row is the hit target. `indeterminate` is a **prop**
+mirrored onto the element's DOM property (drawn as a dash) — purely visual, it never touches the
+model. Native `required` is never set; `aria-required` is the conveyance, like the whole family.
+Undeclared attrs (`name`, `data-*`, …) fall through to the **input**, not the label root.
+
+**`Switch`** is the same chassis with `role="switch"` on the native checkbox — the native checked
+state maps to `aria-checked` (HTML-AAM), so the component never sets it by hand. Same
+non-nullable `boolean` model; distinct track + thumb surface on `--ui-switch-*` vars.
+
+**`CheckboxGroup`** renders a chrome-less `<fieldset>` with a `<legend>` (the `label` prop) and
+one checkbox per option (`optionLabel` is the family's property-name-or-getter display resolver —
+renamed from the selects' `label` because `label` is the legend here). It models
+**`T['id'][]` kept in options order**, not click order; an id whose option has not arrived yet
+(async options) is preserved at the tail. Error wiring is **one story**: `aria-describedby` (and
+`aria-invalid`) live on the fieldset only — members mirror the invalid _styling_ but never repeat
+the IDREF. Because ARIA forbids `aria-required` on `role=group`, the required state is conveyed
+group-level through the legend: the visual `*` marker plus screen-reader-only text
+(`requiredLabel`, default `'(required)'`, localisable).
+
+**`RadioGroup`** is the same fieldset shape with native radios sharing one generated `name` (the
+group id) — the **browser** provides the roving tabindex and arrow-key selection, the component
+hand-rolls neither and only mirrors the model from `change`. It models `T['id'] | null` (`null` =
+nothing selected, the SingleSelect shape). The fieldset carries `role="radiogroup"`, which —
+unlike plain `group` — legitimately carries `aria-required`, so here the attribute is the
+group-level conveyance.
+
+```vue
+<Checkbox id="terms" v-model="accepted" label="Accept the terms" />
+<Switch id="notify" v-model="notifications" label="Email notifications" />
+<CheckboxGroup id="toppings" v-model="toppingIds" :options="toppings" option-label="name" label="Toppings" />
+<RadioGroup id="size" v-model="size" :options="sizes" option-label="name" label="Size" />
+```
+
+The family themes through `--ui-check-*` (box size, border — shorthand-valued like
+`--ui-control-border-width` — checked fill, mark colour, radius, control↔label gap, group item
+spacing) and `--ui-switch-*` (track width/height/radius, checked/unchecked track colours, thumb
+size/colour). Every colour default derives from an existing resting token
+(`--ui-control-bg`, `--ui-control-border-color`, `--ui-control-border-open`), so an existing
+`--ui-*` token map themes the checkbox family with no new mappings — remap to opt in.
 
 ## Theming
 

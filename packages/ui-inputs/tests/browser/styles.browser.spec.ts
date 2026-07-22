@@ -212,3 +212,91 @@ describe('styles.css — state-variant hooks on real states', () => {
         expect(getComputedStyle(control).cursor).toBe('not-allowed');
     });
 });
+
+/** The bare check chassis (label.ui-check > span.ui-check__control > input.ui-check__input). */
+const addCheck = (radio = false): HTMLInputElement => {
+    const row = document.createElement('label');
+    row.className = 'ui-check';
+    const holder = document.createElement('span');
+    holder.className = 'ui-check__control';
+    const input = document.createElement('input');
+    input.type = radio ? 'radio' : 'checkbox';
+    input.className = radio ? 'ui-check__input ui-radio__input' : 'ui-check__input';
+    holder.append(input);
+    row.append(holder);
+    document.body.append(row);
+    cleanupTargets.push(row);
+    return input;
+};
+
+describe('styles.css — checkbox family (--ui-check-* / --ui-switch-*)', () => {
+    it('renders the check chassis defaults, chained to the resting control tokens', async () => {
+        addStyle(uiCss);
+        const input = addCheck();
+        const computed = getComputedStyle(input);
+
+        expect(computed.appearance).toBe('none'); // native input restyled, never a div-with-role
+        expect(computed.width).toBe('18px'); // --ui-check-size 1.125rem
+        expect(computed.height).toBe('18px');
+        expect(computed.borderTopWidth).toBe('1px'); // --ui-check-border-width → --ui-control-border-width
+        expect(computed.borderTopColor).toBe('rgb(209, 213, 219)'); // → --ui-control-border-color
+        expect(computed.borderTopLeftRadius).toBe('4px'); // --ui-check-radius
+        expect(computed.backgroundColor).toBe('rgb(255, 255, 255)'); // --ui-check-bg → --ui-control-bg
+
+        // :checked keys on --ui-check-bg-checked, defaulting to --ui-control-border-open.
+        // Background sits in the chassis's 0.12s transition — poll past it.
+        input.checked = true;
+        await expect.poll(() => getComputedStyle(input).backgroundColor).toBe('rgb(37, 99, 235)');
+
+        // The radio variant is the same chassis, rounded.
+        expect(getComputedStyle(addCheck(true)).borderTopLeftRadius).toBe('50%');
+    });
+
+    it('honors --ui-check-* overrides, including a border-width SHORTHAND (the underline idiom)', async () => {
+        addStyle(uiCss);
+        const input = addCheck();
+        document.documentElement.style.setProperty('--ui-check-size', '24px');
+        document.documentElement.style.setProperty('--ui-check-border-width', '0 0 2px');
+        document.documentElement.style.setProperty('--ui-check-bg-checked', 'rgb(1, 2, 3)');
+
+        const computed = getComputedStyle(input);
+        expect(computed.width).toBe('24px');
+        expect(computed.borderBottomWidth).toBe('2px');
+        expect(computed.borderTopWidth).toBe('0px');
+
+        input.checked = true;
+        await expect.poll(() => getComputedStyle(input).backgroundColor).toBe('rgb(1, 2, 3)');
+    });
+
+    it('renders the switch track geometry and travels the thumb by track-width − track-height', async () => {
+        addStyle(uiCss);
+        const row = document.createElement('label');
+        row.className = 'ui-switch';
+        const holder = document.createElement('span');
+        holder.className = 'ui-switch__control';
+        const input = document.createElement('input');
+        input.type = 'checkbox';
+        input.className = 'ui-switch__input';
+        const thumb = document.createElement('span');
+        thumb.className = 'ui-switch__thumb';
+        holder.append(input, thumb);
+        row.append(holder);
+        document.body.append(row);
+        cleanupTargets.push(row);
+
+        const track = getComputedStyle(input);
+        expect(track.width).toBe('36px'); // --ui-switch-track-width 2.25rem
+        expect(track.height).toBe('20px'); // --ui-switch-track-height 1.25rem
+        expect(track.backgroundColor).toBe('rgb(209, 213, 219)'); // --ui-switch-track-bg → border-color token
+
+        // Resting thumb: 14px (--ui-switch-thumb-size 0.875rem), vertically centred.
+        expect(getComputedStyle(thumb).width).toBe('14px');
+        expect(getComputedStyle(thumb).transform).toBe('matrix(1, 0, 0, 1, 0, -7)');
+
+        input.checked = true;
+        // --ui-switch-track-bg-checked; background and transform both ride 0.12s transitions.
+        await expect.poll(() => getComputedStyle(input).backgroundColor).toBe('rgb(37, 99, 235)');
+        // Travel = 36 − 20 = 16px.
+        await expect.poll(() => getComputedStyle(thumb).transform).toBe('matrix(1, 0, 0, 1, 16, -7)');
+    });
+});

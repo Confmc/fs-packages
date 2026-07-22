@@ -74,6 +74,30 @@
     --ui-chip-radius: var(--ui-option-radius);
     --ui-chip-pad: 0.1rem 0.45rem;
 
+    /* check (Checkbox / CheckboxGroup / RadioGroup) — every colour default derives from an
+       existing resting token, so a territory's --ui-* map themes the check family for free;
+       the structural defaults are neutral literals (the chip-pad precedent). */
+    --ui-check-size: 1.125rem;
+    /* feeds a border-width declaration, so it takes the full shorthand grammar — like
+       --ui-control-border-width (`0 0 1px` is valid, if unusual on a checkbox). */
+    --ui-check-border-width: var(--ui-control-border-width);
+    --ui-check-border-color: var(--ui-control-border-color);
+    --ui-check-bg: var(--ui-control-bg);
+    --ui-check-bg-checked: var(--ui-control-border-open);
+    --ui-check-mark-color: var(--ui-control-bg);
+    --ui-check-radius: 4px;
+    --ui-check-gap: 0.5rem;
+    --ui-check-item-gap: 0.5rem;
+
+    /* switch (track + thumb) */
+    --ui-switch-track-width: 2.25rem;
+    --ui-switch-track-height: 1.25rem;
+    --ui-switch-track-radius: 999px;
+    --ui-switch-track-bg: var(--ui-control-border-color);
+    --ui-switch-track-bg-checked: var(--ui-control-border-open);
+    --ui-switch-thumb-size: 0.875rem;
+    --ui-switch-thumb-bg: var(--ui-control-bg);
+
     /* error / danger */
     --ui-danger-text: #dc2626;
     --ui-danger-border: #dc2626;
@@ -251,9 +275,11 @@
 .ui-multiselect__placeholder {
     color: var(--ui-control-text-muted);
 }
-/* Screen-reader-only trigger value (the clip pattern — display:none/visibility:hidden would
-   remove it from the accessibility tree, defeating its purpose). */
-.ui-multiselect__sr-value {
+/* Screen-reader-only text (the clip pattern — display:none/visibility:hidden would remove it
+   from the accessibility tree, defeating its purpose). Shared by the MultiSelect trigger value
+   and the CheckboxGroup legend's required conveyance. */
+.ui-multiselect__sr-value,
+.ui-check-group__sr {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -315,6 +341,167 @@
 .ui-multiselect__empty {
     padding: var(--ui-option-pad);
     color: var(--ui-control-text-muted);
+}
+
+/* Checkbox / Switch / radio rows — the <label> element is the row (implicit labelling, the
+   whole row is the hit target), the native input is the restyled chassis (appearance: none;
+   never a div-with-role), and the drawn mark is an inline SVG sibling — pseudo-elements on a
+   replaced <input> are not guaranteed to render, an overlaid sibling is. */
+.ui-check,
+.ui-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--ui-check-gap);
+    color: var(--ui-control-text);
+    cursor: pointer;
+}
+.ui-check.is-disabled,
+.ui-switch.is-disabled {
+    color: var(--ui-control-text-muted);
+    cursor: not-allowed;
+}
+.ui-check__control,
+.ui-switch__control {
+    position: relative;
+    display: inline-flex;
+    flex: none;
+}
+.ui-check__input {
+    appearance: none;
+    margin: 0;
+    width: var(--ui-check-size);
+    height: var(--ui-check-size);
+    box-sizing: border-box;
+    background: var(--ui-check-bg);
+    border-style: solid;
+    border-width: var(--ui-check-border-width);
+    border-color: var(--ui-check-border-color);
+    border-radius: var(--ui-check-radius);
+    cursor: inherit;
+    transition:
+        background 0.12s ease,
+        border-color 0.12s ease,
+        box-shadow 0.12s ease;
+}
+.ui-radio__input {
+    border-radius: 50%;
+}
+.ui-check__input:checked,
+.ui-check__input:indeterminate {
+    background: var(--ui-check-bg-checked);
+    border-color: var(--ui-check-bg-checked);
+}
+/* State order mirrors .ui-control: :focus-visible first, .is-invalid after, so the invalid
+   treatment keeps winning on a focused invalid control by source order. */
+.ui-check__input:focus-visible {
+    outline: none;
+    box-shadow: var(--ui-focus-ring);
+}
+.ui-check__input.is-invalid {
+    border-color: var(--ui-danger-border);
+    box-shadow: var(--ui-danger-shadow);
+}
+.ui-check__input:disabled {
+    background: var(--ui-control-bg-disabled);
+    box-shadow: none;
+}
+.ui-check__input:disabled:checked,
+.ui-check__input:disabled:indeterminate {
+    background: var(--ui-control-text-muted);
+    border-color: var(--ui-control-text-muted);
+}
+.ui-check__icon {
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    width: calc(var(--ui-check-size) * 0.75);
+    height: calc(var(--ui-check-size) * 0.75);
+    pointer-events: none;
+    color: var(--ui-check-mark-color);
+}
+.ui-check__mark,
+.ui-check__dash,
+.ui-radio__dot {
+    opacity: 0;
+    transition: opacity 0.12s ease;
+}
+.ui-check__input:checked ~ .ui-check__icon .ui-check__mark,
+.ui-check__input:checked ~ .ui-check__icon .ui-radio__dot,
+.ui-check__input:indeterminate ~ .ui-check__icon .ui-check__dash {
+    opacity: 1;
+}
+/* Indeterminate wins the visual over checked when both hold (source order). */
+.ui-check__input:indeterminate ~ .ui-check__icon .ui-check__mark {
+    opacity: 0;
+}
+
+/* Switch — same chassis contract, distinct surface: the input is the track, the thumb is an
+   overlaid sibling that travels track-width − track-height (the horizontal room left once the
+   thumb's centred inset is spent on both sides). */
+.ui-switch__input {
+    appearance: none;
+    margin: 0;
+    width: var(--ui-switch-track-width);
+    height: var(--ui-switch-track-height);
+    box-sizing: border-box;
+    background: var(--ui-switch-track-bg);
+    border: none;
+    border-radius: var(--ui-switch-track-radius);
+    cursor: inherit;
+    transition: background 0.12s ease;
+}
+.ui-switch__input:checked {
+    background: var(--ui-switch-track-bg-checked);
+}
+.ui-switch__input:focus-visible {
+    outline: none;
+    box-shadow: var(--ui-focus-ring);
+}
+.ui-switch__input.is-invalid {
+    box-shadow: var(--ui-danger-shadow);
+}
+.ui-switch__input:disabled {
+    background: var(--ui-control-bg-disabled);
+    box-shadow: none;
+}
+.ui-switch__thumb {
+    position: absolute;
+    top: 50%;
+    left: calc((var(--ui-switch-track-height) - var(--ui-switch-thumb-size)) / 2);
+    width: var(--ui-switch-thumb-size);
+    height: var(--ui-switch-thumb-size);
+    background: var(--ui-switch-thumb-bg);
+    border-radius: 50%;
+    pointer-events: none;
+    transform: translateY(-50%);
+    transition: transform 0.12s ease;
+}
+.ui-switch__input:checked ~ .ui-switch__thumb {
+    transform: translateY(-50%) translateX(calc(var(--ui-switch-track-width) - var(--ui-switch-track-height)));
+}
+
+/* Groups — a chrome-less fieldset; the legend reuses the .ui-label vocabulary. Spacing rides
+   margins rather than flex gap: a <legend> is special-cased out of a flex fieldset's layout
+   (it never becomes a flex item), so gap would silently skip the legend↔first-row seam. */
+.ui-check-group,
+.ui-radio-group {
+    margin: 0;
+    padding: 0;
+    border: none;
+    min-width: 0;
+}
+.ui-check-group__legend,
+.ui-radio-group__legend {
+    padding: 0;
+    margin: 0 0 var(--ui-field-gap);
+}
+.ui-check-group .ui-check,
+.ui-radio-group .ui-check {
+    display: flex;
+}
+.ui-check-group .ui-check + .ui-check,
+.ui-radio-group .ui-check + .ui-check {
+    margin-top: var(--ui-check-item-gap);
 }
 
 .ui-error {
