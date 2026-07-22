@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import {mount} from '@vue/test-utils';
 import {afterEach, describe, expect, it} from 'vitest';
+import {h} from 'vue';
 
 import SingleSelect from '../src/components/SingleSelect.vue';
 
@@ -13,9 +14,10 @@ const FRUITS: Fruit[] = [
 ];
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFC + VTU mount inference
-const mountSelect = (props: Record<string, unknown>) =>
+const mountSelect = (props: Record<string, unknown>, slots?: Record<string, unknown>) =>
     mount(SingleSelect as any, {
         props: {options: FRUITS, label: 'name', id: 'fruit', modelValue: null, ...props},
+        slots,
         attachTo: document.body,
     });
 
@@ -269,5 +271,171 @@ describe('SingleSelect', () => {
         wrapper.unmount();
         // Exercises onBeforeUnmount cleanup — a stray document click must not throw.
         document.body.dispatchEvent(new MouseEvent('click', {bubbles: true}));
+    });
+
+    it('leaves the highlight on nothing when ArrowUp is pressed on the first option (no clear entry)', async () => {
+        const wrapper = mountSelect({});
+        const root = wrapper.find('.ui-select');
+        const trigger = () => wrapper.find('.ui-select__trigger');
+
+        await root.trigger('keydown', {key: 'ArrowDown'}); // open
+        await root.trigger('keydown', {key: 'ArrowDown'}); // → index 0
+        expect(trigger().attributes('aria-activedescendant')).toBe('fruit-opt-0');
+
+        await root.trigger('keydown', {key: 'ArrowUp'}); // no entry above → nothing
+        expect(trigger().attributes('aria-activedescendant')).toBeUndefined();
+        expect(wrapper.find('.ui-select__menu').exists()).toBe(true); // still open
+    });
+
+    it('renders per-option custom content through the #option scoped slot, chrome outside the slot', async () => {
+        const wrapper = mountSelect(
+            {modelValue: 3},
+            {
+                option: (props: {option: Fruit; index: number; selected: boolean; active: boolean}) =>
+                    h(
+                        'b',
+                        {class: 'swatch'},
+                        `${props.option.name}#${props.index}${props.selected ? '*' : ''}${props.active ? '!' : ''}`,
+                    ),
+            },
+        );
+        const root = wrapper.find('.ui-select');
+
+        await wrapper.find('.ui-select__trigger').trigger('click');
+        // Sorted order: Apricot(2), Mango(3, committed), Watermelon(1) — slot payload carries
+        // the option, its rendered index, and the selected flag.
+        expect(wrapper.findAll('.ui-select__option .swatch').map((el) => el.text())).toEqual([
+            'Apricot#0',
+            'Mango#1*',
+            'Watermelon#2',
+        ]);
+
+        // `active` tracks the keyboard pointer, and the .is-active chrome stays on the <li>.
+        await root.trigger('keydown', {key: 'ArrowDown'});
+        expect(wrapper.findAll('.ui-select__option .swatch').map((el) => el.text())).toEqual([
+            'Apricot#0!',
+            'Mango#1*',
+            'Watermelon#2',
+        ]);
+        expect(wrapper.findAll('.ui-select__option')[0].classes()).toContain('is-active');
+
+        // Slotted content commits exactly like the plain text (the <li> owns the click).
+        await wrapper.findAll('.ui-select__option')[0].trigger('click');
+        expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([2]); // Apricot
+    });
+
+    it('marks mutedOptions with .is-muted while keeping them committable', async () => {
+        const wrapper = mountSelect({mutedOptions: [1, 3]}); // Watermelon + Mango
+        await wrapper.find('.ui-select__trigger').trigger('click');
+
+        const options = wrapper.findAll('.ui-select__option'); // Apricot, Mango, Watermelon
+        expect(options.map((o) => o.classes().includes('is-muted'))).toEqual([false, true, true]);
+
+        // Muted ≠ disabled: a muted option still commits.
+        await options[1].trigger('click');
+        expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([3]); // Mango
+    });
+
+    describe('clear entry (clearLabel)', () => {
+        it('renders the entry above the options, outside the index space', async () => {
+            const wrapper = mountSelect({clearLabel: 'No fruit'});
+            await wrapper.find('.ui-select__trigger').trigger('click');
+
+            const entries = wrapper.findAll('[role="option"]');
+            expect(entries[0].classes()).toContain('ui-select__clear');
+            expect(entries[0].text()).toBe('No fruit');
+            expect(entries[0].attributes('id')).toBe('fruit-clear');
+            // The option ids are untouched — the entry does not shift the index space.
+            expect(wrapper.findAll('.ui-select__option').map((o) => o.attributes('id'))).toEqual([
+                'fruit-opt-0',
+                'fruit-opt-1',
+                'fruit-opt-2',
+            ]);
+            // Committed-null state: the entry IS the committed value.
+            expect(entries[0].attributes('aria-selected')).toBe('true');
+        });
+
+        it('is not aria-selected once a value is committed', async () => {
+            const wrapper = mountSelect({clearLabel: 'No fruit', modelValue: 3});
+            await wrapper.find('.ui-select__trigger').trigger('click');
+            expect(wrapper.find('.ui-select__clear').attributes('aria-selected')).toBe('false');
+        });
+
+        it('owns the keyboard slot between "nothing" and index 0', async () => {
+            const wrapper = mountSelect({clearLabel: 'No fruit'});
+            const root = wrapper.find('.ui-select');
+            const trigger = () => wrapper.find('.ui-select__trigger');
+
+            await root.trigger('keydown', {key: 'ArrowDown'}); // open, nothing highlighted
+            expect(trigger().attributes('aria-activedescendant')).toBeUndefined();
+
+            await root.trigger('keydown', {key: 'ArrowDown'}); // → the clear entry
+            expect(trigger().attributes('aria-activedescendant')).toBe('fruit-clear');
+            expect(wrapper.find('.ui-select__clear').classes()).toContain('is-active');
+
+            await root.trigger('keydown', {key: 'ArrowDown'}); // → index 0
+            expect(trigger().attributes('aria-activedescendant')).toBe('fruit-opt-0');
+            expect(wrapper.find('.ui-select__clear').classes()).not.toContain('is-active');
+
+            await root.trigger('keydown', {key: 'ArrowUp'}); // back up → the clear entry
+            expect(trigger().attributes('aria-activedescendant')).toBe('fruit-clear');
+
+            await root.trigger('keydown', {key: 'ArrowUp'}); // above the entry → nothing
+            expect(trigger().attributes('aria-activedescendant')).toBeUndefined();
+            expect(wrapper.find('.ui-select__menu').exists()).toBe(true); // still open
+        });
+
+        it('commits null and closes on Enter', async () => {
+            const wrapper = mountSelect({clearLabel: 'No fruit', modelValue: 3});
+            const root = wrapper.find('.ui-select');
+
+            await root.trigger('keydown', {key: 'ArrowDown'}); // open
+            await root.trigger('keydown', {key: 'ArrowDown'}); // → the clear entry
+            await root.trigger('keydown', {key: 'Enter'});
+
+            expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([null]);
+            expect(wrapper.find('.ui-select__menu').exists()).toBe(false);
+        });
+
+        it('commits null and closes on click, and highlights on hover', async () => {
+            const wrapper = mountSelect({clearLabel: 'No fruit', modelValue: 3});
+            await wrapper.find('.ui-select__trigger').trigger('click');
+
+            const clear = wrapper.find('.ui-select__clear');
+            await clear.trigger('mouseover');
+            expect(clear.classes()).toContain('is-active');
+
+            // Hovering an option hands the highlight over instantly (pointer moves off -1).
+            await wrapper.findAll('.ui-select__option')[1].trigger('mouseover');
+            expect(wrapper.find('.ui-select__clear').classes()).not.toContain('is-active');
+            expect(wrapper.findAll('.ui-select__option')[1].classes()).toContain('is-active');
+
+            await wrapper.find('.ui-select__clear').trigger('click');
+            expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([null]);
+            expect(wrapper.find('.ui-select__menu').exists()).toBe(false);
+        });
+
+        it('drops the highlight when clearLabel is withdrawn while the entry holds it', async () => {
+            const wrapper = mountSelect({clearLabel: 'No fruit'});
+            const root = wrapper.find('.ui-select');
+            const trigger = () => wrapper.find('.ui-select__trigger');
+
+            await root.trigger('keydown', {key: 'ArrowDown'}); // open
+            await root.trigger('keydown', {key: 'ArrowDown'}); // → the clear entry
+            expect(trigger().attributes('aria-activedescendant')).toBe('fruit-clear');
+
+            await wrapper.setProps({clearLabel: undefined});
+            expect(wrapper.find('.ui-select__clear').exists()).toBe(false);
+            expect(trigger().attributes('aria-activedescendant')).toBeUndefined();
+        });
+
+        it('renders emptyDisplayValue as the trigger VALUE when the model is null', () => {
+            const wrapper = mountSelect({clearLabel: 'No fruit', emptyDisplayValue: 'No fruit (any)'});
+
+            expect(wrapper.find('.ui-select__placeholder').exists()).toBe(false);
+            expect(wrapper.find('.ui-select__value').text()).toBe('No fruit (any)');
+            // `has-value` stays keyed on an actual selection — the model IS null.
+            expect(wrapper.find('.ui-select__trigger').classes()).not.toContain('has-value');
+        });
     });
 });

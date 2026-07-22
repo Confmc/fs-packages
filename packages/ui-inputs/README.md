@@ -40,6 +40,49 @@ import '@script-development/ui-inputs/style.css';
 </FormField>
 ```
 
+### The select family's shared extras
+
+**Per-option content — the `#option` scoped slot.** All three selects render each option's
+plain display string by default; the `option` slot replaces that content with your own
+(colour swatches, icons, rich labels). The payload is `{option, index, selected, active}` —
+typed against your option type `T`. Highlight and selection chrome (`.is-active`,
+`aria-selected`) stay on the option row, **outside the slot**, so custom content never
+re-creates them:
+
+```vue
+<SingleSelect id="label" v-model="labelId" :options="labels" label="name">
+    <template #option="{option}">
+        <span class="swatch" :style="{background: option.color}" /> {{ option.name }}
+    </template>
+</SingleSelect>
+```
+
+**Muted options.** `mutedOptions` (an array of option ids) renders the matching options
+visually muted (`.is-muted`, themed by `--ui-option-text-muted`). Muted is **not** disabled:
+muted options stay committable and stay in the keyboard path — use it for de-emphasis
+("already assigned", "archived"), never for gating.
+
+**The committing clear entry (`SingleSelect` / `Combobox`).** `clearLabel` renders a
+committing entry **above** the options — choosing it commits `null` and closes, exactly like
+choosing an option. It lives outside the option index space: its own keyboard slot between
+"nothing highlighted" and the first option, its own `${id}-clear` id for
+`aria-activedescendant`, and `aria-selected="true"` while the model is null. Pair it with
+`emptyDisplayValue` — the string the trigger (or the Combobox input) renders as a **value**
+when the model is null ("No sprint (backlog)") instead of the muted placeholder / blank
+input. The entry is danger-toned by default (`--ui-clear-text`, chains to
+`--ui-danger-text`).
+
+```vue
+<SingleSelect
+    id="sprint"
+    v-model="sprintId"
+    :options="sprints"
+    label="name"
+    clear-label="No sprint"
+    empty-display-value="No sprint (backlog)"
+/>
+```
+
 ### Combobox
 
 `Combobox` shares `SingleSelect`'s generic contract (`:options`, `label`, `v-model`, `alphabeticalSort`,
@@ -154,9 +197,35 @@ The control has a background/text/border hook for each interactive state, so a s
 
 The `.is-open` and `.is-invalid` state classes follow `:focus-visible` in source order, so they keep winning their border/background where they did before — the focus hooks only take effect on a plain focused control.
 
+The listbox options carry the same discipline: `--ui-option-text-muted` (fires on `.is-muted`, defaults to the resting option text) and the MultiSelect membership pair `--ui-option-bg-selected` / `--ui-option-text-selected` (fire on `[aria-selected="true"]` in the MultiSelect popup, default `transparent` / resting text — the pointer highlight keeps winning its background). All no-ops until you opt in.
+
 ### Typography escape hatch
 
-`--ui-control-font-size` (default `inherit`) sizes control text. The control's `font` is decomposed into longhands (`font-family`/`font-size`/`font-style`/`font-variant`/`font-weight`/`font-stretch`/`line-height`, all inheriting except size), so `font-size` reads from this var rather than from a consumer utility class — which would otherwise lose the source-order tie against the package stylesheet. The default `inherit` is byte-identical to the historical `font: inherit`.
+`--ui-control-font-size` (default `inherit`) sizes control text, and `--ui-control-line-height` (default `inherit`) completes the decomposition. The control's `font` is decomposed into longhands (`font-family`/`font-size`/`font-style`/`font-variant`/`font-weight`/`font-stretch`/`line-height`, all inheriting except the two var-keyed ones), so both read from their var rather than from a consumer utility class — which would otherwise lose the source-order tie against the package stylesheet. The defaults are byte-identical to the historical `font: inherit`. The listbox popup has its own hook: `--ui-menu-font-size` (default `inherit` — the popup sizes by inheritance from the component root).
+
+### Menu width clamps
+
+`--ui-menu-min-width` (default `100%` — of the positioned ancestor, i.e. at least the trigger) and `--ui-menu-max-width` (default `none`) clamp the listbox popup. A territory caps them without fighting specificity:
+
+```css
+:root {
+    --ui-menu-min-width: max(100%, 240px);
+    --ui-menu-max-width: calc(100vw - 16px);
+}
+```
+
+### Touch targets
+
+`--ui-control-min-height` and `--ui-option-min-height` (both default `auto` — the measured status quo) put a floor under the control and the listbox options. WCAG 2.5.5's 44px target is the **consumer's** call: assign them under your own coarse-pointer media query rather than expecting the package to decide for every territory:
+
+```css
+@media (hover: none) and (pointer: coarse) {
+    :root {
+        --ui-control-min-height: 2.75rem;
+        --ui-option-min-height: 2.75rem;
+    }
+}
+```
 
 ## Nullable values
 

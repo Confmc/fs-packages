@@ -6,6 +6,9 @@
 // below the trigger. Viewport-flip behaviour is deliberately NOT asserted (flaky across
 // runner viewports); the family shares one useListbox floating config, so one control
 // (SingleSelect) plus a Combobox sanity pass covers the wiring.
+// The hide() gate (WR-0542) IS asserted here: it needs a real clipping ancestor and real
+// scroll geometry, which happy-dom cannot produce — the unit layer pins the gate's wiring
+// against a mocked middlewareData, this file proves it fires in a real browser.
 import {describe, expect, it} from 'vitest';
 import {render} from 'vitest-browser-vue';
 import {userEvent} from 'vitest/browser';
@@ -76,5 +79,53 @@ describe('floating-ui reality — the open menu is actually positioned', () => {
         await expect.poll(() => popup.getBoundingClientRect().height).toBeGreaterThan(0);
         const inputRect = input.getBoundingClientRect();
         await expect.poll(() => popup.getBoundingClientRect().top).toBeGreaterThanOrEqual(inputRect.bottom);
+    });
+});
+
+describe('floating-ui hide() — the open menu follows its clipped-away trigger', () => {
+    // Regression pin for the dead-middleware bug (WR-0542 item 5): hide() was applied but
+    // `middlewareData.hide.referenceHidden` was never consumed, so an open menu stayed
+    // painted, floating detached, while its trigger scrolled out of a clipping ancestor
+    // (under a sticky header, say). The gate now overlays `visibility: hidden` on the
+    // floating styles; this walks the real scroll geometry in Chromium, both directions.
+    it('hides the menu when the trigger scrolls out of its clipping ancestor, and shows it again on scroll-back', async () => {
+        const model = ref<number | null>(null);
+        render(
+            defineComponent(
+                () => () =>
+                    h('div', {id: 'clip', style: 'height: 120px; overflow: auto; position: relative;'}, [
+                        h(SingleSelect, {
+                            options: FRUITS,
+                            label: 'name',
+                            id: 'fruit',
+                            modelValue: model.value,
+                            'onUpdate:modelValue': (value: number | null) => {
+                                model.value = value;
+                            },
+                        }),
+                        // Enough filler that the trigger can scroll fully out of the clip box.
+                        h('div', {style: 'height: 600px;'}),
+                    ]),
+            ),
+        );
+        const clip = document.getElementById('clip') as HTMLElement;
+        const trigger = document.getElementById('fruit') as HTMLElement;
+
+        await userEvent.click(trigger);
+        const popup = document.querySelector('.ui-select__menu') as HTMLElement;
+        expect(popup).not.toBeNull();
+
+        // Open in view: positioned, and NOT visibility-gated.
+        await expect.poll(() => popup.getBoundingClientRect().height).toBeGreaterThan(0);
+        expect(popup.style.visibility).not.toBe('hidden');
+
+        // Scroll the trigger fully out of the clip box — autoUpdate recomputes on ancestor
+        // scroll, hide() reports referenceHidden, and the gate must paint the menu away.
+        clip.scrollTop = 400;
+        await expect.poll(() => popup.style.visibility).toBe('hidden');
+
+        // Scroll back — the gate must release (an overlay, not a one-way latch).
+        clip.scrollTop = 0;
+        await expect.poll(() => popup.style.visibility).not.toBe('hidden');
     });
 });

@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import {mount} from '@vue/test-utils';
 import {afterEach, describe, expect, it} from 'vitest';
+import {h} from 'vue';
 
 import MultiSelect from '../src/components/MultiSelect.vue';
 
@@ -13,9 +14,10 @@ const FRUITS: Fruit[] = [
 ];
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFC + VTU mount inference
-const mountMulti = (props: Record<string, unknown>) =>
+const mountMulti = (props: Record<string, unknown>, slots?: Record<string, unknown>) =>
     mount(MultiSelect as any, {
         props: {options: FRUITS, label: 'name', id: 'fruit', modelValue: [], ...props},
+        slots,
         attachTo: document.body,
     });
 
@@ -296,5 +298,54 @@ describe('MultiSelect', () => {
         wrapper.unmount();
         // Exercises onBeforeUnmount cleanup — a stray document click must not throw.
         document.body.dispatchEvent(new MouseEvent('click', {bubbles: true}));
+    });
+
+    it('leaves the highlight on nothing when ArrowUp is pressed on the first option', async () => {
+        const wrapper = mountMulti({});
+        const trigger = () => wrapper.find('.ui-multiselect__trigger');
+
+        await trigger().trigger('keydown', {key: 'ArrowDown'}); // open
+        await trigger().trigger('keydown', {key: 'ArrowDown'}); // → index 0
+        expect(trigger().attributes('aria-activedescendant')).toBe('fruit-opt-0');
+
+        await trigger().trigger('keydown', {key: 'ArrowUp'}); // MultiSelect has no clear entry → nothing
+        expect(trigger().attributes('aria-activedescendant')).toBeUndefined();
+        expect(wrapper.find('.ui-multiselect__menu').exists()).toBe(true); // still open
+    });
+
+    it('renders per-option custom content through the #option scoped slot, chrome outside the slot', async () => {
+        const wrapper = mountMulti(
+            {modelValue: [3]}, // Mango committed
+            {
+                option: (props: {option: Fruit; index: number; selected: boolean}) =>
+                    h('b', {class: 'swatch'}, `${props.option.name}#${props.index}${props.selected ? '*' : ''}`),
+            },
+        );
+
+        await wrapper.find('.ui-multiselect__trigger').trigger('click');
+        // Sorted order: Apricot(2), Mango(3, member), Watermelon(1) — `selected` carries
+        // committed MEMBERSHIP, and the aria-selected chrome stays on the <li>.
+        expect(wrapper.findAll('.ui-multiselect__option .swatch').map((el) => el.text())).toEqual([
+            'Apricot#0',
+            'Mango#1*',
+            'Watermelon#2',
+        ]);
+
+        // Slotted content toggles exactly like the plain text — and the menu stays open.
+        await wrapper.findAll('.ui-multiselect__option')[0].trigger('click');
+        expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[3, 2]]); // + Apricot
+        expect(wrapper.find('.ui-multiselect__menu').exists()).toBe(true);
+    });
+
+    it('marks mutedOptions with .is-muted while keeping them committable', async () => {
+        const wrapper = mountMulti({mutedOptions: [2]}); // Apricot
+        await wrapper.find('.ui-multiselect__trigger').trigger('click');
+
+        const options = wrapper.findAll('.ui-multiselect__option'); // Apricot, Mango, Watermelon
+        expect(options.map((o) => o.classes().includes('is-muted'))).toEqual([true, false, false]);
+
+        // Muted ≠ disabled: a muted option still toggles membership.
+        await options[0].trigger('click');
+        expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[2]]);
     });
 });
