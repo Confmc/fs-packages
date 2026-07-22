@@ -467,6 +467,22 @@ const themeToppingIds = ref<string[]>(['caramel', 'sprinkles']);
     color: var(--vp-c-text-2);
 }
 
+/* VitePress's `.vp-doc ul` / `.vp-doc li + li` rules (0,1,1 / 0,1,2) outweigh the
+   package's single-class menu selectors (0,1,0), re-adding list markers, indent, and
+   inter-item margins inside the demos — something no real consumer sees. Restore the
+   package's own menu layout at winning specificity. Chips are spans; the only <ul>s
+   in the demos are the listbox menus. */
+.vp-doc .ui-demo ul[role='listbox'],
+.vp-doc .demo-theme-panel ul[role='listbox'] {
+    list-style: none;
+    margin: 0.25rem 0 0;
+    padding: var(--ui-menu-pad);
+}
+.vp-doc .ui-demo ul[role='listbox'] li + li,
+.vp-doc .demo-theme-panel ul[role='listbox'] li + li {
+    margin-top: 0;
+}
+
 /* The two-theme comparison. Each panel commits to a light rendering deliberately —
    the themes are the demo, not the site's dark/light mode. */
 .demo-theme-compare {
