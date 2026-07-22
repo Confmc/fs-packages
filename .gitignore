@@ -4,6 +4,8 @@ coverage/
 reports/
 .stryker-tmp/
 .stryker-incremental.json
+__screenshots__/
+.vitest-attachments/
 *.tsbuildinfo
 docs/.vitepress/cache/
 .changeset/*.md

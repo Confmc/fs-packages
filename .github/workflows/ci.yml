@@ -51,15 +51,48 @@ jobs:
                   retention-days: 30
                   if-no-files-found: warn
 
+    # Browser-mode test lane (real Chromium via the Playwright provider): the
+    # ui-inputs contract + interaction layer the happy-dom suite is structurally
+    # blind to — computed --ui-* styles, real CDP events on disabled controls,
+    # floating-ui positioning, axe-core audits. Config lives OUTSIDE the workspace
+    # glob (packages/ui-inputs/vitest.browser.config.ts), so the `check` lane's
+    # coverage/mutation gates are untouched. Browser binaries are cached keyed on
+    # the locked playwright version; system deps must install on every run (the
+    # cache only holds ~/.cache/ms-playwright).
+    browser-tests:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+              with:
+                  node-version: 24
+            - run: npm ci --ignore-scripts
+            - name: Resolve Playwright version (browser cache key)
+              id: playwright-version
+              run: echo "version=$(node -p "require('playwright/package.json').version")" >> "$GITHUB_OUTPUT"
+            - name: Cache Playwright chromium
+              id: playwright-cache
+              uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+              with:
+                  path: ~/.cache/ms-playwright
+                  key: playwright-chromium-${{ steps.playwright-version.outputs.version }}
+            - name: Install chromium (browser + system deps)
+              if: steps.playwright-cache.outputs.cache-hit != 'true'
+              run: npx playwright install chromium --with-deps
+            - name: Install chromium system deps only (browser cache hit)
+              if: steps.playwright-cache.outputs.cache-hit == 'true'
+              run: npx playwright install-deps chromium
+            - run: npm run test:browser
+
     # Aggregate check the town-crier trial tracks (TC-0069): the bus mirrors each
     # PR's CI verdict by matching exactly one check-run name, case-sensitively,
-    # `ci-passed`. This job fans in every CI lane (just `check` today) and is
-    # intended to become the single required status check on `main` — branch
-    # protection swaps from `check` to `ci-passed` after this merges.
+    # `ci-passed`. This job fans in every CI lane and is intended to become the
+    # single required status check on `main` — branch protection swaps from
+    # `check` to `ci-passed` after this merges.
     ci-passed:
         name: ci-passed
         runs-on: ubuntu-latest
-        needs: [check]
+        needs: [check, browser-tests]
         if: always()
         steps:
             - name: Verify all lanes passed
