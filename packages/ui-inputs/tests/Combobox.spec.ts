@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import {mount} from '@vue/test-utils';
 import {afterEach, describe, expect, it} from 'vitest';
+import {h} from 'vue';
 
 import Combobox from '../src/components/Combobox.vue';
 
@@ -13,9 +14,10 @@ const FRUITS: Fruit[] = [
 ];
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFC + VTU mount inference
-const mountCombobox = (props: Record<string, unknown>) =>
+const mountCombobox = (props: Record<string, unknown>, slots?: Record<string, unknown>) =>
     mount(Combobox as any, {
         props: {options: FRUITS, label: 'name', id: 'fruit', modelValue: null, ...props},
+        slots,
         attachTo: document.body,
     });
 
@@ -361,5 +363,105 @@ describe('Combobox', () => {
         wrapper.unmount();
         // Exercises onBeforeUnmount cleanup — a stray document click must not throw.
         document.body.dispatchEvent(new MouseEvent('click', {bubbles: true}));
+    });
+
+    it('renders per-option custom content through the #option scoped slot over the FILTERED list', async () => {
+        const wrapper = mountCombobox(
+            {modelValue: 3}, // Mango committed
+            {
+                option: (props: {option: Fruit; index: number; selected: boolean}) =>
+                    h('b', {class: 'swatch'}, `${props.option.name}#${props.index}${props.selected ? '*' : ''}`),
+            },
+        );
+        const input = wrapper.find('input');
+
+        await input.trigger('click');
+        await input.setValue('m'); // filtered + sorted: Mango, Watermelon
+        expect(wrapper.findAll('.ui-combobox__option .swatch').map((el) => el.text())).toEqual([
+            'Mango#0*',
+            'Watermelon#1',
+        ]);
+    });
+
+    it('marks mutedOptions with .is-muted while keeping them committable', async () => {
+        const wrapper = mountCombobox({mutedOptions: [2]}); // Apricot
+        await wrapper.find('input').trigger('click');
+
+        const options = wrapper.findAll('.ui-combobox__option'); // Apricot, Mango, Watermelon
+        expect(options.map((o) => o.classes().includes('is-muted'))).toEqual([true, false, false]);
+
+        await options[0].trigger('click');
+        expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([2]); // Apricot commits
+    });
+
+    describe('clear entry (clearLabel) + emptyDisplayValue', () => {
+        it('renders the entry above the filtered options, outside the index space and the filter', async () => {
+            const wrapper = mountCombobox({clearLabel: 'No fruit'});
+            const input = wrapper.find('input');
+
+            await input.setValue('zzz'); // no option matches — the entry still renders
+            const clear = wrapper.find('.ui-combobox__clear');
+            expect(clear.text()).toBe('No fruit');
+            expect(clear.attributes('id')).toBe('fruit-clear');
+            expect(clear.attributes('aria-selected')).toBe('true'); // model is null
+
+            await input.setValue('m'); // option ids keep mapping to the FILTERED list only
+            expect(wrapper.findAll('.ui-combobox__option').map((o) => o.attributes('id'))).toEqual([
+                'fruit-opt-0',
+                'fruit-opt-1',
+            ]);
+        });
+
+        it('commits null on Enter, closes, and snaps the input to emptyDisplayValue', async () => {
+            const wrapper = mountCombobox({clearLabel: 'No fruit', emptyDisplayValue: 'Any fruit', modelValue: 3});
+            const root = wrapper.find('.ui-combobox');
+            const input = wrapper.find('input');
+            expect(input.element.value).toBe('Mango');
+
+            await root.trigger('keydown', {key: 'ArrowDown'}); // open
+            await root.trigger('keydown', {key: 'ArrowDown'}); // → the clear entry
+            expect(input.attributes('aria-activedescendant')).toBe('fruit-clear');
+            await root.trigger('keydown', {key: 'Enter'});
+
+            expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([null]);
+            expect(wrapper.find('.ui-combobox__menu').exists()).toBe(false);
+            expect(input.element.value).toBe('Any fruit'); // the named empty state, not ''
+        });
+
+        it('starts on emptyDisplayValue when mounted with a null model, and reverts to it on dismiss', async () => {
+            const wrapper = mountCombobox({clearLabel: 'No fruit', emptyDisplayValue: 'Any fruit'});
+            const root = wrapper.find('.ui-combobox');
+            const input = wrapper.find('input');
+            expect(input.element.value).toBe('Any fruit');
+
+            await input.setValue('zzz'); // half-typed non-match…
+            await root.trigger('keydown', {key: 'Escape'});
+            expect(input.element.value).toBe('Any fruit'); // …reverts to the named empty state
+        });
+
+        it('commits null on click', async () => {
+            const wrapper = mountCombobox({clearLabel: 'No fruit', modelValue: 3});
+            await wrapper.find('input').trigger('click');
+
+            await wrapper.find('.ui-combobox__clear').trigger('click');
+            expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([null]);
+            expect(wrapper.find('.ui-combobox__menu').exists()).toBe(false);
+            // No emptyDisplayValue → the committed-null rendering is blank, as before.
+            expect(wrapper.find('input').element.value).toBe('');
+        });
+
+        it('drops a hovered clear entry when the user types (keystrokes reset the whole highlight)', async () => {
+            const wrapper = mountCombobox({clearLabel: 'No fruit'});
+            const input = wrapper.find('input');
+
+            await input.trigger('click');
+            await wrapper.find('.ui-combobox__clear').trigger('mouseover');
+            expect(wrapper.find('.ui-combobox__clear').classes()).toContain('is-active');
+            expect(input.attributes('aria-activedescendant')).toBe('fruit-clear');
+
+            await input.setValue('m'); // typing must reset the highlight to "nothing"
+            expect(wrapper.find('.ui-combobox__clear').classes()).not.toContain('is-active');
+            expect(input.attributes('aria-activedescendant')).toBeUndefined();
+        });
     });
 });

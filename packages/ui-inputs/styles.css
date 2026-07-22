@@ -38,6 +38,12 @@
        size; a territory sizes control text through this var (which the package
        reads) instead of a utility that loses the source-order tie. */
     --ui-control-font-size: inherit;
+    /* completes the `font: inherit` decomposition (WR-0537): line-height reads from the
+       var instead of a hardcoded `inherit` longhand — same rendered default. */
+    --ui-control-line-height: inherit;
+    /* touch-target hook — `auto` is the measured status quo. WCAG 2.5.5's 44px is the
+       CONSUMER's call: assign 2.75rem under your own coarse-pointer media query. */
+    --ui-control-min-height: auto;
     --ui-control-border-width: 1px;
     --ui-control-border-color: #d1d5db;
     --ui-control-border-open: #2563eb;
@@ -61,11 +67,32 @@
     --ui-menu-pad: 0.375rem;
     --ui-menu-shadow: 0 8px 32px rgba(0, 0, 0, 0.16);
     --ui-menu-max-height: 15rem;
+    /* width clamps — the defaults reproduce the historical `min-width: 100%` (of the
+       positioned ancestor, i.e. ≥ the trigger) with no max clamp. A territory caps them
+       (e.g. `max(100%, 240px)` / `calc(100vw - 16px)`) without fighting specificity. */
+    --ui-menu-min-width: 100%;
+    --ui-menu-max-width: none;
+    /* menu typography — `inherit` is the status quo (the popup sizes by inheritance from
+       the non-teleported component root); the var gives the popup its own hook. */
+    --ui-menu-font-size: inherit;
 
     /* option */
     --ui-option-radius: 6px;
     --ui-option-pad: 0.5rem 0.625rem;
     --ui-option-bg-active: #f3f4f6;
+    /* touch-target hook — see --ui-control-min-height. */
+    --ui-option-min-height: auto;
+    /* muted options (`mutedOptions` prop) — defaults to the RESTING option text so the
+       class is a no-op until a territory opts in (the state-variant-hook discipline). */
+    --ui-option-text-muted: var(--ui-control-text);
+    /* MultiSelect committed membership (`[aria-selected="true"]`) — both default to the
+       resting option rendering (transparent bg, resting text), so the treatment is a
+       no-op until a territory opts in. */
+    --ui-option-bg-selected: transparent;
+    --ui-option-text-selected: var(--ui-control-text);
+    /* the committing clear entry (`clearLabel` prop) — danger-toned by default (it is a
+       destructive-ish "commit null"); renders only when a consumer passes the prop. */
+    --ui-clear-text: var(--ui-danger-text);
 
     /* chip (MultiSelect) — every default derives from an existing resting token, so the
        chip contract is neutral until a territory opts in. */
@@ -135,8 +162,9 @@
     font-variant: inherit;
     font-weight: inherit;
     font-stretch: inherit;
-    line-height: inherit;
+    line-height: var(--ui-control-line-height);
     width: 100%;
+    min-height: var(--ui-control-min-height);
     box-sizing: border-box;
     padding: var(--ui-control-pad-y) var(--ui-control-pad-x);
     background: var(--ui-control-bg);
@@ -312,7 +340,9 @@
     padding: var(--ui-menu-pad);
     position: absolute;
     z-index: 50;
-    min-width: 100%;
+    min-width: var(--ui-menu-min-width);
+    max-width: var(--ui-menu-max-width);
+    font-size: var(--ui-menu-font-size);
     box-sizing: border-box;
     background: var(--ui-menu-bg);
     border-style: solid;
@@ -330,10 +360,41 @@
     border-radius: var(--ui-option-radius);
     cursor: pointer;
     color: var(--ui-control-text);
+    min-height: var(--ui-option-min-height);
+    box-sizing: border-box;
+}
+/* Committed MEMBERSHIP in the MultiSelect popup. Declared BEFORE the .is-active rule
+   (equal specificity) so the pointer highlight keeps winning its background — with the
+   no-op defaults the combined rendering is byte-identical to the pre-var stylesheet. */
+.ui-multiselect__option[aria-selected='true'] {
+    background: var(--ui-option-bg-selected);
+    color: var(--ui-option-text-selected);
+}
+/* Muted options — visual de-emphasis only; committable, and last in the colour cascade
+   so a muted option stays muted while selected or under the pointer highlight. */
+.ui-select__option.is-muted,
+.ui-combobox__option.is-muted,
+.ui-multiselect__option.is-muted {
+    color: var(--ui-option-text-muted);
 }
 .ui-select__option.is-active,
 .ui-combobox__option.is-active,
 .ui-multiselect__option.is-active {
+    background: var(--ui-option-bg-active);
+}
+/* The committing clear entry — an option-shaped row above the list (outside the index
+   space), danger-toned by default; shares the option's active-highlight treatment. */
+.ui-select__clear,
+.ui-combobox__clear {
+    padding: var(--ui-option-pad);
+    border-radius: var(--ui-option-radius);
+    cursor: pointer;
+    min-height: var(--ui-option-min-height);
+    box-sizing: border-box;
+    color: var(--ui-clear-text);
+}
+.ui-select__clear.is-active,
+.ui-combobox__clear.is-active {
     background: var(--ui-option-bg-active);
 }
 .ui-select__empty,

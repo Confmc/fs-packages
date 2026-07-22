@@ -69,12 +69,27 @@
             :listbox-id="listboxId"
             :option-id="optionId"
             :is-selected="isSelected"
+            :is-muted="isMuted"
             :floating-styles="floatingStyles"
             :options-label="optionsLabel"
             :empty-text="emptyText"
             @hover="pointer = $event"
             @commit="commit"
-        />
+        >
+            <!-- Re-scope OptionList's index into the typed per-option payload; the fallback
+                 (the plain labelOf text) keeps slotless consumers byte-identical. -->
+            <template #option="{index}">
+                <slot
+                    name="option"
+                    :option="sorted[index]"
+                    :index="index"
+                    :selected="isSelected(index)"
+                    :active="pointer === index"
+                >
+                    {{ optionLabels[index] }}
+                </slot>
+            </template>
+        </OptionList>
     </div>
 </template>
 
@@ -100,6 +115,7 @@ const {
     emptyText = 'No options',
     optionsLabel = 'Options',
     removeLabel = 'Remove',
+    mutedOptions,
 } = defineProps<{
     options: T[];
     /** property name or getter for an option's display string. */
@@ -121,6 +137,16 @@ const {
      * a prop, not a literal, so Dutch territories can localise it (the `optionsLabel` ruling).
      */
     removeLabel?: string;
+    /** ids rendered visually muted (`.is-muted`) — still committable, still in the keyboard path. */
+    mutedOptions?: T['id'][];
+}>();
+
+defineSlots<{
+    /**
+     * Per-option content (swatches, icons, rich labels). Highlight/selection chrome stays
+     * on the option row, outside the slot. Fallback: the plain display string.
+     */
+    option?: (props: {option: T; index: number; selected: boolean; active: boolean}) => unknown;
 }>();
 
 /** The committed membership: an array of option ids, in selection order. */
@@ -155,6 +181,8 @@ const optionLabels = computed(() => sorted.value.map(labelOf));
 const optionKeys = computed(() => sorted.value.map((option) => String(option.id)));
 /** `aria-selected` marks committed MEMBERSHIP — the pointer is conveyed by aria-activedescendant. */
 const isSelected = (index: number): boolean => model.value.includes(sorted.value[index].id);
+/** `.is-muted` marks visual de-emphasis only — a muted option stays committable. */
+const isMuted = (index: number): boolean => mutedOptions !== undefined && mutedOptions.includes(sorted.value[index].id);
 
 const root = useTemplateRef<HTMLElement>('root');
 const reference = useTemplateRef<HTMLElement>('reference');

@@ -7,18 +7,39 @@
         :aria-multiselectable="multiselectable || undefined"
         :style="floatingStyles"
     >
+        <!-- The committing clear entry (SingleSelect/Combobox `clearLabel`) renders OUTSIDE
+             the index space — its own <li> above the v-for, its own id (`${id}-clear`), its
+             own highlight flag — so every option index below keeps mapping 1:1 onto the
+             parent's list. It is an option to assistive tech (role="option" inside the
+             listbox); aria-selected marks the committed-null state. -->
+        <li
+            v-if="clearLabel !== undefined"
+            :id="clearId"
+            :class="[`${variant}__clear`, {'is-active': clearActive}]"
+            role="option"
+            :aria-selected="clearSelected"
+            @mouseover="emit('clearHover')"
+            @click="emit('clearCommit')"
+        >
+            {{ clearLabel }}
+        </li>
         <li v-if="!labels.length" :class="`${variant}__empty`">{{ emptyText }}</li>
         <li
             v-for="(optionLabel, index) in labels"
             :id="optionId(index)"
             :key="keys[index]"
-            :class="[`${variant}__option`, {'is-active': pointer === index}]"
+            :class="[`${variant}__option`, {'is-active': pointer === index, 'is-muted': isMuted(index)}]"
             role="option"
             :aria-selected="isSelected(index)"
             @mouseover="emit('hover', index)"
             @click="emit('commit', index)"
         >
-            {{ optionLabel }}
+            <!-- Index-scoped so `T` never crosses this boundary: the parent re-scopes the
+                 index into its typed payload ({option, selected, active}) and owns the
+                 slotless fallback (the labelOf text) — this component renders whatever
+                 comes down. Highlight/selection chrome stays on the <li>, outside the slot,
+                 so custom option content never has to re-create it. -->
+            <slot name="option" :index="index" />
         </li>
     </ul>
 </template>
@@ -37,7 +58,8 @@ import type {CSSProperties} from 'vue';
  * boundary. The parent hands down parallel `labels`/`keys` arrays derived from ITS list
  * (SingleSelect `sorted`, Combobox `filtered`) plus index-keyed lookups, and receives
  * `hover`/`commit` back by index — the parent stays the sole owner of `pointer` and of the
- * commit disposition.
+ * commit disposition. Per-option content flows through the index-scoped `option` slot; the
+ * clear entry (`clear*` props) sits above the list, outside the index space.
  *
  * The single `<ul>` root is LOAD-BEARING: parents reach the floating element through the
  * instance's `$el` (via `componentEl` in `internal/reactivity`) — no `defineExpose`, which the
@@ -51,11 +73,16 @@ const {
     listboxId,
     optionId,
     isSelected,
+    isMuted,
     floatingStyles,
     variant,
     optionsLabel,
     emptyText,
     multiselectable = false,
+    clearLabel,
+    clearId,
+    clearActive = false,
+    clearSelected = false,
 } = defineProps<{
     /** display strings, in render order — parallel to `keys`. */
     labels: string[];
@@ -69,6 +96,8 @@ const {
     optionId: (index: number) => string;
     /** whether the option at an index is the COMMITTED value (`aria-selected`), never the pointer. */
     isSelected: (index: number) => boolean;
+    /** whether the option at an index is visually MUTED (`.is-muted`) — still committable. */
+    isMuted: (index: number) => boolean;
     /** floating-ui positioning styles for the popup. */
     floatingStyles: CSSProperties;
     /** class prefix of the owning control — the only visual divergence across the family. */
@@ -79,7 +108,15 @@ const {
     emptyText: string;
     /** marks the listbox `aria-multiselectable` (MultiSelect) — absent, not "false", otherwise. */
     multiselectable?: boolean;
+    /** display string of the committing clear entry — absent means no entry renders. */
+    clearLabel?: string;
+    /** the clear entry's activedescendant id (`${id}-clear`, from `useListbox`). */
+    clearId?: string;
+    /** whether the clear entry holds the highlight (`useListbox.clearHighlighted`). */
+    clearActive?: boolean;
+    /** whether the clear entry is the COMMITTED state (`aria-selected` — model is null). */
+    clearSelected?: boolean;
 }>();
 
-const emit = defineEmits<{hover: [index: number]; commit: [index: number]}>();
+const emit = defineEmits<{hover: [index: number]; commit: [index: number]; clearHover: []; clearCommit: []}>();
 </script>

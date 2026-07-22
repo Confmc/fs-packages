@@ -198,14 +198,55 @@ See [Nullable values](#nullable-values) for why the models are nullable and what
 | `describedby`      | `string`      | —              | Id of the paired error element                                     |
 | `emptyText`        | `string`      | `'No options'` | Shown when the (filtered) list is empty                            |
 | `optionsLabel`     | `string`      | `'Options'`    | Accessible name for the listbox popup — a prop so you can localise |
+| `mutedOptions`     | `T['id'][]`   | —              | Ids rendered visually muted (`.is-muted`) — still committable      |
 
 They differ in what they model:
 
-| Component      | Model             | Extras                                                                                  |
-| -------------- | ----------------- | --------------------------------------------------------------------------------------- |
-| `SingleSelect` | `T['id'] \| null` | —                                                                                       |
-| `Combobox`     | `T['id'] \| null` | Text-input trigger that filters options; `focus()` exposed for imperative focus         |
-| `MultiSelect`  | `T['id'][]`       | Toggle-in-place commits, chip bar, `removeLabel` prop (default `'Remove'`, localisable) |
+| Component      | Model             | Extras                                                                                         |
+| -------------- | ----------------- | ---------------------------------------------------------------------------------------------- |
+| `SingleSelect` | `T['id'] \| null` | `clearLabel` / `emptyDisplayValue` (the committing clear entry — see below)                    |
+| `Combobox`     | `T['id'] \| null` | Text-input trigger that filters options; `focus()` exposed; `clearLabel` / `emptyDisplayValue` |
+| `MultiSelect`  | `T['id'][]`       | Toggle-in-place commits, chip bar, `removeLabel` prop (default `'Remove'`, localisable)        |
+
+#### The `#option` scoped slot
+
+All three selects render each option's plain display string by default; the `option` slot
+replaces that content with your own (colour swatches, icons, rich labels). The payload is
+`{option: T, index, selected, active}` — typed against your option type. Highlight and
+selection chrome (`.is-active`, `aria-selected`) stay on the option row, **outside the
+slot**, so custom content never has to re-create it:
+
+```vue
+<SingleSelect id="label" v-model="labelId" :options="labels" label="name">
+    <template #option="{option}">
+        <span class="swatch" :style="{background: option.color}" /> {{ option.name }}
+    </template>
+</SingleSelect>
+```
+
+#### The committing clear entry (`SingleSelect` / `Combobox`)
+
+`clearLabel` renders a committing entry **above** the options — choosing it commits `null`
+and closes, exactly like choosing an option. It lives outside the option index space: its
+own keyboard slot between "nothing highlighted" and the first option, its own `${id}-clear`
+id for `aria-activedescendant`, and `aria-selected="true"` while the model is null. In the
+Combobox it also sits outside the filter — it renders whatever the query says.
+
+Pair it with `emptyDisplayValue`: the string the trigger (or the Combobox input) renders as
+a **value** when the model is null ("No sprint (backlog)") instead of the muted placeholder /
+blank input. `has-value` styling stays keyed on an actual selection. The entry is
+danger-toned by default (`--ui-clear-text`, chaining to `--ui-danger-text`).
+
+```vue
+<SingleSelect
+    id="sprint"
+    v-model="sprintId"
+    :options="sprints"
+    label="name"
+    clear-label="No sprint"
+    empty-display-value="No sprint (backlog)"
+/>
+```
 
 ### The checkbox family
 
@@ -245,9 +286,9 @@ Every visual rule in the shipped stylesheet keys on a `--ui-*` custom property �
 The variable surface groups into:
 
 - **Field / label** — `--ui-field-gap`, `--ui-field-margin`, `--ui-label-color`, `--ui-label-size`, `--ui-label-weight`, `--ui-label-transform`, `--ui-label-tracking`
-- **Control** (inputs + select triggers) — `--ui-control-bg`, `--ui-control-text`, `--ui-control-text-muted`, `--ui-control-border-width`, `--ui-control-border-color`, `--ui-control-border-open`, `--ui-control-radius`, `--ui-control-pad-x`, `--ui-control-pad-y`, `--ui-control-shadow`, `--ui-control-shadow-hover`, `--ui-control-bg-disabled`, `--ui-focus-ring`, `--ui-control-font-size`
-- **Listbox menu** — `--ui-menu-bg`, `--ui-menu-border-width`, `--ui-menu-border-color`, `--ui-menu-radius`, `--ui-menu-pad`, `--ui-menu-shadow`, `--ui-menu-max-height`
-- **Option** — `--ui-option-radius`, `--ui-option-pad`, `--ui-option-bg-active`
+- **Control** (inputs + select triggers) — `--ui-control-bg`, `--ui-control-text`, `--ui-control-text-muted`, `--ui-control-border-width`, `--ui-control-border-color`, `--ui-control-border-open`, `--ui-control-radius`, `--ui-control-pad-x`, `--ui-control-pad-y`, `--ui-control-shadow`, `--ui-control-shadow-hover`, `--ui-control-bg-disabled`, `--ui-focus-ring`, `--ui-control-font-size`, `--ui-control-line-height`, `--ui-control-min-height`
+- **Listbox menu** — `--ui-menu-bg`, `--ui-menu-border-width`, `--ui-menu-border-color`, `--ui-menu-radius`, `--ui-menu-pad`, `--ui-menu-shadow`, `--ui-menu-max-height`, `--ui-menu-min-width`, `--ui-menu-max-width`, `--ui-menu-font-size`
+- **Option** — `--ui-option-radius`, `--ui-option-pad`, `--ui-option-bg-active`, `--ui-option-min-height`, `--ui-option-text-muted` (`.is-muted`), `--ui-option-bg-selected` / `--ui-option-text-selected` (MultiSelect `[aria-selected="true"]`), `--ui-clear-text` (the clear entry)
 - **Chip** (MultiSelect) — `--ui-chip-bg`, `--ui-chip-text`, `--ui-chip-radius`, `--ui-chip-pad`, each defaulting to an existing resting token so chips are neutral until you opt in
 - **Check** (Checkbox / CheckboxGroup / RadioGroup) — `--ui-check-size`, `--ui-check-border-width` (shorthand-valued, like the control's), `--ui-check-border-color`, `--ui-check-bg`, `--ui-check-bg-checked`, `--ui-check-mark-color`, `--ui-check-radius`, `--ui-check-gap` (control ↔ label), `--ui-check-item-gap` (group rows) — every colour default derives from an existing resting token (`--ui-control-bg`, `--ui-control-border-color`, `--ui-control-border-open`), so your token map themes the family with no new mappings
 - **Switch** — `--ui-switch-track-width`, `--ui-switch-track-height`, `--ui-switch-track-radius`, `--ui-switch-track-bg`, `--ui-switch-track-bg-checked`, `--ui-switch-thumb-size`, `--ui-switch-thumb-bg` — the thumb travels track-width − track-height, so geometry stays coherent under any override
@@ -285,7 +326,31 @@ The `.is-open` and `.is-invalid` state classes follow `:focus-visible` in source
 
 ### Typography escape hatch
 
-`--ui-control-font-size` (default `inherit`) sizes control text. The control's `font` is decomposed into longhands — all inheriting except size — so `font-size` reads from this variable rather than from a consumer utility class, which would otherwise lose the source-order tie against the package stylesheet.
+`--ui-control-font-size` (default `inherit`) sizes control text, and `--ui-control-line-height` (default `inherit`) completes the decomposition. The control's `font` is decomposed into longhands — all inheriting except the two var-keyed ones — so both read from their variable rather than from a consumer utility class, which would otherwise lose the source-order tie against the package stylesheet. The listbox popup gets its own hook, `--ui-menu-font-size` (default `inherit` — it sizes by inheritance from the component root), so an adapter never needs a `text-[13px]` utility on the popup.
+
+### Menu width clamps
+
+`--ui-menu-min-width` (default `100%` — of the positioned ancestor, i.e. at least the trigger) and `--ui-menu-max-width` (default `none`) clamp the listbox popup without a specificity fight:
+
+```css
+:root {
+    --ui-menu-min-width: max(100%, 240px);
+    --ui-menu-max-width: calc(100vw - 16px);
+}
+```
+
+### Touch targets
+
+`--ui-control-min-height` and `--ui-option-min-height` (both default `auto` — the measured status quo) put a floor under the control and the listbox options. WCAG 2.5.5's 44px minimum target is deliberately the **consumer's** call — assign the floor under your own coarse-pointer media query:
+
+```css
+@media (hover: none) and (pointer: coarse) {
+    :root {
+        --ui-control-min-height: 2.75rem;
+        --ui-option-min-height: 2.75rem;
+    }
+}
+```
 
 ## Two Themes, One Component Set
 

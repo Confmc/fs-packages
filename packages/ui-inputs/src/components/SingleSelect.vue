@@ -17,7 +17,13 @@
             :aria-activedescendant="activeDescendant"
             @click="toggle"
         >
-            <span v-if="selected === undefined" class="ui-select__placeholder">{{ placeholder }}</span>
+            <span v-if="selected === undefined && emptyDisplayValue === undefined" class="ui-select__placeholder">{{
+                placeholder
+            }}</span>
+            <!-- A NAMED empty state ("No sprint (backlog)"): renders as a value, not as muted
+                 placeholder text — but `has-value` stays keyed on an actual selection, because
+                 the model IS null. -->
+            <span v-else-if="selected === undefined" class="ui-select__value">{{ emptyDisplayValue }}</span>
             <span v-else class="ui-select__value">{{ labelOf(selected) }}</span>
             <svg class="ui-select__chevron" viewBox="0 0 20 20" aria-hidden="true">
                 <path d="M5 8l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" />
@@ -34,12 +40,33 @@
             :listbox-id="listboxId"
             :option-id="optionId"
             :is-selected="isSelected"
+            :is-muted="isMuted"
             :floating-styles="floatingStyles"
             :options-label="optionsLabel"
             :empty-text="emptyText"
+            :clear-label="clearLabel"
+            :clear-id="clearId"
+            :clear-active="clearHighlighted"
+            :clear-selected="model === null"
             @hover="pointer = $event"
             @commit="commit"
-        />
+            @clear-hover="highlightClear"
+            @clear-commit="commitClear"
+        >
+            <!-- Re-scope OptionList's index into the typed per-option payload; the fallback
+                 (the plain labelOf text) keeps slotless consumers byte-identical. -->
+            <template #option="{index}">
+                <slot
+                    name="option"
+                    :option="sorted[index]"
+                    :index="index"
+                    :selected="isSelected(index)"
+                    :active="pointer === index"
+                >
+                    {{ optionLabels[index] }}
+                </slot>
+            </template>
+        </OptionList>
     </div>
 </template>
 
@@ -64,6 +91,9 @@ const {
     describedby,
     emptyText = 'No options',
     optionsLabel = 'Options',
+    mutedOptions,
+    clearLabel,
+    emptyDisplayValue,
 } = defineProps<{
     options: T[];
     /** property name or getter for an option's display string. */
@@ -80,6 +110,24 @@ const {
     emptyText?: string;
     /** accessible name for the listbox popup (`aria-label`). */
     optionsLabel?: string;
+    /** ids rendered visually muted (`.is-muted`) — still committable, still in the keyboard path. */
+    mutedOptions?: T['id'][];
+    /**
+     * display string of a committing CLEAR ENTRY rendered above the options — commits
+     * `null` and closes. Lives outside the option index space (its own keyboard slot
+     * above index 0, its own `${id}-clear` activedescendant id).
+     */
+    clearLabel?: string;
+    /** what the trigger renders when the model is null — as a VALUE, not muted placeholder text. */
+    emptyDisplayValue?: string;
+}>();
+
+defineSlots<{
+    /**
+     * Per-option content (swatches, icons, rich labels). Highlight/selection chrome stays
+     * on the option row, outside the slot. Fallback: the plain display string.
+     */
+    option?: (props: {option: T; index: number; selected: boolean; active: boolean}) => unknown;
 }>();
 
 const model = defineModel<T['id'] | null>({required: true});
@@ -101,6 +149,8 @@ const optionLabels = computed(() => sorted.value.map(labelOf));
 const optionKeys = computed(() => sorted.value.map((option) => String(option.id)));
 /** `aria-selected` marks the COMMITTED value — OptionList only asks about rendered indices. */
 const isSelected = (index: number): boolean => sorted.value[index].id === model.value;
+/** `.is-muted` marks visual de-emphasis only — a muted option stays committable. */
+const isMuted = (index: number): boolean => mutedOptions !== undefined && mutedOptions.includes(sorted.value[index].id);
 
 const root = useTemplateRef<HTMLElement>('root');
 const reference = useTemplateRef<HTMLElement>('reference');
@@ -120,7 +170,27 @@ const commit = (index: number): boolean => {
     return true;
 };
 
-const {open, pointer, listboxId, optionId, activeDescendant, floatingStyles, onKey, close} = useListbox({
+// The clear entry commits the family's other legal value — null — and closes, exactly like
+// choosing an option. Always a real commit (null is always committable), so always `true`.
+const commitClear = (): boolean => {
+    model.value = null;
+    close();
+    return true;
+};
+
+const {
+    open,
+    pointer,
+    listboxId,
+    optionId,
+    activeDescendant,
+    floatingStyles,
+    onKey,
+    close,
+    clearHighlighted,
+    clearId,
+    highlightClear,
+} = useListbox({
     root,
     reference,
     floating,
@@ -132,6 +202,8 @@ const {open, pointer, listboxId, optionId, activeDescendant, floatingStyles, onK
     onCommit: commit,
     onDismiss: () => close(),
     onOutside: () => close(),
+    clearEntry: () => clearLabel !== undefined,
+    onClearCommit: commitClear,
 });
 
 const toggle = () => {

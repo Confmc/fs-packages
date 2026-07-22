@@ -32,12 +32,33 @@
             :listbox-id="listboxId"
             :option-id="optionId"
             :is-selected="isSelected"
+            :is-muted="isMuted"
             :floating-styles="floatingStyles"
             :options-label="optionsLabel"
             :empty-text="emptyText"
+            :clear-label="clearLabel"
+            :clear-id="clearId"
+            :clear-active="clearHighlighted"
+            :clear-selected="model === null"
             @hover="pointer = $event"
             @commit="commit"
-        />
+            @clear-hover="highlightClear"
+            @clear-commit="commitClear"
+        >
+            <!-- Re-scope OptionList's index into the typed per-option payload; the fallback
+                 (the plain labelOf text) keeps slotless consumers byte-identical. -->
+            <template #option="{index}">
+                <slot
+                    name="option"
+                    :option="filtered[index]"
+                    :index="index"
+                    :selected="isSelected(index)"
+                    :active="pointer === index"
+                >
+                    {{ optionLabels[index] }}
+                </slot>
+            </template>
+        </OptionList>
     </div>
 </template>
 
@@ -62,6 +83,9 @@ const {
     describedby,
     emptyText = 'No options',
     optionsLabel = 'Options',
+    mutedOptions,
+    clearLabel,
+    emptyDisplayValue,
 } = defineProps<{
     options: T[];
     /** property name or getter for an option's display string. */
@@ -78,6 +102,24 @@ const {
     emptyText?: string;
     /** accessible name for the listbox popup (`aria-label`). */
     optionsLabel?: string;
+    /** ids rendered visually muted (`.is-muted`) — still committable, still in the keyboard path. */
+    mutedOptions?: T['id'][];
+    /**
+     * display string of a committing CLEAR ENTRY rendered above the (filtered) options —
+     * commits `null` and closes. Lives outside the option index space and outside the
+     * filter (it renders whatever the query says).
+     */
+    clearLabel?: string;
+    /** what the input renders when the model is null — a NAMED empty state instead of `''`. */
+    emptyDisplayValue?: string;
+}>();
+
+defineSlots<{
+    /**
+     * Per-option content (swatches, icons, rich labels). Highlight/selection chrome stays
+     * on the option row, outside the slot. Fallback: the plain display string.
+     */
+    option?: (props: {option: T; index: number; selected: boolean; active: boolean}) => unknown;
 }>();
 
 const model = defineModel<T['id'] | null>({required: true});
@@ -89,7 +131,9 @@ const labelOf = (option: T): string =>
         : String((option as Record<PropertyKey, unknown>)[label as PropertyKey]);
 
 const selected = computed(() => options.find((option) => option.id === model.value));
-const selectedLabel = computed(() => (selected.value ? labelOf(selected.value) : ''));
+// The committed-null rendering: `emptyDisplayValue` names the empty state ("No sprint
+// (backlog)") as a value; without it the input reverts to blank as before.
+const selectedLabel = computed(() => (selected.value ? labelOf(selected.value) : (emptyDisplayValue ?? '')));
 
 // The input's text is LOCAL state so the user can filter freely — it is not a mirror
 // of the committed label the way SingleSelect's trigger text is. It starts on the
@@ -112,6 +156,9 @@ const optionLabels = computed(() => filtered.value.map(labelOf));
 const optionKeys = computed(() => filtered.value.map((option) => String(option.id)));
 /** `aria-selected` marks the COMMITTED value — OptionList only asks about rendered indices. */
 const isSelected = (index: number): boolean => filtered.value[index].id === model.value;
+/** `.is-muted` marks visual de-emphasis only — a muted option stays committable. */
+const isMuted = (index: number): boolean =>
+    mutedOptions !== undefined && mutedOptions.includes(filtered.value[index].id);
 
 const root = useTemplateRef<HTMLElement>('root');
 // The input is both the floating-ui reference and the target of the imperative focus
@@ -133,7 +180,30 @@ const commit = (index: number): boolean => {
     return true;
 };
 
-const {open, pointer, listboxId, optionId, activeDescendant, floatingStyles, onKey, close} = useListbox({
+// The clear entry commits the family's other legal value — null — and closes; the input
+// snaps to the committed-null rendering (`emptyDisplayValue`, or blank) through the same
+// `selectedLabel` read every other close path uses. Always a real commit, so always `true`.
+const commitClear = (): boolean => {
+    model.value = null;
+    query.value = selectedLabel.value;
+    close();
+    return true;
+};
+
+const {
+    open,
+    pointer,
+    listboxId,
+    optionId,
+    activeDescendant,
+    floatingStyles,
+    onKey,
+    close,
+    clearHighlighted,
+    clearId,
+    highlightClear,
+    resetHighlight,
+} = useListbox({
     root,
     reference: input,
     floating,
@@ -146,6 +216,8 @@ const {open, pointer, listboxId, optionId, activeDescendant, floatingStyles, onK
     onCommit: commit,
     onDismiss: () => dismiss(),
     onOutside: () => dismiss(),
+    clearEntry: () => clearLabel !== undefined,
+    onClearCommit: commitClear,
 });
 
 // The input text is local, but it must still track the committed label when it changes
@@ -173,10 +245,11 @@ const choose = (option: T): void => {
 
 // Typing filters and opens; the raw value is bound through `query`, and every keystroke
 // resets the highlight (nothing is pre-selected — Enter with no highlight is a no-op).
+// `resetHighlight` (not a bare pointer write) so a hovered clear entry drops too.
 const onInput = (event: Event) => {
     query.value = (event.target as HTMLInputElement).value;
     open.value = true;
-    pointer.value = -1;
+    resetHighlight();
 };
 // Clicking the (enabled) input opens the list. A disabled input never dispatches click.
 const onClick = () => {

@@ -1,5 +1,5 @@
 import type {Placement} from '@floating-ui/vue';
-import type {Ref} from 'vue';
+import type {CSSProperties, Ref} from 'vue';
 
 import {autoUpdate, flip, hide, offset, shift, useFloating} from '@floating-ui/vue';
 import {computed, onBeforeUnmount, onMounted, ref, watch} from 'vue';
@@ -55,6 +55,16 @@ export interface UseListboxOptions {
     onOutside: () => void;
     /** floating-ui layout-policy overrides — layout is the caller's business, not the core's. */
     floatingOptions?: ListboxFloatingOptions;
+    /**
+     * Whether a committing CLEAR ENTRY currently renders above the option list (the
+     * `clearLabel` feature on SingleSelect/Combobox). The entry lives OUTSIDE the index
+     * space — indexes keep mapping to the caller's option list — and gets its own keyboard
+     * slot between "nothing highlighted" and index 0, plus its own activedescendant id
+     * (`${id}-clear`). A getter so it tracks the prop reactively.
+     */
+    clearEntry?: () => boolean;
+    /** Commit the clear entry; returns whether a commit happened (decides preventDefault). */
+    onClearCommit?: () => boolean;
 }
 
 /**
@@ -77,10 +87,34 @@ export function useListbox(options: UseListboxOptions) {
         onDismiss,
         onOutside,
         floatingOptions = {},
+        clearEntry,
+        onClearCommit,
     } = options;
 
     const open = ref(false);
     const pointer = ref(-1);
+
+    // Whether the CLEAR ENTRY holds the highlight. Guarded on all three legs by
+    // `clearHighlighted`: the flag itself, the pointer parked at -1 (an option hover moves
+    // the pointer without touching this flag, which must instantly un-highlight the entry),
+    // and the entry still rendering (`clearLabel` can be withdrawn reactively while
+    // highlighted). The entry check runs FIRST so the no-entry family (MultiSelect) settles
+    // the computed on its own leg.
+    const clearActive = ref(false);
+    const clearHighlighted = computed(() => (clearEntry?.() ?? false) && clearActive.value && pointer.value === -1);
+    const clearId = computed(() => `${id()}-clear`);
+    /** Move the highlight onto the clear entry (keyboard slot above index 0, or hover). */
+    const highlightClear = () => {
+        clearActive.value = true;
+        pointer.value = -1;
+    };
+
+    // Reset the highlight to "nothing" — shared by close() and the Combobox keystroke reset
+    // (typing must drop a hovered clear entry exactly as it drops an option highlight).
+    const resetHighlight = () => {
+        clearActive.value = false;
+        pointer.value = -1;
+    };
 
     // The one dismissal step every consumer needs: close the list AND reset the highlight.
     // Owned here so a future consumer cannot forget the `-1` — a stale pointer would resurface
@@ -89,7 +123,7 @@ export function useListbox(options: UseListboxOptions) {
     // decision (`onCommit` — the MultiSelect toggle-and-stay-open contract).
     const close = () => {
         open.value = false;
-        pointer.value = -1;
+        resetHighlight();
     };
 
     // Keyboard focus lives on the trigger, so the focused option is conveyed to assistive
@@ -108,9 +142,11 @@ export function useListbox(options: UseListboxOptions) {
     // The upper bound is load-bearing: the rendered list can shrink while the listbox is open
     // (a reactive `options` prop reloading, or a combobox filter narrowing), leaving `pointer`
     // past the end.
-    const activeDescendant = computed(() =>
-        open.value && pointer.value >= 0 && pointer.value < listLength() ? optionId(pointer.value) : undefined,
-    );
+    const activeDescendant = computed(() => {
+        if (!open.value) return undefined;
+        if (clearHighlighted.value) return clearId.value;
+        return pointer.value >= 0 && pointer.value < listLength() ? optionId(pointer.value) : undefined;
+    });
 
     // The list shrinking while open leaves `pointer` dangling. Clamping on `flush: 'pre'` (so it
     // lands before the re-render that would read a stale index) keeps the highlight honest AND
@@ -119,7 +155,14 @@ export function useListbox(options: UseListboxOptions) {
     watch(
         listLength,
         (length) => {
-            if (pointer.value >= length) pointer.value = length - 1;
+            if (pointer.value >= length) {
+                pointer.value = length - 1;
+                // A clamp lands the pointer honestly on "the new last option" — or on -1
+                // when the list drained. Either way the clear flag is stale hygiene here
+                // (the pointer was ≥ 0, so the entry was not highlighted): without this
+                // reset, a drain-to-empty would resurrect a previously-hovered clear entry.
+                clearActive.value = false;
+            }
         },
         {flush: 'pre'},
     );
@@ -141,17 +184,43 @@ export function useListbox(options: UseListboxOptions) {
         }
         switch (event.key) {
             case 'ArrowDown':
-                pointer.value = Math.min(pointer.value + 1, listLength() - 1);
+                if (clearHighlighted.value) {
+                    // Leaving the clear entry downward: first option — or stay when the
+                    // list is empty (the entry is then the only thing to highlight).
+                    if (listLength() > 0) {
+                        clearActive.value = false;
+                        pointer.value = 0;
+                    }
+                } else if (pointer.value === -1 && (clearEntry?.() ?? false)) {
+                    // The clear entry owns the keyboard slot between "nothing" and index 0.
+                    highlightClear();
+                } else {
+                    clearActive.value = false;
+                    pointer.value = Math.min(pointer.value + 1, listLength() - 1);
+                }
                 event.preventDefault();
                 break;
             case 'ArrowUp':
-                pointer.value = Math.max(pointer.value - 1, -1);
+                if (clearHighlighted.value) {
+                    // Leaving the clear entry upward lands on "nothing highlighted".
+                    clearActive.value = false;
+                } else if (pointer.value === 0 && (clearEntry?.() ?? false)) {
+                    highlightClear();
+                } else {
+                    clearActive.value = false;
+                    pointer.value = Math.max(pointer.value - 1, -1);
+                }
                 event.preventDefault();
                 break;
             case 'Enter':
-                // The commit callback owns the read-through-a-local race guard and the close
-                // decision; it reports whether it committed, and only a real commit swallows Enter.
-                if (onCommit(pointer.value)) event.preventDefault();
+                // The commit callbacks own the read-through-a-local race guard and the close
+                // decision; they report whether they committed, and only a real commit
+                // swallows Enter.
+                if (clearHighlighted.value) {
+                    if (onClearCommit?.() ?? false) event.preventDefault();
+                } else if (onCommit(pointer.value)) {
+                    event.preventDefault();
+                }
                 break;
             case 'Escape':
                 onDismiss();
@@ -170,7 +239,7 @@ export function useListbox(options: UseListboxOptions) {
     onMounted(() => document.addEventListener('click', onDocumentPointer));
     onBeforeUnmount(() => document.removeEventListener('click', onDocumentPointer));
 
-    const {floatingStyles} = useFloating(reference, floating, {
+    const {floatingStyles, middlewareData} = useFloating(reference, floating, {
         placement: floatingOptions.placement ?? 'bottom-start',
         middleware: [
             offset(floatingOptions.offset ?? 4),
@@ -181,5 +250,29 @@ export function useListbox(options: UseListboxOptions) {
         whileElementsMounted: autoUpdate,
     });
 
-    return {open, pointer, listboxId, optionId, activeDescendant, floatingStyles, onKey, close};
+    // hide() only COMPUTES `middlewareData.hide.referenceHidden` — consuming it is the
+    // caller's job, and for a long stretch nobody did (the middleware sat dead and an open
+    // menu stayed painted, floating detached, while its trigger scrolled out of a clipping
+    // ancestor — under a sticky header, say). The gate lives here so every consumer gets it:
+    // when the reference is fully clipped away, the popup hides with it.
+    const gatedFloatingStyles = computed<CSSProperties>(() =>
+        middlewareData.value.hide?.referenceHidden
+            ? {...floatingStyles.value, visibility: 'hidden'}
+            : floatingStyles.value,
+    );
+
+    return {
+        open,
+        pointer,
+        listboxId,
+        optionId,
+        activeDescendant,
+        floatingStyles: gatedFloatingStyles,
+        onKey,
+        close,
+        clearHighlighted,
+        clearId,
+        highlightClear,
+        resetHighlight,
+    };
 }
