@@ -91,6 +91,32 @@ Models an **array of option ids**. Committing an option toggles its membership a
 </FormField>
 ```
 
+### The checkbox family
+
+`Checkbox`, `Switch`, `CheckboxGroup`, and `RadioGroup` sit on a **native input chassis** — a real `<input type="checkbox">` / `<input type="radio">` restyled through the same `--ui-*` contract, never a div-with-role — so keyboard and assistive-tech behaviour come from the platform. The radio group's arrow-key selection below is the **browser's own** roving focus; the component hand-rolls none of it.
+
+<ClientOnly>
+<div class="ui-demo">
+<Checkbox id="demo-terms" v-model="accepted" label="Accept the terms" />
+<p class="ui-demo__state">Model value: <code>{{ JSON.stringify(accepted) }}</code></p>
+<Switch id="demo-notify" v-model="notifications" label="Email notifications" />
+<p class="ui-demo__state">Model value: <code>{{ JSON.stringify(notifications) }}</code></p>
+<CheckboxGroup id="demo-extras" v-model="extraIds" :options="toppings" option-label="name" label="Extras" />
+<p class="ui-demo__state">Model value: <code>{{ JSON.stringify(extraIds) }}</code> — kept in options order, not click order</p>
+<RadioGroup id="demo-size" v-model="size" :options="sizes" option-label="name" label="Size" required />
+<p class="ui-demo__state">Model value: <code>{{ size === null ? 'null' : JSON.stringify(size) }}</code></p>
+</div>
+</ClientOnly>
+
+```vue
+<Checkbox id="terms" v-model="accepted" label="Accept the terms" />
+<Switch id="notify" v-model="notifications" label="Email notifications" />
+<CheckboxGroup id="extras" v-model="extraIds" :options="toppings" option-label="name" label="Extras" />
+<RadioGroup id="size" v-model="size" :options="sizes" option-label="name" label="Size" required />
+```
+
+`Checkbox` and `Switch` model a **non-nullable `boolean`** — a checkbox is never "empty", unchecked _is_ `false` (the one deliberate exception to the family's nullable-model rule). `Checkbox` additionally takes `indeterminate` as a **prop**, mirrored onto the element's DOM property and drawn as a dash — purely visual, it never touches the model.
+
 ### Composing with FormField — error state
 
 `FormField` wires label, control, and error together (ids, `aria-describedby`, invalid flag) through its slot scope. The error is **a prop, never a service** — resolve the message in your app and pass it down. Clear the field below to see the invalid treatment appear:
@@ -119,6 +145,10 @@ Models an **array of option ids**. Committing an option toggles its membership a
 | `NumberInput`             | Native `number` input; owns the `NaN` → `null` empty-value guard                                                             |
 | `DateInput`               | Native `date` input with ISO `min` / `max` bounds                                                                            |
 | `Textarea`                | Native `textarea` with `rows`                                                                                                |
+| `Checkbox`                | Native checkbox, visually restyled; non-nullable `boolean` model, `indeterminate` as a visual prop                           |
+| `CheckboxGroup`           | Fieldset/legend group of checkboxes — models an array of option ids in **options order**                                     |
+| `Switch`                  | The checkbox chassis with `role="switch"` — an on/off toggle with a themeable track + thumb                                  |
+| `RadioGroup`              | Fieldset/legend radio group (`role="radiogroup"`) — models `T['id'] \| null`; **native** roving focus + arrow-key selection  |
 | `SingleSelect`            | Accessible button-triggered listbox, generic over your option type                                                           |
 | `Combobox`                | Accessible searchable/filtering single-select; exposes an imperative `focus()` handle                                        |
 | `MultiSelect`             | Accessible multi-value select — models an array of option ids; toggle-in-place listbox, inline chip bar with per-chip remove |
@@ -177,9 +207,36 @@ They differ in what they model:
 | `Combobox`     | `T['id'] \| null` | Text-input trigger that filters options; `focus()` exposed for imperative focus         |
 | `MultiSelect`  | `T['id'][]`       | Toggle-in-place commits, chip bar, `removeLabel` prop (default `'Remove'`, localisable) |
 
+### The checkbox family
+
+`Checkbox` and `Switch` share `id` (required), `label` (inline label text; the default slot overrides it for rich content), `disabled`, `required`, `invalid`, and `describedby`. Both model a **non-nullable `boolean`**. `Checkbox` adds `indeterminate` (visual prop → the element's DOM property). Native `required` is never set — `aria-required` is the conveyance, as everywhere in the family.
+
+`CheckboxGroup` and `RadioGroup` are generic over `T extends SelectItem` and render a chrome-less `<fieldset>` with a `<legend>`:
+
+| Prop            | Type          | Default        | Notes                                                                                       |
+| --------------- | ------------- | -------------- | ------------------------------------------------------------------------------------------- |
+| `options`       | `T[]`         | —              | Required. Rendered in the given order — groups never sort                                   |
+| `optionLabel`   | `LabelKey<T>` | —              | Required. The family's display resolver — named `optionLabel` because `label` is the legend |
+| `label`         | `string`      | —              | Required. The group legend                                                                  |
+| `id`            | `string`      | —              | Required. On the fieldset, the base for position-keyed member ids, and (radios) the `name`  |
+| `disabled`      | `boolean`     | `false`        | Threaded to every member                                                                    |
+| `required`      | `boolean`     | `false`        | Group-level conveyance — see below                                                          |
+| `invalid`       | `boolean`     | `false`        | `aria-invalid` on the fieldset; members mirror the invalid styling                          |
+| `describedby`   | `string`      | —              | **One story:** the error IDREF lives on the fieldset only — members never repeat it         |
+| `requiredLabel` | `string`      | `'(required)'` | `CheckboxGroup` only — screen-reader-only required text in the legend, localisable          |
+
+They differ in what they model, mirroring the select family:
+
+| Component       | Model             | Required conveyance                                                                                                                      |
+| --------------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `CheckboxGroup` | `T['id'][]`       | Legend marker + sr-only `requiredLabel` — ARIA forbids `aria-required` on `role=group`, so the legend text is the group-level conveyance |
+| `RadioGroup`    | `T['id'] \| null` | `aria-required` on the fieldset — it carries `role="radiogroup"`, which legitimately supports the attribute                              |
+
+`CheckboxGroup` keeps its array in **options order** (not click order); an id whose option has not arrived yet (async options) is preserved at the tail. `RadioGroup`'s radios share one generated `name` (the group id), so the **browser** provides the roving tabindex and arrow-key selection — the component only mirrors the model from the native `change` event.
+
 ### Attribute fall-through
 
-Props the components do not declare — `name`, `autocomplete`, `inputmode`, `data-*`, … — fall through to the underlying native control via Vue's attribute inheritance. You do not need a declared prop to make a field participate in autofill or a native form post.
+Props the components do not declare — `name`, `autocomplete`, `inputmode`, `data-*`, … — fall through to the underlying native control via Vue's attribute inheritance. You do not need a declared prop to make a field participate in autofill or a native form post. (`Checkbox` and `Switch` re-aim attrs at the native **input** — their root is the wrapping `<label>`.)
 
 ## Theming — the `--ui-*` contract
 
@@ -192,6 +249,8 @@ The variable surface groups into:
 - **Listbox menu** — `--ui-menu-bg`, `--ui-menu-border-width`, `--ui-menu-border-color`, `--ui-menu-radius`, `--ui-menu-pad`, `--ui-menu-shadow`, `--ui-menu-max-height`
 - **Option** — `--ui-option-radius`, `--ui-option-pad`, `--ui-option-bg-active`
 - **Chip** (MultiSelect) — `--ui-chip-bg`, `--ui-chip-text`, `--ui-chip-radius`, `--ui-chip-pad`, each defaulting to an existing resting token so chips are neutral until you opt in
+- **Check** (Checkbox / CheckboxGroup / RadioGroup) — `--ui-check-size`, `--ui-check-border-width` (shorthand-valued, like the control's), `--ui-check-border-color`, `--ui-check-bg`, `--ui-check-bg-checked`, `--ui-check-mark-color`, `--ui-check-radius`, `--ui-check-gap` (control ↔ label), `--ui-check-item-gap` (group rows) — every colour default derives from an existing resting token (`--ui-control-bg`, `--ui-control-border-color`, `--ui-control-border-open`), so your token map themes the family with no new mappings
+- **Switch** — `--ui-switch-track-width`, `--ui-switch-track-height`, `--ui-switch-track-radius`, `--ui-switch-track-bg`, `--ui-switch-track-bg-checked`, `--ui-switch-thumb-size`, `--ui-switch-thumb-bg` — the thumb travels track-width − track-height, so geometry stays coherent under any override
 - **Error / danger** — `--ui-danger-text`, `--ui-danger-border`, `--ui-danger-shadow`, `--ui-error-size`, `--ui-error-weight`
 
 The shipped `styles.css` is the authoritative list — every variable is declared there with its default.
@@ -392,12 +451,12 @@ Let integration tests (`mount`) own real composition. Two more test-surface note
 
 ### What the package does not cover
 
-No checkbox, radio, switch, file, or range atoms; no date _picker_ (`DateInput` wraps the native control); no headless combobox-_input_ primitive; no imperative focus handle on `TextInput` (only `Combobox` exposes `focus()`). When you need one of these, inline native markup inside `FormField`'s slot — the slot hands you `controlId`, `describedby`, and `invalid`, so a native control composes with the label/error chrome without waiting on a package atom.
+No file or range atoms; no date _picker_ (`DateInput` wraps the native control); no headless combobox-_input_ primitive; no imperative focus handle on `TextInput` (only `Combobox` exposes `focus()`). When you need one of these, inline native markup inside `FormField`'s slot — the slot hands you `controlId`, `describedby`, and `invalid`, so a native control composes with the label/error chrome without waiting on a package atom.
 
 <script setup lang="ts">
 import {computed, ref} from 'vue';
 
-import {Combobox, FormField, MultiSelect, SingleSelect, TextInput} from '../../packages/ui-inputs/src/index';
+import {Checkbox, CheckboxGroup, Combobox, FormField, MultiSelect, RadioGroup, SingleSelect, Switch, TextInput} from '../../packages/ui-inputs/src/index';
 
 import '../../packages/ui-inputs/styles.css';
 
@@ -427,9 +486,20 @@ const toppings = [
     {id: 'whipped-cream', name: 'Whipped cream'},
 ];
 
+const sizes = [
+    {id: 'small', name: 'Small'},
+    {id: 'medium', name: 'Medium'},
+    {id: 'large', name: 'Large'},
+];
+
 const fruit = ref<string | null>(null);
 const city = ref<string | null>(null);
 const toppingIds = ref<string[]>([]);
+
+const accepted = ref(false);
+const notifications = ref(true);
+const extraIds = ref<string[]>(['sprinkles']);
+const size = ref<string | null>(null);
 
 const email = ref<string | null>('you@example.com');
 const emailError = computed(() => (email.value ? undefined : 'The email field is required.'));

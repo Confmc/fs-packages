@@ -11,9 +11,12 @@ import {render} from 'vitest-browser-vue';
 import {userEvent} from 'vitest/browser';
 import {defineComponent, h, ref} from 'vue';
 
+import Checkbox from '../../src/components/Checkbox.vue';
 import Combobox from '../../src/components/Combobox.vue';
 import MultiSelect from '../../src/components/MultiSelect.vue';
+import RadioGroup from '../../src/components/RadioGroup.vue';
 import SingleSelect from '../../src/components/SingleSelect.vue';
+import Switch from '../../src/components/Switch.vue';
 import TextInput from '../../src/components/TextInput.vue';
 import '../../styles.css';
 
@@ -240,5 +243,83 @@ describe('MultiSelect — chips, toggle-stays-open, Backspace', () => {
 
         await userEvent.keyboard('{Backspace}'); // empty model: no-op, no throw
         expect(model.value).toEqual([]);
+    });
+});
+
+describe('RadioGroup — NATIVE roving focus and arrow-key selection', () => {
+    it('Tab enters the group, real arrow keys move focus AND selection, the model follows change', async () => {
+        // The component hand-rolls no keyboard code — this walk proves the browser provides
+        // the radio-group roving (shared `name`) and that the model mirrors the native
+        // change events the arrows fire. Only a real browser can prove this: happy-dom
+        // implements no radio roving at all.
+        const model = renderControlled<number | null>(RadioGroup, null, {optionLabel: 'name', label: 'Fruit'});
+        const radioAt = (index: number) => document.getElementById(`fruit-opt-${index}`) as HTMLInputElement;
+
+        await userEvent.tab();
+        expect(document.activeElement).toBe(radioAt(0)); // first radio takes the group's tab stop
+        expect(model.value).toBeNull(); // focus alone selects nothing
+
+        await userEvent.keyboard('{ArrowDown}'); // native: moves focus AND checks the next radio
+        expect(document.activeElement).toBe(radioAt(1));
+        expect(model.value).toBe(FRUITS[1].id);
+
+        await userEvent.keyboard('{ArrowRight}'); // horizontal arrows rove too
+        expect(document.activeElement).toBe(radioAt(2));
+        expect(model.value).toBe(FRUITS[2].id);
+
+        await userEvent.keyboard('{ArrowUp}');
+        expect(document.activeElement).toBe(radioAt(1));
+        expect(model.value).toBe(FRUITS[1].id);
+    });
+
+    it('the checked radio is the single tab stop — Tab leaves the rest of the group alone', async () => {
+        renderControlled<number | null>(RadioGroup, FRUITS[2].id, {optionLabel: 'name', label: 'Fruit'});
+        const checked = document.getElementById('fruit-opt-2') as HTMLInputElement;
+
+        await userEvent.tab();
+        expect(document.activeElement).toBe(checked); // roving tabindex: straight to the checked one
+
+        await userEvent.tab();
+        // One tab stop per group: the next Tab exits rather than visiting the siblings.
+        expect(document.activeElement?.getAttribute('type')).not.toBe('radio');
+    });
+});
+
+describe('checkbox family — disabled controls genuinely receive no events', () => {
+    it('a forced real click on a disabled Checkbox never checks it', async () => {
+        const model = renderControlled<boolean>(Checkbox, false, {options: undefined, label: 'Accept', disabled: true});
+        const input = document.getElementById('fruit') as HTMLInputElement;
+        expect(input.matches(':disabled')).toBe(true);
+
+        await userEvent.click(input, {force: true});
+        expect(input.checked).toBe(false);
+        expect(model.value).toBe(false);
+    });
+
+    it('real Tab skips a disabled Switch; keyboard input cannot reach it', async () => {
+        const model = renderControlled<boolean>(Switch, false, {
+            options: undefined,
+            label: 'Notifications',
+            disabled: true,
+        });
+        const input = document.getElementById('fruit') as HTMLInputElement;
+
+        await userEvent.tab();
+        expect(document.activeElement).not.toBe(input);
+        await userEvent.keyboard(' ');
+        expect(model.value).toBe(false);
+    });
+
+    it('an enabled Switch toggles with a real keyboard Space', async () => {
+        const model = renderControlled<boolean>(Switch, false, {options: undefined, label: 'Notifications'});
+        const input = document.getElementById('fruit') as HTMLInputElement;
+
+        await userEvent.tab();
+        expect(document.activeElement).toBe(input);
+
+        await userEvent.keyboard(' ');
+        expect(model.value).toBe(true);
+        await userEvent.keyboard(' ');
+        expect(model.value).toBe(false);
     });
 });
