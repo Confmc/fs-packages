@@ -1,0 +1,550 @@
+# ui-inputs
+
+Headless, themeable Vue 3 form input components, styled entirely through `--ui-*` CSS custom properties.
+
+`ui-inputs` opens the `ui-*` family: where `fs-*` packages are frontend **services**, `ui-*` packages are shared **UI components**. The components ship no token vocabulary and no hard-coded brand colour — you map your design tokens onto the `--ui-*` contract once, and every component follows. Soft and rounded or hard and brutalist, light or dark, from one component set.
+
+```bash
+npm install @script-development/ui-inputs
+```
+
+**Peer dependency:** `vue ^3.5.40`
+
+Import the stylesheet once (e.g. in your app entry):
+
+```typescript
+import '@script-development/ui-inputs/style.css';
+```
+
+## Live Demo
+
+Every control below is the real component, rendered by this page. The demo container maps a handful of `--ui-*` variables onto this site's own theme variables — which is exactly the adoption step your app performs with its design tokens (see [Theming](#theming-the-ui-contract)):
+
+```css
+.ui-demo {
+    --ui-control-bg: var(--vp-c-bg);
+    --ui-control-text: var(--vp-c-text-1);
+    --ui-control-border-color: var(--vp-c-divider);
+    --ui-menu-bg: var(--vp-c-bg-elv);
+    /* … */
+}
+```
+
+That is the whole trick: the components read variables, the consumer supplies values. Toggle this site's dark mode — the controls follow, because the mapped tokens do.
+
+### SingleSelect
+
+A button-triggered, keyboard-navigable listbox, generic over your option type. Open it with click, <kbd>Enter</kbd>, <kbd>Space</kbd>, or the arrow keys; navigation is announced to assistive tech via `aria-activedescendant`.
+
+<ClientOnly>
+<div class="ui-demo">
+<FormField id="demo-fruit" label="Fruit" #default="{controlId, describedby, invalid}">
+<SingleSelect :id="controlId" v-model="fruit" :options="fruits" label="name" :invalid="invalid" :describedby="describedby" />
+</FormField>
+<p class="ui-demo__state">Model value: <code>{{ fruit === null ? 'null' : JSON.stringify(fruit) }}</code></p>
+</div>
+</ClientOnly>
+
+```vue
+<FormField id="fruit" label="Fruit" #default="{controlId, describedby, invalid}">
+    <SingleSelect :id="controlId" v-model="fruit" :options="fruits" label="name" :invalid="invalid" :describedby="describedby" />
+</FormField>
+```
+
+### Combobox
+
+The searchable single-select: a text input that filters the listbox as you type. On <kbd>Escape</kbd>, <kbd>Tab</kbd>, or a click outside, the input snaps back to the committed label — a half-typed non-match never lingers. Try typing `ma`:
+
+<ClientOnly>
+<div class="ui-demo">
+<FormField id="demo-city" label="City" #default="{controlId, describedby, invalid}">
+<Combobox :id="controlId" v-model="city" :options="cities" label="name" :invalid="invalid" :describedby="describedby" />
+</FormField>
+<p class="ui-demo__state">Model value: <code>{{ city === null ? 'null' : JSON.stringify(city) }}</code></p>
+</div>
+</ClientOnly>
+
+```vue
+<FormField id="city" label="City" #default="{controlId, describedby, invalid}">
+    <Combobox :id="controlId" v-model="city" :options="cities" label="name" :invalid="invalid" :describedby="describedby" />
+</FormField>
+```
+
+`Combobox` also exposes an imperative `focus()` handle via a template ref (`box.value?.focus()`) — the piece a focus-trap or command-palette integration needs.
+
+### MultiSelect
+
+Models an **array of option ids**. Committing an option toggles its membership and the listbox stays open, so picking several values is one open/close cycle. Committed values render as chips with per-chip remove buttons; <kbd>Backspace</kbd> on the focused trigger pops the last value.
+
+<ClientOnly>
+<div class="ui-demo">
+<FormField id="demo-toppings" label="Toppings" #default="{controlId, describedby, invalid}">
+<MultiSelect :id="controlId" v-model="toppingIds" :options="toppings" label="name" :invalid="invalid" :describedby="describedby" />
+</FormField>
+<p class="ui-demo__state">Model value: <code>{{ JSON.stringify(toppingIds) }}</code></p>
+</div>
+</ClientOnly>
+
+```vue
+<FormField id="toppings" label="Toppings" #default="{controlId, describedby, invalid}">
+    <MultiSelect :id="controlId" v-model="toppingIds" :options="toppings" label="name" :invalid="invalid" :describedby="describedby" />
+</FormField>
+```
+
+### Composing with FormField — error state
+
+`FormField` wires label, control, and error together (ids, `aria-describedby`, invalid flag) through its slot scope. The error is **a prop, never a service** — resolve the message in your app and pass it down. Clear the field below to see the invalid treatment appear:
+
+<ClientOnly>
+<div class="ui-demo">
+<FormField id="demo-email" label="Email" required :error="emailError" #default="{controlId, describedby, invalid}">
+<TextInput :id="controlId" v-model="email" type="email" placeholder="you@example.com" :invalid="invalid" :describedby="describedby" />
+</FormField>
+</div>
+</ClientOnly>
+
+```vue
+<FormField id="email" label="Email" required :error="errors.email" #default="{controlId, describedby, invalid}">
+    <TextInput :id="controlId" v-model="email" type="email" :invalid="invalid" :describedby="describedby" />
+</FormField>
+```
+
+## Components
+
+| Component                 | Purpose                                                                                                                      |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `FormField`               | Label + error + required-marker composition wrapper (error-as-prop)                                                          |
+| `FormLabel` / `FormError` | The atoms `FormField` composes — usable standalone                                                                           |
+| `TextInput`               | Native `text` / `email` / `password` / `search` / `tel` / `url` input                                                        |
+| `NumberInput`             | Native `number` input; owns the `NaN` → `null` empty-value guard                                                             |
+| `DateInput`               | Native `date` input with ISO `min` / `max` bounds                                                                            |
+| `Textarea`                | Native `textarea` with `rows`                                                                                                |
+| `SingleSelect`            | Accessible button-triggered listbox, generic over your option type                                                           |
+| `Combobox`                | Accessible searchable/filtering single-select; exposes an imperative `focus()` handle                                        |
+| `MultiSelect`             | Accessible multi-value select — models an array of option ids; toggle-in-place listbox, inline chip bar with per-chip remove |
+
+Two types complete the public surface: `SelectItem` (`{id: string | number}` — the minimal shape every option must satisfy) and `LabelKey<T>` (`keyof T | ((option: T) => string)` — how to derive an option's display string).
+
+## Contracts
+
+### FormField
+
+| Prop       | Type      | Default | Notes                                                                   |
+| ---------- | --------- | ------- | ----------------------------------------------------------------------- |
+| `id`       | `string`  | —       | Required. Stable control id — pass `useId()` if you have no natural one |
+| `label`    | `string`  | —       | Omit for an unlabelled field                                            |
+| `required` | `boolean` | `false` | Renders the required marker and threads `required` to the slot          |
+| `error`    | `string`  | —       | Resolved error string (error-as-prop); renders `FormError` when present |
+
+The default slot receives `{controlId, errorId, required, invalid, describedby}` — spread them onto the control as shown in the demos, and the label/error/aria wiring is complete.
+
+### Text-like inputs
+
+`TextInput`, `DateInput`, and `Textarea` model `string | null`; `NumberInput` models `number | null`. All four share `id` (required), `disabled`, `required`, `invalid`, and `describedby` props, plus:
+
+| Component     | Extra props                         | Model            | Emits on clear |
+| ------------- | ----------------------------------- | ---------------- | -------------- |
+| `TextInput`   | `type`, `placeholder`               | `string \| null` | `''`           |
+| `NumberInput` | `min`, `max`, `step`, `placeholder` | `number \| null` | `null`         |
+| `DateInput`   | `min`, `max` (ISO `YYYY-MM-DD`)     | `string \| null` | `''`           |
+| `Textarea`    | `rows`, `placeholder`               | `string \| null` | `''`           |
+
+See [Nullable values](#nullable-values) for why the models are nullable and what each input emits when cleared.
+
+### The select family
+
+`SingleSelect`, `Combobox`, and `MultiSelect` share one generic contract (`<T extends SelectItem>`):
+
+| Prop               | Type          | Default        | Notes                                                              |
+| ------------------ | ------------- | -------------- | ------------------------------------------------------------------ |
+| `options`          | `T[]`         | —              | Required                                                           |
+| `label`            | `LabelKey<T>` | —              | Required. Property name or getter for an option's display string   |
+| `id`               | `string`      | —              | Required. Pairs the trigger with a label/error                     |
+| `placeholder`      | `string`      | `'Select…'`    |                                                                    |
+| `disabled`         | `boolean`     | `false`        |                                                                    |
+| `alphabeticalSort` | `boolean`     | `true`         | Sorts rendered options by display string                           |
+| `required`         | `boolean`     | `false`        | Conveyed via `aria-required`                                       |
+| `invalid`          | `boolean`     | `false`        | Invalid styling + `aria-invalid`                                   |
+| `describedby`      | `string`      | —              | Id of the paired error element                                     |
+| `emptyText`        | `string`      | `'No options'` | Shown when the (filtered) list is empty                            |
+| `optionsLabel`     | `string`      | `'Options'`    | Accessible name for the listbox popup — a prop so you can localise |
+
+They differ in what they model:
+
+| Component      | Model             | Extras                                                                                  |
+| -------------- | ----------------- | --------------------------------------------------------------------------------------- |
+| `SingleSelect` | `T['id'] \| null` | —                                                                                       |
+| `Combobox`     | `T['id'] \| null` | Text-input trigger that filters options; `focus()` exposed for imperative focus         |
+| `MultiSelect`  | `T['id'][]`       | Toggle-in-place commits, chip bar, `removeLabel` prop (default `'Remove'`, localisable) |
+
+### Attribute fall-through
+
+Props the components do not declare — `name`, `autocomplete`, `inputmode`, `data-*`, … — fall through to the underlying native control via Vue's attribute inheritance. You do not need a declared prop to make a field participate in autofill or a native form post.
+
+## Theming — the `--ui-*` contract
+
+Every visual rule in the shipped stylesheet keys on a `--ui-*` custom property — colours **and structure**: `--ui-control-border-width`, `--ui-control-radius`, `--ui-control-shadow`, `--ui-label-transform`, and so on. The defaults are declared under `:where(:root)`, carrying zero specificity, so any selector you write overrides them. Remap under `:root` for an app-wide theme, or under any scoping selector for a per-section theme.
+
+The variable surface groups into:
+
+- **Field / label** — `--ui-field-gap`, `--ui-field-margin`, `--ui-label-color`, `--ui-label-size`, `--ui-label-weight`, `--ui-label-transform`, `--ui-label-tracking`
+- **Control** (inputs + select triggers) — `--ui-control-bg`, `--ui-control-text`, `--ui-control-text-muted`, `--ui-control-border-width`, `--ui-control-border-color`, `--ui-control-border-open`, `--ui-control-radius`, `--ui-control-pad-x`, `--ui-control-pad-y`, `--ui-control-shadow`, `--ui-control-shadow-hover`, `--ui-control-bg-disabled`, `--ui-focus-ring`, `--ui-control-font-size`
+- **Listbox menu** — `--ui-menu-bg`, `--ui-menu-border-width`, `--ui-menu-border-color`, `--ui-menu-radius`, `--ui-menu-pad`, `--ui-menu-shadow`, `--ui-menu-max-height`
+- **Option** — `--ui-option-radius`, `--ui-option-pad`, `--ui-option-bg-active`
+- **Chip** (MultiSelect) — `--ui-chip-bg`, `--ui-chip-text`, `--ui-chip-radius`, `--ui-chip-pad`, each defaulting to an existing resting token so chips are neutral until you opt in
+- **Error / danger** — `--ui-danger-text`, `--ui-danger-border`, `--ui-danger-shadow`, `--ui-error-size`, `--ui-error-weight`
+
+The shipped `styles.css` is the authoritative list — every variable is declared there with its default.
+
+### Structural variables take shorthand values
+
+`--ui-control-border-width` feeds a `border-width` declaration, so it accepts the full shorthand grammar. An underline-only field style — no side or top borders — is one line:
+
+```css
+:root {
+    --ui-control-border-width: 0 0 1px; /* bottom border only */
+    --ui-control-radius: 0;
+}
+```
+
+`--ui-field-margin` is likewise a full `margin` shorthand (default `0 0 1.25rem`). This is what makes the contract _structural_: radically different field shapes are variable maps, not CSS overrides.
+
+### State-variant hooks
+
+Each interactive state has background/text/border hooks. Every hook **defaults to its resting counterpart**, so the contract is a no-op until you opt in:
+
+| Var                               | Fires on         | Default                          |
+| --------------------------------- | ---------------- | -------------------------------- |
+| `--ui-control-bg-focus`           | `:focus-visible` | `var(--ui-control-bg)`           |
+| `--ui-control-text-focus`         | `:focus-visible` | `var(--ui-control-text)`         |
+| `--ui-control-border-color-focus` | `:focus-visible` | `var(--ui-control-border-color)` |
+| `--ui-control-border-width-focus` | `:focus-visible` | `var(--ui-control-border-width)` |
+| `--ui-control-bg-invalid`         | `.is-invalid`    | `var(--ui-control-bg)`           |
+| `--ui-control-text-invalid`       | `.is-invalid`    | `var(--ui-control-text)`         |
+
+The `.is-open` and `.is-invalid` state classes follow `:focus-visible` in source order, so they keep winning their border/background — the focus hooks only take effect on a plain focused control.
+
+### Typography escape hatch
+
+`--ui-control-font-size` (default `inherit`) sizes control text. The control's `font` is decomposed into longhands — all inheriting except size — so `font-size` reads from this variable rather than from a consumer utility class, which would otherwise lose the source-order tie against the package stylesheet.
+
+## Two Themes, One Component Set
+
+The centerpiece of the contract: the panels below render **the same components, bound to the same state** — select a fruit in one panel and the other follows. Only the `--ui-*` map differs. Note this is not just palette: border width, radius, shadow shape, label casing, and chip geometry all diverge.
+
+<ClientOnly>
+<div class="demo-theme-compare">
+<div class="demo-theme-panel demo-soft">
+<p class="demo-theme-title">Soft</p>
+<FormField id="soft-name" label="Full name" required :error="themeNameError" #default="{controlId, describedby, invalid}">
+<TextInput :id="controlId" v-model="themeName" placeholder="Ada Lovelace" :invalid="invalid" :describedby="describedby" />
+</FormField>
+<FormField id="soft-fruit" label="Favourite fruit" #default="{controlId, describedby, invalid}">
+<SingleSelect :id="controlId" v-model="themeFruit" :options="fruits" label="name" :invalid="invalid" :describedby="describedby" />
+</FormField>
+<FormField id="soft-toppings" label="Toppings" #default="{controlId, describedby, invalid}">
+<MultiSelect :id="controlId" v-model="themeToppingIds" :options="toppings" label="name" :invalid="invalid" :describedby="describedby" />
+</FormField>
+</div>
+<div class="demo-theme-panel demo-brutalist">
+<p class="demo-theme-title">Brutalist</p>
+<FormField id="hard-name" label="Full name" required :error="themeNameError" #default="{controlId, describedby, invalid}">
+<TextInput :id="controlId" v-model="themeName" placeholder="Ada Lovelace" :invalid="invalid" :describedby="describedby" />
+</FormField>
+<FormField id="hard-fruit" label="Favourite fruit" #default="{controlId, describedby, invalid}">
+<SingleSelect :id="controlId" v-model="themeFruit" :options="fruits" label="name" :invalid="invalid" :describedby="describedby" />
+</FormField>
+<FormField id="hard-toppings" label="Toppings" #default="{controlId, describedby, invalid}">
+<MultiSelect :id="controlId" v-model="themeToppingIds" :options="toppings" label="name" :invalid="invalid" :describedby="describedby" />
+</FormField>
+</div>
+</div>
+</ClientOnly>
+
+The two maps, in full — each is nothing but variable assignments:
+
+::: code-group
+
+```css [soft.css]
+.demo-soft {
+    --ui-label-color: #6b7280;
+    --ui-label-size: 0.8125rem;
+    --ui-control-bg: #f9fafb;
+    --ui-control-bg-focus: #ffffff; /* state-variant hook in action */
+    --ui-control-text: #1f2937;
+    --ui-control-border-color: #e5e7eb;
+    --ui-control-border-color-focus: #a5b4fc;
+    --ui-control-border-open: #6366f1;
+    --ui-control-radius: 14px;
+    --ui-control-shadow: inset 0 1px 2px rgba(17, 24, 39, 0.04);
+    --ui-focus-ring: 0 0 0 4px rgba(99, 102, 241, 0.18);
+    --ui-menu-bg: #ffffff;
+    --ui-menu-border-color: #e5e7eb;
+    --ui-menu-radius: 14px;
+    --ui-menu-shadow: 0 12px 32px rgba(17, 24, 39, 0.12);
+    --ui-option-radius: 10px;
+    --ui-option-bg-active: #eef2ff;
+    --ui-chip-bg: #eef2ff;
+    --ui-chip-text: #4338ca;
+    --ui-chip-radius: 999px;
+}
+```
+
+```css [brutalist.css]
+.demo-brutalist {
+    --ui-label-color: #111111;
+    --ui-label-size: 0.75rem;
+    --ui-label-weight: 700;
+    --ui-label-transform: uppercase;
+    --ui-label-tracking: 0.08em;
+    --ui-control-bg: #ffffff;
+    --ui-control-text: #111111;
+    --ui-control-border-width: 2px;
+    --ui-control-border-color: #111111;
+    --ui-control-border-open: #111111;
+    --ui-control-radius: 0;
+    --ui-control-shadow: 4px 4px 0 #111111;
+    --ui-control-shadow-hover: 4px 4px 0 #111111;
+    --ui-focus-ring: 0 0 0 3px #ffd43b;
+    --ui-menu-bg: #ffffff;
+    --ui-menu-border-width: 2px;
+    --ui-menu-border-color: #111111;
+    --ui-menu-radius: 0;
+    --ui-menu-shadow: 8px 8px 0 #111111;
+    --ui-option-radius: 0;
+    --ui-option-bg-active: #ffd43b;
+    --ui-chip-bg: #111111;
+    --ui-chip-text: #ffffff;
+    --ui-chip-radius: 0;
+    --ui-danger-text: #c2255c;
+    --ui-danger-border: #c2255c;
+    --ui-danger-shadow: 4px 4px 0 #c2255c;
+}
+```
+
+:::
+
+## Adoption Playbook
+
+Lessons from live adoptions, distilled. Following these keeps an adoption to a few hours instead of a few days.
+
+### Map tokens, never bake hex
+
+Write **one** token map that assigns your design system's variables to the `--ui-*` contract:
+
+```css
+:root {
+    --ui-control-bg: var(--app-surface);
+    --ui-control-text: var(--app-text-primary);
+    --ui-control-border-color: var(--app-border);
+    --ui-danger-text: rgb(var(--app-danger-rgb));
+    /* … */
+}
+```
+
+Never copy resolved hex values into the map. When the map points at your tokens, everything your token layer already does — dark/light switching, density modes, per-tenant palettes — travels to the components **for free**. A map of baked hex values freezes one snapshot of your theme and silently detaches from every future token change.
+
+### One map per app in a multi-design-system codebase
+
+If one repository serves multiple apps with different design languages, write **one map per app, colocated with that app** — and keep any shared/unbranded layer free of design-system-specific maps. The maps will usually differ in palette but agree in structure; that is the contract working as intended. A single "shared" map naming several design systems couples layers that are deliberately separate.
+
+### Keep your components as thin adapters
+
+Adopting does not mean rewriting every call site. The proven pattern: reshape your existing component (`AppSelect`, `BaseInput`, …) into a **thin adapter** over the ui-inputs atom — preserving your call-site API and absorbing any value-type or boolean impedance inside the adapter. Call sites stay untouched; the behaviour, a11y wiring, and theming migrate underneath them.
+
+### Nullable values
+
+Every text-like input models `string | null` and `NumberInput` models `number | null`, matching how a backend serialises a nullable column:
+
+- A `null` from the backend **binds directly** — the control renders empty. No `?? ''` at the call site; a smuggled fallback there hides real `null`s from your form logic.
+- Clearing a string input emits `''` (the raw native value). A Laravel backend's `ConvertEmptyStringsToNull` middleware maps that back to `null` on submit — the fleet convention.
+- `NumberInput` is the one exception: an empty number input emits `null` (not `NaN`, not `''`), since a `number` model can never hold `''` honestly. The `NaN` → `null` guard lives in the component — delete your local ones.
+- A field that is nullable on the wire but non-null in your domain (e.g. a quantity defaulting to 1) should use a **decoupled local ref** coerced at submit time — widen the local form state, never the wire type.
+
+### The accessibility model
+
+The select family keeps DOM focus on the trigger and conveys the keyboard-focused option via `aria-activedescendant`, so arrow-key navigation is announced rather than silent. The wiring, so you know what you are getting:
+
+- The trigger carries `role="combobox"`, `aria-haspopup="listbox"`, `aria-expanded`, and `aria-controls` while open (the IDREF only resolves inside the listbox it owns).
+- Option ids are **position-keyed** (`${id}-opt-${index}`) — derived from the option's position in the rendered list, not from `option.id`, so a non-unique or whitespace-containing id can never break the IDREF linkage.
+- `aria-selected` marks the **committed** value, never the option under the keyboard pointer — keyboard/hover focus stays visual (`.is-active`) plus `aria-activedescendant`; selection only moves on <kbd>Enter</kbd> or click.
+- `MultiSelect`'s listbox is `aria-multiselectable="true"`; `aria-selected` marks membership, and every chip's remove button carries an accessible name (`"${removeLabel} ${label}"`).
+- `required` and `invalid` are conveyed via `aria-required` / `aria-invalid`; pair `describedby` with the error element's id — `FormField` does all of this for you.
+
+Preserve this model when writing adapters: pass `id`, `invalid`, and `describedby` through, don't re-create them.
+
+### Errors are a prop, never a service
+
+The components never import an error service. Resolve the message in your app — from a validation-error bag, a translation layer, wherever — and pass `error` (to `FormField`) or `invalid` + `describedby` (to the inputs). This keeps the package agnostic to how your app produces validation errors, and composes cleanly with [fs-form](/packages/form)'s 422 error bag.
+
+### Testing in a consumer (`shallowMount` architectures)
+
+Because the atoms live inside `FormField`'s scoped slot, a codebase whose unit tests standardise on `shallowMount` needs a targeted unstub to reach the real controls:
+
+```typescript
+shallowMount(MyFormSection, {global: {stubs: {FormField: false, TextInput: false, SingleSelect: false}}});
+```
+
+Let integration tests (`mount`) own real composition. Two more test-surface notes:
+
+- `findComponent(SingleSelect)` trips TypeScript on the generic component object — use `findComponent({name: 'SingleSelect'})` instead.
+- Don't copy the package's internal `required || undefined` idiom into a call site where `required` is constant-true — on a branch-coverage-gated codebase that's a permanently dead branch. Bind the literal.
+
+### What the package does not cover
+
+No checkbox, radio, switch, file, or range atoms; no date _picker_ (`DateInput` wraps the native control); no headless combobox-_input_ primitive; no imperative focus handle on `TextInput` (only `Combobox` exposes `focus()`). When you need one of these, inline native markup inside `FormField`'s slot — the slot hands you `controlId`, `describedby`, and `invalid`, so a native control composes with the label/error chrome without waiting on a package atom.
+
+<script setup lang="ts">
+import {computed, ref} from 'vue';
+
+import {Combobox, FormField, MultiSelect, SingleSelect, TextInput} from '../../packages/ui-inputs/src/index';
+
+import '../../packages/ui-inputs/styles.css';
+
+const fruits = [
+    {id: 'apple', name: 'Apple'},
+    {id: 'banana', name: 'Banana'},
+    {id: 'cherry', name: 'Cherry'},
+    {id: 'dragonfruit', name: 'Dragonfruit'},
+    {id: 'elderberry', name: 'Elderberry'},
+];
+
+const cities = [
+    {id: 'ams', name: 'Amsterdam'},
+    {id: 'ber', name: 'Berlin'},
+    {id: 'lis', name: 'Lisbon'},
+    {id: 'mad', name: 'Madrid'},
+    {id: 'osl', name: 'Oslo'},
+    {id: 'pra', name: 'Prague'},
+    {id: 'rom', name: 'Rome'},
+    {id: 'vie', name: 'Vienna'},
+];
+
+const toppings = [
+    {id: 'caramel', name: 'Caramel'},
+    {id: 'hazelnut', name: 'Hazelnut'},
+    {id: 'sprinkles', name: 'Sprinkles'},
+    {id: 'whipped-cream', name: 'Whipped cream'},
+];
+
+const fruit = ref<string | null>(null);
+const city = ref<string | null>(null);
+const toppingIds = ref<string[]>([]);
+
+const email = ref<string | null>('you@example.com');
+const emailError = computed(() => (email.value ? undefined : 'The email field is required.'));
+
+const themeName = ref<string | null>(null);
+const themeNameError = computed(() => (themeName.value === null ? undefined : themeName.value ? undefined : 'The full name field is required.'));
+const themeFruit = ref<string | null>('apple');
+const themeToppingIds = ref<string[]>(['caramel', 'sprinkles']);
+</script>
+
+<style>
+/* Demo containers — the --ui-* map onto this site's own theme tokens. */
+.ui-demo {
+    --ui-control-bg: var(--vp-c-bg);
+    --ui-control-bg-disabled: var(--vp-c-bg-soft);
+    --ui-control-text: var(--vp-c-text-1);
+    --ui-control-text-muted: var(--vp-c-text-2);
+    --ui-control-border-color: var(--vp-c-divider);
+    --ui-control-border-open: var(--vp-c-brand-1);
+    --ui-focus-ring: 0 0 0 3px var(--vp-c-brand-soft);
+    --ui-label-color: var(--vp-c-text-1);
+    --ui-menu-bg: var(--vp-c-bg-elv);
+    --ui-menu-border-color: var(--vp-c-divider);
+    --ui-option-bg-active: var(--vp-c-default-soft);
+    --ui-field-margin: 0;
+    padding: 1.5rem;
+    border: 1px solid var(--vp-c-divider);
+    border-radius: 8px;
+    background: var(--vp-c-bg-soft);
+    margin: 1rem 0;
+}
+.ui-demo__state {
+    margin: 0.75rem 0 0;
+    font-size: 0.8125rem;
+    color: var(--vp-c-text-2);
+}
+
+/* The two-theme comparison. Each panel commits to a light rendering deliberately —
+   the themes are the demo, not the site's dark/light mode. */
+.demo-theme-compare {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin: 1rem 0;
+}
+.demo-theme-panel {
+    flex: 1 1 280px;
+    min-width: 0;
+    padding: 1.5rem;
+    border: 1px solid var(--vp-c-divider);
+    border-radius: 8px;
+}
+.demo-theme-title {
+    margin: 0 0 1rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--vp-c-text-2);
+}
+
+.demo-soft {
+    background: #fafbff;
+    --ui-label-color: #6b7280;
+    --ui-label-size: 0.8125rem;
+    --ui-control-bg: #f9fafb;
+    --ui-control-bg-focus: #ffffff;
+    --ui-control-text: #1f2937;
+    --ui-control-text-muted: #9ca3af;
+    --ui-control-border-color: #e5e7eb;
+    --ui-control-border-color-focus: #a5b4fc;
+    --ui-control-border-open: #6366f1;
+    --ui-control-radius: 14px;
+    --ui-control-shadow: inset 0 1px 2px rgba(17, 24, 39, 0.04);
+    --ui-focus-ring: 0 0 0 4px rgba(99, 102, 241, 0.18);
+    --ui-menu-bg: #ffffff;
+    --ui-menu-border-color: #e5e7eb;
+    --ui-menu-radius: 14px;
+    --ui-menu-shadow: 0 12px 32px rgba(17, 24, 39, 0.12);
+    --ui-option-radius: 10px;
+    --ui-option-bg-active: #eef2ff;
+    --ui-chip-bg: #eef2ff;
+    --ui-chip-text: #4338ca;
+    --ui-chip-radius: 999px;
+}
+
+.demo-brutalist {
+    background: #fffdf5;
+    --ui-label-color: #111111;
+    --ui-label-size: 0.75rem;
+    --ui-label-weight: 700;
+    --ui-label-transform: uppercase;
+    --ui-label-tracking: 0.08em;
+    --ui-control-bg: #ffffff;
+    --ui-control-text: #111111;
+    --ui-control-text-muted: #6b7280;
+    --ui-control-border-width: 2px;
+    --ui-control-border-color: #111111;
+    --ui-control-border-open: #111111;
+    --ui-control-radius: 0;
+    --ui-control-shadow: 4px 4px 0 #111111;
+    --ui-control-shadow-hover: 4px 4px 0 #111111;
+    --ui-focus-ring: 0 0 0 3px #ffd43b;
+    --ui-menu-bg: #ffffff;
+    --ui-menu-border-width: 2px;
+    --ui-menu-border-color: #111111;
+    --ui-menu-radius: 0;
+    --ui-menu-shadow: 8px 8px 0 #111111;
+    --ui-option-radius: 0;
+    --ui-option-bg-active: #ffd43b;
+    --ui-chip-bg: #111111;
+    --ui-chip-text: #ffffff;
+    --ui-chip-radius: 0;
+    --ui-danger-text: #c2255c;
+    --ui-danger-border: #c2255c;
+    --ui-danger-shadow: 4px 4px 0 #c2255c;
+}
+</style>
