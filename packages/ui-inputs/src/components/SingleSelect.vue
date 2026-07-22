@@ -24,30 +24,22 @@
             </svg>
         </button>
 
-        <ul
+        <OptionList
             v-if="open"
-            :id="listboxId"
-            ref="floating"
-            class="ui-select__menu"
-            role="listbox"
-            :aria-label="optionsLabel"
-            :style="floatingStyles"
-        >
-            <li v-if="!options.length" class="ui-select__empty">{{ emptyText }}</li>
-            <li
-                v-for="(option, index) in sorted"
-                :id="optionId(index)"
-                :key="String(option.id)"
-                class="ui-select__option"
-                :class="{'is-active': pointer === index}"
-                role="option"
-                :aria-selected="option.id === model"
-                @mouseover="pointer = index"
-                @click="choose(option)"
-            >
-                {{ labelOf(option) }}
-            </li>
-        </ul>
+            ref="menu"
+            variant="ui-select"
+            :labels="optionLabels"
+            :keys="optionKeys"
+            :pointer="pointer"
+            :listbox-id="listboxId"
+            :option-id="optionId"
+            :is-selected="isSelected"
+            :floating-styles="floatingStyles"
+            :options-label="optionsLabel"
+            :empty-text="emptyText"
+            @hover="pointer = $event"
+            @commit="commit"
+        />
     </div>
 </template>
 
@@ -57,6 +49,8 @@ import {computed, useTemplateRef} from 'vue';
 import type {LabelKey, SelectItem} from '../types';
 
 import {useListbox} from '../composables/useListbox';
+import {componentEl} from '../internal/reactivity';
+import OptionList from './OptionList.vue';
 
 const {
     options,
@@ -101,11 +95,32 @@ const sorted = computed(() =>
     alphabeticalSort ? [...options].sort((a, b) => labelOf(a).localeCompare(labelOf(b))) : options,
 );
 
+// The index-based view OptionList renders — parallel arrays derived from `sorted`, which
+// stays the single list every index (pointer, commit, aria) is keyed against.
+const optionLabels = computed(() => sorted.value.map(labelOf));
+const optionKeys = computed(() => sorted.value.map((option) => String(option.id)));
+/** `aria-selected` marks the COMMITTED value — OptionList only asks about rendered indices. */
+const isSelected = (index: number): boolean => sorted.value[index].id === model.value;
+
 const root = useTemplateRef<HTMLElement>('root');
 const reference = useTemplateRef<HTMLElement>('reference');
-const floating = useTemplateRef<HTMLElement>('floating');
+// OptionList's root <ul>, derived from the instance's `$el` (null while closed) — the family
+// keeps `defineExpose` off internal plumbing, see `componentEl`.
+const menu = useTemplateRef<InstanceType<typeof OptionList>>('menu');
+const floating = componentEl(menu);
 
-const {open, pointer, listboxId, optionId, activeDescendant, floatingStyles, onKey} = useListbox({
+// Both keyboard (Enter via useListbox) and pointer (OptionList `commit`) funnel through this
+// one guard. Read through a local rather than indexing blind: the clamp watcher normally keeps
+// `pointer` in range, but a keypress landing between an `options` change and the watcher flush
+// would otherwise index off the end.
+const commit = (index: number): boolean => {
+    const highlighted = sorted.value[index];
+    if (!highlighted) return false;
+    choose(highlighted);
+    return true;
+};
+
+const {open, pointer, listboxId, optionId, activeDescendant, floatingStyles, onKey, close} = useListbox({
     root,
     reference,
     floating,
@@ -114,15 +129,7 @@ const {open, pointer, listboxId, optionId, activeDescendant, floatingStyles, onK
     listLength: () => sorted.value.length,
     // A closed SingleSelect opens on Enter, ArrowDown, or Space.
     openKeys: (key) => ['Enter', 'ArrowDown', ' '].includes(key),
-    onCommit: (index) => {
-        // Read through a local rather than indexing blind: the clamp watcher normally keeps
-        // `pointer` in range, but a keypress landing between an `options` change and the
-        // watcher flush would otherwise index off the end.
-        const highlighted = sorted.value[index];
-        if (!highlighted) return false;
-        choose(highlighted);
-        return true;
-    },
+    onCommit: commit,
     onDismiss: () => close(),
     onOutside: () => close(),
 });
@@ -130,11 +137,7 @@ const {open, pointer, listboxId, optionId, activeDescendant, floatingStyles, onK
 const toggle = () => {
     open.value = !open.value;
 };
-const close = () => {
-    open.value = false;
-    pointer.value = -1;
-};
-const choose = (option: T) => {
+const choose = (option: T): void => {
     model.value = option.id;
     close();
 };

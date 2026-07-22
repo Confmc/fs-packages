@@ -22,30 +22,22 @@
             @click="onClick"
         />
 
-        <ul
+        <OptionList
             v-if="open"
-            :id="listboxId"
-            ref="floating"
-            class="ui-combobox__menu"
-            role="listbox"
-            :aria-label="optionsLabel"
-            :style="floatingStyles"
-        >
-            <li v-if="!filtered.length" class="ui-combobox__empty">{{ emptyText }}</li>
-            <li
-                v-for="(option, index) in filtered"
-                :id="optionId(index)"
-                :key="String(option.id)"
-                class="ui-combobox__option"
-                :class="{'is-active': pointer === index}"
-                role="option"
-                :aria-selected="option.id === model"
-                @mouseover="pointer = index"
-                @click="choose(option)"
-            >
-                {{ labelOf(option) }}
-            </li>
-        </ul>
+            ref="menu"
+            variant="ui-combobox"
+            :labels="optionLabels"
+            :keys="optionKeys"
+            :pointer="pointer"
+            :listbox-id="listboxId"
+            :option-id="optionId"
+            :is-selected="isSelected"
+            :floating-styles="floatingStyles"
+            :options-label="optionsLabel"
+            :empty-text="emptyText"
+            @hover="pointer = $event"
+            @commit="commit"
+        />
     </div>
 </template>
 
@@ -55,6 +47,8 @@ import {computed, ref, useTemplateRef, watch} from 'vue';
 import type {LabelKey, SelectItem} from '../types';
 
 import {useListbox} from '../composables/useListbox';
+import {componentEl, ensureRefValueExists} from '../internal/reactivity';
+import OptionList from './OptionList.vue';
 
 const {
     options,
@@ -112,13 +106,34 @@ const filtered = computed(() => {
     return alphabeticalSort ? [...matched].sort((a, b) => labelOf(a).localeCompare(labelOf(b))) : matched;
 });
 
+// The index-based view OptionList renders — parallel arrays derived from `filtered`, which
+// stays the single list every index (pointer, commit, aria) is keyed against.
+const optionLabels = computed(() => filtered.value.map(labelOf));
+const optionKeys = computed(() => filtered.value.map((option) => String(option.id)));
+/** `aria-selected` marks the COMMITTED value — OptionList only asks about rendered indices. */
+const isSelected = (index: number): boolean => filtered.value[index].id === model.value;
+
 const root = useTemplateRef<HTMLElement>('root');
 // The input is both the floating-ui reference and the target of the imperative focus
 // handle isms's command-palette focus trap (WR-0448) consumes.
 const input = useTemplateRef<HTMLInputElement>('input');
-const floating = useTemplateRef<HTMLElement>('floating');
+// OptionList's root <ul>, derived from the instance's `$el` (null while closed) — the family
+// keeps `defineExpose` off internal plumbing, see `componentEl`.
+const menu = useTemplateRef<InstanceType<typeof OptionList>>('menu');
+const floating = componentEl(menu);
 
-const {open, pointer, listboxId, optionId, activeDescendant, floatingStyles, onKey} = useListbox({
+// Both keyboard (Enter via useListbox) and pointer (OptionList `commit`) funnel through this
+// one guard. Read through a local rather than indexing blind: the clamp watcher normally keeps
+// `pointer` in range, but a keypress landing between a filter change and the watcher flush
+// would otherwise index off the end.
+const commit = (index: number): boolean => {
+    const highlighted = filtered.value[index];
+    if (!highlighted) return false;
+    choose(highlighted);
+    return true;
+};
+
+const {open, pointer, listboxId, optionId, activeDescendant, floatingStyles, onKey, close} = useListbox({
     root,
     reference: input,
     floating,
@@ -128,15 +143,7 @@ const {open, pointer, listboxId, optionId, activeDescendant, floatingStyles, onK
     // Only ArrowDown opens a closed list — a printable key must fall through to the input so
     // it can filter, so it is deliberately not an open key (never preventDefault-ed here).
     openKeys: (key) => key === 'ArrowDown',
-    onCommit: (index) => {
-        // Read through a local rather than indexing blind: the clamp watcher normally keeps
-        // `pointer` in range, but a keypress landing between a filter change and the watcher
-        // flush would otherwise index off the end.
-        const highlighted = filtered.value[index];
-        if (!highlighted) return false;
-        choose(highlighted);
-        return true;
-    },
+    onCommit: commit,
     onDismiss: () => dismiss(),
     onOutside: () => dismiss(),
 });
@@ -152,17 +159,13 @@ watch(selectedLabel, (label) => {
     if (!open.value) query.value = label;
 });
 
-const close = () => {
-    open.value = false;
-    pointer.value = -1;
-};
 // Snap the input back to the committed label so a half-typed non-match never survives a
 // close-without-commit (Escape, Tab, or a click outside the control).
-const dismiss = () => {
+const dismiss = (): void => {
     query.value = selectedLabel.value;
     close();
 };
-const choose = (option: T) => {
+const choose = (option: T): void => {
     model.value = option.id;
     query.value = labelOf(option);
     close();
@@ -180,5 +183,7 @@ const onClick = () => {
     open.value = true;
 };
 
-defineExpose({focus: () => input.value!.focus()});
+// The one sanctioned defineExpose: a PUBLIC imperative handle (isms WR-0448 focus trap).
+// The input is non-null by lifetime; the loud accessor names the assumption if it ever breaks.
+defineExpose({focus: () => ensureRefValueExists(input).focus()});
 </script>

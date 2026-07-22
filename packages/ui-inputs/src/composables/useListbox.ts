@@ -1,10 +1,31 @@
-import type {ShallowRef} from 'vue';
+import type {Placement} from '@floating-ui/vue';
+import type {Ref} from 'vue';
 
 import {autoUpdate, flip, hide, offset, shift, useFloating} from '@floating-ui/vue';
 import {computed, onBeforeUnmount, onMounted, ref, watch} from 'vue';
 
-/** A template ref as returned by `useTemplateRef` — a readonly shallow ref to the element or null. */
-type ElementRef = Readonly<ShallowRef<HTMLElement | null>>;
+import {ensureRefValueExists} from '../internal/reactivity';
+
+/**
+ * A readonly ref to the element or null — a `useTemplateRef` result, or a computed deriving
+ * the element from a child component's exposed handle (the `OptionList` case).
+ */
+type ElementRef = Readonly<Ref<HTMLElement | null>>;
+
+/**
+ * Overrides for the floating-ui layout policy. Every value defaults to the family standard,
+ * so the knob is a no-op until a consumer opts in.
+ */
+export interface ListboxFloatingOptions {
+    /** floating-ui placement of the popup (default `'bottom-start'`). */
+    placement?: Placement;
+    /** `offset()` main-axis distance between reference and popup, in px (default `4`). */
+    offset?: number;
+    /** `flip()` fallback placements tried when the primary placement overflows (default `['top-start']`). */
+    fallbackPlacements?: Placement[];
+    /** `shift()` viewport padding, in px (default `8`). */
+    shiftPadding?: number;
+}
 
 export interface UseListboxOptions {
     /** the component root — click-outside is measured against it. */
@@ -32,6 +53,8 @@ export interface UseListboxOptions {
     onDismiss: () => void;
     /** click-outside disposition. SingleSelect closes; Combobox reverts-then-closes. */
     onOutside: () => void;
+    /** floating-ui layout-policy overrides — layout is the caller's business, not the core's. */
+    floatingOptions?: ListboxFloatingOptions;
 }
 
 /**
@@ -42,10 +65,32 @@ export interface UseListboxOptions {
  * clamp watcher, click-outside, floating-ui, and the keyboard-nav skeleton.
  */
 export function useListbox(options: UseListboxOptions) {
-    const {root, reference, floating, id, disabled, listLength, openKeys, onCommit, onDismiss, onOutside} = options;
+    const {
+        root,
+        reference,
+        floating,
+        id,
+        disabled,
+        listLength,
+        openKeys,
+        onCommit,
+        onDismiss,
+        onOutside,
+        floatingOptions = {},
+    } = options;
 
     const open = ref(false);
     const pointer = ref(-1);
+
+    // The one dismissal step every consumer needs: close the list AND reset the highlight.
+    // Owned here so a future consumer cannot forget the `-1` — a stale pointer would resurface
+    // as a phantom highlight (and a phantom aria-activedescendant) on the next open. The
+    // composable still never calls this on commit: closing after a commit stays the caller's
+    // decision (`onCommit` — the MultiSelect toggle-and-stay-open contract).
+    const close = () => {
+        open.value = false;
+        pointer.value = -1;
+    };
 
     // Keyboard focus lives on the trigger, so the focused option is conveyed to assistive
     // tech via aria-activedescendant rather than real DOM focus. That IDREF only resolves
@@ -118,16 +163,23 @@ export function useListbox(options: UseListboxOptions) {
     // click-outside — closes/reverts without a shared directive dependency.
     const onDocumentPointer = (event: MouseEvent) => {
         // The listener is attached only between mount and unmount, so the ref is non-null here.
-        if (!root.value!.contains(event.target as Node)) onOutside();
+        // Non-null by lifetime (the listener only exists while mounted) — loud, named accessor
+        // over a bare `!`: the same impossible state throws, but names the broken assumption.
+        if (!ensureRefValueExists(root).contains(event.target as Node)) onOutside();
     };
     onMounted(() => document.addEventListener('click', onDocumentPointer));
     onBeforeUnmount(() => document.removeEventListener('click', onDocumentPointer));
 
     const {floatingStyles} = useFloating(reference, floating, {
-        placement: 'bottom-start',
-        middleware: [offset(4), flip({fallbackPlacements: ['top-start']}), shift({padding: 8}), hide()],
+        placement: floatingOptions.placement ?? 'bottom-start',
+        middleware: [
+            offset(floatingOptions.offset ?? 4),
+            flip({fallbackPlacements: floatingOptions.fallbackPlacements ?? ['top-start']}),
+            shift({padding: floatingOptions.shiftPadding ?? 8}),
+            hide(),
+        ],
         whileElementsMounted: autoUpdate,
     });
 
-    return {open, pointer, listboxId, optionId, activeDescendant, floatingStyles, onKey};
+    return {open, pointer, listboxId, optionId, activeDescendant, floatingStyles, onKey, close};
 }
