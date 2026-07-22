@@ -26,6 +26,9 @@ npm install @script-development/fs-translation
 # Domain (Vue required)
 npm install @script-development/fs-adapter-store
 npm install @script-development/fs-router
+
+# UI Components (Vue required)
+npm install @script-development/ui-inputs
 ```
 
 ## Your First Service

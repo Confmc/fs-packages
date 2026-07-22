@@ -65,6 +65,14 @@ Higher-level packages for domain-driven application architecture.
 | [fs-adapter-store](/packages/adapter-store) | Reactive state management with CRUD resource adapters         |
 | [fs-router](/packages/router)               | Type-safe router with CRUD navigation and middleware pipeline |
 
+### UI Components
+
+Headless, themeable Vue components (the `ui-*` family) — behaviour and accessibility in the package, all styling through a CSS custom-property contract you map your design tokens onto.
+
+| Package                          | Description                                                                                                                       |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| [ui-inputs](/packages/ui-inputs) | Headless form inputs — field/label/error, text/number/date/textarea, select/combobox/multi-select — themed via `--ui-*` variables |
+
 ## Quality Guarantees
 
 Every package passes an 8-gate CI pipeline before it can be published:
