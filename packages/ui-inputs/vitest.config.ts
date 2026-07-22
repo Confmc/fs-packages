@@ -14,7 +14,9 @@ export default defineProject({
         // The browser-mode layer (vitest.browser.config.ts — real Chromium, run via the root
         // `test:browser` script) names its specs `*.browser.spec.ts`, which the default include
         // glob would otherwise sweep into this happy-dom project on the root `vitest run`.
-        exclude: [...configDefaults.exclude, 'tests/browser/**'],
+        // Leftover Stryker sandboxes (crash-abandoned .stryker-tmp/) are likewise a full
+        // package copy of the specs — carried from the pre-`test.projects` root config.
+        exclude: [...configDefaults.exclude, 'tests/browser/**', '**/.stryker-tmp/**'],
         coverage: {
             provider: 'v8',
             // Stricter than the service-package siblings (which cover `.ts` only):
