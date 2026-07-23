@@ -276,9 +276,17 @@ const dismiss = (): void => {
     close();
 };
 
-/** Per-chip remove — drops one committed id; never touches `open`. */
+// Per-chip remove — drops one committed id. Removal unmounts the focused remove button,
+// which would drop document.activeElement to the body — refocus the input (the APG chip
+// treatment; same move `commit()` makes for the pointer path). The refocus must not TOGGLE
+// the list, though: focus() fires the input's open-on-focus handler synchronously, so the
+// prior open-state is restored before Vue paints (chip remove ≠ open, and removing while
+// the list is open must not close it either).
 const remove = (value: T['id']): void => {
     model.value = model.value.filter((member) => member !== value);
+    const wasOpen = open.value;
+    ensureRefValueExists(input).focus();
+    open.value = wasOpen;
 };
 /** Backspace with an EMPTY query pops the LAST committed value (no-op when empty). */
 const popLast = (): void => {

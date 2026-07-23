@@ -66,7 +66,8 @@ const Harness = defineComponent({
 
 const lastFloatingConfig = () => vi.mocked(useFloating).mock.calls.at(-1)?.[2];
 
-const key = (name: string): KeyboardEvent => new KeyboardEvent('keydown', {key: name, cancelable: true});
+const key = (name: string, modifiers?: KeyboardEventInit): KeyboardEvent =>
+    new KeyboardEvent('keydown', {key: name, cancelable: true, ...modifiers});
 
 describe('useListbox floating options', () => {
     it('applies the family layout policy by default (bottom-start, offset 4, top-start flip, shift 8)', () => {
@@ -166,6 +167,24 @@ describe('useListbox Home/End (WR-0521)', () => {
         expect(api.pointer.value).toBe(-1);
         expect(api.activeDescendant.value).toBeUndefined();
         expect(home.defaultPrevented).toBe(true);
+        wrapper.unmount();
+    });
+
+    it('modified Home/End (Shift/Ctrl/Meta) fall through to native text-selection — never swallowed', () => {
+        const wrapper = mount(Harness, {props: {overrides: {listLength: () => 3}}});
+
+        api.open.value = true;
+        api.onKey(key('ArrowDown')); // highlight option 0 so a wrongly-taken arm would move it
+        expect(api.pointer.value).toBe(0);
+
+        for (const modifiers of [{shiftKey: true}, {ctrlKey: true}, {metaKey: true}, {shiftKey: true, ctrlKey: true}]) {
+            for (const name of ['Home', 'End']) {
+                const event = key(name, modifiers);
+                api.onKey(event);
+                expect(api.pointer.value).toBe(0); // highlight untouched
+                expect(event.defaultPrevented).toBe(false); // native selection/caret editing preserved
+            }
+        }
         wrapper.unmount();
     });
 

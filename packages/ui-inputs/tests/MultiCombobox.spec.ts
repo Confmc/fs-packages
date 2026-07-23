@@ -193,6 +193,21 @@ describe('MultiCombobox', () => {
         await chips[0].find('.ui-multicombobox__chip-remove').trigger('click');
         expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[2]]);
         expect(wrapper.find('.ui-multicombobox__menu').exists()).toBe(false); // chip remove ≠ open
+        // Removal unmounts the focused button — focus must land on the input, not the body
+        // (#185 review Minor: the APG chip treatment).
+        expect(document.activeElement).toBe(wrapper.find('input').element);
+    });
+
+    it('removing a chip while the list is open keeps it open — the refocus never toggles the list', async () => {
+        const wrapper = mountMultiCombobox({modelValue: [1, 2]});
+
+        await wrapper.find('input').trigger('focus');
+        expect(wrapper.find('.ui-multicombobox__menu').exists()).toBe(true);
+
+        await wrapper.find('.ui-multicombobox__chip-remove').trigger('click');
+        expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[2]]);
+        expect(wrapper.find('.ui-multicombobox__menu').exists()).toBe(true); // stays open
+        expect(document.activeElement).toBe(wrapper.find('input').element);
     });
 
     it('pops the last committed value on Backspace ONLY while the query is empty, and no-ops on an empty model', async () => {

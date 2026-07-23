@@ -217,9 +217,13 @@ export function useListbox(options: UseListboxOptions) {
                 // WR-0521: jump to the first/last option. APG marks Home/End optional on
                 // editable comboboxes (they trade away caret jumps while the popup is open);
                 // the family takes the option-jump reading uniformly — one skeleton, four
-                // controls. A clear-entry highlight drops (the jump lands on an OPTION);
-                // an empty list leaves the highlight untouched, but the key is still
-                // swallowed while open (consistent modality with the arrow keys).
+                // controls. The option-jump reading belongs to UNMODIFIED keys only:
+                // Shift/Ctrl/Meta variants are text-SELECTION shortcuts on the input-triggered
+                // controls' query field and must fall through to native editing (#185 review).
+                if (event.shiftKey || event.ctrlKey || event.metaKey) return;
+                // A clear-entry highlight drops (the jump lands on an OPTION); an empty list
+                // leaves the highlight untouched, but the unmodified key is still swallowed
+                // while open (consistent modality with the arrow keys).
                 if (listLength() > 0) {
                     clearActive.value = false;
                     pointer.value = event.key === 'Home' ? 0 : listLength() - 1;
