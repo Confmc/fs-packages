@@ -18,6 +18,7 @@ import Checkbox from '../../src/components/Checkbox.vue';
 import CheckboxGroup from '../../src/components/CheckboxGroup.vue';
 import Combobox from '../../src/components/Combobox.vue';
 import FormField from '../../src/components/FormField.vue';
+import MultiCombobox from '../../src/components/MultiCombobox.vue';
 import MultiSelect from '../../src/components/MultiSelect.vue';
 import RadioGroup from '../../src/components/RadioGroup.vue';
 import SingleSelect from '../../src/components/SingleSelect.vue';
@@ -139,6 +140,20 @@ describe('axe-core audits — zero violations, closed and open', () => {
 
         await userEvent.click(document.getElementById('fruit') as HTMLElement);
         expect(document.querySelector('.ui-multiselect__menu')).not.toBeNull();
+        await expectNoViolations(screen.container);
+    });
+
+    it('FormField + MultiCombobox, closed with chips and open with a typed filter', async () => {
+        const model = ref<number[]>([2]);
+        const screen = renderInField((slot) =>
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFC in a render-fn host
+            h(MultiCombobox as any, {...selectProps(slot), modelValue: model.value, 'onUpdate:modelValue': noop}),
+        );
+        await expectNoViolations(screen.container);
+
+        await userEvent.click(document.getElementById('fruit') as HTMLElement);
+        await userEvent.keyboard('a{ArrowDown}');
+        expect(document.querySelector('.ui-multicombobox__menu')).not.toBeNull();
         await expectNoViolations(screen.container);
     });
 

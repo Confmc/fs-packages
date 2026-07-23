@@ -186,7 +186,8 @@
    .is-invalid, so those state classes keep winning their properties over focus exactly as
    they do over :focus-visible on the sibling controls. */
 .ui-control:focus-visible,
-.ui-multiselect__box:focus-within {
+.ui-multiselect__box:focus-within,
+.ui-multicombobox__box:focus-within {
     outline: none;
     color: var(--ui-control-text-focus);
     background: var(--ui-control-bg-focus);
@@ -208,10 +209,11 @@
 .ui-textarea {
     resize: vertical;
 }
-/* The MultiSelect box is a div, so :disabled cannot match it — the component mirrors the
-   state as .is-disabled (every focusable child inside carries the native :disabled). */
+/* The MultiSelect/MultiCombobox box is a div, so :disabled cannot match it — the component
+   mirrors the state as .is-disabled (every focusable child inside carries the native :disabled). */
 .ui-control:disabled,
-.ui-multiselect__box.is-disabled {
+.ui-multiselect__box.is-disabled,
+.ui-multicombobox__box.is-disabled {
     background: var(--ui-control-bg-disabled);
     color: var(--ui-control-text-muted);
     box-shadow: none;
@@ -220,7 +222,8 @@
 
 .ui-select,
 .ui-combobox,
-.ui-multiselect {
+.ui-multiselect,
+.ui-multicombobox {
     position: relative;
 }
 .ui-select__trigger {
@@ -244,16 +247,19 @@
     transform: rotate(180deg);
 }
 
-/* MultiSelect — the control chrome sits on the flex box; the chips and the (chrome-less,
-   flex-filling) trigger button live inside it, so clicking the empty part of the chip bar
-   is clicking the trigger. */
-.ui-multiselect__box {
+/* MultiSelect / MultiCombobox — the control chrome sits on the flex box; the chips and the
+   (chrome-less, flex-filling) trigger — a button on MultiSelect, a text input on
+   MultiCombobox — live inside it, so clicking the empty part of the chip bar is clicking
+   the trigger. */
+.ui-multiselect__box,
+.ui-multicombobox__box {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 0.25rem;
 }
-.ui-multiselect__chip {
+.ui-multiselect__chip,
+.ui-multicombobox__chip {
     display: inline-flex;
     align-items: center;
     gap: 0.25rem;
@@ -263,7 +269,8 @@
     border-radius: var(--ui-chip-radius);
     font-size: 0.875em;
 }
-.ui-multiselect__chip-remove {
+.ui-multiselect__chip-remove,
+.ui-multicombobox__chip-remove {
     display: inline-flex;
     align-items: center;
     padding: 0;
@@ -273,12 +280,35 @@
     color: inherit;
     cursor: pointer;
 }
-.ui-multiselect__chip-remove:disabled {
+.ui-multiselect__chip-remove:disabled,
+.ui-multicombobox__chip-remove:disabled {
     cursor: not-allowed;
 }
-.ui-multiselect__chip-x {
+.ui-multiselect__chip-x,
+.ui-multicombobox__chip-x {
     width: 0.9em;
     height: 0.9em;
+}
+/* The MultiCombobox input-as-trigger: chrome-less and flex-filling (the box carries the
+   control chrome), like the MultiSelect trigger button — but an input, so the font must be
+   inherited explicitly and the caret keeps its text cursor. Focus is conveyed on the box
+   via :focus-within (rule above, with :focus-visible). */
+.ui-multicombobox__input {
+    flex: 1;
+    min-width: 6ch;
+    padding: 0;
+    margin: 0;
+    background: none;
+    border: none;
+    color: inherit;
+    font: inherit;
+    outline: none;
+}
+.ui-multicombobox__input::placeholder {
+    color: var(--ui-control-text-muted);
+}
+.ui-multicombobox__box.is-disabled .ui-multicombobox__input {
+    cursor: not-allowed;
 }
 .ui-multiselect__trigger {
     flex: 1;
@@ -304,10 +334,13 @@
     color: var(--ui-control-text-muted);
 }
 /* Screen-reader-only text (the clip pattern — display:none/visibility:hidden would remove it
-   from the accessibility tree, defeating its purpose). Shared by the MultiSelect trigger value
-   and the CheckboxGroup legend's required conveyance. */
+   from the accessibility tree, defeating its purpose). Shared by the MultiSelect trigger value,
+   the MultiCombobox selection summary, the CheckboxGroup legend's required conveyance, and the
+   select family's empty-results live region (WR-0521). */
 .ui-multiselect__sr-value,
-.ui-check-group__sr {
+.ui-multicombobox__sr-selection,
+.ui-check-group__sr,
+.ui-live-region {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -330,11 +363,12 @@
 }
 
 /* The listbox popup is shared verbatim across the button-triggered SingleSelect, the
-   text-input-triggered Combobox, and the chip-bar MultiSelect — one rule body, all three
-   class families, same --ui-* vars. */
+   text-input-triggered Combobox, the chip-bar MultiSelect, and the input-as-trigger
+   MultiCombobox — one rule body, all four class families, same --ui-* vars. */
 .ui-select__menu,
 .ui-combobox__menu,
-.ui-multiselect__menu {
+.ui-multiselect__menu,
+.ui-multicombobox__menu {
     list-style: none;
     margin: 0.25rem 0 0;
     padding: var(--ui-menu-pad);
@@ -355,7 +389,8 @@
 }
 .ui-select__option,
 .ui-combobox__option,
-.ui-multiselect__option {
+.ui-multiselect__option,
+.ui-multicombobox__option {
     padding: var(--ui-option-pad);
     border-radius: var(--ui-option-radius);
     cursor: pointer;
@@ -363,10 +398,11 @@
     min-height: var(--ui-option-min-height);
     box-sizing: border-box;
 }
-/* Committed MEMBERSHIP in the MultiSelect popup. Declared BEFORE the .is-active rule
-   (equal specificity) so the pointer highlight keeps winning its background — with the
+/* Committed MEMBERSHIP in the MultiSelect/MultiCombobox popup. Declared BEFORE the .is-active
+   rule (equal specificity) so the pointer highlight keeps winning its background — with the
    no-op defaults the combined rendering is byte-identical to the pre-var stylesheet. */
-.ui-multiselect__option[aria-selected='true'] {
+.ui-multiselect__option[aria-selected='true'],
+.ui-multicombobox__option[aria-selected='true'] {
     background: var(--ui-option-bg-selected);
     color: var(--ui-option-text-selected);
 }
@@ -374,12 +410,14 @@
    so a muted option stays muted while selected or under the pointer highlight. */
 .ui-select__option.is-muted,
 .ui-combobox__option.is-muted,
-.ui-multiselect__option.is-muted {
+.ui-multiselect__option.is-muted,
+.ui-multicombobox__option.is-muted {
     color: var(--ui-option-text-muted);
 }
 .ui-select__option.is-active,
 .ui-combobox__option.is-active,
-.ui-multiselect__option.is-active {
+.ui-multiselect__option.is-active,
+.ui-multicombobox__option.is-active {
     background: var(--ui-option-bg-active);
 }
 /* The committing clear entry — an option-shaped row above the list (outside the index
@@ -399,7 +437,8 @@
 }
 .ui-select__empty,
 .ui-combobox__empty,
-.ui-multiselect__empty {
+.ui-multiselect__empty,
+.ui-multicombobox__empty {
     padding: var(--ui-option-pad);
     color: var(--ui-control-text-muted);
 }

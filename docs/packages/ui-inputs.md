@@ -91,6 +91,25 @@ Models an **array of option ids**. Committing an option toggles its membership a
 </FormField>
 ```
 
+### MultiCombobox
+
+`MultiSelect`'s **searchable** sibling: the same array model, toggle-in-place commits, and chip bar — but the trigger is `Combobox`'s filter-as-you-type text input (the list opens on focus, click, or typing). On every toggle-commit the popup stays open, the query clears so the full list is re-offered, and focus returns to the input — so picking several values is type, <kbd>Enter</kbd>, type, <kbd>Enter</kbd>. <kbd>Backspace</kbd> with an empty query pops the last chip. Try typing `ca`:
+
+<ClientOnly>
+<div class="ui-demo">
+<FormField id="demo-tags" label="Toppings (searchable)" #default="{controlId, describedby, invalid}">
+<MultiCombobox :id="controlId" v-model="tagIds" :options="toppings" label="name" :invalid="invalid" :describedby="describedby" />
+</FormField>
+<p class="ui-demo__state">Model value: <code>{{ JSON.stringify(tagIds) }}</code></p>
+</div>
+</ClientOnly>
+
+```vue
+<FormField id="tags" label="Toppings (searchable)" #default="{controlId, describedby, invalid}">
+    <MultiCombobox :id="controlId" v-model="tagIds" :options="toppings" label="name" :invalid="invalid" :describedby="describedby" />
+</FormField>
+```
+
 ### The checkbox family
 
 `Checkbox`, `Switch`, `CheckboxGroup`, and `RadioGroup` sit on a **native input chassis** — a real `<input type="checkbox">` / `<input type="radio">` restyled through the same `--ui-*` contract, never a div-with-role — so keyboard and assistive-tech behaviour come from the platform. The radio group's arrow-key selection below is the **browser's own** roving focus; the component hand-rolls none of it.
@@ -152,6 +171,7 @@ Models an **array of option ids**. Committing an option toggles its membership a
 | `SingleSelect`            | Accessible button-triggered listbox, generic over your option type                                                           |
 | `Combobox`                | Accessible searchable/filtering single-select; exposes an imperative `focus()` handle                                        |
 | `MultiSelect`             | Accessible multi-value select — models an array of option ids; toggle-in-place listbox, inline chip bar with per-chip remove |
+| `MultiCombobox`           | Accessible **searchable** multi-value select — MultiSelect's model + chips with Combobox's filtering input as the trigger    |
 
 Two types complete the public surface: `SelectItem` (`{id: string | number}` — the minimal shape every option must satisfy) and `LabelKey<T>` (`keyof T | ((option: T) => string)` — how to derive an option's display string).
 
@@ -183,7 +203,7 @@ See [Nullable values](#nullable-values) for why the models are nullable and what
 
 ### The select family
 
-`SingleSelect`, `Combobox`, and `MultiSelect` share one generic contract (`<T extends SelectItem>`):
+`SingleSelect`, `Combobox`, `MultiSelect`, and `MultiCombobox` share one generic contract (`<T extends SelectItem>`):
 
 | Prop               | Type          | Default        | Notes                                                              |
 | ------------------ | ------------- | -------------- | ------------------------------------------------------------------ |
@@ -202,15 +222,16 @@ See [Nullable values](#nullable-values) for why the models are nullable and what
 
 They differ in what they model:
 
-| Component      | Model             | Extras                                                                                         |
-| -------------- | ----------------- | ---------------------------------------------------------------------------------------------- |
-| `SingleSelect` | `T['id'] \| null` | `clearLabel` / `emptyDisplayValue` (the committing clear entry — see below)                    |
-| `Combobox`     | `T['id'] \| null` | Text-input trigger that filters options; `focus()` exposed; `clearLabel` / `emptyDisplayValue` |
-| `MultiSelect`  | `T['id'][]`       | Toggle-in-place commits, chip bar, `removeLabel` prop (default `'Remove'`, localisable)        |
+| Component       | Model             | Extras                                                                                                                |
+| --------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `SingleSelect`  | `T['id'] \| null` | `clearLabel` / `emptyDisplayValue` (the committing clear entry — see below)                                           |
+| `Combobox`      | `T['id'] \| null` | Text-input trigger that filters options; `focus()` exposed; `clearLabel` / `emptyDisplayValue`                        |
+| `MultiSelect`   | `T['id'][]`       | Toggle-in-place commits, chip bar, `removeLabel` prop (default `'Remove'`, localisable)                               |
+| `MultiCombobox` | `T['id'][]`       | MultiSelect's extras + the filtering input trigger; `focus()` exposed; query clears + input refocuses on every commit |
 
 #### The `#option` scoped slot
 
-All three selects render each option's plain display string by default; the `option` slot
+All four selects render each option's plain display string by default; the `option` slot
 replaces that content with your own (colour swatches, icons, rich labels). The payload is
 `{option: T, index, selected, active}` — typed against your option type. Highlight and
 selection chrome (`.is-active`, `aria-selected`) stay on the option row, **outside the
@@ -492,7 +513,8 @@ The select family keeps DOM focus on the trigger and conveys the keyboard-focuse
 - The trigger carries `role="combobox"`, `aria-haspopup="listbox"`, `aria-expanded`, and `aria-controls` while open (the IDREF only resolves inside the listbox it owns).
 - Option ids are **position-keyed** (`${id}-opt-${index}`) — derived from the option's position in the rendered list, not from `option.id`, so a non-unique or whitespace-containing id can never break the IDREF linkage.
 - `aria-selected` marks the **committed** value, never the option under the keyboard pointer — keyboard/hover focus stays visual (`.is-active`) plus `aria-activedescendant`; selection only moves on <kbd>Enter</kbd> or click.
-- `MultiSelect`'s listbox is `aria-multiselectable="true"`; `aria-selected` marks membership, and every chip's remove button carries an accessible name (`"${removeLabel} ${label}"`).
+- `MultiSelect`'s and `MultiCombobox`'s listboxes are `aria-multiselectable="true"`; `aria-selected` marks membership, and every chip's remove button carries an accessible name (`"${removeLabel} ${label}"`). `MultiCombobox` additionally conveys the committed selection through an `aria-describedby` summary (its input's accessible value is the query).
+- <kbd>Home</kbd>/<kbd>End</kbd> jump the keyboard highlight to the first/last option while the listbox is open, and the empty state (`emptyText`) is announced through a persistent, visually-hidden `aria-live="polite"` region — a filtered list draining to nothing is never silent.
 - `required` and `invalid` are conveyed via `aria-required` / `aria-invalid`; pair `describedby` with the error element's id — `FormField` does all of this for you.
 
 Preserve this model when writing adapters: pass `id`, `invalid`, and `describedby` through, don't re-create them.
@@ -521,7 +543,7 @@ No file or range atoms; no date _picker_ (`DateInput` wraps the native control);
 <script setup lang="ts">
 import {computed, ref} from 'vue';
 
-import {Checkbox, CheckboxGroup, Combobox, FormField, MultiSelect, RadioGroup, SingleSelect, Switch, TextInput} from '../../packages/ui-inputs/src/index';
+import {Checkbox, CheckboxGroup, Combobox, FormField, MultiCombobox, MultiSelect, RadioGroup, SingleSelect, Switch, TextInput} from '../../packages/ui-inputs/src/index';
 
 import '../../packages/ui-inputs/styles.css';
 
@@ -560,6 +582,7 @@ const sizes = [
 const fruit = ref<string | null>(null);
 const city = ref<string | null>(null);
 const toppingIds = ref<string[]>([]);
+const tagIds = ref<string[]>([]);
 
 const accepted = ref(false);
 const notifications = ref(true);

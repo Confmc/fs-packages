@@ -26,6 +26,31 @@ afterEach(() => {
 });
 
 describe('MultiSelect', () => {
+    it('jumps to the first/last option on Home/End while open (WR-0521)', async () => {
+        const wrapper = mountMulti({});
+        const trigger = wrapper.find('.ui-multiselect__trigger');
+
+        await trigger.trigger('keydown', {key: 'ArrowDown'}); // open, pointer -1
+        await trigger.trigger('keydown', {key: 'End'});
+        expect(trigger.attributes('aria-activedescendant')).toBe('fruit-opt-2');
+        await trigger.trigger('keydown', {key: 'Home'});
+        expect(trigger.attributes('aria-activedescendant')).toBe('fruit-opt-0');
+    });
+
+    it('announces the empty state through the polite live region while open (WR-0521)', async () => {
+        const wrapper = mountMulti({emptyText: 'No match'});
+        const region = wrapper.find('[aria-live="polite"]');
+
+        expect(region.attributes('role')).toBe('status');
+        expect(region.text()).toBe(''); // closed → silent, options or not
+
+        await wrapper.find('.ui-multiselect__trigger').trigger('click');
+        expect(region.text()).toBe(''); // open with options → silent
+
+        await wrapper.setProps({options: []}); // drained while open → announced
+        expect(region.text()).toBe('No match');
+    });
+
     it('shows the placeholder and no menu until opened, then renders sorted options in a multiselectable listbox', async () => {
         const wrapper = mountMulti({placeholder: 'Pick some'});
 

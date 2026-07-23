@@ -140,6 +140,52 @@ describe('useListbox hide() visibility gate', () => {
     });
 });
 
+describe('useListbox Home/End (WR-0521)', () => {
+    it('End jumps to the last option and Home back to the first, both swallowing the key', () => {
+        const wrapper = mount(Harness, {props: {overrides: {listLength: () => 3}}});
+
+        api.open.value = true;
+        const end = key('End');
+        api.onKey(end);
+        expect(api.pointer.value).toBe(2);
+        expect(end.defaultPrevented).toBe(true);
+
+        const home = key('Home');
+        api.onKey(home);
+        expect(api.pointer.value).toBe(0);
+        expect(home.defaultPrevented).toBe(true);
+        wrapper.unmount();
+    });
+
+    it('an empty list leaves the highlight untouched but still swallows the key while open', () => {
+        const wrapper = mount(Harness); // listLength 0
+
+        api.open.value = true;
+        const home = key('Home');
+        api.onKey(home);
+        expect(api.pointer.value).toBe(-1);
+        expect(api.activeDescendant.value).toBeUndefined();
+        expect(home.defaultPrevented).toBe(true);
+        wrapper.unmount();
+    });
+
+    it('Home drops a clear-entry highlight and lands on the first OPTION', () => {
+        const wrapper = mount(Harness, {
+            props: {overrides: {clearEntry: () => true, onClearCommit: () => true, listLength: () => 2}},
+        });
+
+        api.open.value = true;
+        api.onKey(key('ArrowDown')); // "nothing" → the clear entry
+        expect(api.clearHighlighted.value).toBe(true);
+
+        api.onKey(key('Home'));
+        expect(api.clearHighlighted.value).toBe(false);
+        expect(api.pointer.value).toBe(0);
+        expect(api.activeDescendant.value).toBe('harness-opt-0');
+        wrapper.unmount();
+    });
+});
+
 describe('useListbox clear-entry option combinations', () => {
     // The components always pass `clearEntry` and `onClearCommit` together; the composable
     // treats them as independent optionals, so the decoupled combinations are pinned here.

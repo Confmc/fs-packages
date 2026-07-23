@@ -212,6 +212,20 @@ export function useListbox(options: UseListboxOptions) {
                 }
                 event.preventDefault();
                 break;
+            case 'Home':
+            case 'End':
+                // WR-0521: jump to the first/last option. APG marks Home/End optional on
+                // editable comboboxes (they trade away caret jumps while the popup is open);
+                // the family takes the option-jump reading uniformly — one skeleton, four
+                // controls. A clear-entry highlight drops (the jump lands on an OPTION);
+                // an empty list leaves the highlight untouched, but the key is still
+                // swallowed while open (consistent modality with the arrow keys).
+                if (listLength() > 0) {
+                    clearActive.value = false;
+                    pointer.value = event.key === 'Home' ? 0 : listLength() - 1;
+                }
+                event.preventDefault();
+                break;
             case 'Enter':
                 // The commit callbacks own the read-through-a-local race guard and the close
                 // decision; they report whether they committed, and only a real commit

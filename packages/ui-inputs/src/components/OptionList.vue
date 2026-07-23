@@ -101,7 +101,7 @@ const {
     /** floating-ui positioning styles for the popup. */
     floatingStyles: CSSProperties;
     /** class prefix of the owning control — the only visual divergence across the family. */
-    variant: 'ui-select' | 'ui-combobox' | 'ui-multiselect';
+    variant: 'ui-select' | 'ui-combobox' | 'ui-multiselect' | 'ui-multicombobox';
     /** accessible name for the listbox popup (`aria-label`). */
     optionsLabel: string;
     /** shown when `labels` is empty. */

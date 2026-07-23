@@ -12,5 +12,6 @@ export {default as RadioGroup} from './components/RadioGroup.vue';
 export {default as SingleSelect} from './components/SingleSelect.vue';
 export {default as Combobox} from './components/Combobox.vue';
 export {default as MultiSelect} from './components/MultiSelect.vue';
+export {default as MultiCombobox} from './components/MultiCombobox.vue';
 
 export type {SelectItem, LabelKey} from './types';
