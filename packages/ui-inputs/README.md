@@ -103,6 +103,11 @@ query shows everything. Arrow keys and Enter navigate/commit the **filtered** li
 shows the chosen label; on Escape, Tab, or a click outside the control the input snaps back to the
 committed label so a half-typed non-match never lingers.
 
+**Browse-to-change.** A query equal to the committed rendering (the committed option's label, or
+`emptyDisplayValue` on a committed null) does **not** filter — opening a filled combobox shows the
+full list, and the committed label sits fully selected so the first keystroke replaces it and starts
+a fresh filter. The filter engages only once the query diverges from the committed rendering.
+
 ```vue
 <FormField id="city" label="City" :error="errors.city" #default="{controlId, describedby, invalid}">
     <Combobox ref="cityBox" :id="controlId" v-model="city" :options="cities" label="name" :invalid="invalid" :describedby="describedby" />

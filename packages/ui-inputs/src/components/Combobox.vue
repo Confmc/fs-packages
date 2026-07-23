@@ -152,8 +152,17 @@ const query = ref(selectedLabel.value);
 // The visible list = filter by the trimmed, case-folded query (empty query ⇒ all),
 // then the same optional alphabetical pass SingleSelect applies. Both aria-activedescendant
 // and Enter index into THIS filtered list, not the raw `options`.
+//
+// WR-0576 (browse-to-change): a query EQUAL to the committed rendering (`selectedLabel` —
+// the committed option's label, or `emptyDisplayValue` on a committed null) does NOT
+// filter. The query rests on that rendering, so without this rule opening a FILLED
+// combobox narrowed the list to ~the already-chosen option and the open→see-list→pick-
+// another flow forced a manual clear first. The convention is pure EQUALITY, not a
+// typed-once latch (MUI Autocomplete parity): the committed label as a query carries no
+// intent to narrow, even when retyped verbatim mid-session.
 const filtered = computed(() => {
-    const needle = query.value.trim().toLowerCase();
+    const engaged = query.value !== selectedLabel.value;
+    const needle = engaged ? query.value.trim().toLowerCase() : '';
     const matched = needle ? options.filter((option) => labelOf(option).toLowerCase().includes(needle)) : options;
     return alphabeticalSort ? [...matched].sort((a, b) => labelOf(a).localeCompare(labelOf(b))) : matched;
 });
@@ -237,6 +246,19 @@ const {
 // not yank the text out from under them.
 watch(selectedLabel, (label) => {
     if (!open.value) query.value = label;
+});
+
+// WR-0576 (select-all-on-open): when the popup opens with the committed rendering in the
+// input, select the text so the first keystroke REPLACES it and starts a fresh filter —
+// composing with the equality rule above (open ⇒ full list; type ⇒ diverge ⇒ filter).
+// Guarded on equality, NOT on mere non-emptiness: when TYPING is what opened the popup
+// (`onInput`), the query has already diverged and selecting would eat the user's edit.
+// A `pre`-flush watcher runs after the opening event handler (so it wins over the click's
+// own caret placement) and before render; the input is mounted whenever `open` can flip.
+watch(open, (isOpen) => {
+    if (isOpen && query.value !== '' && query.value === selectedLabel.value) {
+        ensureRefValueExists(input).select();
+    }
 });
 
 // Snap the input back to the committed label so a half-typed non-match never survives a

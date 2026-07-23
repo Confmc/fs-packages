@@ -187,6 +187,26 @@ describe('Combobox — real typing filters and commits', () => {
         expect(menu()).toBeNull();
     });
 
+    it('opening a filled combobox shows the FULL list and the first keystroke replaces the label (WR-0576)', async () => {
+        renderControlled<number | null>(Combobox, 3, {}); // Mango committed
+        const input = document.getElementById('fruit') as HTMLInputElement;
+        expect(input.value).toBe('Mango');
+
+        await userEvent.click(input);
+        expect(menu()).not.toBeNull();
+        // Browse-to-change: the committed label must not narrow the list on open…
+        expect(document.querySelectorAll('[role="option"]')).toHaveLength(3);
+        // …and the label sits fully selected (real Chromium selection, AFTER the click's
+        // own caret placement), so typing REPLACES it instead of appending.
+        expect(input.selectionStart).toBe(0);
+        expect(input.selectionEnd).toBe('Mango'.length);
+
+        await userEvent.keyboard('ap');
+        expect(input.value).toBe('ap'); // replaced, not 'Mangoap'
+        const options = document.querySelectorAll('[role="option"]');
+        expect([...options].map((option) => option.textContent?.trim())).toEqual(['Apricot']);
+    });
+
     it('Escape reverts a half-typed query to the committed label', async () => {
         renderControlled<number | null>(Combobox, 2, {});
         const input = document.getElementById('fruit') as HTMLInputElement;
