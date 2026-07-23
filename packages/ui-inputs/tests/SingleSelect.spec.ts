@@ -26,6 +26,32 @@ afterEach(() => {
 });
 
 describe('SingleSelect', () => {
+    it('jumps to the first/last option on Home/End while open (WR-0521)', async () => {
+        const wrapper = mountSelect({});
+        const root = wrapper.find('.ui-select');
+        const trigger = wrapper.find('button');
+
+        await root.trigger('keydown', {key: 'Enter'}); // open, pointer -1
+        await root.trigger('keydown', {key: 'End'});
+        expect(trigger.attributes('aria-activedescendant')).toBe('fruit-opt-2');
+        await root.trigger('keydown', {key: 'Home'});
+        expect(trigger.attributes('aria-activedescendant')).toBe('fruit-opt-0');
+    });
+
+    it('announces the empty state through the polite live region while open (WR-0521)', async () => {
+        const wrapper = mountSelect({emptyText: 'No match'});
+        const region = wrapper.find('[aria-live="polite"]');
+
+        expect(region.attributes('role')).toBe('status');
+        expect(region.text()).toBe(''); // closed → silent, options or not
+
+        await wrapper.find('button').trigger('click');
+        expect(region.text()).toBe(''); // open with options → silent
+
+        await wrapper.setProps({options: []}); // drained while open → announced
+        expect(region.text()).toBe('No match');
+    });
+
     it('shows the placeholder and no menu until opened, then renders sorted options', async () => {
         const wrapper = mountSelect({placeholder: 'Pick one'});
 

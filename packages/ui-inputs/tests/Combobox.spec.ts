@@ -26,6 +26,36 @@ afterEach(() => {
 });
 
 describe('Combobox', () => {
+    it('jumps to the first/last FILTERED option on Home/End while open (WR-0521)', async () => {
+        const wrapper = mountCombobox({});
+        const root = wrapper.find('.ui-combobox');
+        const input = wrapper.find('input');
+
+        await input.setValue('m'); // filtered: Mango, Watermelon
+        await root.trigger('keydown', {key: 'End'});
+        expect(input.attributes('aria-activedescendant')).toBe('fruit-opt-1');
+        await root.trigger('keydown', {key: 'Home'});
+        expect(input.attributes('aria-activedescendant')).toBe('fruit-opt-0');
+    });
+
+    it('announces drain-to-empty through the polite live region (WR-0521)', async () => {
+        const wrapper = mountCombobox({emptyText: 'No match'});
+        const region = wrapper.find('[aria-live="polite"]');
+        const input = wrapper.find('input');
+
+        expect(region.attributes('role')).toBe('status');
+        expect(region.text()).toBe(''); // closed → silent
+
+        await input.trigger('click');
+        expect(region.text()).toBe(''); // open with options → silent
+
+        await input.setValue('zzz'); // typing drains the filtered list
+        expect(region.text()).toBe('No match');
+
+        await input.setValue('m'); // matches return → the region empties again
+        expect(region.text()).toBe('');
+    });
+
     it('renders a combobox input with no menu until opened, then the sorted options', async () => {
         const wrapper = mountCombobox({placeholder: 'Pick one'});
         const input = wrapper.find('input');

@@ -154,6 +154,12 @@ describe('styles.css — WR-0512 font-size source-order regression pins', () => 
 describe('styles.css — state-variant hooks on real states', () => {
     it('focus hooks fire on real keyboard :focus-visible', async () => {
         addStyle(uiCss);
+        // Kill the 0.12s box-shadow/border-color transition for THIS test: the hooks under
+        // test are the state-variant declarations, not the transition, and synchronous reads
+        // are what turned the old intermittent poll timeout into a hard, diagnosable failure —
+        // which exposed its true cause as the hover-masks-ring specificity defect (regression
+        // test below), keyed on where earlier spec files happened to park the virtual mouse.
+        addStyle('.ui-control { transition: none !important; }');
         const control = addControl();
         document.documentElement.style.setProperty('--ui-control-bg-focus', 'rgb(10, 20, 30)');
         document.documentElement.style.setProperty('--ui-control-text-focus', 'rgb(3, 4, 5)');
@@ -170,9 +176,27 @@ describe('styles.css — state-variant hooks on real states', () => {
         expect(focused.backgroundColor).toBe('rgb(10, 20, 30)');
         expect(focused.color).toBe('rgb(3, 4, 5)');
         expect(focused.borderTopWidth).toBe('3px');
-        // border-color (and box-shadow) sit in .ui-control's 0.12s transition — poll past it.
-        await expect.poll(() => getComputedStyle(control).borderTopColor).toBe('rgb(7, 8, 9)');
-        await expect.poll(() => getComputedStyle(control).boxShadow).not.toBe('none'); // --ui-focus-ring applied
+        // Transition disabled above — border-color and box-shadow are synchronous too.
+        expect(focused.borderTopColor).toBe('rgb(7, 8, 9)');
+        expect(focused.boxShadow).not.toBe('none'); // --ui-focus-ring applied
+    });
+
+    it('the focus ring survives a pointer resting on the control — hover must not mask :focus-visible', async () => {
+        addStyle(uiCss);
+        addStyle('.ui-control { transition: none !important; }');
+        const control = addControl();
+
+        control.focus(); // a text input matches :focus-visible on ANY focus in Chromium
+        expect(document.activeElement).toBe(control);
+        expect(getComputedStyle(control).boxShadow).not.toBe('none'); // ring present
+
+        // Park the real (CDP) mouse over the focused control: hover's box-shadow declaration
+        // defaults to none, and at its old (0,3,0) specificity it beat the (0,2,0) focus rule —
+        // silently stripping the keyboard focus ring (and the .is-open/.is-invalid shadows)
+        // whenever the pointer rested on the control. The :where() fix keeps hover at (0,2,0)
+        // so the later state rules win the tie.
+        await userEvent.hover(control);
+        expect(getComputedStyle(control).boxShadow).not.toBe('none'); // ring survives hover
     });
 
     it('focus hooks are a no-op until a territory opts in (defaults chain to the resting vars)', async () => {

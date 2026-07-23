@@ -30,6 +30,14 @@
             </svg>
         </button>
 
+        <!-- WR-0521: the empty state must be ANNOUNCED, not just painted — a persistent,
+             visually-hidden live region (mounted for the component's whole lifetime, so
+             the emptyText lands as a content CHANGE, the reliable live-region path). One
+             treatment, applied uniformly across the whole select family. -->
+        <span class="ui-live-region" role="status" aria-live="polite">{{
+            open && optionLabels.length === 0 ? emptyText : ''
+        }}</span>
+
         <OptionList
             v-if="open"
             ref="menu"

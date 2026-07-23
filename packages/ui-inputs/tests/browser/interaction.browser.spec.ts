@@ -13,6 +13,7 @@ import {defineComponent, h, ref} from 'vue';
 
 import Checkbox from '../../src/components/Checkbox.vue';
 import Combobox from '../../src/components/Combobox.vue';
+import MultiCombobox from '../../src/components/MultiCombobox.vue';
 import MultiSelect from '../../src/components/MultiSelect.vue';
 import RadioGroup from '../../src/components/RadioGroup.vue';
 import SingleSelect from '../../src/components/SingleSelect.vue';
@@ -59,7 +60,8 @@ const renderControlled = <V>(component: any, initial: V, props: Record<string, u
     return model;
 };
 
-const menu = () => document.querySelector('.ui-select__menu, .ui-combobox__menu, .ui-multiselect__menu');
+const menu = () =>
+    document.querySelector('.ui-select__menu, .ui-combobox__menu, .ui-multiselect__menu, .ui-multicombobox__menu');
 const optionAt = (index: number): HTMLElement => document.querySelectorAll<HTMLElement>('[role="option"]')[index];
 
 describe('SingleSelect — real keyboard walk', () => {
@@ -243,6 +245,43 @@ describe('MultiSelect — chips, toggle-stays-open, Backspace', () => {
 
         await userEvent.keyboard('{Backspace}'); // empty model: no-op, no throw
         expect(model.value).toEqual([]);
+    });
+});
+
+describe('MultiCombobox — input-as-trigger, real focus choreography', () => {
+    it('a real Tab focuses the input and focus alone OPENS the list', async () => {
+        renderControlled<number[]>(MultiCombobox, [], {});
+        const input = document.getElementById('fruit') as HTMLInputElement;
+
+        await userEvent.tab();
+        expect(document.activeElement).toBe(input);
+        expect(menu()).not.toBeNull(); // kendo's searchable choreography — focus is the context
+    });
+
+    it('a real click commit toggles membership, STAYS open, clears the query, and REFOCUSES the input', async () => {
+        const model = renderControlled<number[]>(MultiCombobox, [], {});
+        const input = document.getElementById('fruit') as HTMLInputElement;
+
+        await userEvent.click(input);
+        await userEvent.keyboard('ma'); // filter → Mango
+        expect(input.value).toBe('ma');
+
+        // A real click lands on a non-focusable <li>, which genuinely drops DOM focus off
+        // the input (the part happy-dom cannot prove) — the component must pull it back.
+        await userEvent.click(optionAt(0));
+        expect(model.value).toEqual([3]); // Mango toggled in
+        expect(menu()).not.toBeNull(); // menu stays open
+        expect(input.value).toBe(''); // query cleared — the full list is re-offered
+        expect(document.activeElement).toBe(input); // focus returned to the input
+    });
+
+    it('real Backspace with an empty query pops the last chip', async () => {
+        const model = renderControlled<number[]>(MultiCombobox, [2, 3], {});
+        const input = document.getElementById('fruit') as HTMLInputElement;
+
+        await userEvent.click(input);
+        await userEvent.keyboard('{Backspace}');
+        expect(model.value).toEqual([2]);
     });
 });
 

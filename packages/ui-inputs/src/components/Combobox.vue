@@ -22,6 +22,14 @@
             @click="onClick"
         />
 
+        <!-- WR-0521: the empty state must be ANNOUNCED, not just painted — a persistent,
+             visually-hidden live region (mounted for the component's whole lifetime, so
+             the emptyText lands as a content CHANGE, the reliable live-region path).
+             Matters most here, where typing can drain the filtered list. -->
+        <span class="ui-live-region" role="status" aria-live="polite">{{
+            open && optionLabels.length === 0 ? emptyText : ''
+        }}</span>
+
         <OptionList
             v-if="open"
             ref="menu"

@@ -33,6 +33,7 @@ import '@script-development/ui-inputs/style.css';
 | `SingleSelect`            | Accessible button-triggered listbox over `@floating-ui/vue`, generic over your option type                                                                 |
 | `Combobox`                | Accessible **searchable/filtering** single-select — a text input that filters the listbox as you type; exposes an imperative `focus()` handle              |
 | `MultiSelect`             | Accessible **multi-value** select — models an array of option ids; toggle-in-place listbox that stays open on commit, inline chip bar with per-chip remove |
+| `MultiCombobox`           | Accessible **searchable multi-value** select — MultiSelect's array model + chips with Combobox's filter-as-you-type input as the trigger                   |
 
 ```vue
 <FormField id="fruit" label="Fruit" :error="errors.fruit" #default="{controlId, describedby, invalid}">
@@ -42,7 +43,7 @@ import '@script-development/ui-inputs/style.css';
 
 ### The select family's shared extras
 
-**Per-option content — the `#option` scoped slot.** All three selects render each option's
+**Per-option content — the `#option` scoped slot.** All four selects render each option's
 plain display string by default; the `option` slot replaces that content with your own
 (colour swatches, icons, rich labels). The payload is `{option, index, selected, active}` —
 typed against your option type `T`. Highlight and selection chrome (`.is-active`,
@@ -61,6 +62,15 @@ re-creates them:
 visually muted (`.is-muted`, themed by `--ui-option-text-muted`). Muted is **not** disabled:
 muted options stay committable and stay in the keyboard path — use it for de-emphasis
 ("already assigned", "archived"), never for gating.
+
+**Home/End + the empty-state announcement.** While the listbox is open, **Home** jumps the
+keyboard highlight to the first option and **End** to the last — one shared keyboard skeleton,
+all four selects (on the input-triggered `Combobox`/`MultiCombobox` this deliberately trades
+away caret jumps while the popup is open; both readings are APG-sanctioned). And the empty
+state ("No options" / `emptyText`) is **announced**, not just painted: every select carries a
+persistent, visually-hidden `aria-live="polite"` region that speaks the empty text the moment
+the (filtered) list drains to nothing — which matters most on the filterable components,
+where typing can drain the list silently.
 
 **The committing clear entry (`SingleSelect` / `Combobox`).** `clearLabel` renders a
 committing entry **above** the options — choosing it commits `null` and closes, exactly like
@@ -129,6 +139,33 @@ option has not loaded yet (async options) stays in the model but renders no chip
 Chips theme through `--ui-chip-bg` / `--ui-chip-text` / `--ui-chip-radius` / `--ui-chip-pad`, each
 defaulting to an existing resting token (`--ui-option-bg-active`, `--ui-control-text`,
 `--ui-option-radius`) — neutral out of the box, remap to opt in.
+
+### MultiCombobox
+
+`MultiCombobox` is `MultiSelect`'s **searchable** sibling: the same `T['id'][]` model,
+toggle-in-place commits, chip bar (with `removeLabel`), and `aria-multiselectable` listbox —
+but the trigger is Combobox's filter-as-you-type text `<input>` (the APG-canonical
+input-as-trigger combobox; an in-popup search field has an awkward focus story). The list
+opens on focus, click, or typing.
+
+The **multi-specific query choreography** differs from `Combobox`, because there is no single
+committed label to snap to. The input rests **empty + placeholder**; on every toggle-commit
+the popup **stays open**, the **query clears** so the full list is re-offered, and DOM focus
+**returns to the input** — so picking several values is type, Enter, type, Enter. Escape,
+Tab, or a click outside closes and clears the query. **Backspace with an empty query pops the
+last chip** (with text in the query it stays native editing). Since the input's own value is
+the query, the committed selection is additionally conveyed to assistive tech through an
+`aria-describedby` summary (the input-as-trigger analogue of MultiSelect's hidden value span).
+
+```vue
+<FormField id="tags" label="Tags" :error="errors.tags" #default="{controlId, describedby, invalid}">
+    <MultiCombobox :id="controlId" v-model="tagIds" :options="tags" label="name" :invalid="invalid" :describedby="describedby" />
+</FormField>
+```
+
+Like `Combobox` it exposes an imperative `focus()` handle. `clearLabel` / `emptyDisplayValue`
+deliberately do not transfer — an empty array is the multi "nothing", so there is no `null`
+to commit and no committed label to name.
 
 ### Checkbox family
 
