@@ -154,6 +154,14 @@ describe('styles.css — WR-0512 font-size source-order regression pins', () => 
 describe('styles.css — state-variant hooks on real states', () => {
     it('focus hooks fire on real keyboard :focus-visible', async () => {
         addStyle(uiCss);
+        // Kill the 0.12s box-shadow/border-color transition for THIS test: the hooks under
+        // test are the state-variant declarations, not the transition, and polling past the
+        // transition left a ~1s window in which the shared CI runner intermittently dropped
+        // the page's focus-visible state — box-shadow then legitimately re-computed to none
+        // and the poll timed out (3 CI strikes). With the transition gone every focus style
+        // is assertable SYNCHRONOUSLY, inside the same instant the activeElement assertion
+        // proves focus is held.
+        addStyle('.ui-control { transition: none !important; }');
         const control = addControl();
         document.documentElement.style.setProperty('--ui-control-bg-focus', 'rgb(10, 20, 30)');
         document.documentElement.style.setProperty('--ui-control-text-focus', 'rgb(3, 4, 5)');
@@ -170,9 +178,9 @@ describe('styles.css — state-variant hooks on real states', () => {
         expect(focused.backgroundColor).toBe('rgb(10, 20, 30)');
         expect(focused.color).toBe('rgb(3, 4, 5)');
         expect(focused.borderTopWidth).toBe('3px');
-        // border-color (and box-shadow) sit in .ui-control's 0.12s transition — poll past it.
-        await expect.poll(() => getComputedStyle(control).borderTopColor).toBe('rgb(7, 8, 9)');
-        await expect.poll(() => getComputedStyle(control).boxShadow).not.toBe('none'); // --ui-focus-ring applied
+        // Transition disabled above — border-color and box-shadow are synchronous too.
+        expect(focused.borderTopColor).toBe('rgb(7, 8, 9)');
+        expect(focused.boxShadow).not.toBe('none'); // --ui-focus-ring applied
     });
 
     it('focus hooks are a no-op until a territory opts in (defaults chain to the resting vars)', async () => {
