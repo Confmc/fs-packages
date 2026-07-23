@@ -178,7 +178,11 @@
         box-shadow 0.12s ease,
         border-color 0.12s ease;
 }
-.ui-control:hover:not(:disabled) {
+/* :where() keeps this at (0,2,0) so the LATER state rules — :focus-visible's ring, .is-open,
+   .is-invalid — win the specificity tie while hover co-matches. Without it, hover's (0,3,0)
+   masked the focus ring (and the open/invalid shadows) with its `none` default for any
+   pointer resting on the control — caught by the browser suite's focus-visible spec. */
+.ui-control:hover:where(:not(:disabled)) {
     box-shadow: var(--ui-control-shadow-hover);
 }
 /* The MultiSelect control is a flex box whose focus lives on the inner trigger button, so
