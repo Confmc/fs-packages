@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import {mount} from '@vue/test-utils';
-import {afterEach, describe, expect, it} from 'vitest';
+import {afterEach, describe, expect, it, vi} from 'vitest';
 import {h} from 'vue';
 
 import Combobox from '../src/components/Combobox.vue';
@@ -233,8 +233,8 @@ describe('Combobox', () => {
         const wrapper = mountCombobox({modelValue: 3}); // Mango — query starts as 'Mango'
         const input = wrapper.find('input');
 
+        // Opening shows the FULL list (the committed-label query does not filter, WR-0576).
         await input.trigger('click');
-        await input.setValue(''); // clear the filter to reveal every option
         const options = wrapper.findAll('.ui-combobox__option'); // Apricot, Mango, Watermelon
         expect(options.map((o) => o.attributes('aria-selected'))).toEqual(['false', 'true', 'false']);
 
@@ -422,6 +422,90 @@ describe('Combobox', () => {
 
         await options[0].trigger('click');
         expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([2]); // Apricot commits
+    });
+
+    describe('browse-to-change (WR-0576)', () => {
+        it('opens with the FULL option list when the input holds the committed label', async () => {
+            const wrapper = mountCombobox({modelValue: 3}); // Mango committed → query rests on 'Mango'
+            const input = wrapper.find('input');
+            expect(input.element.value).toBe('Mango');
+
+            await input.trigger('click');
+            // The query EQUALS the committed label, so the filter must NOT engage — the
+            // user opened to BROWSE, and a list narrowed to the already-chosen option
+            // would force a manual clear before any other option is even visible.
+            expect(wrapper.findAll('.ui-combobox__option').map((o) => o.text())).toEqual([
+                'Apricot',
+                'Mango',
+                'Watermelon',
+            ]);
+        });
+
+        it('engages the filter on divergence and disengages again on convergence', async () => {
+            const wrapper = mountCombobox({modelValue: 3}); // Mango
+            const input = wrapper.find('input');
+
+            await input.trigger('click');
+            await input.setValue('Man'); // diverged from the committed label → filter engages
+            expect(wrapper.findAll('.ui-combobox__option').map((o) => o.text())).toEqual(['Mango']);
+
+            // Retyping the EXACT committed label converges back to the full list — the
+            // convention is equality, not a typed-once latch (MUI Autocomplete parity):
+            // the committed label as a query carries no intent to narrow.
+            await input.setValue('Mango');
+            expect(wrapper.findAll('.ui-combobox__option').map((o) => o.text())).toEqual([
+                'Apricot',
+                'Mango',
+                'Watermelon',
+            ]);
+        });
+
+        it('does not filter by emptyDisplayValue when the committed-null rendering fills the input', async () => {
+            const wrapper = mountCombobox({emptyDisplayValue: 'Any fruit'}); // model null → input 'Any fruit'
+            const input = wrapper.find('input');
+            expect(input.element.value).toBe('Any fruit');
+
+            await input.trigger('click');
+            // Same defect shape as the committed label: 'Any fruit' matches no option
+            // label, so the un-fixed filter would show an EMPTY list on open.
+            expect(wrapper.findAll('.ui-combobox__option')).toHaveLength(3);
+            expect(wrapper.find('.ui-combobox__empty').exists()).toBe(false);
+        });
+
+        it('selects the input text when the popup opens holding the committed label', async () => {
+            const wrapper = mountCombobox({modelValue: 3}); // Mango
+            const input = wrapper.find('input');
+
+            await input.trigger('click');
+            // Select-all-on-open: the first keystroke REPLACES the committed label and
+            // starts a fresh filter (composes with the equality convention above).
+            expect(input.element.selectionStart).toBe(0);
+            expect(input.element.selectionEnd).toBe('Mango'.length);
+        });
+
+        it('does not select on open when the input is empty, and re-selects on a later reopen', async () => {
+            const wrapper = mountCombobox({});
+            const input = wrapper.find('input');
+            const select = vi.spyOn(input.element, 'select');
+
+            await input.trigger('click'); // nothing committed → nothing to select
+            expect(select).not.toHaveBeenCalled();
+
+            // Commit Mango, then REOPEN — the committed label is back in the input and
+            // must be selected again on this open (a live watcher, not a one-shot).
+            await wrapper.findAll('.ui-combobox__option')[1].trigger('click'); // Mango
+            await input.trigger('click');
+            expect(select).toHaveBeenCalledTimes(1);
+        });
+
+        it('does not select the freshly-typed query when typing is what opens the popup', async () => {
+            const wrapper = mountCombobox({modelValue: 3}); // Mango, closed
+            const input = wrapper.find('input');
+            const select = vi.spyOn(input.element, 'select');
+
+            await input.setValue('Man'); // typing opens; the query has already diverged
+            expect(select).not.toHaveBeenCalled(); // selecting now would eat the user's edit
+        });
     });
 
     describe('clear entry (clearLabel) + emptyDisplayValue', () => {
