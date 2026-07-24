@@ -6,7 +6,7 @@
 // WR-0512 regression pins (font-size source-order fight) and the state-variant hooks on a
 // real keyboard :focus-visible.
 import {afterEach, describe, expect, it} from 'vitest';
-import {userEvent} from 'vitest/browser';
+import {cdp, userEvent} from 'vitest/browser';
 
 // `?inline` yields the stylesheet as text so each test controls WHERE in the cascade the
 // package sheet sits — the WR-0512 pins need both orderings, which a plain side-effect
@@ -322,5 +322,95 @@ describe('styles.css — checkbox family (--ui-check-* / --ui-switch-*)', () => 
         await expect.poll(() => getComputedStyle(input).backgroundColor).toBe('rgb(37, 99, 235)');
         // Travel = 36 − 20 = 16px.
         await expect.poll(() => getComputedStyle(thumb).transform).toBe('matrix(1, 0, 0, 1, 16, -7)');
+    });
+});
+
+/** A bare `<input class="ui-switch__input">` — the switch track chassis, focusable. */
+const addSwitchInput = (): HTMLInputElement => {
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.className = 'ui-switch__input';
+    document.body.append(input);
+    cleanupTargets.push(input);
+    return input;
+};
+
+// WR-0587 F-1. Every focusable control sets `outline: none` and conveys focus through
+// box-shadow (--ui-focus-ring). Forced-colors mode STRIPS box-shadow, so keyboard focus goes
+// invisible family-wide. The fix is a `@media (forced-colors: active)` block restoring a real
+// outline on every focus surface. Emulated here through CDP (Emulation.setEmulatedMedia) —
+// getComputedStyle then reflects the forced-colors cascade in a real engine, which no static
+// text scan can prove. Reset in afterEach so forced-colors never leaks into the serial siblings.
+describe('styles.css — forced-colors keyboard focus (WR-0587 F-1)', () => {
+    afterEach(async () => {
+        await cdp().send('Emulation.setEmulatedMedia', {features: []});
+    });
+
+    const enableForcedColors = () =>
+        cdp().send('Emulation.setEmulatedMedia', {features: [{name: 'forced-colors', value: 'active'}]});
+
+    it('restores a visible outline on a focused .ui-control (box-shadow ring is not enough in forced-colors)', async () => {
+        addStyle(uiCss);
+        const control = addControl();
+        await enableForcedColors();
+
+        control.focus(); // a text input matches :focus-visible on any focus in Chromium
+        expect(document.activeElement).toBe(control);
+
+        const focused = getComputedStyle(control);
+        // The restored outline — the load-bearing indicator once box-shadow is stripped.
+        expect(focused.outlineStyle).toBe('solid');
+        expect(focused.outlineWidth).toBe('2px');
+    });
+
+    it('restores the outline on the MultiSelect / MultiCombobox box (:focus-within) and the check + switch inputs (:focus-visible)', async () => {
+        addStyle(uiCss);
+
+        // MultiSelect box carries focus via :focus-within on the box, not the inner trigger.
+        const msBox = document.createElement('div');
+        msBox.className = 'ui-multiselect__box';
+        msBox.tabIndex = 0;
+        const mcBox = document.createElement('div');
+        mcBox.className = 'ui-multicombobox__box';
+        mcBox.tabIndex = 0;
+        document.body.append(msBox, mcBox);
+        cleanupTargets.push(msBox, mcBox);
+
+        const check = addCheck();
+        const sw = addSwitchInput();
+
+        await enableForcedColors();
+
+        for (const el of [msBox, mcBox, check, sw]) {
+            el.focus();
+            expect(document.activeElement).toBe(el);
+            const s = getComputedStyle(el);
+            expect(s.outlineStyle).toBe('solid');
+            expect(s.outlineWidth).toBe('2px');
+        }
+    });
+});
+
+// WR-0587 F-7. The stylesheet declares seven 0.12s transitions with no reduced-motion gate.
+// The fix is a `@media (prefers-reduced-motion: reduce)` block zeroing them. Emulated through
+// CDP so getComputedStyle reports the gated transition in a real engine.
+describe('styles.css — reduced-motion gate (WR-0587 F-7)', () => {
+    afterEach(async () => {
+        await cdp().send('Emulation.setEmulatedMedia', {features: []});
+    });
+
+    it('zeroes every declared transition under prefers-reduced-motion: reduce', async () => {
+        addStyle(uiCss);
+        const control = addControl();
+        const check = addCheck();
+
+        // Baseline: the eases are present (no reduced-motion preference).
+        expect(getComputedStyle(control).transitionDuration).not.toBe('0s');
+        expect(getComputedStyle(check).transitionDuration).not.toBe('0s');
+
+        await cdp().send('Emulation.setEmulatedMedia', {features: [{name: 'prefers-reduced-motion', value: 'reduce'}]});
+
+        expect(getComputedStyle(control).transitionDuration).toBe('0s');
+        expect(getComputedStyle(check).transitionDuration).toBe('0s');
     });
 });

@@ -614,3 +614,40 @@
     font-size: var(--ui-error-size);
     font-weight: var(--ui-error-weight);
 }
+
+/* Forced-colors mode strips box-shadow — which is the ONLY thing conveying focus by default:
+   every focusable control sets `outline: none` and paints --ui-focus-ring through box-shadow
+   (.ui-control / .ui-multiselect__box / .ui-multicombobox__box :focus, .ui-check__input and
+   .ui-switch__input :focus-visible). With the shadow gone, keyboard focus becomes invisible in a
+   forced-colors / high-contrast theme. Restore a real outline for EVERY focus surface so the
+   indicator survives (WCAG 2.4.7). This block sits last in source order and reuses the same
+   selectors, so it wins the specificity tie over each base `outline: none`. `Highlight` is a
+   system colour forced-colors maps to the user's palette (author colours are ignored here). */
+@media (forced-colors: active) {
+    .ui-control:focus-visible,
+    .ui-multiselect__box:focus-within,
+    .ui-multicombobox__box:focus-within,
+    .ui-check__input:focus-visible,
+    .ui-switch__input:focus-visible {
+        outline: 2px solid Highlight;
+        outline-offset: 2px;
+    }
+}
+
+/* Respect a reduced-motion preference — zero every transition the stylesheet declares (the 0.12s
+   box-shadow / border-color / background / opacity / transform eases on the controls, chevrons,
+   check chassis, marks, switch track + thumb). Scoped to the ui-* surfaces that carry a transition
+   rather than a blanket `*`, so a consumer's own transitions stay untouched. */
+@media (prefers-reduced-motion: reduce) {
+    .ui-control,
+    .ui-select__chevron,
+    .ui-multiselect__chevron,
+    .ui-check__input,
+    .ui-check__mark,
+    .ui-check__dash,
+    .ui-radio__dot,
+    .ui-switch__input,
+    .ui-switch__thumb {
+        transition: none;
+    }
+}
