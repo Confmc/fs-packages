@@ -116,6 +116,30 @@ describe('axe-core audits — zero violations, closed and open', () => {
         await expectNoViolations(screen.container);
     });
 
+    // WR-0587 F-6. When the option list is empty the popup renders a single non-option <li>
+    // (the empty-state row). Inside role="listbox" that <li> must carry role="presentation"
+    // (or role="none"), else it is an invalid listbox child — axe aria-required-children. This
+    // opens a listbox with zero options so the empty row is the ONLY child and audits it.
+    it('FormField + SingleSelect, open with NO options (empty listbox is valid — presentational empty row)', async () => {
+        const model = ref<number | null>(null);
+        const screen = renderInField((slot) =>
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFC in a render-fn host
+            h(SingleSelect as any, {
+                ...selectProps(slot),
+                options: [],
+                emptyText: 'No options',
+                modelValue: model.value,
+                'onUpdate:modelValue': noop,
+            }),
+        );
+
+        await userEvent.click(document.getElementById('fruit') as HTMLElement);
+        const menu = document.querySelector('.ui-select__menu');
+        expect(menu).not.toBeNull();
+        expect(document.querySelector('.ui-select__empty')).not.toBeNull(); // empty row rendered inside the listbox
+        await expectNoViolations(screen.container);
+    });
+
     it('FormField + Combobox, closed and open with a typed filter', async () => {
         const model = ref<number | null>(null);
         const screen = renderInField((slot) =>

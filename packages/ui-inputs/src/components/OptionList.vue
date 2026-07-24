@@ -23,7 +23,15 @@
         >
             {{ clearLabel }}
         </li>
-        <li v-if="!labels.length" :class="`${variant}__empty`">{{ emptyText }}</li>
+        <!-- The empty-state row renders as the SOLE child of the listbox (it only shows when
+             there are zero options). A bare <li> here is doubly invalid: role="listbox" requires
+             an owned role="option" (axe aria-required-children), and a <li> whose parent is a
+             listbox (not a list) trips axe listitem. A presentational role clears the second but
+             leaves the listbox with no required child. Rendering the message as a DISABLED option
+             (the APG no-results pattern) satisfies both — it is a valid listbox child and gives
+             the listbox its required option, while aria-disabled marks it non-selectable (the
+             pointer never lands on it — useListbox has no navigable index when empty). -->
+        <li v-if="!labels.length" :class="`${variant}__empty`" role="option" aria-disabled="true">{{ emptyText }}</li>
         <li
             v-for="(optionLabel, index) in labels"
             :id="optionId(index)"
