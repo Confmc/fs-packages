@@ -26,7 +26,17 @@ jobs:
               with:
                   name: build-output
                   path: packages/*/dist/
-                  retention-days: 1
+                  # 90 (the GitHub maximum), NOT the runtime of a green pipeline.
+                  # 'publish' below sits behind the 'npm-publish' environment gate,
+                  # which is wall-clock unbounded — a human approves when a human
+                  # approves. Sizing retention against pipeline runtime coupled two
+                  # unrelated clocks: at retention-days:1 any release approved more
+                  # than 24h after merge lost its input. Fired live 2026-07-27
+                  # (WR-0615, ui-inputs 0.10.1 — merged 07-24, approved 07-27,
+                  # publish died on 'Artifact not found for name: build-output').
+                  # Retention is the FIRST line of defence; the rebuild fallback in
+                  # 'publish' is the second, so expiry can never block a release.
+                  retention-days: 90
                   if-no-files-found: error
 
     publish:
@@ -47,15 +57,49 @@ jobs:
                   node-version: 24
                   registry-url: 'https://registry.npmjs.org'
                   scope: '@script-development'
-            - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+            # Soft download. The artifact is the PREFERRED input (build-once: the
+            # bytes a reviewer approved are the bytes that publish), but it must
+            # never be a hard dependency — see the rebuild step below.
+            - id: fetch-build
+              continue-on-error: true
+              uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
               with:
                   name: build-output
                   path: packages
             - run: npm ci --ignore-scripts
-            # Pre-publish dist validation. Shares scripts/validate-dist.mjs with the
-            # PR-time gate in ci.yml — single source of truth, so the release-time and
-            # PR-time assertions cannot drift. Refuses to publish empty or incomplete
-            # tarballs (fs-http 0.1.1/0.1.2 empty-tarball class).
+            # Second line of defence. If the artifact is gone — expired, or purged
+            # from storage — rebuild from the same pinned commit + lockfile this job
+            # already checked out, rather than failing. The recovery is automatic
+            # BECAUSE the manual one is not discoverable: the obvious "Re-run failed
+            # jobs" re-runs 'publish' alone against the same absent artifact and
+            # fails identically; only "Re-run ALL jobs" works, and nothing in
+            # 'Artifact not found' says so. That ambiguity cost three days (WR-0615).
+            #
+            # The message names the CAUSE (approval delay) rather than the symptom.
+            - name: Rebuild — build artifact unavailable (approval-delay recovery)
+              if: steps.fetch-build.outcome != 'success'
+              env:
+                  MERGED_AT: ${{ github.event.head_commit.timestamp }}
+              run: |
+                  set -euo pipefail
+                  # Cosmetic: this only shapes the warning text. Never let a bad or
+                  # absent timestamp abort the step under `set -e` — the release is
+                  # the point, the message is the courtesy.
+                  # The -n test is load-bearing: GNU `date -d ''` SUCCEEDS (it reads
+                  # as today's midnight), so an empty timestamp would otherwise
+                  # report a plausible-looking but fabricated delay.
+                  delay='an unknown interval (no usable push timestamp on this event)'
+                  if [ -n "${MERGED_AT:-}" ] && merged_epoch=$(date -u -d "$MERGED_AT" +%s 2>/dev/null); then
+                    elapsed=$(( $(date -u +%s) - merged_epoch ))
+                    delay="$(( elapsed / 86400 ))d $(( (elapsed % 86400) / 3600 ))h $(( (elapsed % 3600) / 60 ))m"
+                  fi
+                  echo "::warning title=Build artifact unavailable — rebuilding::APPROVAL DELAY, not a broken build. The 'build-output' artifact from the build job could not be downloaded. This release was approved ${delay} after the commit landed on main, which outlived the artifact's retention window (or the artifact was deleted). Publishing waits on the 'npm-publish' environment approval, which has no time limit, while build artifacts expire on a fixed clock — the two are unrelated. Rebuilding from commit ${GITHUB_SHA}, the same commit and the same pinned lockfile the build job used. No manual re-run is required."
+                  npm run build
+            # Pre-publish dist validation, on whichever path produced packages/*/dist —
+            # downloaded or rebuilt. Shares scripts/validate-dist.mjs with the PR-time
+            # gate in ci.yml — single source of truth, so the release-time and PR-time
+            # assertions cannot drift. Refuses to publish empty or incomplete tarballs
+            # (fs-http 0.1.1/0.1.2 empty-tarball class).
             - run: npm run validate:dist
             - run: npx changeset publish
               env:
