@@ -46,6 +46,7 @@
     },
     "overrides": {
         "esbuild": "^0.28.1",
+        "js-beautify": "^2.0.3",
         "typed-rest-client": {
             "qs": "^6.15.2"
         },
