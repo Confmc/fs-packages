@@ -217,15 +217,44 @@ describe('createExampleService', () => {
 
 ## Publishing
 
-Packages are published to npm via **OIDC Trusted Publishing** — no stored tokens. The publish workflow (`.github/workflows/publish.yml`) triggers automatically on push to `main` when any `**/package.json` file changes.
+Packages are published to npm via **OIDC Trusted Publishing** — no stored tokens. The publish workflow (`.github/workflows/publish.yml`) triggers automatically on push to `main` when a `packages/*/package.json` file changes. (Root and tooling manifests are deliberately excluded: dependabot churn must not start a job that mints an OIDC publish token.)
 
 The flow:
 
 1. Create your changes on a branch (including a `version` bump in the affected package's `package.json` per the rules in [Adding a New Package § 5](#_5-bump-the-package-version)).
-2. Open a PR — CI runs all 8 gates (audit → format → lint → build → typecheck → lint:pkg → coverage → mutation).
+2. Open a PR — CI runs the full gate set (audit → format → lint → build → validate:dist → validate:workflows → typecheck → lint:pkg → coverage → mutation, plus the browser-test lane).
 3. On merge to `main`, the publish workflow detects the `package.json` change and:
-    - Builds all packages and uploads `dist/` artifacts.
-    - For each package whose published version differs from the local `package.json#version`, publishes the new version via OIDC Trusted Publishing.
-    - Provenance attestation is enabled (`NPM_CONFIG_PROVENANCE=true`).
+    - **`build`** — builds all packages and uploads `packages/*/dist/` as the `build-output` artifact.
+    - **`publish`** — waits for approval on the **`npm-publish` deployment environment**, then downloads that artifact and, for each package whose published version differs from the local `package.json#version`, publishes via OIDC Trusted Publishing. Provenance attestation is enabled (`NPM_CONFIG_PROVENANCE=true`).
 
 There is no changeset bot and no "Version Packages" intermediate PR. Version bumps are author-managed in the source PR; the publish step reacts to whatever shipped on `main`.
+
+### The approval gate holds indefinitely — and that is fine
+
+`publish` does not run until a human approves the `npm-publish` environment. There is **no time limit** on that approval: a run can sit `waiting` for minutes, or for weeks. Releases here routinely wait hours.
+
+That matters because the build artifact `publish` consumes expires on its own, unrelated clock. Two guards keep the two from colliding:
+
+1. **Retention is sized against the approval window, not the pipeline runtime** — `retention-days: 90`, the GitHub maximum.
+2. **The download is soft, with a rebuild fallback** — if the artifact is gone anyway (retention exceeded, or the artifact deliberately deleted), `publish` rebuilds from the same pinned commit and lockfile and continues. It emits a `::warning` naming the approval delay, so the recovery is visible rather than silent.
+
+Both are enforced at PR time by `npm run validate:workflows`.
+
+### Recovery: re-run **ALL** jobs, never just the failed ones
+
+If you ever land on a publish run that failed for lack of its build artifact — an older run predating the guards above, or a genuinely broken upload — the fix is:
+
+> **Re-run all jobs**, not "Re-run failed jobs".
+
+This is the single least discoverable thing about this pipeline, and it cost three days on 2026-07-27 (WR-0615).
+
+- **"Re-run failed jobs"** re-runs `publish` **alone**. `build` is skipped because it already succeeded, so no new artifact is produced, `download-artifact` looks for the same expired artifact, and the run fails **identically**. Repeating it can never succeed.
+- **"Re-run all jobs"** re-runs `build` first, producing a fresh artifact for `publish` to consume. It also re-triggers the `npm-publish` approval, so someone must approve again.
+
+The error message gives no hint of this. It reads:
+
+```
+Unable to download artifact(s): Artifact not found for name: build-output
+```
+
+which sounds like a broken upload. It is not — the upload succeeded days earlier. Under the current workflow this state should no longer occur, because `publish` rebuilds rather than failing; the note stands for older runs and for anyone reading a historical red run.

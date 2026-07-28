@@ -11,7 +11,7 @@ Shared frontend service packages monorepo under the `@script-development` npm sc
 - **Format:** oxfmt
 - **Package lint:** publint + attw (Are The Types Wrong) — `lint:pkg` enforces fail-on-any-advisory via `scripts/lint-pkg.mjs` (suggestions, warnings, and errors all treat as fatal — publint CLI default and `--strict` both exit 0 on suggestions). Motivated by enforcement queue #33 + the PR #35 `git+` prefix regression that silently drifted across 10 packages because the unenforced gate only printed the suggestion. The same wrapper also asserts `engines.node` presence across the root manifest + all workspace packages — closes enforcement queue #31 (drift-prevention gate, deployed 2026-05-12; declarations themselves landed 2026-04-22 via commit `0605d99`). Presence-only check; the value (`>=24.0.0` today) is not validated — value alignment is a separate doctrine question tracked alongside the CI `node-version`.
 - **Publish:** OIDC Trusted Publishing to public npm registry (no stored tokens)
-- **CI:** 8-gate pipeline: audit → format → lint → build → typecheck → lint:pkg → coverage → mutation
+- **CI:** three jobs. `check` — 10 sequential gates: audit → format → lint → build → validate:dist → **validate:workflows** → typecheck → lint:pkg → coverage → mutation; `browser-tests` — real Chromium via Playwright + axe-core; `ci-passed` — the fan-in rollup. (`validate:workflows` is the release-pipeline invariant gate, WR-0615 — see § Release Pipeline below.)
 
 ## Doctrine #8 — HTTP Timeout Surface (fs-http)
 
@@ -102,6 +102,22 @@ Cascade peers as of 2026-05-13:
 
 This tax disappears once packages reach 1.0. The `workspace:*` protocol is **not** an option on npm (npm 11+ rejects it as `EUNSUPPORTEDPROTOCOL`); it is a pnpm/yarn feature.
 
+## Release Pipeline — Two Unrelated Clocks
+
+`.github/workflows/publish.yml` splits the release into `build` (compile + upload `build-output`) and `publish` (download + `changeset publish` under OIDC). `publish` is fronted by the **`npm-publish` deployment environment**, and that approval is **wall-clock unbounded** — publishing to npm is outward-facing and stays human-approved, so a run may sit `waiting` for weeks. Build artifacts, meanwhile, expire on a fixed timer.
+
+**The standing rule: never size artifact retention against pipeline runtime.** Doing so couples the two clocks, and the release loses. Sized at `retention-days: 1`, this fired live on 2026-07-27 (WR-0615): `ui-inputs` 0.10.1 merged 07-24, was approved 07-27, and `publish` died on `Artifact not found for name: build-output` — silently holding a Major WCAG fix for three days across seven consumer territories.
+
+Three properties now make the coupling impossible, all enforced at PR time by `npm run validate:workflows` (`scripts/validate-workflows.mjs`, zero-dep):
+
+1. `retention-days: 90` — the GitHub maximum, sized against the approval window.
+2. The `download-artifact` step is `continue-on-error: true` — a **soft** input, never a hard dependency.
+3. A rebuild fallback (`if: steps.fetch-build.outcome != 'success'`) rebuilds from the same pinned commit and lockfile, and emits a `::warning` **naming the approval delay** rather than recovering silently.
+
+**Provenance is unaffected by the fallback.** `NPM_CONFIG_PROVENANCE` attests repository + workflow + commit SHA from the OIDC token minted in the `publish` job; it does not distinguish which job produced the bytes. The happy path still publishes build-once bytes; the fallback rebuilds the same commit with the same `npm ci --ignore-scripts` lockfile install `publish` already performs, and `validate:dist` gates either path identically.
+
+**Recovery on any historical red run: re-run ALL jobs, never "Re-run failed jobs".** The latter re-runs `publish` alone against the same absent artifact and fails identically — it can never succeed. Documented for humans in `docs/contributing.md § Publishing`.
+
 ## Commands
 
 | Command                 | Purpose                                        |
@@ -115,6 +131,8 @@ This tax disappears once packages reach 1.0. The `workspace:*` protocol is **not
 | `npm run format:check`  | Check formatting with oxfmt                    |
 | `npm run format`        | Fix formatting with oxfmt                      |
 | `npm run lint:pkg`      | Run publint + attw on all packages             |
+| `npm run validate:dist` | Assert every package's required dist artifacts are present and non-empty |
+| `npm run validate:workflows` | Assert the release pipeline's artifact clock cannot be outrun by its approval clock |
 | `npm audit`             | Check for dependency vulnerabilities           |
 
 **Build before typecheck.** Cross-package type resolution requires built `.d.mts` files. The CI pipeline enforces this order.

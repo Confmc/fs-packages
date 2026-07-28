@@ -33,6 +33,13 @@ jobs:
             # Shares scripts/validate-dist.mjs with publish.yml — the two gates
             # cannot drift.
             - run: npm run validate:dist
+            # Release-pipeline invariant gate (WR-0615). validate:dist asserts the
+            # publish job's OUTPUT is sound; this asserts its INPUT can always be
+            # obtained — that the build artifact's expiry clock can never be
+            # outrun by the unbounded 'npm-publish' approval clock. Cheap, zero-dep,
+            # and placed here so re-coupling the two clocks fails the PR rather than
+            # a release three days later. See scripts/validate-workflows.mjs.
+            - run: npm run validate:workflows
             - run: npm run typecheck
             - run: npm run lint:pkg
             - run: npm run test:coverage

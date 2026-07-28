@@ -22,6 +22,7 @@
         "test:mutation": "npm run test:mutation --workspaces",
         "typecheck": "npm run typecheck --workspaces",
         "validate:dist": "node scripts/validate-dist.mjs",
+        "validate:workflows": "node scripts/validate-workflows.mjs",
         "version": "changeset version"
     },
     "devDependencies": {
