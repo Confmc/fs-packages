@@ -28,11 +28,21 @@ const WORKFLOW = '.github/workflows/publish.yml';
 
 /**
  * Minimum artifact retention, in days. Sized against the *approval* clock — how long
- * a release may plausibly wait on a human — not against pipeline runtime. The live
- * incident was a 3-day wait; 30 leaves an order of magnitude of headroom, and the
- * rebuild fallback covers anything beyond it.
+ * a release may plausibly wait on a human — not against pipeline runtime.
+ *
+ * Pinned to 90 (the GitHub maximum) because CLAUDE.md certifies exactly that number
+ * as enforced here. An earlier 30-day floor left a 30-89 band that the doc claimed
+ * was machine-guarded and this gate would have waved through — a guarantee asserted
+ * by an artifact but checked by nothing, which is the failure mode that terminates
+ * the search: a reader sees the claim, believes the property is guarded, stops
+ * looking. Raised rather than re-wording the doc down, because retention costs
+ * nothing within GitHub's limits and the whole point of WR-0615 is that the
+ * approval clock is unbounded — any lower ceiling is a smaller version of the bug.
+ *
+ * Changing this is a deliberate act: update CLAUDE.md § Release Pipeline in the
+ * same commit, or the divergence simply reappears pointing the other way.
  */
-const MIN_RETENTION_DAYS = 30;
+const MIN_RETENTION_DAYS = 90;
 
 const source = readFileSync(WORKFLOW, 'utf8');
 const lines = source.split('\n');
