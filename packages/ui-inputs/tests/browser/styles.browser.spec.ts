@@ -335,6 +335,118 @@ const addSwitchInput = (): HTMLInputElement => {
     return input;
 };
 
+/** A bare `<button class="ui-pressable">` — the chrome-less interactive chassis. */
+const addPressable = (parentStyle = ''): HTMLButtonElement => {
+    const parent = document.createElement('div');
+    if (parentStyle) parent.setAttribute('style', parentStyle);
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'ui-pressable';
+    button.textContent = 'Press';
+    parent.append(button);
+    document.body.append(parent);
+    cleanupTargets.push(parent);
+    return button;
+};
+
+describe('styles.css — pressable chassis (--ui-pressable-*)', () => {
+    it('is CHROME-LESS by default, so adopting it in place of a bare <span @click> repaints nothing', () => {
+        addStyle(uiCss);
+        const pressable = addPressable('font-size: 18px');
+        const computed = getComputedStyle(pressable);
+
+        // A UA button paints a grey background, a border and padding; the point of this component
+        // is that swapping a `<span @click>` for it changes the semantics, not the pixels.
+        expect(computed.backgroundColor).toBe('rgba(0, 0, 0, 0)'); // --ui-pressable-bg: transparent
+        expect(computed.borderTopWidth).toBe('0px'); // --ui-pressable-border-width
+        expect(computed.paddingTop).toBe('0px'); // --ui-pressable-pad
+        // …and the text keeps inheriting, which a UA button does NOT do.
+        expect(computed.fontSize).toBe('18px'); // --ui-pressable-font-size: inherit
+        expect(computed.cursor).toBe('pointer');
+    });
+
+    it('reads --ui-pressable-font-size, so a consumer utility survives the source-order tie (WR-0512)', () => {
+        // The trap pinned on .ui-control applies here too: a plain font-size utility EARLIER in
+        // the cascade loses to the package's font reset, the var wins by contract.
+        addStyle('.size-sm { --ui-pressable-font-size: 13px; }');
+        addStyle(uiCss);
+        const pressable = addPressable('font-size: 18px');
+        pressable.classList.add('size-sm');
+
+        expect(getComputedStyle(pressable).fontSize).toBe('13px');
+    });
+
+    it('paints the focus ring on a real keyboard :focus-visible', async () => {
+        addStyle(uiCss);
+        addStyle('.ui-pressable { transition: none !important; }');
+        const pressable = addPressable();
+
+        expect(getComputedStyle(pressable).boxShadow).toBe('none');
+
+        await userEvent.tab();
+        expect(document.activeElement).toBe(pressable);
+        // The keyboard affordance this component exists to supply.
+        expect(getComputedStyle(pressable).boxShadow).not.toBe('none');
+    });
+
+    it('gives toggle mode a VISIBLE pressed state, not just aria-pressed', () => {
+        addStyle(uiCss);
+        const pressable = addPressable();
+
+        expect(getComputedStyle(pressable).backgroundColor).toBe('rgba(0, 0, 0, 0)');
+        // Keyed on the ARIA attribute itself, so the rendering cannot drift out of step with what
+        // assistive tech is told. Unlike the other state hooks this default is NOT a no-op: a
+        // toggle whose state only reaches a screen reader is invisible to everyone else.
+        pressable.setAttribute('aria-pressed', 'true');
+        expect(getComputedStyle(pressable).backgroundColor).toBe('rgb(243, 244, 246)'); // --ui-option-bg-active
+
+        document.documentElement.style.setProperty('--ui-pressable-bg-pressed', 'rgb(1, 2, 3)');
+        expect(getComputedStyle(pressable).backgroundColor).toBe('rgb(1, 2, 3)');
+    });
+
+    it('mirrors disabled on BOTH paths — :disabled natively, .is-disabled on the `as` fallback', () => {
+        addStyle(uiCss);
+        const native = addPressable();
+        native.disabled = true;
+        expect(getComputedStyle(native).color).toBe('rgb(107, 114, 128)'); // --ui-control-text-muted
+        expect(getComputedStyle(native).cursor).toBe('not-allowed');
+
+        // A <div role="button"> cannot match :disabled, so the fallback mirrors it as a class —
+        // and pointer-events is what actually suppresses the click a plain div would still fire.
+        const fallback = document.createElement('div');
+        fallback.className = 'ui-pressable is-disabled';
+        document.body.append(fallback);
+        cleanupTargets.push(fallback);
+        expect(getComputedStyle(fallback).color).toBe('rgb(107, 114, 128)');
+        expect(getComputedStyle(fallback).pointerEvents).toBe('none');
+    });
+
+    it('rotates the Disclosure chevron off the ARIA state, and leaves the heading unstyled', async () => {
+        addStyle(uiCss);
+        const heading = document.createElement('h2');
+        heading.className = 'ui-disclosure__header';
+        const trigger = document.createElement('button');
+        trigger.type = 'button';
+        trigger.className = 'ui-pressable ui-disclosure__trigger';
+        trigger.setAttribute('aria-expanded', 'false');
+        const chevron = document.createElement('span');
+        chevron.className = 'ui-disclosure__chevron';
+        trigger.append(chevron);
+        heading.append(trigger);
+        document.body.append(heading);
+        cleanupTargets.push(heading);
+
+        expect(getComputedStyle(chevron).transform).toBe('none');
+
+        trigger.setAttribute('aria-expanded', 'true');
+        await expect.poll(() => getComputedStyle(chevron).transform).toBe('matrix(-1, 0, 0, -1, 0, 0)'); // 180deg
+
+        // The consumer's <h2> must keep looking like their <h2> — the package only guarantees the
+        // button inside it is a real button, so it resets margin and nothing else.
+        expect(getComputedStyle(heading).fontSize).not.toBe('16px');
+    });
+});
+
 // WR-0587 F-1. Every focusable control sets `outline: none` and conveys focus through
 // box-shadow (--ui-focus-ring). Forced-colors mode STRIPS box-shadow, so keyboard focus goes
 // invisible family-wide. The fix is a `@media (forced-colors: active)` block restoring a real
@@ -359,6 +471,21 @@ describe('styles.css — forced-colors keyboard focus (WR-0587 F-1)', () => {
 
         const focused = getComputedStyle(control);
         // The restored outline — the load-bearing indicator once box-shadow is stripped.
+        expect(focused.outlineStyle).toBe('solid');
+        expect(focused.outlineWidth).toBe('2px');
+    });
+
+    it('restores a visible outline on a focused .ui-pressable (Pressable + the Disclosure trigger)', async () => {
+        addStyle(uiCss);
+        const pressable = addPressable();
+        await enableForcedColors();
+
+        pressable.focus();
+        expect(document.activeElement).toBe(pressable);
+
+        const focused = getComputedStyle(pressable);
+        // The box-shadow ring the component paints is STRIPPED in forced-colors — a new focusable
+        // surface that skipped this block would go invisible exactly like WR-0587 F-1.
         expect(focused.outlineStyle).toBe('solid');
         expect(focused.outlineWidth).toBe('2px');
     });
@@ -404,13 +531,19 @@ describe('styles.css — reduced-motion gate (WR-0587 F-7)', () => {
         const control = addControl();
         const check = addCheck();
 
+        const pressable = addPressable();
+
         // Baseline: the eases are present (no reduced-motion preference).
         expect(getComputedStyle(control).transitionDuration).not.toBe('0s');
         expect(getComputedStyle(check).transitionDuration).not.toBe('0s');
+        expect(getComputedStyle(pressable).transitionDuration).not.toBe('0s');
 
         await cdp().send('Emulation.setEmulatedMedia', {features: [{name: 'prefers-reduced-motion', value: 'reduce'}]});
 
         expect(getComputedStyle(control).transitionDuration).toBe('0s');
         expect(getComputedStyle(check).transitionDuration).toBe('0s');
+        // Every NEW transition the sheet declares must join the gate — the pressable's focus-ring
+        // ease and the disclosure chevron's rotate.
+        expect(getComputedStyle(pressable).transitionDuration).toBe('0s');
     });
 });

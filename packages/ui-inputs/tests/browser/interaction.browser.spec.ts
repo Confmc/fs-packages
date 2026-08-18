@@ -13,8 +13,10 @@ import {defineComponent, h, ref} from 'vue';
 
 import Checkbox from '../../src/components/Checkbox.vue';
 import Combobox from '../../src/components/Combobox.vue';
+import Disclosure from '../../src/components/Disclosure.vue';
 import MultiCombobox from '../../src/components/MultiCombobox.vue';
 import MultiSelect from '../../src/components/MultiSelect.vue';
+import Pressable from '../../src/components/Pressable.vue';
 import RadioGroup from '../../src/components/RadioGroup.vue';
 import SingleSelect from '../../src/components/SingleSelect.vue';
 import Switch from '../../src/components/Switch.vue';
@@ -380,5 +382,175 @@ describe('checkbox family — disabled controls genuinely receive no events', ()
         expect(model.value).toBe(true);
         await userEvent.keyboard(' ');
         expect(model.value).toBe(false);
+    });
+});
+
+/** Mount a Pressable with a spy click handler; returns the recorded activation count. */
+const renderPressable = (props: Record<string, unknown>) => {
+    const clicks = ref(0);
+    const pressed = ref<boolean | undefined>(props.pressed as boolean | undefined);
+    render(
+        defineComponent(
+            () => () =>
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFC in a render-fn host
+                h(Pressable as any, {
+                    label: 'Show example',
+                    ...props,
+                    ...(pressed.value === undefined ? {} : {pressed: pressed.value}),
+                    onClick: () => {
+                        clicks.value += 1;
+                    },
+                    'onUpdate:pressed': (value: boolean) => {
+                        pressed.value = value;
+                    },
+                }),
+        ),
+    );
+    return {clicks, pressed};
+};
+
+const control = () => document.querySelector('.ui-pressable') as HTMLElement;
+
+describe('Pressable — real keyboard walk', () => {
+    it('Tab focuses the native button, and BOTH Enter and Space activate it', async () => {
+        const {clicks} = renderPressable({});
+
+        await userEvent.tab();
+        expect(document.activeElement).toBe(control()); // focusable with no author tabindex
+
+        await userEvent.keyboard('{Enter}');
+        expect(clicks.value).toBe(1);
+
+        await userEvent.keyboard(' ');
+        expect(clicks.value).toBe(2);
+        // Exactly one activation per key: the component adds no key handling of its own on the
+        // native path, so nothing double-fires.
+    });
+
+    it('toggle mode flips aria-pressed from the keyboard', async () => {
+        const {pressed} = renderPressable({pressed: false});
+        expect(control().getAttribute('aria-pressed')).toBe('false');
+
+        await userEvent.tab();
+        await userEvent.keyboard('{Enter}');
+        expect(pressed.value).toBe(true);
+        await expect.poll(() => control().getAttribute('aria-pressed')).toBe('true');
+
+        await userEvent.keyboard(' ');
+        expect(pressed.value).toBe(false);
+    });
+
+    it('a plain Pressable carries NO aria-pressed — it is an action, not a toggle', async () => {
+        renderPressable({});
+        expect(control().hasAttribute('aria-pressed')).toBe(false);
+    });
+
+    it('real Tab skips a disabled Pressable, and a forced real click activates nothing', async () => {
+        const {clicks} = renderPressable({disabled: true});
+        expect(control().matches(':disabled')).toBe(true);
+
+        await userEvent.tab();
+        expect(document.activeElement).not.toBe(control());
+        await userEvent.keyboard('{Enter} ');
+
+        // {force: true} skips the actionability wait but still rides the real input pipeline —
+        // Chromium suppresses click on a disabled control.
+        await userEvent.click(control(), {force: true});
+        expect(clicks.value).toBe(0);
+    });
+
+    it('the `as` fallback is reachable and activatable by the SAME keys as the native button', async () => {
+        const {clicks} = renderPressable({as: 'div'});
+        expect(control().tagName).toBe('DIV');
+
+        await userEvent.tab();
+        expect(document.activeElement).toBe(control()); // tabindex="0" put it in the tab order
+
+        await userEvent.keyboard('{Enter}');
+        expect(clicks.value).toBe(1);
+
+        // Space activates on keyUP, exactly as a native button does — and only once.
+        await userEvent.keyboard(' ');
+        expect(clicks.value).toBe(2);
+    });
+
+    it('real Tab skips a disabled `as` fallback', async () => {
+        const {clicks} = renderPressable({as: 'div', disabled: true});
+
+        await userEvent.tab();
+        expect(document.activeElement).not.toBe(control());
+        await userEvent.keyboard('{Enter} ');
+        expect(clicks.value).toBe(0);
+    });
+});
+
+describe('Disclosure — real keyboard walk', () => {
+    const trigger = () => document.getElementById('details') as HTMLButtonElement;
+    const panel = () => document.getElementById('details-panel') as HTMLElement;
+
+    const renderDisclosure = (props: Record<string, unknown> = {}) => {
+        const expanded = ref(false);
+        render(
+            defineComponent(
+                () => () =>
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFC in a render-fn host
+                    h(
+                        Disclosure as any,
+                        {
+                            id: 'details',
+                            label: 'Details',
+                            headingLevel: 2,
+                            ...props,
+                            expanded: expanded.value,
+                            'onUpdate:expanded': (value: boolean) => {
+                                expanded.value = value;
+                            },
+                        },
+                        {default: () => h('p', 'Panel body')},
+                    ),
+            ),
+        );
+        return expanded;
+    };
+
+    it('Tab focuses the trigger, Enter and Space flip aria-expanded and show/hide the region', async () => {
+        const expanded = renderDisclosure();
+
+        // The heading is NOT the tab stop — the button inside it is.
+        await userEvent.tab();
+        expect(document.activeElement).toBe(trigger());
+        expect(document.activeElement?.tagName).toBe('BUTTON');
+
+        expect(trigger().getAttribute('aria-expanded')).toBe('false');
+        expect(getComputedStyle(panel()).display).toBe('none');
+
+        await userEvent.keyboard('{Enter}');
+        expect(expanded.value).toBe(true);
+        await expect.poll(() => trigger().getAttribute('aria-expanded')).toBe('true');
+        expect(getComputedStyle(panel()).display).not.toBe('none');
+
+        await userEvent.keyboard(' ');
+        expect(expanded.value).toBe(false);
+        await expect.poll(() => trigger().getAttribute('aria-expanded')).toBe('false');
+        expect(getComputedStyle(panel()).display).toBe('none');
+    });
+
+    it('the heading itself is inert — only the button it contains is reachable', async () => {
+        renderDisclosure();
+        const heading = document.querySelector('h2') as HTMLElement;
+
+        // The defect being replaced is a heading that behaves as a control: not focusable, and a
+        // real click on the heading padding (outside the button) toggles nothing.
+        heading.focus();
+        expect(document.activeElement).not.toBe(heading);
+    });
+
+    it('real Tab skips a disabled Disclosure trigger', async () => {
+        const expanded = renderDisclosure({disabled: true});
+
+        await userEvent.tab();
+        expect(document.activeElement).not.toBe(trigger());
+        await userEvent.keyboard('{Enter} ');
+        expect(expanded.value).toBe(false);
     });
 });

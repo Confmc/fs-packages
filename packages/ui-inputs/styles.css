@@ -125,6 +125,33 @@
     --ui-switch-thumb-size: 0.875rem;
     --ui-switch-thumb-bg: var(--ui-control-bg);
 
+    /* pressable (Pressable, and the Disclosure trigger which reuses the class) — the defaults
+       are deliberately CHROME-LESS: adopting Pressable in place of a bare `<span @click>` must
+       not repaint the control, only make it reachable. Every hook opts a territory in. */
+    --ui-pressable-gap: 0.4rem;
+    --ui-pressable-pad: 0;
+    --ui-pressable-min-height: auto; /* touch-target hook — see --ui-control-min-height. */
+    --ui-pressable-bg: transparent;
+    --ui-pressable-text: inherit;
+    /* the WR-0512 decomposition, repeated: a bare `font: inherit` would make a consumer's
+       font-size utility lose the source-order tie against this sheet. Both default to the
+       inherited value, so the rendering is identical to `font: inherit`. */
+    --ui-pressable-font-size: inherit;
+    --ui-pressable-line-height: inherit;
+    --ui-pressable-border-width: 0;
+    --ui-pressable-border-color: transparent;
+    --ui-pressable-radius: var(--ui-control-radius);
+    --ui-pressable-text-disabled: var(--ui-control-text-muted);
+    /* toggle mode ([aria-pressed="true"]). Unlike the other state hooks this one is NOT a no-op:
+       a toggle whose pressed state is conveyed only to assistive tech is invisible to everyone
+       else. The default is an EXISTING resting token, so it adds no colour vocabulary. */
+    --ui-pressable-bg-pressed: var(--ui-option-bg-active);
+    --ui-pressable-text-pressed: var(--ui-pressable-text);
+
+    /* disclosure — neutral by default (the panel adds no box of its own). */
+    --ui-disclosure-panel-pad: 0;
+    --ui-disclosure-panel-gap: 0;
+
     /* error / danger */
     --ui-danger-text: #dc2626;
     --ui-danger-border: #dc2626;
@@ -615,6 +642,86 @@
     font-weight: var(--ui-error-weight);
 }
 
+/* Pressable — a real <button> stripped back to nothing so it can stand in for the bare
+   `<span @click>` / `<div @click>` controls it replaces, WITHOUT repainting them. Everything a
+   native button brings (focusability, Enter/Space, :disabled, forced-colors treatment) is kept;
+   everything it paints (UA chrome) is removed. The Disclosure trigger carries this class too. */
+.ui-pressable {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--ui-pressable-gap);
+    box-sizing: border-box;
+    min-height: var(--ui-pressable-min-height);
+    padding: var(--ui-pressable-pad);
+    margin: 0;
+    background: var(--ui-pressable-bg);
+    color: var(--ui-pressable-text);
+    border-style: solid;
+    border-width: var(--ui-pressable-border-width);
+    border-color: var(--ui-pressable-border-color);
+    border-radius: var(--ui-pressable-radius);
+    /* decomposed rather than `font: inherit` — see the --ui-pressable-font-size rationale. */
+    font-family: inherit;
+    font-size: var(--ui-pressable-font-size);
+    font-style: inherit;
+    font-variant: inherit;
+    font-weight: inherit;
+    font-stretch: inherit;
+    line-height: var(--ui-pressable-line-height);
+    text-align: inherit;
+    cursor: pointer;
+    transition: box-shadow 0.12s ease;
+}
+/* The focus ring is the POINT of this component — a control with no keyboard affordance is the
+   defect it exists to close, so the ring is not themeable away to nothing by omission. */
+.ui-pressable:focus-visible {
+    outline: none;
+    box-shadow: var(--ui-focus-ring);
+}
+.ui-pressable[aria-pressed='true'] {
+    background: var(--ui-pressable-bg-pressed);
+    color: var(--ui-pressable-text-pressed);
+}
+.ui-pressable:disabled {
+    color: var(--ui-pressable-text-disabled);
+    cursor: not-allowed;
+}
+/* The `as` escape hatch renders a non-button, where :disabled cannot match (the
+   .ui-multiselect__box precedent) — the component mirrors the state as .is-disabled, which is
+   therefore only ever present on the fallback path. `pointer-events: none` is load-bearing there:
+   a plain <div> has no native event suppression, so without it a consumer's own fall-through
+   @click would still fire on a disabled control. */
+.ui-pressable.is-disabled {
+    color: var(--ui-pressable-text-disabled);
+    pointer-events: none;
+}
+
+/* Disclosure — the header wrapper is untouched (a consumer's <h2> must keep looking like their
+   <h2>; the package only guarantees the button INSIDE it is a real button). */
+.ui-disclosure__header {
+    margin: 0;
+}
+.ui-disclosure__trigger {
+    width: 100%;
+    justify-content: space-between;
+}
+.ui-disclosure__chevron {
+    width: 1.1em;
+    height: 1.1em;
+    flex: none;
+    margin-left: auto;
+    transition: transform 0.12s ease;
+}
+/* Keyed on the ARIA state itself rather than a parallel class, so the rendering cannot drift
+   out of step with what assistive tech is told (the [aria-selected] precedent). */
+.ui-disclosure__trigger[aria-expanded='true'] .ui-disclosure__chevron {
+    transform: rotate(180deg);
+}
+.ui-disclosure__panel {
+    padding: var(--ui-disclosure-panel-pad);
+    margin-top: var(--ui-disclosure-panel-gap);
+}
+
 /* Forced-colors mode strips box-shadow — which is the ONLY thing conveying focus by default:
    every focusable control sets `outline: none` and paints --ui-focus-ring through box-shadow
    (.ui-control / .ui-multiselect__box / .ui-multicombobox__box :focus, .ui-check__input and
@@ -628,7 +735,8 @@
     .ui-multiselect__box:focus-within,
     .ui-multicombobox__box:focus-within,
     .ui-check__input:focus-visible,
-    .ui-switch__input:focus-visible {
+    .ui-switch__input:focus-visible,
+    .ui-pressable:focus-visible {
         outline: 2px solid Highlight;
         outline-offset: 2px;
     }
@@ -647,7 +755,9 @@
     .ui-check__dash,
     .ui-radio__dot,
     .ui-switch__input,
-    .ui-switch__thumb {
+    .ui-switch__thumb,
+    .ui-pressable,
+    .ui-disclosure__chevron {
         transition: none;
     }
 }
