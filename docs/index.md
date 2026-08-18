@@ -69,9 +69,9 @@ Higher-level packages for domain-driven application architecture.
 
 Headless, themeable Vue components (the `ui-*` family) — behaviour and accessibility in the package, all styling through a CSS custom-property contract you map your design tokens onto.
 
-| Package                          | Description                                                                                                                                              |
-| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [ui-inputs](/packages/ui-inputs) | Headless form inputs — field/label/error, text/number/date/textarea, checkbox/switch/radio, select/combobox/multi-select — themed via `--ui-*` variables |
+| Package                          | Description                                                                                                                                                                                                        |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [ui-inputs](/packages/ui-inputs) | Headless UI components — field/label/error, text/number/date/textarea, checkbox/switch/radio, select/combobox/multi-select, plus the valueless controls `Pressable` / `Disclosure` — themed via `--ui-*` variables |
 
 ## Quality Guarantees
 

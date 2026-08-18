@@ -1,6 +1,6 @@
 # ui-inputs
 
-Headless, themeable Vue 3 form input components, styled entirely through `--ui-*` CSS custom properties.
+Headless, themeable Vue 3 UI components — form inputs, plus the interactive controls that carry no value (`Pressable`, `Disclosure`) — styled entirely through `--ui-*` CSS custom properties.
 
 `ui-inputs` opens the `ui-*` family: where `fs-*` packages are frontend **services**, `ui-*` packages are shared **UI components**. The components ship no token vocabulary and no hard-coded brand colour — you map your design tokens onto the `--ui-*` contract once, and every component follows. Soft and rounded or hard and brutalist, light or dark, from one component set.
 
@@ -136,6 +136,33 @@ Models an **array of option ids**. Committing an option toggles its membership a
 
 `Checkbox` and `Switch` model a **non-nullable `boolean`** — a checkbox is never "empty", unchecked _is_ `false` (the one deliberate exception to the family's nullable-model rule). `Checkbox` additionally takes `indeterminate` as a **prop**, mirrored onto the element's DOM property and drawn as a dash — purely visual, it never touches the model.
 
+### Interactive controls that are not form inputs
+
+`Pressable` and `Disclosure` carry no value and belong to no field. They exist to close the most common accessibility defect in a Vue codebase: a click handler on an element that cannot receive one. A bare `<span @click>` is invisible to the keyboard and announces no role — WCAG 2.1.1 _Keyboard_ and 4.1.2 _Name, Role, Value_, both Level A. `Pressable` renders a **real `<button>`**, so focusability, <kbd>Enter</kbd>/<kbd>Space</kbd> activation, `disabled` semantics and forced-colors treatment come from the platform. Tab into the controls below rather than clicking them.
+
+<ClientOnly>
+<div class="ui-demo">
+<Pressable label="Show example" @click="pressCount += 1" />
+<p class="ui-demo__state">Activated <code>{{ pressCount }}</code> times — by click, <kbd>Enter</kbd>, or <kbd>Space</kbd></p>
+<Pressable v-model:pressed="bold" label="Bold" />
+<p class="ui-demo__state">Toggle mode: <code>aria-pressed="{{ bold }}"</code> — absent entirely unless you bind <code>v-model:pressed</code></p>
+<Disclosure id="demo-disclosure" label="What does headless mean here?" :heading-level="3">
+<p>It means the package ships no token vocabulary and no colour literal — only structure, behaviour, and the <code>--ui-*</code> contract you map your own design tokens onto.</p>
+</Disclosure>
+</div>
+</ClientOnly>
+
+```vue
+<Pressable label="Show example" @click="showExample" />
+<Pressable v-model:pressed="bold" label="Bold" />
+
+<Disclosure id="details" label="Details" :heading-level="3">
+    <p>Anything at all.</p>
+</Disclosure>
+```
+
+`Disclosure` puts a real button carrying `aria-expanded` + `aria-controls` **inside** the heading — the heading contains the button, it never behaves as one. The live shape it replaces is `<h2 @click="toggle">`, which is unreachable by keyboard and lies about its role.
+
 ### Composing with FormField — error state
 
 `FormField` wires label, control, and error together (ids, `aria-describedby`, invalid flag) through its slot scope. The error is **a prop, never a service** — resolve the message in your app and pass it down. Clear the field below to see the invalid treatment appear:
@@ -156,22 +183,24 @@ Models an **array of option ids**. Committing an option toggles its membership a
 
 ## Components
 
-| Component                 | Purpose                                                                                                                      |
-| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `FormField`               | Label + error + required-marker composition wrapper (error-as-prop)                                                          |
-| `FormLabel` / `FormError` | The atoms `FormField` composes — usable standalone                                                                           |
-| `TextInput`               | Native `text` / `email` / `password` / `search` / `tel` / `url` input                                                        |
-| `NumberInput`             | Native `number` input; owns the `NaN` → `null` empty-value guard                                                             |
-| `DateInput`               | Native `date` input with ISO `min` / `max` bounds                                                                            |
-| `Textarea`                | Native `textarea` with `rows`                                                                                                |
-| `Checkbox`                | Native checkbox, visually restyled; non-nullable `boolean` model, `indeterminate` as a visual prop                           |
-| `CheckboxGroup`           | Fieldset/legend group of checkboxes — models an array of option ids in **options order**                                     |
-| `Switch`                  | The checkbox chassis with `role="switch"` — an on/off toggle with a themeable track + thumb                                  |
-| `RadioGroup`              | Fieldset/legend radio group (`role="radiogroup"`) — models `T['id'] \| null`; **native** roving focus + arrow-key selection  |
-| `SingleSelect`            | Accessible button-triggered listbox, generic over your option type                                                           |
-| `Combobox`                | Accessible searchable/filtering single-select; exposes an imperative `focus()` handle                                        |
-| `MultiSelect`             | Accessible multi-value select — models an array of option ids; toggle-in-place listbox, inline chip bar with per-chip remove |
-| `MultiCombobox`           | Accessible **searchable** multi-value select — MultiSelect's model + chips with Combobox's filtering input as the trigger    |
+| Component                 | Purpose                                                                                                                                    |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `FormField`               | Label + error + required-marker composition wrapper (error-as-prop)                                                                        |
+| `FormLabel` / `FormError` | The atoms `FormField` composes — usable standalone                                                                                         |
+| `TextInput`               | Native `text` / `email` / `password` / `search` / `tel` / `url` input                                                                      |
+| `NumberInput`             | Native `number` input; owns the `NaN` → `null` empty-value guard                                                                           |
+| `DateInput`               | Native `date` input with ISO `min` / `max` bounds                                                                                          |
+| `Textarea`                | Native `textarea` with `rows`                                                                                                              |
+| `Checkbox`                | Native checkbox, visually restyled; non-nullable `boolean` model, `indeterminate` as a visual prop                                         |
+| `CheckboxGroup`           | Fieldset/legend group of checkboxes — models an array of option ids in **options order**                                                   |
+| `Switch`                  | The checkbox chassis with `role="switch"` — an on/off toggle with a themeable track + thumb                                                |
+| `RadioGroup`              | Fieldset/legend radio group (`role="radiogroup"`) — models `T['id'] \| null`; **native** roving focus + arrow-key selection                |
+| `SingleSelect`            | Accessible button-triggered listbox, generic over your option type                                                                         |
+| `Combobox`                | Accessible searchable/filtering single-select; exposes an imperative `focus()` handle                                                      |
+| `MultiSelect`             | Accessible multi-value select — models an array of option ids; toggle-in-place listbox, inline chip bar with per-chip remove               |
+| `MultiCombobox`           | Accessible **searchable** multi-value select — MultiSelect's model + chips with Combobox's filtering input as the trigger                  |
+| `Pressable`               | A real `<button>` for a control that carries **no value** — replaces `<span @click>` / `<div @click>`; optional `aria-pressed` toggle mode |
+| `Disclosure`              | Show/hide a region from a real button (`aria-expanded` + `aria-controls`), optionally wrapped in a real heading — replaces `<h2 @click>`   |
 
 Two types complete the public surface: `SelectItem` (`{id: string | number}` — the minimal shape every option must satisfy) and `LabelKey<T>` (`keyof T | ((option: T) => string)` — how to derive an option's display string).
 
@@ -296,6 +325,16 @@ They differ in what they model, mirroring the select family:
 
 `CheckboxGroup` keeps its array in **options order** (not click order); an id whose option has not arrived yet (async options) is preserved at the tail. `RadioGroup`'s radios share one generated `name` (the group id), so the **browser** provides the roving tabindex and arrow-key selection — the component only mirrors the model from the native `change` event.
 
+### Pressable and Disclosure
+
+**`Pressable`** renders `<button type="button">` by default and that is the design, not a default to be talked out of: a native button supplies focusability, <kbd>Enter</kbd>/<kbd>Space</kbd> activation, `disabled` semantics and forced-colors behaviour for free and correctly. Hand-rolled ARIA is the fallback, never the default. The chassis is deliberately **chrome-less** (transparent background, no border, no padding, inherited font), so replacing a `<span @click>` with a `Pressable` changes the semantics without repainting the control. The root _is_ the interactive element here, so undeclared attrs (`aria-label` for an icon-only control, `title`, `data-*`, your own `@click`) fall through to it directly — nothing is re-aimed.
+
+`v-model:pressed` opts into **toggle mode**: the control conveys `aria-pressed` and flips it on activation. Left unbound the attribute is absent, because a plain action button must not claim toggle semantics. This is the one place the package hand-sets an ARIA state, and deliberately: unlike `Switch`, where `role="switch"` on a native checkbox lets the native checked state map to `aria-checked`, a `<button>` has no native pressed state, so `aria-pressed` is the only conveyance there is.
+
+The **`as` escape hatch is discouraged**. Where a button genuinely cannot be used — a clickable `<tr>`, an element whose parent forbids interactive content — `as` renders another tag and the component hand-rolls the _whole_ contract together: `role="button"`, `tabindex`, <kbd>Enter</kbd> on keydown, <kbd>Space</kbd> on keyup (dispatching a real click, so a fall-through `@click` still runs), and a disabled emulation (`tabindex="-1"` + `aria-disabled` + a pointer block). Half a contract is worse than none. Never aim it at an element the browser already activates (`a[href]`, `summary`): every handler would fire twice.
+
+**`Disclosure`** pairs a real button to its panel by a stable derived id (`${id}-panel`). Pass `headingLevel` to wrap the trigger in a real `<h1>`…`<h6>`; omit it where the disclosure is not a section heading and the wrapper stays a plain div, leaving the document outline untouched. Expansion is UI state, not form data, so — unlike the value-carrying components, whose model is required — it works **uncontrolled** out of the box; bind `v-model:expanded` only when the parent needs to drive or observe it. The panel is always mounted and hidden with `v-show`, never `v-if`: `aria-controls` is an IDREF, and one pointing at nothing names no relationship for assistive tech to expose — so the reference resolves in both states. Wrap genuinely expensive panel content in your own `v-if` inside the slot. No landmark role is stamped on the panel — a disclosure is not automatically a region, and doing so on every instance would flood the landmark list.
+
 ### Attribute fall-through
 
 Props the components do not declare — `name`, `autocomplete`, `inputmode`, `data-*`, … — fall through to the underlying native control via Vue's attribute inheritance. You do not need a declared prop to make a field participate in autofill or a native form post. (`Checkbox` and `Switch` re-aim attrs at the native **input** — their root is the wrapping `<label>`.)
@@ -307,6 +346,7 @@ Every visual rule in the shipped stylesheet keys on a `--ui-*` custom property �
 The variable surface groups into:
 
 - **Field / label** — `--ui-field-gap`, `--ui-field-margin`, `--ui-label-color`, `--ui-label-size`, `--ui-label-weight`, `--ui-label-transform`, `--ui-label-tracking`
+- **Pressable** (`Pressable` + the `Disclosure` trigger) — `--ui-pressable-gap`, `--ui-pressable-pad`, `--ui-pressable-min-height`, `--ui-pressable-bg`, `--ui-pressable-text`, `--ui-pressable-font-size`, `--ui-pressable-line-height`, `--ui-pressable-border-width`, `--ui-pressable-border-color`, `--ui-pressable-radius`, `--ui-pressable-text-disabled`, `--ui-pressable-bg-pressed`, `--ui-pressable-text-pressed`; plus `--ui-disclosure-panel-pad` / `--ui-disclosure-panel-gap`
 - **Control** (inputs + select triggers) — `--ui-control-bg`, `--ui-control-text`, `--ui-control-text-muted`, `--ui-control-border-width`, `--ui-control-border-color`, `--ui-control-border-open`, `--ui-control-radius`, `--ui-control-pad-x`, `--ui-control-pad-y`, `--ui-control-shadow`, `--ui-control-shadow-hover`, `--ui-control-bg-disabled`, `--ui-focus-ring`, `--ui-control-font-size`, `--ui-control-line-height`, `--ui-control-min-height`
 - **Listbox menu** — `--ui-menu-bg`, `--ui-menu-border-width`, `--ui-menu-border-color`, `--ui-menu-radius`, `--ui-menu-pad`, `--ui-menu-shadow`, `--ui-menu-max-height`, `--ui-menu-min-width`, `--ui-menu-max-width`, `--ui-menu-font-size`
 - **Option** — `--ui-option-radius`, `--ui-option-pad`, `--ui-option-bg-active`, `--ui-option-min-height`, `--ui-option-text-muted` (`.is-muted`), `--ui-option-bg-selected` / `--ui-option-text-selected` (MultiSelect `[aria-selected="true"]`), `--ui-clear-text` (the clear entry)
@@ -517,6 +557,8 @@ The select family keeps DOM focus on the trigger and conveys the keyboard-focuse
 - <kbd>Home</kbd>/<kbd>End</kbd> jump the keyboard highlight to the first/last option while the listbox is open, and the empty state (`emptyText`) is announced through a persistent, visually-hidden `aria-live="polite"` region — a filtered list draining to nothing is never silent.
 - `required` and `invalid` are conveyed via `aria-required` / `aria-invalid`; pair `describedby` with the error element's id — `FormField` does all of this for you.
 
+`Pressable` and `Disclosure` follow the same rule from the other end: rather than describing a control to assistive tech, they _are_ the control — a real `<button>`, whose role, focusability and activation the platform supplies. The only ARIA either sets by hand is the state a button has no native equivalent for (`aria-pressed`, `aria-expanded` + `aria-controls`).
+
 Preserve this model when writing adapters: pass `id`, `invalid`, and `describedby` through, don't re-create them.
 
 ### Errors are a prop, never a service
@@ -543,7 +585,7 @@ No file or range atoms; no date _picker_ (`DateInput` wraps the native control);
 <script setup lang="ts">
 import {computed, ref} from 'vue';
 
-import {Checkbox, CheckboxGroup, Combobox, FormField, MultiCombobox, MultiSelect, RadioGroup, SingleSelect, Switch, TextInput} from '../../packages/ui-inputs/src/index';
+import {Checkbox, CheckboxGroup, Combobox, Disclosure, FormField, MultiCombobox, MultiSelect, Pressable, RadioGroup, SingleSelect, Switch, TextInput} from '../../packages/ui-inputs/src/index';
 
 import '../../packages/ui-inputs/styles.css';
 
@@ -578,6 +620,9 @@ const sizes = [
     {id: 'medium', name: 'Medium'},
     {id: 'large', name: 'Large'},
 ];
+
+const pressCount = ref(0);
+const bold = ref(false);
 
 const fruit = ref<string | null>(null);
 const city = ref<string | null>(null);

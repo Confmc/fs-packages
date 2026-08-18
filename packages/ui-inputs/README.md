@@ -1,6 +1,7 @@
 # @script-development/ui-inputs
 
-Headless, themeable Vue 3 form input components, styled entirely through `--ui-*` CSS custom properties.
+Headless, themeable Vue 3 UI components — **form inputs** plus the **interactive controls that carry no value**
+(`Pressable`, `Disclosure`) — styled entirely through `--ui-*` CSS custom properties.
 
 Part of the Armory `ui-*` family. The components ship **no token vocabulary and no colour literal** — you map your design tokens onto the `--ui-*` contract once, and every component follows. Kendo-soft or brutalist, light or dark, from one component set.
 
@@ -18,22 +19,24 @@ import '@script-development/ui-inputs/style.css';
 
 ## Components
 
-| Component                 | Purpose                                                                                                                                                    |
-| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `FormField`               | Label + error + required-marker composition wrapper (error-as-prop)                                                                                        |
-| `FormLabel` / `FormError` | The atoms `FormField` composes                                                                                                                             |
-| `TextInput`               | Native `text` / `email` / `password` / `search` / `tel` / `url` input                                                                                      |
-| `NumberInput`             | Native `number` input; owns the `NaN`→`null` empty-value guard                                                                                             |
-| `DateInput`               | Native `date` input                                                                                                                                        |
-| `Textarea`                | Native `textarea` with `rows`                                                                                                                              |
-| `Checkbox`                | Native checkbox, visually restyled; non-nullable `boolean` model, `indeterminate` as a visual prop                                                         |
-| `CheckboxGroup`           | Fieldset/legend group of checkboxes — models an array of option ids in **options order**                                                                   |
-| `Switch`                  | The checkbox chassis with `role="switch"` — an on/off toggle with a themeable track + thumb                                                                |
-| `RadioGroup`              | Fieldset/legend radio group (`role="radiogroup"`) — models `T['id'] \| null`; **native** roving focus and arrow-key selection                              |
-| `SingleSelect`            | Accessible button-triggered listbox over `@floating-ui/vue`, generic over your option type                                                                 |
-| `Combobox`                | Accessible **searchable/filtering** single-select — a text input that filters the listbox as you type; exposes an imperative `focus()` handle              |
-| `MultiSelect`             | Accessible **multi-value** select — models an array of option ids; toggle-in-place listbox that stays open on commit, inline chip bar with per-chip remove |
-| `MultiCombobox`           | Accessible **searchable multi-value** select — MultiSelect's array model + chips with Combobox's filter-as-you-type input as the trigger                   |
+| Component                 | Purpose                                                                                                                                                                             |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `FormField`               | Label + error + required-marker composition wrapper (error-as-prop)                                                                                                                 |
+| `FormLabel` / `FormError` | The atoms `FormField` composes                                                                                                                                                      |
+| `TextInput`               | Native `text` / `email` / `password` / `search` / `tel` / `url` input                                                                                                               |
+| `NumberInput`             | Native `number` input; owns the `NaN`→`null` empty-value guard                                                                                                                      |
+| `DateInput`               | Native `date` input                                                                                                                                                                 |
+| `Textarea`                | Native `textarea` with `rows`                                                                                                                                                       |
+| `Checkbox`                | Native checkbox, visually restyled; non-nullable `boolean` model, `indeterminate` as a visual prop                                                                                  |
+| `CheckboxGroup`           | Fieldset/legend group of checkboxes — models an array of option ids in **options order**                                                                                            |
+| `Switch`                  | The checkbox chassis with `role="switch"` — an on/off toggle with a themeable track + thumb                                                                                         |
+| `RadioGroup`              | Fieldset/legend radio group (`role="radiogroup"`) — models `T['id'] \| null`; **native** roving focus and arrow-key selection                                                       |
+| `SingleSelect`            | Accessible button-triggered listbox over `@floating-ui/vue`, generic over your option type                                                                                          |
+| `Combobox`                | Accessible **searchable/filtering** single-select — a text input that filters the listbox as you type; exposes an imperative `focus()` handle                                       |
+| `MultiSelect`             | Accessible **multi-value** select — models an array of option ids; toggle-in-place listbox that stays open on commit, inline chip bar with per-chip remove                          |
+| `MultiCombobox`           | Accessible **searchable multi-value** select — MultiSelect's array model + chips with Combobox's filter-as-you-type input as the trigger                                            |
+| `Pressable`               | A real `<button>` for an interactive control that carries **no value** — the keyboard-correct replacement for `<span @click>` / `<div @click>`; optional `aria-pressed` toggle mode |
+| `Disclosure`              | Show/hide a region from a real `<button>` carrying `aria-expanded` + `aria-controls`; optionally wrapped in a real heading — the replacement for `<h2 @click>`                      |
 
 ```vue
 <FormField id="fruit" label="Fruit" :error="errors.fruit" #default="{controlId, describedby, invalid}">
@@ -219,6 +222,67 @@ spacing) and `--ui-switch-*` (track width/height/radius, checked/unchecked track
 size/colour). Every colour default derives from an existing resting token
 (`--ui-control-bg`, `--ui-control-border-color`, `--ui-control-border-open`), so an existing
 `--ui-*` token map themes the checkbox family with no new mappings — remap to opt in.
+
+### Interactive controls that are not form inputs
+
+`Pressable` and `Disclosure` carry no value and belong to no field. They exist because the single most
+common accessibility defect in a Vue codebase is a click handler on an element that cannot receive one:
+a bare `<span @click>` is invisible to the keyboard and announces no role (WCAG 2.1.1 _Keyboard_ and
+4.1.2 _Name, Role, Value_, both Level A). No linter and no input component catches it.
+
+**`Pressable` renders a real `<button type="button">`.** That is the whole design: focusability,
+Enter/Space activation, `disabled` semantics and forced-colors treatment come from the platform,
+correctly, for free — hand-rolled ARIA is the fallback, never the default. The chassis is
+_chrome-less_ (transparent background, no border, no padding, inherited font), so swapping a
+`<span @click>` for a `Pressable` changes the semantics without repainting the control.
+
+```vue
+<Pressable label="Show example" @click="showExample" />
+<Pressable v-model:pressed="bold" label="Bold" />
+```
+
+`v-model:pressed` opts into **toggle mode**: the control conveys `aria-pressed` and flips it on
+activation. Left unbound the attribute is absent — a plain action button must not claim toggle
+semantics. (This is the one place the package sets an ARIA state by hand, and deliberately: unlike
+`Switch`, where `role="switch"` on a native checkbox lets the native checked state map to
+`aria-checked`, a `<button>` has no native pressed state, so `aria-pressed` is the only conveyance
+there is.) Give an icon-only control an accessible name with `aria-label` — undeclared attrs fall
+through to the button, because here the root _is_ the interactive element.
+
+**The `as` escape hatch is discouraged.** For the cases where a button genuinely cannot be used — a
+clickable `<tr>`, an element whose parent forbids interactive content — `as` renders another tag and
+the component hand-rolls the _whole_ contract together: `role="button"`, `tabindex`, Enter on keydown,
+Space on keyup (dispatching a real click, so your own `@click` still runs), and a disabled emulation
+(`tabindex="-1"` + `aria-disabled` + a pointer block). Half a contract is worse than none. Never point
+it at an element the browser already activates (`a[href]`, `summary`) — every handler would fire twice.
+
+**`Disclosure`** shows and hides a region from a real button carrying `aria-expanded` and
+`aria-controls`, paired to the panel by the stable `${id}-panel` derived id. Pass `headingLevel` and
+the trigger is wrapped in a real `<h2>`…`<h6>`: **the heading contains the button, it never behaves as
+one** — a heading with a click handler on it is the exact defect this replaces. Omit `headingLevel`
+where the disclosure is not a section heading and the wrapper stays a plain div, leaving the document
+outline untouched.
+
+```vue
+<Disclosure id="details" label="Details" :heading-level="2">
+    <p>Anything at all.</p>
+    <template #trigger>Rich <strong>trigger</strong> content</template>
+</Disclosure>
+```
+
+Expansion is UI state, not form data, so — unlike the value-carrying components, whose model is
+required — `Disclosure` works **uncontrolled** out of the box; bind `v-model:expanded` only when the
+parent needs to drive or observe it. The panel is always mounted and hidden with `v-show`, never
+`v-if`: `aria-controls` is an IDREF, and one pointing at nothing names no relationship for assistive
+tech to expose — the reference has to resolve in both states. Wrap genuinely expensive panel content
+in your own `v-if` inside the slot.
+
+Both theme through `--ui-pressable-*` (gap, padding, min-height, background, text, font-size,
+line-height, border width/colour, radius, disabled text, and the `[aria-pressed="true"]` pair) and
+`--ui-disclosure-panel-pad` / `--ui-disclosure-panel-gap`. Every default is either neutral or derived
+from an existing resting token, with one deliberate exception: `--ui-pressable-bg-pressed` defaults to
+`--ui-option-bg-active` rather than to a no-op, because a toggle whose state reaches only a screen
+reader is invisible to everyone else.
 
 ## Theming
 
