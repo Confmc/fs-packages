@@ -45,7 +45,7 @@
         "@script-development/fs-adapter-store": "^0.1.0 || ^0.2.0 || ^0.3.0",
         "@script-development/fs-http": "^0.1.0 || ^0.2.0 || ^0.3.0 || ^0.4.0 || ^0.5.0 || ^0.6.0",
         "@script-development/fs-storage": "^0.1.0",
-        "axios": "^1.18.1",
+        "axios": "^1.19.0",
         "happy-dom": "^20.11.0",
         "vue": "^3.5.40"
     },
