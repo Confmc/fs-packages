@@ -44,11 +44,11 @@
     "devDependencies": {
         "@vue/test-utils": "^2.4.11",
         "happy-dom": "^20.11.6",
-        "vue": "^3.5.40",
+        "vue": "^3.5.41",
         "vue-router": "^5.2.0"
     },
     "peerDependencies": {
-        "vue": "^3.5.40",
+        "vue": "^3.5.41",
         "vue-router": "^5.2.0"
     },
     "engines": {
