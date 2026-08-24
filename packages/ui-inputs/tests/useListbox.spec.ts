@@ -275,6 +275,48 @@ describe('useListbox teleportTarget (KD-1136)', () => {
         wrapper.unmount();
         dialog.remove();
     });
+
+    // `Element.closest()` stops at the ShadowRoot. Without the root -> host hop, a control
+    // inside a custom element would miss a light-DOM <dialog> ancestor, teleport to body, and
+    // paint BEHIND the dialog's top layer — visible but unreachable.
+    const mountInShadow = (outer: HTMLElement) => {
+        const host = document.createElement('div');
+        outer.append(host);
+        const mountPoint = document.createElement('div');
+        host.attachShadow({mode: 'open'}).append(mountPoint);
+        return {host, wrapper: mount(Harness, {attachTo: mountPoint})};
+    };
+
+    it('crosses a shadow boundary to find a light-DOM dialog', () => {
+        const dialog = document.createElement('dialog');
+        document.body.append(dialog);
+        const {wrapper} = mountInShadow(dialog);
+
+        expect(api.teleportTarget.value).toBe(dialog);
+        wrapper.unmount();
+        dialog.remove();
+    });
+
+    it('is "body" for a shadow-hosted control with no dialog anywhere up the chain', () => {
+        const {host, wrapper} = mountInShadow(document.body);
+
+        expect(api.teleportTarget.value).toBe('body');
+        wrapper.unmount();
+        host.remove();
+    });
+
+    it('finds a dialog nested INSIDE the shadow tree without leaving it', () => {
+        const host = document.createElement('div');
+        document.body.append(host);
+        const shadow = host.attachShadow({mode: 'open'});
+        const dialog = document.createElement('dialog');
+        shadow.append(dialog);
+        const wrapper = mount(Harness, {attachTo: dialog});
+
+        expect(api.teleportTarget.value).toBe(dialog);
+        wrapper.unmount();
+        host.remove();
+    });
 });
 
 describe('useListbox click-outside after teleport (KD-1136)', () => {

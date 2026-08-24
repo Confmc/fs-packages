@@ -68,6 +68,29 @@ export interface UseListboxOptions {
 }
 
 /**
+ * `closest('dialog')`, continued across shadow boundaries.
+ *
+ * `Element.closest()` stops at the ShadowRoot, so a control rendered inside a custom element
+ * never sees a light-DOM `<dialog>` ancestor. The listbox would then teleport to `body` and
+ * paint BEHIND the dialog's top layer — visible but unreachable, which is worse than the clip
+ * KD-1136 set out to fix. Hopping root → host resumes the walk in the outer tree, so the menu
+ * lands in the same top layer as the dialog that contains its trigger.
+ */
+const closestDialog = (start: HTMLElement): HTMLElement | null => {
+    let node: Element | null = start;
+
+    while (node) {
+        const dialog = node.closest('dialog');
+        if (dialog) return dialog;
+
+        const root = node.getRootNode();
+        node = root instanceof ShadowRoot ? root.host : null;
+    }
+
+    return null;
+};
+
+/**
  * The behavioural core shared by every ui-inputs listbox control (SingleSelect, Combobox, and —
  * forthcoming — MultiSelect). Entirely position/index-based, so the option type `T` never crosses
  * this boundary: the caller owns the derived list and hands back only its length and index-keyed
@@ -267,7 +290,7 @@ export function useListbox(options: UseListboxOptions) {
     // Native <dialog> is a top layer: a menu teleported to body would paint BEHIND it. Landing
     // on the closest dialog (kendo Tooltip's proven pattern) keeps the menu in that layer;
     // otherwise body, so overflow/stacking ancestors of the trigger cannot clip it (KD-1136).
-    const teleportTarget = computed<string | HTMLElement>(() => root.value?.closest('dialog') ?? 'body');
+    const teleportTarget = computed<string | HTMLElement>(() => (root.value && closestDialog(root.value)) ?? 'body');
 
     const {floatingStyles, middlewareData} = useFloating(reference, floating, {
         placement: floatingOptions.placement ?? 'bottom-start',
