@@ -151,10 +151,86 @@ describe('Pressable — the discouraged `as` escape hatch', () => {
         expect(wrapper.emitted('update:pressed')).toBeUndefined();
 
         // The pointer block on the fallback path is CSS-only, so a dispatched click DOES reach the
-        // handler — the disabled guard, not `pointer-events`, is what stops it committing.
+        // element — and the guard has to stop the consumer's own fall-through handler too, not
+        // just our toggle. An early return cannot do that; `stopImmediatePropagation` can.
         wrapper.element.dispatchEvent(new MouseEvent('click', {bubbles: true}));
         await wrapper.vm.$nextTick();
-        expect(onClick).toHaveBeenCalledTimes(1); // the consumer's own handler still ran…
-        expect(wrapper.emitted('update:pressed')).toBeUndefined(); // …but nothing was toggled
+        expect(onClick).not.toHaveBeenCalled();
+        expect(wrapper.emitted('update:pressed')).toBeUndefined();
+    });
+
+    it('runs NOTHING when disabled — the fallback matches the native path it emulates', async () => {
+        // Half a disabled contract is worse than none, so the two paths are asserted against each
+        // other rather than separately: the browser refuses to dispatch on a disabled <button>,
+        // and the hand-rolled emulation has to reach the same observable end state.
+        const nativeClick = vi.fn();
+        const native = mount(Pressable, {props: {label: 'Row', disabled: true}, attrs: {onClick: nativeClick}});
+        native.element.dispatchEvent(new MouseEvent('click', {bubbles: true}));
+
+        const fallbackClick = vi.fn();
+        const fallback = mount(Pressable, {
+            props: {as: 'div', label: 'Row', disabled: true},
+            attrs: {onClick: fallbackClick},
+        });
+        fallback.element.dispatchEvent(new MouseEvent('click', {bubbles: true}));
+
+        await Promise.all([native.vm.$nextTick(), fallback.vm.$nextTick()]);
+
+        expect(nativeClick).not.toHaveBeenCalled();
+        expect(fallbackClick).not.toHaveBeenCalled();
+        expect(fallbackClick.mock.calls.length).toBe(nativeClick.mock.calls.length);
+    });
+
+    it('stops the fall-through handler because OUR handler is merged ahead of it', async () => {
+        // The mechanism, pinned rather than trusted: `stopImmediatePropagation` only reaches
+        // handlers that run AFTER it, so the guard works only while Vue keeps the component's own
+        // template handler ahead of a fallthrough `onClick` in the merged array. A capture-phase
+        // listener on the parent discriminates the two ways the consumer could stay silent —
+        // it fires before the target either way, so seeing it prove the click was dispatched
+        // while the consumer's handler stayed silent means our handler stopped it.
+        const consumer = vi.fn();
+        const captured = vi.fn();
+        const wrapper = mount(Pressable, {
+            attachTo: document.body,
+            props: {as: 'div', label: 'Row', pressed: false},
+            attrs: {onClick: consumer},
+        });
+        document.body.addEventListener('click', captured, true);
+
+        try {
+            wrapper.element.dispatchEvent(new MouseEvent('click', {bubbles: true}));
+            await wrapper.vm.$nextTick();
+            expect(captured).toHaveBeenCalledTimes(1);
+            expect(consumer).toHaveBeenCalledTimes(1); // enabled: ours toggled, theirs ran after
+
+            await wrapper.setProps({disabled: true});
+            wrapper.element.dispatchEvent(new MouseEvent('click', {bubbles: true}));
+            await wrapper.vm.$nextTick();
+
+            expect(captured).toHaveBeenCalledTimes(2); // the click WAS dispatched…
+            expect(consumer).toHaveBeenCalledTimes(1); // …and ours ran first and stopped the array
+            expect(wrapper.emitted('update:pressed')).toHaveLength(1);
+        } finally {
+            document.body.removeEventListener('click', captured, true);
+            wrapper.unmount();
+        }
+    });
+
+    it('clears the Space latch even when disabled interrupts the press mid-key', async () => {
+        const onClick = vi.fn();
+        const wrapper = mount(Pressable, {props: {as: 'div', label: 'Row'}, attrs: {onClick}});
+
+        key(wrapper.element, 'keydown', ' '); // armed…
+        await wrapper.setProps({disabled: true}); // …and the control is taken away before keyup
+
+        key(wrapper.element, 'keyup', ' ');
+        expect(onClick).not.toHaveBeenCalled(); // deaf while disabled
+
+        await wrapper.setProps({disabled: false});
+        // The keyup of the very press that was cancelled must not activate on re-enable, and
+        // neither must the next one: the latch is cleared on every Space keyup, not only on the
+        // ones that reach activation.
+        key(wrapper.element, 'keyup', ' ');
+        expect(onClick).not.toHaveBeenCalled();
     });
 });

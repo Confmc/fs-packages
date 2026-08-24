@@ -1,6 +1,7 @@
 <template>
     <component
         :is="as"
+        ref="control"
         v-bind="chassis"
         class="ui-pressable"
         :class="{'is-disabled': !native && disabled}"
@@ -14,7 +15,10 @@
 </template>
 
 <script setup lang="ts">
-import {computed, ref} from 'vue';
+import {computed, onMounted, ref, useTemplateRef} from 'vue';
+
+import {warnWhenUnnamed} from '../internal/accessible-name';
+import {ensureRefValueExists} from '../internal/reactivity';
 
 // The root IS the interactive element here (unlike Checkbox/Switch, whose root is the <label>),
 // so attrs must NOT be re-aimed: `aria-label`, `title`, `data-*`, a consumer's own `@click` —
@@ -39,7 +43,8 @@ const {
      * would translate the keypress too and every handler would run twice.
      */
     as?: string;
-    /** label text; the default slot overrides it (icon-only? supply `aria-label` via attrs). */
+    /** label text; the default slot overrides it (icon-only? supply `aria-label` via attrs — the
+     *  dev-only mount check warns when no route names the control at all). */
     label?: string;
     disabled?: boolean;
 }>();
@@ -66,6 +71,12 @@ const pressed = defineModel<boolean | undefined>('pressed', {default: undefined}
 
 const native = computed(() => as === 'button');
 
+const control = useTemplateRef<HTMLElement>('control');
+
+// `label` is optional and the default slot may render empty, so a consumer can end up with a
+// focusable, correctly-roled, UNNAMED control. Dev-only, mount-time, once per instance.
+onMounted(() => warnWhenUnnamed(ensureRefValueExists(control), 'Pressable', 'the `label` prop, default-slot content'));
+
 /** Per-path chassis: native semantics, or the hand-rolled equivalents the fallback must supply. */
 const chassis = computed(() =>
     native.value
@@ -83,11 +94,18 @@ const spaceArmed = ref(false);
  */
 const handlesKeys = (): boolean => !native.value && !disabled;
 
-const onClick = (): void => {
-    // The disabled guard keeps synthetic dispatch honest (the Switch/Checkbox precedent): a real
-    // browser never fires click on a disabled button, and the fallback path blocks the pointer in
-    // CSS — but a programmatic dispatch reaches both.
-    if (disabled) return;
+const onClick = (event: MouseEvent): void => {
+    if (disabled) {
+        // Stopping — not returning — is what keeps the two paths from diverging. A real browser
+        // dispatches NO click on a disabled <button>, so nothing downstream runs on the native
+        // path; the fallback has no such protection (its pointer block is CSS-only, and a
+        // programmatic dispatch reaches both paths anyway), so a bare early return would leave a
+        // consumer's own fall-through @click running on a control that is supposed to be inert.
+        // Vue merges this handler ahead of the fallthrough one and patches the event so a stop
+        // inside the merged array skips the rest — spec-pinned, not assumed.
+        event.stopImmediatePropagation();
+        return;
+    }
     if (pressed.value !== undefined) pressed.value = !pressed.value;
 };
 
@@ -105,8 +123,13 @@ const onKeydown = (event: KeyboardEvent): void => {
 };
 
 const onKeyup = (event: KeyboardEvent): void => {
-    if (!handlesKeys() || event.key !== ' ' || !spaceArmed.value) return;
+    if (event.key !== ' ') return;
+    // Disarm on EVERY Space keyup, before anything can bail out: a press interrupted by the
+    // control going disabled mid-key would otherwise leave the latch set, and the next Space
+    // keyup after re-enable — including the keyup of that same cancelled press — would activate.
+    const armed = spaceArmed.value;
     spaceArmed.value = false;
+    if (!handlesKeys() || !armed) return;
     (event.currentTarget as HTMLElement).click();
 };
 </script>
