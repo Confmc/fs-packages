@@ -42,15 +42,15 @@
         "typecheck": "tsc --noEmit"
     },
     "dependencies": {
-        "vue-component-type-helpers": "^3.3.7"
+        "vue-component-type-helpers": "^3.3.11"
     },
     "devDependencies": {
         "@vue/test-utils": "^2.4.11",
-        "happy-dom": "^20.11.0",
-        "vue": "^3.5.40"
+        "happy-dom": "^20.11.6",
+        "vue": "^3.5.41"
     },
     "peerDependencies": {
-        "vue": "^3.5.40"
+        "vue": "^3.5.41"
     },
     "engines": {
         "node": ">=24.0.0"
