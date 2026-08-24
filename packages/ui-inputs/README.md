@@ -281,6 +281,18 @@ so a pointer over it targets whatever sits behind it and an _ancestor's_ `@click
 `as` at an element the browser already activates (`a[href]`, `summary`) — every handler would fire
 twice.
 
+**Keys inside an `as` fallback belong to the child that has focus.** Both key handlers check the
+event's origin and ignore anything that reached the root by bubbling, so a nested `<input>` keeps
+its spacebar and a nested `<button>` keeps its own Enter. Without that check every Space typed into
+an inline filter field is swallowed and converted into an activation of the row — the field cannot
+hold a space at all. The check is deliberately **not** applied to the click handler: a click targets
+the element under the pointer, so the ordinary `<Pressable as="div"><span>Label</span></Pressable>`
+shape legitimately reports a child as the target, and the same guard there would stop the row
+responding to the mouse. Keys follow focus; clicks follow the pointer. One consequence to plan for:
+the child's own click still **bubbles**, so a row with its own `@click` counts an activation when a
+nested button is pressed, by keyboard or mouse alike — put `@click.stop` on the child where that is
+not what you want.
+
 **`Disclosure`** shows and hides a region from a real button carrying `aria-expanded` and
 `aria-controls`, paired to the panel by the stable `${id}-panel` derived id. Pass `headingLevel` and
 the trigger is wrapped in a real `<h2>`…`<h6>`: **the heading contains the button, it never behaves as
@@ -329,6 +341,23 @@ The control has a background/text/border hook for each interactive state, so a s
 The `.is-open` and `.is-invalid` state classes follow `:focus-visible` in source order, so they keep winning their border/background where they did before — the focus hooks only take effect on a plain focused control.
 
 The listbox options carry the same discipline: `--ui-option-text-muted` (fires on `.is-muted`, defaults to the resting option text) and the MultiSelect membership pair `--ui-option-bg-selected` / `--ui-option-text-selected` (fire on `[aria-selected="true"]` in the MultiSelect popup, default `transparent` / resting text — the pointer highlight keeps winning its background). All no-ops until you opt in.
+
+### Two media queries the tokens do not reach
+
+The stylesheet ends with two gated blocks that deliberately step **outside** the `--ui-*` contract,
+because the user's own preferences outrank the theme.
+
+`@media (forced-colors: active)` — a high-contrast theme makes the user agent ignore author colours
+outright, so anything conveyed by colour alone disappears. Three states would: keyboard focus
+(painted through `box-shadow`, which forced-colors strips), the `aria-pressed` toggle state, and the
+`as` fallback's disabled state. The block restores each with a **system colour** — `Highlight` for
+the focus outline, `Highlight` / `HighlightText` for the pressed surface, `GrayText` for both
+disabled paths — rather than opting out with `forced-color-adjust`, since speaking the user's
+palette is the point of the mode. Your `--ui-pressable-bg-pressed` / `--ui-pressable-text-disabled`
+overrides do not apply there, and that is correct.
+
+`@media (prefers-reduced-motion: reduce)` zeroes every transition the sheet declares, scoped to the
+`ui-*` surfaces that carry one so your own transitions stay untouched.
 
 ### Typography escape hatch
 

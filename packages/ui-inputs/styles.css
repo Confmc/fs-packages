@@ -744,6 +744,29 @@
         outline: 2px solid Highlight;
         outline-offset: 2px;
     }
+
+    /* Same class of defect, one surface further in. The pressed state is conveyed ONLY by
+       `background` + `color` and the fallback's disabled state ONLY by `color` — all author
+       colours, all ignored here, so a pressed toggle computes pixel-identical to an unpressed one
+       (measured: transparent-white over Canvas vs opaque white, black text either way) and a
+       disabled `as` fallback identical to an enabled one. `aria-pressed` and `aria-disabled` still
+       reach assistive tech, so this is a SIGHTED high-contrast gap (WCAG 1.4.11), not an AT one.
+       System colours rather than `forced-color-adjust`: the user's palette is the whole point of
+       the mode, so the fix is to speak it, not to opt out of it. Highlight/HighlightText is what
+       the UA itself uses for a selected surface. Source order matches the base sheet (pressed,
+       then disabled) so a control that is BOTH still resolves disabled last, as it does there. */
+    .ui-pressable[aria-pressed='true'] {
+        background: Highlight;
+        color: HighlightText;
+    }
+    /* The native path already gets GrayText from the UA's own disabled-button treatment (measured:
+       it computes rgb(96, 0, 0) here unaided); declaring it makes the two paths hold the SAME
+       source rather than one of them depending on a UA default, and the spec asserts them against
+       each other. `.is-disabled` is the leg that was genuinely broken. */
+    .ui-pressable:disabled,
+    .ui-pressable.is-disabled {
+        color: GrayText;
+    }
 }
 
 /* Respect a reduced-motion preference — zero every transition the stylesheet declares (the 0.12s

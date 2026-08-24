@@ -124,13 +124,29 @@ const spaceArmed = ref(false);
  */
 const handlesKeys = (): boolean => !native.value && !disabled;
 
+/**
+ * Whether a key event belongs to a focusable DESCENDANT rather than to this control. A keyboard
+ * event targets the FOCUSED element and then bubbles, so without this the fallback translates a
+ * child's keys as its own: every Space typed into a nested `<input>` is `preventDefault()`ed and
+ * converted into an activation of the row — the text box loses its spacebar entirely — and Enter
+ * on a nested `<button>` activates the row instead of the button (measured, both).
+ *
+ * **This must NOT be applied to `onClick`, and the asymmetry is not an oversight.** A click
+ * targets the element under the POINTER, so the ordinary `<Pressable as="div"><span>Label</span>`
+ * shape legitimately has `target !== currentTarget` — the same check there would make the most
+ * common use of the escape hatch stop responding to the mouse. Keys follow focus; clicks follow
+ * the pointer. Both directions are spec-pinned, including a click on a non-focusable child.
+ */
+const isChildsOwnKey = (event: KeyboardEvent): boolean => event.target !== event.currentTarget;
+
 const onClick = (event: MouseEvent): void => {
     if (disabled) {
         // Stopping — not returning — is what keeps the two paths from diverging. A real browser
         // dispatches NO click on a disabled <button>, so nothing downstream runs on the native
-        // path; the fallback has no such protection (its pointer block is CSS-only, and a
-        // programmatic dispatch reaches both paths anyway), so a bare early return would leave a
-        // consumer's own fall-through @click running on a control that is supposed to be inert.
+        // path; the fallback has no such protection (it stays fully in hit-testing, deliberately —
+        // see the .is-disabled rule — and a programmatic dispatch reaches both paths anyway), so a
+        // bare early return would leave a consumer's own fall-through @click running on a control
+        // that is supposed to be inert.
         // Vue merges this handler ahead of the fallthrough one and patches the event so a stop
         // inside the merged array skips the rest — spec-pinned, not assumed.
         event.stopImmediatePropagation();
@@ -140,6 +156,7 @@ const onClick = (event: MouseEvent): void => {
 };
 
 const onKeydown = (event: KeyboardEvent): void => {
+    if (isChildsOwnKey(event)) return;
     if (!handlesKeys()) return;
     if (event.key === 'Enter') {
         event.preventDefault();
@@ -159,6 +176,10 @@ const onKeyup = (event: KeyboardEvent): void => {
     // keyup after re-enable — including the keyup of that same cancelled press — would activate.
     const armed = spaceArmed.value;
     spaceArmed.value = false;
+    // Origin check AFTER the disarm, deliberately: a keyup from a child still clears a latch the
+    // root armed (focus moved into a nested control mid-press), which is the conservative end of
+    // the same stale-latch failure the disarm exists to close.
+    if (isChildsOwnKey(event)) return;
     if (!handlesKeys() || !armed) return;
     (event.currentTarget as HTMLElement).click();
 };

@@ -555,6 +555,104 @@ describe('Pressable — a real pointer on a disabled `as` fallback', () => {
     });
 });
 
+/**
+ * The shape the nested-key defect actually harms: a clickable row (the `as` fallback) with an
+ * inline control inside it. Only a real browser can settle this one — happy-dom performs neither
+ * the native Enter-to-click translation on the nested button nor the text insertion on the nested
+ * input, so it can prove the event was left alone but not that the field still WORKS.
+ */
+const renderFallbackWithChildren = () => {
+    const rowClicks = ref(0);
+    const childClicks = ref(0);
+    render(
+        defineComponent(
+            () => () =>
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFC in a render-fn host
+                h(
+                    Pressable as any,
+                    {
+                        as: 'div',
+                        label: 'Row',
+                        onClick: () => {
+                            rowClicks.value += 1;
+                        },
+                    },
+                    {
+                        default: () => [
+                            h('input', {id: 'nested-filter'}),
+                            h('button', {
+                                id: 'nested-remove',
+                                type: 'button',
+                                onClick: () => {
+                                    childClicks.value += 1;
+                                },
+                            }),
+                        ],
+                    },
+                ),
+        ),
+    );
+    return {rowClicks, childClicks};
+};
+
+describe('Pressable — a real keyboard inside an `as` fallback', () => {
+    const filter = () => document.getElementById('nested-filter') as HTMLInputElement;
+    const remove = () => document.getElementById('nested-remove') as HTMLButtonElement;
+
+    it("a nested <input> keeps its SPACEBAR — the row must not translate a child's keys", async () => {
+        // The headline harm, end to end through the real CDP input pipeline. Unguarded, every
+        // Space keydown reaching the root was preventDefault()ed AND converted into an activation
+        // of the row: the field could not hold a space, and the row fired on every attempt.
+        const {rowClicks} = renderFallbackWithChildren();
+
+        // Focus, never click: a real pointer click on the child would bubble to the row's own
+        // @click and confound the count with an activation that has nothing to do with keys.
+        filter().focus();
+        await userEvent.keyboard('a b');
+
+        expect(filter().value).toBe('a b'); // the space actually landed in the field
+        expect(rowClicks.value).toBe(0); // …and nothing activated the row
+    });
+
+    it('gives Enter on a nested <button> to the BUTTON — and the row then sees exactly what a MOUSE click gives it', async () => {
+        // Two halves, and the scope is worth stating precisely. (a) The child's own activation is
+        // restored: unguarded, the row preventDefault()ed the Enter, so the button's handler never
+        // ran at ALL — measured 0 — and the row activated instead through the row's own synthetic
+        // click. This is the half happy-dom structurally cannot show. (b) The row still counting an
+        // activation is NOT the same defect and is not this component's to suppress: it is the
+        // child's real click BUBBLING, exactly as a mouse click on that button does. A consumer who
+        // does not want it writes `@click.stop` on the child. Asserted as an equivalence against
+        // the mouse rather than as a bare number, so the two causes cannot be confused.
+        const {rowClicks, childClicks} = renderFallbackWithChildren();
+
+        remove().focus();
+        await userEvent.keyboard('{Enter}');
+        expect(childClicks.value).toBe(1);
+        expect(rowClicks.value).toBe(1); // the bubbled click, not a translated key
+
+        await userEvent.click(remove());
+        expect(childClicks.value).toBe(2);
+        // One activation apiece, keyboard and pointer alike — the equivalence, stated as two
+        // concrete numbers so it cannot hold vacuously at zero.
+        expect(rowClicks.value).toBe(2);
+    });
+
+    it('POSITIVE CONTROL — the ROW itself still activates on Enter and Space', async () => {
+        // Same fixture, same focusable children, focus on the root. Without this the two zeros
+        // above are equally consistent with a fallback that has stopped answering the keyboard.
+        const {rowClicks} = renderFallbackWithChildren();
+
+        control().focus();
+        expect(document.activeElement).toBe(control());
+
+        await userEvent.keyboard('{Enter}');
+        expect(rowClicks.value).toBe(1);
+
+        await userEvent.keyboard(' ');
+        expect(rowClicks.value).toBe(2);
+    });
+});
+
 describe('Disclosure — real keyboard walk', () => {
     const trigger = () => document.getElementById('details') as HTMLButtonElement;
     const panel = () => document.getElementById('details-panel') as HTMLElement;

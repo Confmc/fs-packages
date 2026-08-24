@@ -142,7 +142,9 @@ describe('Pressable — the discouraged `as` escape hatch', () => {
 
         expect(wrapper.attributes('tabindex')).toBe('-1');
         expect(wrapper.attributes('aria-disabled')).toBe('true');
-        // A <div> has no native `disabled`, so .is-disabled carries the CSS pointer-events block.
+        // A <div> has no native `disabled`, so the state is mirrored as a class — which the
+        // stylesheet reads for the muted colour and the not-allowed cursor, NOT for a pointer
+        // block (see the `must not come back` pin in styles.browser.spec.ts).
         expect(wrapper.classes()).toContain('is-disabled');
 
         key(wrapper.element, 'keydown', 'Enter');
@@ -151,9 +153,9 @@ describe('Pressable — the discouraged `as` escape hatch', () => {
         expect(onClick).not.toHaveBeenCalled();
         expect(wrapper.emitted('update:pressed')).toBeUndefined();
 
-        // The pointer block on the fallback path is CSS-only, so a dispatched click DOES reach the
-        // element — and the guard has to stop the consumer's own fall-through handler too, not
-        // just our toggle. An early return cannot do that; `stopImmediatePropagation` can.
+        // The fallback stays in hit-testing, so a click DOES reach the element — and the guard has
+        // to stop the consumer's own fall-through handler too, not just our toggle. An early
+        // return cannot do that; `stopImmediatePropagation` can.
         wrapper.element.dispatchEvent(new MouseEvent('click', {bubbles: true}));
         await wrapper.vm.$nextTick();
         expect(onClick).not.toHaveBeenCalled();
@@ -215,6 +217,85 @@ describe('Pressable — the discouraged `as` escape hatch', () => {
             document.body.removeEventListener('click', captured, true);
             wrapper.unmount();
         }
+    });
+
+    it('leaves a nested <input> its OWN spacebar — keys follow FOCUS, not the bubble path', () => {
+        // A keyboard event targets the FOCUSED element and then bubbles, so an unguarded fallback
+        // translates a child's keys as its own. Measured at HEAD before the fix: the keydown came
+        // back `defaultPrevented` AND the row activated — a consumer's inline filter input inside a
+        // clickable row could not type a space at all, and every attempt fired the row.
+        const onClick = vi.fn();
+        const wrapper = mount(Pressable, {
+            props: {as: 'div', label: 'Row'},
+            attrs: {onClick},
+            slots: {default: '<input class="nested" />'},
+        });
+        const nested = wrapper.element.querySelector('.nested')!;
+
+        const down = key(nested, 'keydown', ' ');
+        key(nested, 'keyup', ' ');
+
+        expect(down.defaultPrevented).toBe(false); // the space reaches the text field
+        expect(onClick).not.toHaveBeenCalled(); // …and does not activate the row
+    });
+
+    it('does not translate Enter from a nested <button> into an activation of its own', () => {
+        // `defaultPrevented` is the load-bearing half, and the scope is narrower than the zero
+        // below suggests: happy-dom performs no native Enter-to-click translation, so what this
+        // pins is that the ROW's key handler stayed out of it. In a real browser the child's own
+        // click then bubbles and the row does see one activation — the same one a mouse click
+        // gives it, which the browser suite asserts as an equivalence. Suppressing the default is
+        // exactly how the unguarded version stole the button's Enter outright (child handler
+        // measured at 0), so an untouched event is what hands the job back to the browser.
+        const onClick = vi.fn();
+        const wrapper = mount(Pressable, {
+            props: {as: 'div', label: 'Row'},
+            attrs: {onClick},
+            slots: {default: '<button class="nested" type="button">Remove</button>'},
+        });
+        const nested = wrapper.element.querySelector('.nested')!;
+
+        const down = key(nested, 'keydown', 'Enter');
+
+        expect(down.defaultPrevented).toBe(false);
+        expect(onClick).not.toHaveBeenCalled();
+    });
+
+    it('POSITIVE CONTROL — the guard does not deafen the ROOT: Enter and Space still activate', () => {
+        // Without this, every assertion above is equally consistent with a fallback that has
+        // stopped responding to the keyboard altogether — which is the component's whole purpose.
+        // Same fixture as the two cases above, carrying the same focusable child.
+        const onClick = vi.fn();
+        const wrapper = mount(Pressable, {
+            props: {as: 'div', label: 'Row'},
+            attrs: {onClick},
+            slots: {default: '<input class="nested" />'},
+        });
+
+        key(wrapper.element, 'keydown', 'Enter');
+        expect(onClick).toHaveBeenCalledTimes(1);
+
+        key(wrapper.element, 'keydown', ' ');
+        key(wrapper.element, 'keyup', ' ');
+        expect(onClick).toHaveBeenCalledTimes(2);
+    });
+
+    it('POSITIVE CONTROL — a click on a NON-focusable child still activates: clicks follow the POINTER', () => {
+        // The asymmetry, pinned. A click targets the element under the pointer, so the ordinary
+        // `<Pressable as="div"><span>Label</span></Pressable>` shape legitimately has
+        // `target !== currentTarget`. Copying the key guard onto `onClick` "for consistency" would
+        // break the most common use of the escape hatch, and this case is what says so.
+        const onClick = vi.fn();
+        const wrapper = mount(Pressable, {
+            props: {as: 'div', pressed: false},
+            attrs: {onClick},
+            slots: {default: '<span class="lbl">Label</span>'},
+        });
+
+        wrapper.element.querySelector('.lbl')!.dispatchEvent(new MouseEvent('click', {bubbles: true}));
+
+        expect(onClick).toHaveBeenCalledTimes(1);
+        expect(wrapper.emitted('update:pressed')?.at(-1)).toEqual([true]);
     });
 
     it('clears the Space latch even when disabled interrupts the press mid-key', async () => {

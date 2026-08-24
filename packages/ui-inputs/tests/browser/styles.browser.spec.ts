@@ -526,6 +526,56 @@ describe('styles.css — forced-colors keyboard focus (WR-0587 F-1)', () => {
         expect(focused.outlineWidth).toBe('2px');
     });
 
+    /**
+     * Resolve a system colour the way the ENGINE does, from a throwaway element inside the same
+     * forced-colors context — so the assertions below pin `Highlight` / `GrayText` themselves and
+     * not whatever hex Chromium's emulated palette happens to use this version.
+     */
+    const systemColour = (property: 'color' | 'backgroundColor', value: string): string => {
+        const probe = document.createElement('div');
+        probe.style.setProperty(property === 'color' ? 'color' : 'background-color', value);
+        document.body.append(probe);
+        cleanupTargets.push(probe);
+        return getComputedStyle(probe)[property];
+    };
+
+    it('conveys the PRESSED state with a system colour — author colours alone are ignored here', async () => {
+        // Measured at HEAD before the fix: pressed computed `rgb(255, 255, 255)` on Canvas white
+        // against an unpressed `rgba(255, 255, 255, 0)` — DIFFERENT strings, IDENTICAL pixels, with
+        // black text on both. A naive `not.toBe(plain)` would have passed on the defect, which is
+        // why this pins the system colours rather than mere inequality.
+        addStyle(uiCss);
+        const plain = addPressable();
+        const pressed = addPressable();
+        pressed.setAttribute('aria-pressed', 'true');
+        await enableForcedColors();
+
+        expect(getComputedStyle(pressed).backgroundColor).toBe(systemColour('backgroundColor', 'Highlight'));
+        expect(getComputedStyle(pressed).color).toBe(systemColour('color', 'HighlightText'));
+        // …and the pair is genuinely distinguishable, in the same fixture and the same sheet.
+        expect(getComputedStyle(pressed).color).not.toBe(getComputedStyle(plain).color);
+    });
+
+    it('conveys DISABLED with GrayText on BOTH paths — the `as` fallback was the broken leg', async () => {
+        // The native path already gets GrayText from the UA's own disabled-button treatment; the
+        // fallback is a <div>, which the UA owes nothing, so at HEAD a disabled row computed
+        // pixel-identical to an enabled one. Asserted across the two paths, as the non-forced
+        // sibling spec does, plus against the enabled control that makes the zero meaningful.
+        addStyle(uiCss);
+        const native = addPressable();
+        native.disabled = true;
+        const fbEnabled = addFallback('');
+        const fbDisabled = addFallback('is-disabled');
+        await enableForcedColors();
+
+        const grey = systemColour('color', 'GrayText');
+        expect(getComputedStyle(native).color).toBe(grey);
+        expect(getComputedStyle(fbDisabled).color).toBe(grey);
+        // POSITIVE CONTROL — an ENABLED fallback in the same fixture is NOT greyed, so the two
+        // assertions above are not just reporting that forced-colors flattens everything.
+        expect(getComputedStyle(fbEnabled).color).not.toBe(grey);
+    });
+
     it('restores the outline on the MultiSelect / MultiCombobox box (:focus-within) and the check + switch inputs (:focus-visible)', async () => {
         addStyle(uiCss);
 
