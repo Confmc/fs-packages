@@ -688,12 +688,16 @@
 }
 /* The `as` escape hatch renders a non-button, where :disabled cannot match (the
    .ui-multiselect__box precedent) — the component mirrors the state as .is-disabled, which is
-   therefore only ever present on the fallback path. `pointer-events: none` is load-bearing there:
-   a plain <div> has no native event suppression, so without it a consumer's own fall-through
-   @click would still fire on a disabled control. */
+   therefore only ever present on the fallback path. Suppressing the fall-through @click is the
+   COMPONENT's job, not this rule's: `onClick` calls stopImmediatePropagation() while disabled, so
+   the event dies at the control. `pointer-events: none` used to stand in for that and must NOT
+   come back — it removes the control from hit-testing entirely, so a pointer over a disabled
+   fallback targets whatever sits BEHIND it and an ancestor's own @click fires (measured with
+   document.elementFromPoint; pinned in the browser suite). Transparent is worse than inert.
+   `cursor` is set here because the rule no longer hides the resting `cursor: pointer`. */
 .ui-pressable.is-disabled {
     color: var(--ui-pressable-text-disabled);
-    pointer-events: none;
+    cursor: not-allowed;
 }
 
 /* Disclosure — the header wrapper is untouched (a consumer's <h2> must keep looking like their

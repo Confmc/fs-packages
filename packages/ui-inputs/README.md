@@ -246,8 +246,11 @@ activation. Left unbound the attribute is absent — a plain action button must 
 semantics. (This is the one place the package sets an ARIA state by hand, and deliberately: unlike
 `Switch`, where `role="switch"` on a native checkbox lets the native checked state map to
 `aria-checked`, a `<button>` has no native pressed state, so `aria-pressed` is the only conveyance
-there is.) Give an icon-only control an accessible name with `aria-label` — undeclared attrs fall
-through to the button, because here the root _is_ the interactive element.
+there is.) **Initialise the ref you bind**: `defineModel` cannot tell an unbound model from one
+bound to `undefined`, so a `ref<boolean>()` left uninitialised produces a control that renders no
+`aria-pressed` and silently never toggles — development warns when it sees a `pressed` binding
+holding `undefined`. Give an icon-only control an accessible name with `aria-label` — undeclared
+attrs fall through to the button, because here the root _is_ the interactive element.
 
 **Both controls warn in development when they render with no accessible name.** `label` is optional
 on `Pressable` and `Disclosure` alike and their slots may render empty, so nothing in the types stops
@@ -255,21 +258,28 @@ a consumer producing a focusable, correctly-roled, _unnamed_ control — a WCAG 
 failure, and on `Disclosure` a trigger whose only content is the `aria-hidden` chevron. On mount each
 control checks that a name arrives by one of four routes — rendered content, `aria-label`,
 `aria-labelledby` or `title` — and `console.warn`s once, naming all four, when none does. Icon-only
-usage with `aria-label` is legitimate and stays silent. The check is stripped from production builds
-by `process.env.NODE_ENV`, and it takes `aria-labelledby` at its word rather than dereferencing the
-IDREF (the target may legitimately mount later), so a _dangling_ reference passes it — axe is the
-layer that catches that one.
+usage with `aria-label` is legitimate and stays silent. It takes `aria-labelledby` at its word rather
+than dereferencing the IDREF (the target may legitimately mount later), so a _dangling_ reference
+passes it — axe is the layer that catches that one.
+
+Every dev-only warning here is gated on `process.env.NODE_ENV`, which Vite and webpack substitute for
+you; **rollup needs `@rollup/plugin-replace`**. Where nothing substitutes it the package fails
+_silent_ rather than warning — a library must not `console.warn` into a host it cannot identify, and
+a missing `process` global must not become a `ReferenceError` at mount.
 
 **The `as` escape hatch is discouraged.** For the cases where a button genuinely cannot be used — a
 clickable `<tr>`, an element whose parent forbids interactive content — `as` renders another tag and
 the component hand-rolls the _whole_ contract together: `role="button"`, `tabindex`, Enter on keydown,
 Space on keyup (dispatching a real click, so your own `@click` still runs), and a disabled emulation
-(`tabindex="-1"` + `aria-disabled` + a pointer block, **plus a click stop**). Half a contract is worse
+(`tabindex="-1"` + `aria-disabled`, **plus a click stop**). Half a contract is worse
 than none — and the stop is the half that is easy to miss: on the native path the browser dispatches
 no click at all on a disabled `<button>`, so a fall-through `@click` never runs, and an emulation
 that still ran it on a programmatic click would be a different control from the one it claims to
-emulate. Never point it at an element the browser already activates (`a[href]`, `summary`) — every
-handler would fire twice.
+emulate. The stop is a real `stopImmediatePropagation()` in the component, **not** a
+`pointer-events: none` in the stylesheet: that rule takes the control out of hit-testing altogether,
+so a pointer over it targets whatever sits behind it and an _ancestor's_ `@click` fires. Never point
+`as` at an element the browser already activates (`a[href]`, `summary`) — every handler would fire
+twice.
 
 **`Disclosure`** shows and hides a region from a real button carrying `aria-expanded` and
 `aria-controls`, paired to the panel by the stable `${id}-panel` derived id. Pass `headingLevel` and

@@ -1,9 +1,4 @@
-// `process` is not a browser global, and this package declares no node types. The reference below
-// exists purely as the token every consumer bundler replaces statically (Vite, webpack and rollup
-// all substitute `process.env.NODE_ENV`), which is what strips this guard from production builds.
-// `import.meta.env` is NOT usable here: ui-inputs emits a CJS artifact too, where `import.meta` is
-// a syntax error — the same reason `.oxlintrc.json` disables `unicorn/prefer-import-meta-properties`.
-declare const process: {env: {NODE_ENV?: string}};
+import {devWarningsSuppressed} from './dev-warning';
 
 /** The naming routes this check can see. Content is checked separately — it is not an attribute. */
 const NAME_ATTRIBUTES = ['aria-label', 'aria-labelledby', 'title'] as const;
@@ -23,7 +18,7 @@ const trimmedAttribute = (element: HTMLElement, name: string): string => (elemen
  * A dangling IDREF therefore passes here; axe in the browser suite is the layer that catches it.
  */
 export const warnWhenUnnamed = (element: HTMLElement, component: string, contentRoutes: string): void => {
-    if (process.env.NODE_ENV === 'production') return;
+    if (devWarningsSuppressed()) return;
     if ((element.textContent || '').trim() !== '') return;
     if (NAME_ATTRIBUTES.some((name) => trimmedAttribute(element, name) !== '')) return;
 

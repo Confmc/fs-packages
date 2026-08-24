@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import {mount} from '@vue/test-utils';
-import {describe, expect, it, vi} from 'vitest';
+import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
+import {defineComponent, h, ref} from 'vue';
 
 import Pressable from '../src/components/Pressable.vue';
 
@@ -232,5 +233,95 @@ describe('Pressable — the discouraged `as` escape hatch', () => {
         // ones that reach activation.
         key(wrapper.element, 'keyup', ' ');
         expect(onClick).not.toHaveBeenCalled();
+    });
+});
+
+/**
+ * The cost of "no `aria-pressed` until `v-model:pressed` is bound": `defineModel` cannot tell an
+ * UNBOUND model from one bound to `undefined`, and `onClick` skips the assignment on `undefined`,
+ * so a consumer who binds an uninitialised `ref<boolean>()` gets a control that silently never
+ * toggles. The click semantics are deliberately left alone — toggling from `undefined` would make
+ * an unbound Pressable start emitting and rendering `aria-pressed`, which is the contract above.
+ * The fix is to make the silent case LOUD, and the discriminator is the listener a binding passes
+ * alongside the prop. Asserted in both directions: a warning that fires on correct code would cost
+ * the guard its authority.
+ */
+describe('Pressable — the uninitialised-model guard', () => {
+    /** A host that binds a real `v-model:pressed`, so the compiler — not the spec — builds the props. */
+    const ModelHost = defineComponent({
+        props: {initial: {type: Boolean, default: undefined}},
+        setup(props) {
+            const pressed = ref<boolean | undefined>(props.initial);
+            return () =>
+                h(Pressable, {
+                    pressed: pressed.value,
+                    label: 'Bold',
+                    'onUpdate:pressed': (value: boolean) => (pressed.value = value),
+                });
+        },
+    });
+
+    let warn: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+        warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    });
+
+    afterEach(() => {
+        vi.restoreAllMocks();
+        vi.unstubAllEnvs();
+    });
+
+    it('is the defect being reported: a bound model holding undefined never toggles or emits', async () => {
+        const wrapper = mount(ModelHost);
+        await wrapper.findComponent(Pressable).trigger('click');
+
+        // Unchanged on purpose — this is the trade, not the bug. The warning is the fix.
+        expect(wrapper.findComponent(Pressable).emitted('update:pressed')).toBeUndefined();
+        expect(wrapper.findComponent(Pressable).attributes('aria-pressed')).toBeUndefined();
+    });
+
+    it('warns when a real v-model:pressed is bound to an uninitialised ref', () => {
+        mount(ModelHost);
+
+        expect(warn).toHaveBeenCalledTimes(1);
+        const message = String(warn.mock.calls[0]?.[0]);
+        expect(message).toContain('<Pressable>');
+        expect(message).toContain('v-model:pressed');
+        expect(message).toContain('Initialise the bound ref to a boolean.');
+    });
+
+    it('warns on the hand-written `:pressed` + `@update:pressed` pair too — same discriminator', () => {
+        mount(Pressable, {props: {label: 'Bold', pressed: undefined, 'onUpdate:pressed': vi.fn()}});
+
+        expect(warn).toHaveBeenCalledTimes(1);
+    });
+
+    it('stays silent once the bound model holds a boolean — false is initialised, not absent', () => {
+        mount(ModelHost, {props: {initial: false}});
+
+        expect(warn).not.toHaveBeenCalled();
+    });
+
+    it('stays silent on an UNBOUND Pressable — the supported plain-action-button case', () => {
+        mount(Pressable, {props: {label: 'Go'}});
+
+        expect(warn).not.toHaveBeenCalled();
+    });
+
+    it('stays silent on `:pressed` with no listener — a prop without a binding is not a bound model', () => {
+        // The listener, not the prop, is the discriminator: this consumer never asked to be told
+        // about changes, so there is nothing uninitialised to complain about.
+        mount(Pressable, {props: {label: 'Go', pressed: undefined}});
+
+        expect(warn).not.toHaveBeenCalled();
+    });
+
+    it('is stripped in production, on the same gate as the accessible-name check', () => {
+        vi.stubEnv('NODE_ENV', 'production');
+
+        mount(ModelHost);
+
+        expect(warn).not.toHaveBeenCalled();
     });
 });

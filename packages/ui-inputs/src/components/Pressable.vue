@@ -15,9 +15,10 @@
 </template>
 
 <script setup lang="ts">
-import {computed, onMounted, ref, useTemplateRef} from 'vue';
+import {computed, getCurrentInstance, onMounted, ref, useTemplateRef} from 'vue';
 
 import {warnWhenUnnamed} from '../internal/accessible-name';
+import {devWarningsSuppressed} from '../internal/dev-warning';
 import {ensureRefValueExists} from '../internal/reactivity';
 
 // The root IS the interactive element here (unlike Checkbox/Switch, whose root is the <label>),
@@ -73,9 +74,38 @@ const native = computed(() => as === 'button');
 
 const control = useTemplateRef<HTMLElement>('control');
 
+// Read in setup, where `<script setup>` guarantees an instance. `vnode.props` is null when the
+// consumer passes nothing at all, which is itself the unbound case.
+const vnodeProps = getCurrentInstance()?.vnode.props;
+
+/**
+ * Dev-only guard for the cost of the trade above: `defineModel` cannot tell "no model bound" from
+ * "model bound, holding `undefined`", and `onClick` skips the assignment on `undefined` to keep an
+ * UNBOUND Pressable from claiming toggle semantics. A consumer who binds a `ref<boolean>()` they
+ * never initialised therefore gets a control that silently never toggles and never emits.
+ *
+ * The two cases ARE distinguishable, just not through the model ref: a binding passes an
+ * `onUpdate:pressed` listener alongside the prop. Verified to hold for `v-model:pressed` AND for a
+ * hand-written `:pressed` + `@update:pressed` pair, and to stay absent for both a bare `<Pressable>`
+ * and `:pressed` with no listener — so this cannot fire on correct code.
+ */
+const warnWhenModelUninitialised = (): void => {
+    if (devWarningsSuppressed()) return;
+    if (pressed.value !== undefined) return;
+    if (vnodeProps?.['onUpdate:pressed'] === undefined) return;
+
+    console.warn(
+        '[ui-inputs] <Pressable> has `v-model:pressed` bound to `undefined`, so it renders no ' +
+            '`aria-pressed` and never toggles or emits. Initialise the bound ref to a boolean.',
+    );
+};
+
 // `label` is optional and the default slot may render empty, so a consumer can end up with a
 // focusable, correctly-roled, UNNAMED control. Dev-only, mount-time, once per instance.
-onMounted(() => warnWhenUnnamed(ensureRefValueExists(control), 'Pressable', 'the `label` prop, default-slot content'));
+onMounted(() => {
+    warnWhenUnnamed(ensureRefValueExists(control), 'Pressable', 'the `label` prop, default-slot content');
+    warnWhenModelUninitialised();
+});
 
 /** Per-path chassis: native semantics, or the hand-rolled equivalents the fallback must supply. */
 const chassis = computed(() =>

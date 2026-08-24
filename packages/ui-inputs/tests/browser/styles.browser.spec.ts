@@ -349,6 +349,22 @@ const addPressable = (parentStyle = ''): HTMLButtonElement => {
     return button;
 };
 
+/** A `<div class="ui-pressable">` — the `as` escape hatch's shape, which cannot match :disabled. */
+const addFallback = (extraClass: string, parent: HTMLElement = document.body): HTMLElement => {
+    const fallback = document.createElement('div');
+    fallback.className = `ui-pressable ${extraClass}`.trim();
+    fallback.textContent = 'Row';
+    parent.append(fallback);
+    if (parent === document.body) cleanupTargets.push(fallback);
+    return fallback;
+};
+
+/** What a pointer at the element's own centre would actually target. */
+const hitAtCentre = (element: Element): Element | null => {
+    const rect = element.getBoundingClientRect();
+    return document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+};
+
 describe('styles.css — pressable chassis (--ui-pressable-*)', () => {
     it('is CHROME-LESS by default, so adopting it in place of a bare <span @click> repaints nothing', () => {
         addStyle(uiCss);
@@ -411,14 +427,34 @@ describe('styles.css — pressable chassis (--ui-pressable-*)', () => {
         expect(getComputedStyle(native).color).toBe('rgb(107, 114, 128)'); // --ui-control-text-muted
         expect(getComputedStyle(native).cursor).toBe('not-allowed');
 
-        // A <div role="button"> cannot match :disabled, so the fallback mirrors it as a class —
-        // and pointer-events is what actually suppresses the click a plain div would still fire.
-        const fallback = document.createElement('div');
-        fallback.className = 'ui-pressable is-disabled';
-        document.body.append(fallback);
-        cleanupTargets.push(fallback);
+        // A <div role="button"> cannot match :disabled, so the fallback mirrors it as a class. The
+        // affordance has to be mirrored explicitly: the resting `cursor: pointer` would otherwise
+        // survive on a control that does nothing.
+        const fallback = addFallback('is-disabled');
         expect(getComputedStyle(fallback).color).toBe('rgb(107, 114, 128)');
-        expect(getComputedStyle(fallback).pointerEvents).toBe('none');
+        expect(getComputedStyle(fallback).cursor).toBe('not-allowed');
+    });
+
+    it('leaves a DISABLED fallback IN hit-testing — `pointer-events: none` must not come back', () => {
+        // The rule this pins used to carry `pointer-events: none`, on the rationale that a plain
+        // <div> has no native event suppression. It suppressed nothing: it removed the control from
+        // hit-testing, so a pointer at its centre targeted whatever sat BEHIND it and an ancestor's
+        // own @click fired on a control that is supposed to be inert. Transparent is worse than
+        // inert, and the component's stopImmediatePropagation() is what actually does the job now
+        // (interaction.browser.spec.ts pins the end-to-end harm).
+        addStyle(uiCss);
+        const ancestor = document.createElement('div');
+        ancestor.style.cssText = 'padding: 24px';
+        const disabled = addFallback('is-disabled', ancestor);
+        // Same fixture, same stylesheet, enabled: without it a passing result would prove only
+        // that elementFromPoint returns SOMETHING, not that the disabled rule stopped hiding it.
+        const enabled = addFallback('', ancestor);
+        document.body.append(ancestor);
+        cleanupTargets.push(ancestor);
+
+        expect(getComputedStyle(disabled).pointerEvents).not.toBe('none');
+        expect(hitAtCentre(disabled)).toBe(disabled);
+        expect(hitAtCentre(enabled)).toBe(enabled);
     });
 
     it('rotates the Disclosure chevron off the ARIA state, and leaves the heading unstyled', async () => {

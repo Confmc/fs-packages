@@ -484,6 +484,77 @@ describe('Pressable — real keyboard walk', () => {
     });
 });
 
+/**
+ * A fallback nested in an ancestor that has its own @click — the shape a clickable row or card
+ * actually has in a consuming app, and the only shape in which the hit-testing defect is visible.
+ */
+const renderNestedFallback = (props: Record<string, unknown> = {}) => {
+    const ancestorClicks = ref(0);
+    const controlClicks = ref(0);
+    render(
+        defineComponent(
+            () => () =>
+                h(
+                    'div',
+                    {
+                        style: 'padding: 24px',
+                        onClick: () => {
+                            ancestorClicks.value += 1;
+                        },
+                    },
+                    [
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFC in a render-fn host
+                        h(Pressable as any, {
+                            label: 'Show example',
+                            as: 'div',
+                            ...props,
+                            onClick: () => {
+                                controlClicks.value += 1;
+                            },
+                        }),
+                    ],
+                ),
+        ),
+    );
+    return {ancestorClicks, controlClicks};
+};
+
+/** What a pointer at the element's own centre would actually target. */
+const hitAtCentre = (element: Element): Element | null => {
+    const rect = element.getBoundingClientRect();
+    return document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+};
+
+describe('Pressable — a real pointer on a disabled `as` fallback', () => {
+    it('activates NEITHER the control nor its ancestor — inert, not transparent', async () => {
+        const {ancestorClicks, controlClicks} = renderNestedFallback({disabled: true});
+
+        // The measurement that found the defect. `pointer-events: none` used to take the control
+        // out of hit-testing, so this returned the ANCESTOR and a real pointer never touched the
+        // control at all — which also meant the component's own disabled guard could never run.
+        expect(hitAtCentre(control())).toBe(control());
+
+        // {force: true} skips Playwright's actionability wait (aria-disabled reads as "not
+        // enabled") but still rides the real CDP input pipeline, so the browser does its own
+        // hit-testing at the point — which is the thing under test.
+        await userEvent.click(control(), {force: true});
+        expect(controlClicks.value).toBe(0);
+        // The harm: an ancestor's handler firing from a click on a control that is disabled.
+        expect(ancestorClicks.value).toBe(0);
+    });
+
+    it('POSITIVE CONTROL — the same fixture, enabled, reaches both handlers', async () => {
+        const {ancestorClicks, controlClicks} = renderNestedFallback();
+
+        expect(hitAtCentre(control())).toBe(control());
+
+        await userEvent.click(control());
+        // Without this, the zeros above would be consistent with a fixture that wires nothing.
+        expect(controlClicks.value).toBe(1);
+        expect(ancestorClicks.value).toBe(1);
+    });
+});
+
 describe('Disclosure — real keyboard walk', () => {
     const trigger = () => document.getElementById('details') as HTMLButtonElement;
     const panel = () => document.getElementById('details-panel') as HTMLElement;

@@ -76,4 +76,22 @@ describe.each(CONTROLS)('$name — accessible-name guard', ({name, component, pr
 
         expect(warn).not.toHaveBeenCalled();
     });
+
+    it('stays SILENT rather than crashing when NOTHING replaced the token and `process` is absent', () => {
+        // A browser has no `process`. Vite and webpack substitute the token by default; rollup on
+        // its own does NOT (it needs `@rollup/plugin-replace`), so an unreplaced token reaching a
+        // browser is a real shipping state — and reading `.env` off a missing global there is a
+        // ReferenceError at MOUNT, taking down the component whose entire job is accessibility.
+        // Fails safe to silent, never to warning: a library must not warn into a host it cannot
+        // identify.
+        const original = Reflect.get(globalThis, 'process');
+        Reflect.deleteProperty(globalThis, 'process');
+
+        try {
+            expect(() => mount(component, {props})).not.toThrow();
+            expect(warn).not.toHaveBeenCalled();
+        } finally {
+            Reflect.set(globalThis, 'process', original);
+        }
+    });
 });
