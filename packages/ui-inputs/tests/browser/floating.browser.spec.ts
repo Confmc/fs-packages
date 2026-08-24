@@ -214,6 +214,48 @@ describe('listbox teleport — the open menu escapes a clipping ancestor (KD-113
         expect(popup.contains(hit)).toBe(true);
     });
 
+    // The UA stylesheet gives <dialog> `position: absolute`, so a dialog IS the containing
+    // block for an absolutely positioned descendant — and its `overflow: hidden` clips one.
+    // Landing in the dialog escapes the OUTER clip and walks straight into the dialog's own.
+    // `strategy: 'fixed'` is the escape: a fixed box's containing block is the viewport, which
+    // the dialog cannot clip, while the anchor stays a DOM descendant and keeps the top layer.
+    it('escapes overflow:hidden on the dialog it teleported into', async () => {
+        const model = ref<number | null>(null);
+        render(
+            defineComponent(
+                () => () =>
+                    h('dialog', {id: 'dlg', open: true, style: 'height: 60px; overflow: hidden; padding: 0;'}, [
+                        h(SingleSelect, {
+                            options: FRUITS,
+                            label: 'name',
+                            id: 'fruit',
+                            modelValue: model.value,
+                            'onUpdate:modelValue': (value: number | null) => {
+                                model.value = value;
+                            },
+                        }),
+                    ]),
+            ),
+        );
+        const trigger = document.getElementById('fruit') as HTMLElement;
+
+        await userEvent.click(trigger);
+        const popup = document.querySelector('.ui-select__menu') as HTMLElement;
+        await expect.poll(() => popup.getBoundingClientRect().height).toBeGreaterThan(0);
+
+        const dialogRect = (document.getElementById('dlg') as HTMLElement).getBoundingClientRect();
+        const popupRect = popup.getBoundingClientRect();
+        // The menu is taller than the 60px dialog — so it MUST overhang to be fully reachable.
+        expect(popupRect.height).toBeGreaterThan(dialogRect.height);
+        expect(popupRect.bottom).toBeGreaterThan(dialogRect.bottom);
+
+        // The decisive check: a point on the menu BELOW the dialog's bottom edge must hit the
+        // menu. If the dialog clipped it, that point paints nothing of ours.
+        const probeY = dialogRect.bottom + Math.min(12, popupRect.bottom - dialogRect.bottom - 1);
+        const hit = document.elementFromPoint(popupRect.left + 8, probeY);
+        expect(popup.contains(hit)).toBe(true);
+    });
+
     it('teleports into the nearest dialog rather than body (native-dialog top-layer)', async () => {
         const model = ref<number | null>(null);
         render(

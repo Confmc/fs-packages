@@ -293,6 +293,14 @@ export function useListbox(options: UseListboxOptions) {
     const teleportTarget = computed<string | HTMLElement>(() => (root.value && closestDialog(root.value)) ?? 'body');
 
     const {floatingStyles, middlewareData} = useFloating(reference, floating, {
+        // `fixed`, not the default `absolute`. Teleporting into a <dialog> escapes the outer
+        // clip and walks into the dialog's own: the UA stylesheet gives <dialog>
+        // `position: absolute`, so it IS the containing block for an absolutely positioned
+        // descendant, and its `overflow: hidden` clips the anchor. A fixed box's containing
+        // block is the viewport, which no ancestor's overflow can clip, while the anchor stays
+        // a DOM descendant of the dialog and so keeps its top layer. autoUpdate already
+        // recomputes on ancestor scroll, which is what a fixed popup needs to stay anchored.
+        strategy: 'fixed',
         placement: floatingOptions.placement ?? 'bottom-start',
         middleware: [
             offset(floatingOptions.offset ?? 4),

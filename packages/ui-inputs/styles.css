@@ -381,7 +381,10 @@
    `max(100%, 240px)`, or a long option), so shift() and hide() keep measuring a box that
    encloses the whole menu. */
 .ui-menu-anchor {
-    position: absolute;
+    /* `fixed` matches useListbox's floating-ui strategy, and is what survives an
+       `overflow: hidden` <dialog> — see the composable for why absolute does not. This
+       declaration is the pre-layout value; floating-ui writes the same `position` inline. */
+    position: fixed;
     z-index: 50;
     width: max-content;
 }
