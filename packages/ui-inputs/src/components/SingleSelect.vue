@@ -38,43 +38,46 @@
             open && optionLabels.length === 0 ? emptyText : ''
         }}</span>
 
-        <OptionList
-            v-if="open"
-            ref="menu"
-            variant="ui-select"
-            :labels="optionLabels"
-            :keys="optionKeys"
-            :pointer="pointer"
-            :listbox-id="listboxId"
-            :option-id="optionId"
-            :is-selected="isSelected"
-            :is-muted="isMuted"
-            :floating-styles="floatingStyles"
-            :options-label="optionsLabel"
-            :empty-text="emptyText"
-            :clear-label="clearLabel"
-            :clear-id="clearId"
-            :clear-active="clearHighlighted"
-            :clear-selected="model === null"
-            @hover="pointer = $event"
-            @commit="commit"
-            @clear-hover="highlightClear"
-            @clear-commit="commitClear"
-        >
-            <!-- Re-scope OptionList's index into the typed per-option payload; the fallback
-                 (the plain labelOf text) keeps slotless consumers byte-identical. -->
-            <template #option="{index}">
-                <slot
-                    name="option"
-                    :option="sorted[index]"
-                    :index="index"
-                    :selected="isSelected(index)"
-                    :active="pointer === index"
-                >
-                    {{ optionLabels[index] }}
-                </slot>
-            </template>
-        </OptionList>
+        <!-- Teleport stays OUTSIDE OptionList so the instance `$el` remains the <ul>
+             (componentEl). Target is closest('dialog') ?? body — KD-1136. -->
+        <Teleport v-if="open" :to="teleportTarget">
+            <OptionList
+                ref="menu"
+                variant="ui-select"
+                :labels="optionLabels"
+                :keys="optionKeys"
+                :pointer="pointer"
+                :listbox-id="listboxId"
+                :option-id="optionId"
+                :is-selected="isSelected"
+                :is-muted="isMuted"
+                :floating-styles="floatingStyles"
+                :options-label="optionsLabel"
+                :empty-text="emptyText"
+                :clear-label="clearLabel"
+                :clear-id="clearId"
+                :clear-active="clearHighlighted"
+                :clear-selected="model === null"
+                @hover="pointer = $event"
+                @commit="commit"
+                @clear-hover="highlightClear"
+                @clear-commit="commitClear"
+            >
+                <!-- Re-scope OptionList's index into the typed per-option payload; the fallback
+                     (the plain labelOf text) keeps slotless consumers byte-identical. -->
+                <template #option="{index}">
+                    <slot
+                        name="option"
+                        :option="sorted[index]"
+                        :index="index"
+                        :selected="isSelected(index)"
+                        :active="pointer === index"
+                    >
+                        {{ optionLabels[index] }}
+                    </slot>
+                </template>
+            </OptionList>
+        </Teleport>
     </div>
 </template>
 
@@ -193,6 +196,7 @@ const {
     optionId,
     activeDescendant,
     floatingStyles,
+    teleportTarget,
     onKey,
     close,
     clearHighlighted,

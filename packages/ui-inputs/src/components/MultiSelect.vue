@@ -66,38 +66,41 @@
             open && optionLabels.length === 0 ? emptyText : ''
         }}</span>
 
-        <OptionList
-            v-if="open"
-            ref="menu"
-            variant="ui-multiselect"
-            multiselectable
-            :labels="optionLabels"
-            :keys="optionKeys"
-            :pointer="pointer"
-            :listbox-id="listboxId"
-            :option-id="optionId"
-            :is-selected="isSelected"
-            :is-muted="isMuted"
-            :floating-styles="floatingStyles"
-            :options-label="optionsLabel"
-            :empty-text="emptyText"
-            @hover="pointer = $event"
-            @commit="commit"
-        >
-            <!-- Re-scope OptionList's index into the typed per-option payload; the fallback
-                 (the plain labelOf text) keeps slotless consumers byte-identical. -->
-            <template #option="{index}">
-                <slot
-                    name="option"
-                    :option="sorted[index]"
-                    :index="index"
-                    :selected="isSelected(index)"
-                    :active="pointer === index"
-                >
-                    {{ optionLabels[index] }}
-                </slot>
-            </template>
-        </OptionList>
+        <!-- Teleport stays OUTSIDE OptionList so the instance `$el` remains the <ul>
+             (componentEl). Target is closest('dialog') ?? body — KD-1136. -->
+        <Teleport v-if="open" :to="teleportTarget">
+            <OptionList
+                ref="menu"
+                variant="ui-multiselect"
+                multiselectable
+                :labels="optionLabels"
+                :keys="optionKeys"
+                :pointer="pointer"
+                :listbox-id="listboxId"
+                :option-id="optionId"
+                :is-selected="isSelected"
+                :is-muted="isMuted"
+                :floating-styles="floatingStyles"
+                :options-label="optionsLabel"
+                :empty-text="emptyText"
+                @hover="pointer = $event"
+                @commit="commit"
+            >
+                <!-- Re-scope OptionList's index into the typed per-option payload; the fallback
+                     (the plain labelOf text) keeps slotless consumers byte-identical. -->
+                <template #option="{index}">
+                    <slot
+                        name="option"
+                        :option="sorted[index]"
+                        :index="index"
+                        :selected="isSelected(index)"
+                        :active="pointer === index"
+                    >
+                        {{ optionLabels[index] }}
+                    </slot>
+                </template>
+            </OptionList>
+        </Teleport>
     </div>
 </template>
 
@@ -219,19 +222,21 @@ const commit = (index: number): boolean => {
     return true;
 };
 
-const {open, pointer, listboxId, optionId, activeDescendant, floatingStyles, onKey, close} = useListbox({
-    root,
-    reference,
-    floating,
-    id: () => id,
-    disabled: () => disabled,
-    listLength: () => sorted.value.length,
-    // A closed MultiSelect opens on Enter, ArrowDown, or Space — the SingleSelect skeleton.
-    openKeys: (key) => ['Enter', 'ArrowDown', ' '].includes(key),
-    onCommit: commit,
-    onDismiss: () => close(),
-    onOutside: () => close(),
-});
+const {open, pointer, listboxId, optionId, activeDescendant, floatingStyles, teleportTarget, onKey, close} = useListbox(
+    {
+        root,
+        reference,
+        floating,
+        id: () => id,
+        disabled: () => disabled,
+        listLength: () => sorted.value.length,
+        // A closed MultiSelect opens on Enter, ArrowDown, or Space — the SingleSelect skeleton.
+        openKeys: (key) => ['Enter', 'ArrowDown', ' '].includes(key),
+        onCommit: commit,
+        onDismiss: () => close(),
+        onOutside: () => close(),
+    },
+);
 
 const toggle = () => {
     open.value = !open.value;

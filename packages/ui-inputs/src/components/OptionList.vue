@@ -73,6 +73,8 @@ import type {CSSProperties} from 'vue';
  * instance's `$el` (via `componentEl` in `internal/reactivity`) — no `defineExpose`, which the
  * family reserves for public imperative handles, never internal plumbing. A second root node
  * (or a root comment outside the `<ul>`) would break `$el` resolution for every consumer.
+ * Parents wrap this component in `<Teleport>` (KD-1136); the Teleport must stay outside so
+ * `$el` remains the `<ul>` rather than the Teleport placeholder.
  */
 const {
     labels,

@@ -67,13 +67,20 @@
     --ui-menu-pad: 0.375rem;
     --ui-menu-shadow: 0 8px 32px rgba(0, 0, 0, 0.16);
     --ui-menu-max-height: 15rem;
-    /* width clamps — the defaults reproduce the historical `min-width: 100%` (of the
-       positioned ancestor, i.e. ≥ the trigger) with no max clamp. A territory caps them
-       (e.g. `max(100%, 240px)` / `calc(100vw - 16px)`) without fighting specificity. */
-    --ui-menu-min-width: 100%;
+    /* width clamps — the popup is never narrower than its trigger: the layout engine writes
+       the trigger width onto the popup as `--ui-menu-reference-width`, and the popup rule
+       takes the max of that and this var. `--ui-menu-min-width` is therefore an EXTRA floor
+       (default `0px`, i.e. the trigger width alone), so a territory writes a plain length —
+       `--ui-menu-min-width: 240px` — where the pre-teleport idiom was `max(100%, 240px)`.
+       Do NOT write `var(--ui-menu-reference-width)` into this declaration: a `var()` here
+       substitutes against `:root`, where the reference width never exists, so it would bake
+       in the fallback and the popup would never read its own trigger width. `100%` is out
+       for the same reason it stopped working — teleported, the popup's containing block is
+       the viewport (or the dialog), not the trigger. */
+    --ui-menu-min-width: 0px;
     --ui-menu-max-width: none;
-    /* menu typography — `inherit` is the status quo (the popup sizes by inheritance from
-       the non-teleported component root); the var gives the popup its own hook. */
+    /* menu typography — `inherit` is from the teleport target (body or the nearest dialog),
+       not the component root; the var is the hook to match control text. */
     --ui-menu-font-size: inherit;
 
     /* option */
@@ -368,7 +375,9 @@
 
 /* The listbox popup is shared verbatim across the button-triggered SingleSelect, the
    text-input-triggered Combobox, the chip-bar MultiSelect, and the input-as-trigger
-   MultiCombobox — one rule body, all four class families, same --ui-* vars. */
+   MultiCombobox — one rule body, all four class families, same --ui-* vars. Teleported
+   to closest(dialog) ?? body (KD-1136), so `position: absolute; z-index: 50` competes at
+   that stacking context rather than inside a clipping ancestor of the trigger. */
 .ui-select__menu,
 .ui-combobox__menu,
 .ui-multiselect__menu,
@@ -378,7 +387,10 @@
     padding: var(--ui-menu-pad);
     position: absolute;
     z-index: 50;
-    min-width: var(--ui-menu-min-width);
+    /* The trigger-width floor is resolved HERE, on the popup — the only element that carries
+       `--ui-menu-reference-width`. `0px` is the pre-layout fallback: content-sized for the one
+       frame before floating-ui's first pass, never a full-viewport flash. */
+    min-width: max(var(--ui-menu-reference-width, 0px), var(--ui-menu-min-width));
     max-width: var(--ui-menu-max-width);
     font-size: var(--ui-menu-font-size);
     box-sizing: border-box;

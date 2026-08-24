@@ -70,38 +70,41 @@
             open && optionLabels.length === 0 ? emptyText : ''
         }}</span>
 
-        <OptionList
-            v-if="open"
-            ref="menu"
-            variant="ui-multicombobox"
-            multiselectable
-            :labels="optionLabels"
-            :keys="optionKeys"
-            :pointer="pointer"
-            :listbox-id="listboxId"
-            :option-id="optionId"
-            :is-selected="isSelected"
-            :is-muted="isMuted"
-            :floating-styles="floatingStyles"
-            :options-label="optionsLabel"
-            :empty-text="emptyText"
-            @hover="pointer = $event"
-            @commit="commit"
-        >
-            <!-- Re-scope OptionList's index into the typed per-option payload; the fallback
-                 (the plain labelOf text) keeps slotless consumers byte-identical. -->
-            <template #option="{index}">
-                <slot
-                    name="option"
-                    :option="filtered[index]"
-                    :index="index"
-                    :selected="isSelected(index)"
-                    :active="pointer === index"
-                >
-                    {{ optionLabels[index] }}
-                </slot>
-            </template>
-        </OptionList>
+        <!-- Teleport stays OUTSIDE OptionList so the instance `$el` remains the <ul>
+             (componentEl). Target is closest('dialog') ?? body — KD-1136. -->
+        <Teleport v-if="open" :to="teleportTarget">
+            <OptionList
+                ref="menu"
+                variant="ui-multicombobox"
+                multiselectable
+                :labels="optionLabels"
+                :keys="optionKeys"
+                :pointer="pointer"
+                :listbox-id="listboxId"
+                :option-id="optionId"
+                :is-selected="isSelected"
+                :is-muted="isMuted"
+                :floating-styles="floatingStyles"
+                :options-label="optionsLabel"
+                :empty-text="emptyText"
+                @hover="pointer = $event"
+                @commit="commit"
+            >
+                <!-- Re-scope OptionList's index into the typed per-option payload; the fallback
+                     (the plain labelOf text) keeps slotless consumers byte-identical. -->
+                <template #option="{index}">
+                    <slot
+                        name="option"
+                        :option="filtered[index]"
+                        :index="index"
+                        :selected="isSelected(index)"
+                        :active="pointer === index"
+                    >
+                        {{ optionLabels[index] }}
+                    </slot>
+                </template>
+            </OptionList>
+        </Teleport>
     </div>
 </template>
 
@@ -252,22 +255,31 @@ const commit = (index: number): boolean => {
     return true;
 };
 
-const {open, pointer, listboxId, optionId, activeDescendant, floatingStyles, onKey, close, resetHighlight} = useListbox(
-    {
-        root,
-        reference: box,
-        floating,
-        id: () => id,
-        disabled: () => disabled,
-        listLength: () => filtered.value.length,
-        // Only ArrowDown opens a closed list — a printable key must fall through to the input so
-        // it can filter (Combobox parity); focus, click, and typing are the other open paths.
-        openKeys: (key) => key === 'ArrowDown',
-        onCommit: commit,
-        onDismiss: () => dismiss(),
-        onOutside: () => dismiss(),
-    },
-);
+const {
+    open,
+    pointer,
+    listboxId,
+    optionId,
+    activeDescendant,
+    floatingStyles,
+    teleportTarget,
+    onKey,
+    close,
+    resetHighlight,
+} = useListbox({
+    root,
+    reference: box,
+    floating,
+    id: () => id,
+    disabled: () => disabled,
+    listLength: () => filtered.value.length,
+    // Only ArrowDown opens a closed list — a printable key must fall through to the input so
+    // it can filter (Combobox parity); focus, click, and typing are the other open paths.
+    openKeys: (key) => key === 'ArrowDown',
+    onCommit: commit,
+    onDismiss: () => dismiss(),
+    onOutside: () => dismiss(),
+});
 
 // Close-without-commit (Escape, Tab, click outside): the query clears back to the resting
 // empty state — a half-typed filter never lingers, and there is no committed label to revert to.

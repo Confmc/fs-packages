@@ -62,7 +62,9 @@ describe('floating-ui reality — the open menu is actually positioned', () => {
         // bottom-start placement with offset(4): below the trigger. Tolerant — assert
         // "at or below the trigger's bottom edge", not the exact 4px offset.
         await expect.poll(() => popup.getBoundingClientRect().top).toBeGreaterThanOrEqual(triggerRect.bottom);
-        // min-width: 100% of the positioned ancestor — the popup spans at least the trigger.
+        // Width tracks the trigger via --ui-menu-reference-width after teleport. This fixture
+        // renders full-bleed, so trigger width and viewport width coincide and the assertion
+        // cannot separate the two — the narrow-wrapper test in the KD-1136 block does that.
         await expect.poll(() => popup.getBoundingClientRect().width).toBeGreaterThanOrEqual(triggerRect.width);
         // Horizontally on-screen (shift(8) keeps it inside the viewport).
         expect(popup.getBoundingClientRect().left).toBeGreaterThanOrEqual(0);
@@ -127,5 +129,109 @@ describe('floating-ui hide() — the open menu follows its clipped-away trigger'
         // Scroll back — the gate must release (an overlay, not a one-way latch).
         clip.scrollTop = 0;
         await expect.poll(() => popup.style.visibility).not.toBe('hidden');
+    });
+});
+
+describe('listbox teleport — the open menu escapes a clipping ancestor (KD-1136)', () => {
+    it('sizes the teleported menu to the TRIGGER, not to the teleport target', async () => {
+        const model = ref<number | null>(null);
+        render(
+            defineComponent(
+                () => () =>
+                    h('div', {style: 'width: 200px;'}, [
+                        h(SingleSelect, {
+                            options: FRUITS,
+                            label: 'name',
+                            id: 'fruit',
+                            modelValue: model.value,
+                            'onUpdate:modelValue': (value: number | null) => {
+                                model.value = value;
+                            },
+                        }),
+                    ]),
+            ),
+        );
+        const trigger = document.getElementById('fruit') as HTMLElement;
+
+        await userEvent.click(trigger);
+        const popup = document.querySelector('.ui-select__menu') as HTMLElement;
+        await expect.poll(() => popup.getBoundingClientRect().width).toBeGreaterThan(0);
+
+        // A 200px trigger inside a much wider viewport: the pre-fix `min-width: 100%` measured
+        // the teleported popup's containing block (the viewport) and blew the menu out to full
+        // width. --ui-menu-reference-width pins it back to the trigger.
+        const triggerWidth = trigger.getBoundingClientRect().width;
+        expect(triggerWidth).toBeLessThan(document.documentElement.clientWidth);
+        await expect.poll(() => Math.round(popup.getBoundingClientRect().width)).toBe(Math.round(triggerWidth));
+    });
+
+    it('renders the SingleSelect menu on document.body, fully visible above a following sibling', async () => {
+        const model = ref<number | null>(null);
+        render(
+            defineComponent(
+                () => () =>
+                    h('div', {id: 'page'}, [
+                        h('div', {id: 'clip', style: 'height: 48px; overflow: hidden; position: relative;'}, [
+                            h(SingleSelect, {
+                                options: FRUITS,
+                                label: 'name',
+                                id: 'fruit',
+                                modelValue: model.value,
+                                'onUpdate:modelValue': (value: number | null) => {
+                                    model.value = value;
+                                },
+                            }),
+                        ]),
+                        h('div', {
+                            id: 'cover',
+                            style: 'height: 240px; background: rgb(200, 0, 0); position: relative; z-index: 1;',
+                        }),
+                    ]),
+            ),
+        );
+        const trigger = document.getElementById('fruit') as HTMLElement;
+
+        await userEvent.click(trigger);
+        const popup = document.querySelector('.ui-select__menu') as HTMLElement;
+        expect(popup).not.toBeNull();
+        expect(popup.parentElement).toBe(document.body);
+
+        await expect.poll(() => popup.getBoundingClientRect().height).toBeGreaterThan(0);
+        const popupRect = popup.getBoundingClientRect();
+        const clipRect = (document.getElementById('clip') as HTMLElement).getBoundingClientRect();
+        // The menu is taller than the clip box — without teleport it would be cut off.
+        expect(popupRect.height).toBeGreaterThan(clipRect.height);
+
+        // The pixels of the menu that sit over the covering sibling are the MENU, not the cover.
+        const hit = document.elementFromPoint(popupRect.left + 8, popupRect.top + Math.min(16, popupRect.height / 2));
+        expect(popup.contains(hit)).toBe(true);
+    });
+
+    it('teleports into the nearest dialog rather than body (native-dialog top-layer)', async () => {
+        const model = ref<number | null>(null);
+        render(
+            defineComponent(
+                () => () =>
+                    h('dialog', {id: 'dlg', open: true}, [
+                        h(SingleSelect, {
+                            options: FRUITS,
+                            label: 'name',
+                            id: 'fruit',
+                            modelValue: model.value,
+                            'onUpdate:modelValue': (value: number | null) => {
+                                model.value = value;
+                            },
+                        }),
+                    ]),
+            ),
+        );
+        const trigger = document.getElementById('fruit') as HTMLElement;
+
+        await userEvent.click(trigger);
+        const popup = document.querySelector('.ui-select__menu') as HTMLElement;
+        expect(popup).not.toBeNull();
+        expect(popup.parentElement).toBe(document.getElementById('dlg'));
+        expect(popup.parentElement).not.toBe(document.body);
+        await expect.poll(() => popup.getBoundingClientRect().height).toBeGreaterThan(0);
     });
 });

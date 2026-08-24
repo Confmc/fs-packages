@@ -31,6 +31,7 @@ vi.mock('@floating-ui/vue', () => ({
     flip: vi.fn((config: unknown) => ({name: 'flip', config})),
     shift: vi.fn((config: unknown) => ({name: 'shift', config})),
     hide: vi.fn(() => ({name: 'hide'})),
+    size: vi.fn((config: unknown) => ({name: 'size', config})),
 }));
 
 beforeEach(() => {
@@ -79,6 +80,7 @@ describe('useListbox floating options', () => {
                 {name: 'offset', value: 4},
                 {name: 'flip', config: {fallbackPlacements: ['top-start']}},
                 {name: 'shift', config: {padding: 8}},
+                {name: 'size', config: {apply: expect.any(Function)}},
                 {name: 'hide'},
             ],
         });
@@ -105,6 +107,7 @@ describe('useListbox floating options', () => {
                 {name: 'offset', value: 12},
                 {name: 'flip', config: {fallbackPlacements: ['bottom-end']}},
                 {name: 'shift', config: {padding: 2}},
+                {name: 'size', config: {apply: expect.any(Function)}},
                 {name: 'hide'},
             ],
         });
@@ -251,6 +254,92 @@ describe('useListbox clear-entry option combinations', () => {
         const enter = key('Enter');
         api.onKey(enter); // the callback commits → swallowed
         expect(enter.defaultPrevented).toBe(true);
+        wrapper.unmount();
+    });
+});
+
+describe('useListbox teleportTarget (KD-1136)', () => {
+    it('is the string "body" when the root is not inside a dialog', () => {
+        const wrapper = mount(Harness, {attachTo: document.body});
+
+        expect(api.teleportTarget.value).toBe('body');
+        wrapper.unmount();
+    });
+
+    it('is the closest dialog element when the root sits inside one', () => {
+        const dialog = document.createElement('dialog');
+        document.body.append(dialog);
+        const wrapper = mount(Harness, {attachTo: dialog});
+
+        expect(api.teleportTarget.value).toBe(dialog);
+        wrapper.unmount();
+        dialog.remove();
+    });
+});
+
+describe('useListbox click-outside after teleport (KD-1136)', () => {
+    it('does not call onOutside while the list is closed', () => {
+        const onOutside = vi.fn();
+        const wrapper = mount(Harness, {props: {overrides: {onOutside}}, attachTo: document.body});
+
+        document.body.dispatchEvent(new MouseEvent('click', {bubbles: true}));
+        expect(onOutside).not.toHaveBeenCalled();
+        wrapper.unmount();
+    });
+
+    it('does not treat a click on the teleported floating element as outside', () => {
+        const onOutside = vi.fn();
+        const floatingEl = document.createElement('ul');
+        document.body.append(floatingEl);
+        const wrapper = mount(Harness, {
+            props: {overrides: {onOutside, floating: shallowRef(floatingEl)}},
+            attachTo: document.body,
+        });
+        api.open.value = true;
+
+        floatingEl.dispatchEvent(new MouseEvent('click', {bubbles: true}));
+        expect(onOutside).not.toHaveBeenCalled();
+        wrapper.unmount();
+        floatingEl.remove();
+    });
+
+    it('calls onOutside for a click that is in neither root nor floating', () => {
+        const onOutside = vi.fn();
+        const wrapper = mount(Harness, {props: {overrides: {onOutside}}, attachTo: document.body});
+        api.open.value = true;
+
+        document.body.dispatchEvent(new MouseEvent('click', {bubbles: true}));
+        expect(onOutside).toHaveBeenCalledTimes(1);
+        wrapper.unmount();
+    });
+
+    it('does not call onOutside for a click inside root', () => {
+        const onOutside = vi.fn();
+        const wrapper = mount(Harness, {props: {overrides: {onOutside}}, attachTo: document.body});
+        api.open.value = true;
+
+        wrapper.element.dispatchEvent(new MouseEvent('click', {bubbles: true}));
+        expect(onOutside).not.toHaveBeenCalled();
+        wrapper.unmount();
+    });
+});
+
+describe('useListbox size middleware — --ui-menu-reference-width', () => {
+    it('writes the reference width onto the floating element', () => {
+        const wrapper = mount(Harness);
+        const middleware = lastFloatingConfig()?.middleware as
+            | {
+                  name: string;
+                  config?: {
+                      apply: (state: {rects: {reference: {width: number}}; elements: {floating: HTMLElement}}) => void;
+                  };
+              }[]
+            | undefined;
+        const sizeMw = middleware?.find((item) => item.name === 'size');
+        const floatingEl = document.createElement('div');
+
+        sizeMw?.config?.apply({rects: {reference: {width: 180}}, elements: {floating: floatingEl}});
+        expect(floatingEl.style.getPropertyValue('--ui-menu-reference-width')).toBe('180px');
         wrapper.unmount();
     });
 });

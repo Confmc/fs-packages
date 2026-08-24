@@ -1,7 +1,7 @@
 import type {Placement} from '@floating-ui/vue';
 import type {CSSProperties, Ref} from 'vue';
 
-import {autoUpdate, flip, hide, offset, shift, useFloating} from '@floating-ui/vue';
+import {autoUpdate, flip, hide, offset, shift, size, useFloating} from '@floating-ui/vue';
 import {computed, onBeforeUnmount, onMounted, ref, watch} from 'vue';
 
 import {ensureRefValueExists} from '../internal/reactivity';
@@ -28,7 +28,7 @@ export interface ListboxFloatingOptions {
 }
 
 export interface UseListboxOptions {
-    /** the component root — click-outside is measured against it. */
+    /** the component root — click-outside is measured against it and the teleported listbox. */
     root: ElementRef;
     /** the floating-ui reference element (the trigger button / the combobox input). */
     reference: ElementRef;
@@ -247,15 +247,27 @@ export function useListbox(options: UseListboxOptions) {
         }
     };
 
-    // click-outside — closes/reverts without a shared directive dependency.
+    // click-outside — closes/reverts without a shared directive dependency. The listbox is
+    // teleported out of `root` (closest dialog, else document.body — KD-1136), so a click on
+    // an option is NOT inside root; without the floating-element check, MultiSelect's
+    // toggle-and-stay-open would close on every option click.
     const onDocumentPointer = (event: MouseEvent) => {
+        if (!open.value) return;
+        const target = event.target as Node;
         // The listener is attached only between mount and unmount, so the ref is non-null here.
         // Non-null by lifetime (the listener only exists while mounted) — loud, named accessor
         // over a bare `!`: the same impossible state throws, but names the broken assumption.
-        if (!ensureRefValueExists(root).contains(event.target as Node)) onOutside();
+        if (ensureRefValueExists(root).contains(target)) return;
+        if (floating.value?.contains(target)) return;
+        onOutside();
     };
     onMounted(() => document.addEventListener('click', onDocumentPointer));
     onBeforeUnmount(() => document.removeEventListener('click', onDocumentPointer));
+
+    // Native <dialog> is a top layer: a menu teleported to body would paint BEHIND it. Landing
+    // on the closest dialog (kendo Tooltip's proven pattern) keeps the menu in that layer;
+    // otherwise body, so overflow/stacking ancestors of the trigger cannot clip it (KD-1136).
+    const teleportTarget = computed<string | HTMLElement>(() => root.value?.closest('dialog') ?? 'body');
 
     const {floatingStyles, middlewareData} = useFloating(reference, floating, {
         placement: floatingOptions.placement ?? 'bottom-start',
@@ -263,6 +275,16 @@ export function useListbox(options: UseListboxOptions) {
             offset(floatingOptions.offset ?? 4),
             flip({fallbackPlacements: floatingOptions.fallbackPlacements ?? ['top-start']}),
             shift({padding: floatingOptions.shiftPadding ?? 8}),
+            // After teleport the popup's containing block is the viewport (or the dialog), so
+            // CSS `min-width: 100%` no longer measures the trigger. Publishing the trigger
+            // width onto the popup as `--ui-menu-reference-width` is what keeps the historical
+            // "at least as wide as the trigger" contract alive across the move; styles.css
+            // takes `max()` of it and `--ui-menu-min-width` on the popup itself.
+            size({
+                apply({rects, elements}) {
+                    elements.floating.style.setProperty('--ui-menu-reference-width', `${rects.reference.width}px`);
+                },
+            }),
             hide(),
         ],
         whileElementsMounted: autoUpdate,
@@ -286,6 +308,7 @@ export function useListbox(options: UseListboxOptions) {
         optionId,
         activeDescendant,
         floatingStyles: gatedFloatingStyles,
+        teleportTarget,
         onKey,
         close,
         clearHighlighted,

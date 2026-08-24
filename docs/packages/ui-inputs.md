@@ -220,6 +220,8 @@ See [Nullable values](#nullable-values) for why the models are nullable and what
 | `optionsLabel`     | `string`      | `'Options'`    | Accessible name for the listbox popup — a prop so you can localise |
 | `mutedOptions`     | `T['id'][]`   | —              | Ids rendered visually muted (`.is-muted`) — still committable      |
 
+The open listbox **teleports** to `document.body`, or into the nearest native `<dialog>` when the control sits in one, so an `overflow: hidden` or stacking-context ancestor of the trigger cannot clip or bury the menu. Width still tracks the trigger via `--ui-menu-reference-width`; a click on the teleported menu is not click-outside.
+
 They differ in what they model:
 
 | Component       | Model             | Extras                                                                                                                |
@@ -347,18 +349,21 @@ The `.is-open` and `.is-invalid` state classes follow `:focus-visible` in source
 
 ### Typography escape hatch
 
-`--ui-control-font-size` (default `inherit`) sizes control text, and `--ui-control-line-height` (default `inherit`) completes the decomposition. The control's `font` is decomposed into longhands — all inheriting except the two var-keyed ones — so both read from their variable rather than from a consumer utility class, which would otherwise lose the source-order tie against the package stylesheet. The listbox popup gets its own hook, `--ui-menu-font-size` (default `inherit` — it sizes by inheritance from the component root), so an adapter never needs a `text-[13px]` utility on the popup.
+`--ui-control-font-size` (default `inherit`) sizes control text, and `--ui-control-line-height` (default `inherit`) completes the decomposition. The control's `font` is decomposed into longhands — all inheriting except the two var-keyed ones — so both read from their variable rather than from a consumer utility class, which would otherwise lose the source-order tie against the package stylesheet. The listbox popup gets its own hook, `--ui-menu-font-size` (default `inherit` — from the teleport target, body or the nearest dialog), so an adapter never needs a `text-[13px]` utility on the popup.
 
 ### Menu width clamps
 
-`--ui-menu-min-width` (default `100%` — of the positioned ancestor, i.e. at least the trigger) and `--ui-menu-max-width` (default `none`) clamp the listbox popup without a specificity fight:
+The popup is never narrower than its trigger: the layout engine writes the trigger width onto the popup as `--ui-menu-reference-width`, and the popup rule takes `max()` of that and `--ui-menu-min-width`. So `--ui-menu-min-width` (default `0px`) is an **extra floor on top of the trigger width**, and `--ui-menu-max-width` (default `none`) caps the popup — both without a specificity fight:
 
 ```css
 :root {
-    --ui-menu-min-width: max(100%, 240px);
+    /* at least the trigger, and at least 240px */
+    --ui-menu-min-width: 240px;
     --ui-menu-max-width: calc(100vw - 16px);
 }
 ```
+
+This replaces the pre-teleport `max(100%, 240px)` idiom. Write a plain length. Do **not** write `var(--ui-menu-reference-width)` into a `:root` declaration — a `var()` there substitutes against `:root`, where the reference width never exists, so it silently bakes in the fallback and the popup never reads its own trigger width. `100%` is out for the same reason it stopped working: teleported, the popup's containing block is the viewport (or the dialog), not the trigger.
 
 ### Touch targets
 

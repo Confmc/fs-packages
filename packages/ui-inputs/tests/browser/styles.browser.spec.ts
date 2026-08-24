@@ -108,6 +108,42 @@ describe('styles.css — :root overrides (the --ui-* contract)', () => {
         document.documentElement.style.setProperty('--ui-menu-max-height', '100px');
         expect(getComputedStyle(menu).maxHeight).toBe('100px');
     });
+
+    // KD-1136: the trigger-width floor must resolve ON THE POPUP — `--ui-menu-reference-width`
+    // only ever exists there. A `var()` for it inside the :root declaration of
+    // `--ui-menu-min-width` substitutes against :root, silently baking in the fallback.
+    const addMenu = (referenceWidth?: string): HTMLElement => {
+        const menu = document.createElement('ul');
+        menu.className = 'ui-select__menu';
+        if (referenceWidth) menu.style.setProperty('--ui-menu-reference-width', referenceWidth);
+        document.body.append(menu);
+        cleanupTargets.push(menu);
+        return menu;
+    };
+
+    it('honours --ui-menu-reference-width as the default min-width (KD-1136 teleport)', () => {
+        addStyle(uiCss);
+        const menu = addMenu('180px');
+
+        expect(getComputedStyle(menu).minWidth).toBe('180px');
+    });
+
+    it('treats --ui-menu-min-width as an EXTRA floor above the trigger width', () => {
+        addStyle(uiCss);
+        document.documentElement.style.setProperty('--ui-menu-min-width', '240px');
+
+        // Trigger narrower than the floor — the floor wins.
+        expect(getComputedStyle(addMenu('180px')).minWidth).toBe('240px');
+        // Trigger wider than the floor — the trigger still wins; the floor never shrinks it.
+        expect(getComputedStyle(addMenu('320px')).minWidth).toBe('320px');
+    });
+
+    it('falls back to content width, never the viewport, before the first layout pass', () => {
+        addStyle(uiCss);
+        // No --ui-menu-reference-width yet: the pre-teleport `100%` would have measured the
+        // teleport target here, flashing a full-width menu.
+        expect(getComputedStyle(addMenu()).minWidth).toBe('0px');
+    });
 });
 
 describe('styles.css — WR-0512 font-size source-order regression pins', () => {
