@@ -261,6 +261,29 @@ describe('Pressable — the discouraged `as` escape hatch', () => {
         expect(onClick).not.toHaveBeenCalled();
     });
 
+    it('does not activate on a Space keyup that landed in a CHILD after the root armed it', () => {
+        // The keyup half of the guard, which the two cases above cannot reach: they never arm the
+        // latch, because the child's own keydown is ignored. Arm it from the ROOT, then move focus
+        // into a nested control before the release. A native button does not activate when focus
+        // leaves mid-press either, so this is the reference the fallback emulates.
+        const onClick = vi.fn();
+        const wrapper = mount(Pressable, {
+            props: {as: 'div', label: 'Row'},
+            attrs: {onClick},
+            slots: {default: '<input class="nested" />'},
+        });
+        const nested = wrapper.element.querySelector('.nested')!;
+
+        key(wrapper.element, 'keydown', ' '); // armed by the root…
+        key(nested, 'keyup', ' '); // …released while a child holds focus
+        expect(onClick).not.toHaveBeenCalled();
+
+        // …and the latch is CLEARED by that keyup rather than left set, so the next release on the
+        // root cannot activate on a press it never saw.
+        key(wrapper.element, 'keyup', ' ');
+        expect(onClick).not.toHaveBeenCalled();
+    });
+
     it('POSITIVE CONTROL — the guard does not deafen the ROOT: Enter and Space still activate', () => {
         // Without this, every assertion above is equally consistent with a fallback that has
         // stopped responding to the keyboard altogether — which is the component's whole purpose.
