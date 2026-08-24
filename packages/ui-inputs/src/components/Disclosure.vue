@@ -6,16 +6,22 @@
              wrapper becomes a real <h2>…<h6> whose only child is the trigger, so the section
              keeps its place in the document outline AND the control is a real button. -->
         <component :is="headingTag" class="ui-disclosure__header">
+            <!-- `@click` sits ABOVE `v-bind="$attrs"` on purpose, and moving it back is a
+                 regression. `mergeProps` preserves source order, so a consumer's fall-through
+                 `onClick` arriving through `$attrs` would otherwise be merged AHEAD of ours and
+                 run before `toggle` could stop it — leaving a disabled trigger that still runs
+                 the consumer's handler. Measured in real Chromium; spec-pinned in the browser
+                 suite, because happy-dom reports the defect as absent. -->
             <button
                 :id="id"
                 ref="trigger"
-                v-bind="$attrs"
                 type="button"
+                @click="toggle"
+                v-bind="$attrs"
                 class="ui-pressable ui-disclosure__trigger"
                 :disabled="disabled"
                 :aria-expanded="expanded"
                 :aria-controls="panelId"
-                @click="toggle"
             >
                 <slot name="trigger">{{ label }}</slot>
                 <svg class="ui-disclosure__chevron" viewBox="0 0 20 20" aria-hidden="true">
@@ -94,10 +100,16 @@ onMounted(() =>
     warnWhenUnnamed(ensureRefValueExists(trigger), 'Disclosure', 'the `label` prop, `trigger`-slot content'),
 );
 
-const toggle = (): void => {
-    // Disabled guard, as everywhere in the family: a real browser fires no click on a disabled
-    // button, and this keeps a synthetic dispatch from making the test lie.
-    if (disabled) return;
+const toggle = (event: MouseEvent): void => {
+    if (disabled) {
+        // Stopping — not returning — is the guard, the same shape `Pressable.onClick` uses. The
+        // browser withholds a click on a disabled <button> only for USER ACTIVATION; a
+        // `dispatchEvent` still runs every listener on it (measured in Chromium), and a consumer's
+        // fall-through `@click` arrives through `$attrs` on the very same element. A bare early
+        // return would leave that handler running on a trigger that is supposed to be inert.
+        event.stopImmediatePropagation();
+        return;
+    }
     expanded.value = !expanded.value;
 };
 </script>

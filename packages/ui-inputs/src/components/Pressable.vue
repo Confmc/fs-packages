@@ -141,12 +141,13 @@ const isChildsOwnKey = (event: KeyboardEvent): boolean => event.target !== event
 
 const onClick = (event: MouseEvent): void => {
     if (disabled) {
-        // Stopping — not returning — is what keeps the two paths from diverging. A real browser
-        // dispatches NO click on a disabled <button>, so nothing downstream runs on the native
-        // path; the fallback has no such protection (it stays fully in hit-testing, deliberately —
-        // see the .is-disabled rule — and a programmatic dispatch reaches both paths anyway), so a
-        // bare early return would leave a consumer's own fall-through @click running on a control
-        // that is supposed to be inert.
+        // Stopping — not returning — is what keeps the two paths from diverging, and THIS stop is
+        // what makes both of them inert. The browser withholds a click on a disabled <button> only
+        // for USER ACTIVATION; `dispatchEvent` still runs every listener on one (measured in
+        // Chromium: a consumer handler fires on the disabled arm exactly as on the enabled arm).
+        // The fallback has no native protection at all — it stays fully in hit-testing,
+        // deliberately, see the .is-disabled rule. So on BOTH paths a bare early return would leave
+        // a consumer's own fall-through @click running on a control that is supposed to be inert.
         // Vue merges this handler ahead of the fallthrough one and patches the event so a stop
         // inside the merged array skips the rest — spec-pinned, not assumed.
         event.stopImmediatePropagation();

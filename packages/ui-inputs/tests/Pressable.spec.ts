@@ -58,8 +58,10 @@ describe('Pressable', () => {
         const wrapper = mount(Pressable, {props: {label: 'Go', disabled: true, pressed: false}});
 
         expect(wrapper.attributes('disabled')).toBeDefined();
-        // Native dispatch — a real browser fires no click on a disabled button, so the guard would
-        // otherwise sit unexercised (the vacuous-assertion trap).
+        // Native dispatch — a real browser withholds a click on a disabled button only for USER
+        // ACTIVATION, so this is the path a real consumer's handler can still be reached on
+        // (`dispatchEvent` runs listeners on a disabled button in Chromium), and the guard is what
+        // stops it rather than the browser.
         wrapper.element.dispatchEvent(new MouseEvent('click', {bubbles: true}));
         await wrapper.vm.$nextTick();
         expect(wrapper.emitted('update:pressed')).toBeUndefined();

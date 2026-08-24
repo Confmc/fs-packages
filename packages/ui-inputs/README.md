@@ -272,10 +272,11 @@ clickable `<tr>`, an element whose parent forbids interactive content — `as` r
 the component hand-rolls the _whole_ contract together: `role="button"`, `tabindex`, Enter on keydown,
 Space on keyup (dispatching a real click, so your own `@click` still runs), and a disabled emulation
 (`tabindex="-1"` + `aria-disabled`, **plus a click stop**). Half a contract is worse
-than none — and the stop is the half that is easy to miss: on the native path the browser dispatches
-no click at all on a disabled `<button>`, so a fall-through `@click` never runs, and an emulation
-that still ran it on a programmatic click would be a different control from the one it claims to
-emulate. The stop is a real `stopImmediatePropagation()` in the component, **not** a
+than none — and the stop is the half that is easy to miss. The native path is **not** protected by
+the browser here: Chromium withholds a click on a disabled `<button>` only for user activation, and a
+`dispatchEvent` still runs every listener on one (measured). The stop is therefore what keeps a
+fall-through `@click` off a disabled control on **both** paths, not a nicety the fallback needs and
+the button does not. It is a real `stopImmediatePropagation()` in the component, **not** a
 `pointer-events: none` in the stylesheet: that rule takes the control out of hit-testing altogether,
 so a pointer over it targets whatever sits behind it and an _ancestor's_ `@click` fires. Never point
 `as` at an element the browser already activates (`a[href]`, `summary`) — every handler would fire

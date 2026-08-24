@@ -723,3 +723,75 @@ describe('Disclosure — real keyboard walk', () => {
         expect(expanded.value).toBe(false);
     });
 });
+
+/**
+ * The consumer's fall-through `@click` on a DISABLED Disclosure trigger. This describe lives in the
+ * browser suite and CANNOT be moved into the happy-dom one: happy-dom does not run listeners for a
+ * `dispatchEvent`-delivered click on a disabled `<button>`, so it reports this defect as ABSENT —
+ * with a working positive control, which is what makes it dangerous. Chromium runs them (measured
+ * on the unfixed code: enabled=1, disabled=1). A happy-dom version of this spec would pass on the
+ * broken component and pin the wrong behaviour permanently.
+ *
+ * `dispatchEvent` rather than `userEvent.click` is likewise deliberate: Chromium's real input
+ * pipeline never produces a click on a disabled native button at all, so a forced user click leaves
+ * BOTH arms at zero and asserts nothing about the merge order. The reachable path is the
+ * programmatic one, and that is the one the guard has to close.
+ */
+describe("Disclosure — a disabled trigger and the consumer's fall-through @click", () => {
+    const trigger = () => document.getElementById('leaky') as HTMLButtonElement;
+
+    const renderWithConsumerClick = (disabled: boolean) => {
+        const consumerClicks = ref(0);
+        const expanded = ref(false);
+        render(
+            defineComponent(
+                () => () =>
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFC in a render-fn host
+                    h(
+                        Disclosure as any,
+                        {
+                            id: 'leaky',
+                            label: 'Details',
+                            disabled,
+                            onClick: () => {
+                                consumerClicks.value += 1;
+                            },
+                            expanded: expanded.value,
+                            'onUpdate:expanded': (value: boolean) => {
+                                expanded.value = value;
+                            },
+                        },
+                        {default: () => h('p', 'Panel body')},
+                    ),
+            ),
+        );
+        return {consumerClicks, expanded};
+    };
+
+    const dispatchClick = (element: Element): void => {
+        element.dispatchEvent(new MouseEvent('click', {bubbles: true}));
+    };
+
+    it('runs NEITHER toggle nor the consumer handler — inert, not merely un-toggling', () => {
+        const {consumerClicks, expanded} = renderWithConsumerClick(true);
+
+        dispatchClick(trigger());
+
+        // The defect: `v-bind="$attrs"` merged ahead of `@click` put the consumer's handler FIRST,
+        // so it ran before `toggle` could stop the event. Our handler must be merged first and stop.
+        expect(consumerClicks.value).toBe(0);
+        expect(expanded.value).toBe(false);
+    });
+
+    it('POSITIVE CONTROL — the same fixture, enabled, runs BOTH', async () => {
+        const {consumerClicks, expanded} = renderWithConsumerClick(false);
+
+        dispatchClick(trigger());
+
+        // Without this arm the zeros above are consistent with a fixture that wires nothing, or
+        // with a stop that swallows the consumer's handler unconditionally.
+        expect(consumerClicks.value).toBe(1);
+        expect(expanded.value).toBe(true);
+        await expect.poll(() => trigger().getAttribute('aria-expanded')).toBe('true');
+    });
+});

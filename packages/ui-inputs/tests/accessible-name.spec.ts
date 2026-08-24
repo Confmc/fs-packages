@@ -94,4 +94,36 @@ describe.each(CONTROLS)('$name — accessible-name guard', ({name, component, pr
             Reflect.set(globalThis, 'process', original);
         }
     });
+
+    it('stays SILENT rather than crashing on a PARTIAL shim — `process` present, `env` missing', () => {
+        // `globalThis.process = {}` is a real browser-polyfill shape, and it is NOT closed by the
+        // absent-`process` guard above: `typeof process` is 'object', so the `.env.NODE_ENV`
+        // dereference runs and throws at mount. A shim without `env` is exactly "an environment
+        // this package cannot read", so it must suppress on the same fail-safe-silent rule.
+        const original = Reflect.get(globalThis, 'process');
+        Reflect.set(globalThis, 'process', {});
+
+        try {
+            expect(() => mount(component, {props})).not.toThrow();
+            expect(warn).not.toHaveBeenCalled();
+        } finally {
+            Reflect.set(globalThis, 'process', original);
+        }
+    });
+
+    it('WARNS on a shim carrying an empty `env` — an unset NODE_ENV is readable, not unreadable', () => {
+        // The other side of the partial-shim guard, and the one that keeps it from over-reaching:
+        // `{env: {}}` IS a readable environment that simply is not production, so the dev warning
+        // must still fire. Suppressing here would silence every consumer whose bundler shims `env`
+        // but leaves NODE_ENV unset — a far larger set than the one the guard exists for.
+        const original = Reflect.get(globalThis, 'process');
+        Reflect.set(globalThis, 'process', {env: {}});
+
+        try {
+            mount(component, {props});
+            expect(warn).toHaveBeenCalledTimes(1);
+        } finally {
+            Reflect.set(globalThis, 'process', original);
+        }
+    });
 });
