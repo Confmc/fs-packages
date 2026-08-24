@@ -129,9 +129,8 @@ describe('styles.css — :root overrides (the --ui-* contract)', () => {
         addStyle(uiCss);
         const {anchor, menu} = addAnchoredMenu('180px');
 
-        // `fixed`, not `absolute`: an absolutely positioned anchor is clipped by
-        // `overflow: hidden` on the <dialog> it teleported into (the UA stylesheet makes the
-        // dialog its containing block). Matches useListbox's floating-ui strategy.
+        // `fixed` matches useListbox's floating-ui strategy — a top-layer box positions
+        // against the viewport.
         expect(getComputedStyle(anchor).position).toBe('fixed');
         expect(getComputedStyle(anchor).zIndex).toBe('50');
         // The menu itself must NOT be positioned — the anchor owns it now.

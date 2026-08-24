@@ -28,7 +28,7 @@ export interface ListboxFloatingOptions {
 }
 
 export interface UseListboxOptions {
-    /** the component root — click-outside is measured against it and the teleported listbox. */
+    /** the component root — click-outside is measured against it (the popup stays inside it). */
     root: ElementRef;
     /** the floating-ui reference element (the trigger button / the combobox input). */
     reference: ElementRef;
@@ -66,29 +66,6 @@ export interface UseListboxOptions {
     /** Commit the clear entry; returns whether a commit happened (decides preventDefault). */
     onClearCommit?: () => boolean;
 }
-
-/**
- * `closest('dialog')`, continued across shadow boundaries.
- *
- * `Element.closest()` stops at the ShadowRoot, so a control rendered inside a custom element
- * never sees a light-DOM `<dialog>` ancestor. The listbox would then teleport to `body` and
- * paint BEHIND the dialog's top layer — visible but unreachable, which is worse than the clip
- * KD-1136 set out to fix. Hopping root → host resumes the walk in the outer tree, so the menu
- * lands in the same top layer as the dialog that contains its trigger.
- */
-const closestDialog = (start: HTMLElement): HTMLElement | null => {
-    let node: Element | null = start;
-
-    while (node) {
-        const dialog = node.closest('dialog');
-        if (dialog) return dialog;
-
-        const root = node.getRootNode();
-        node = root instanceof ShadowRoot ? root.host : null;
-    }
-
-    return null;
-};
 
 /**
  * The behavioural core shared by every ui-inputs listbox control (SingleSelect, Combobox, and —
@@ -270,36 +247,48 @@ export function useListbox(options: UseListboxOptions) {
         }
     };
 
-    // click-outside — closes/reverts without a shared directive dependency. The listbox is
-    // teleported out of `root` (closest dialog, else document.body — KD-1136), so a click on
-    // an option is NOT inside root; without the floating-element check, MultiSelect's
-    // toggle-and-stay-open would close on every option click.
+    // click-outside — closes/reverts without a shared directive dependency.
+    //
+    // `composedPath()`, never `event.target`: at a DOCUMENT listener a click inside a shadow
+    // root is retargeted to the shadow HOST, which is an ancestor of `root` rather than a
+    // descendant, so `root.contains(target)` rejects it and every option click would read as
+    // outside — MultiSelect and MultiCombobox would close instead of toggling. The composed
+    // path carries the true chain across shadow boundaries. The popup needs no separate check:
+    // it is promoted to the top layer IN PLACE, so it never leaves `root`.
     const onDocumentPointer = (event: MouseEvent) => {
         if (!open.value) return;
-        const target = event.target as Node;
         // The listener is attached only between mount and unmount, so the ref is non-null here.
         // Non-null by lifetime (the listener only exists while mounted) — loud, named accessor
         // over a bare `!`: the same impossible state throws, but names the broken assumption.
-        if (ensureRefValueExists(root).contains(target)) return;
-        if (floating.value?.contains(target)) return;
+        if (event.composedPath().includes(ensureRefValueExists(root))) return;
         onOutside();
     };
     onMounted(() => document.addEventListener('click', onDocumentPointer));
     onBeforeUnmount(() => document.removeEventListener('click', onDocumentPointer));
 
-    // Native <dialog> is a top layer: a menu teleported to body would paint BEHIND it. Landing
-    // on the closest dialog (kendo Tooltip's proven pattern) keeps the menu in that layer;
-    // otherwise body, so overflow/stacking ancestors of the trigger cannot clip it (KD-1136).
-    const teleportTarget = computed<string | HTMLElement>(() => (root.value && closestDialog(root.value)) ?? 'body');
+    // KD-1136. The popup is promoted to the TOP LAYER in place, via the Popover API — it is
+    // never moved in the DOM. A top-layer box paints outside the normal flow, so no ancestor's
+    // `overflow` can clip it and no ancestor's stacking context can bury it, which is the whole
+    // defect. Staying put is what the earlier teleport gave away: CSS inheritance follows the
+    // DOM tree, so a consumer's scoped `--ui-*` map and shadow-encapsulated styles keep
+    // applying, `root.contains()` keeps answering truthfully, and there is no landing site to
+    // choose (no dialog lookup, no shadow-boundary walk, no second clipping ancestor).
+    //
+    // `v-if` builds a fresh element per open, so this can never re-show an already-open popup.
+    // Removal from the DOM drops it from the top layer, which is the close path.
+    watch(
+        floating,
+        (element) => {
+            if (element) element.showPopover();
+        },
+        {flush: 'post'},
+    );
 
     const {floatingStyles, middlewareData} = useFloating(reference, floating, {
-        // `fixed`, not the default `absolute`. Teleporting into a <dialog> escapes the outer
-        // clip and walks into the dialog's own: the UA stylesheet gives <dialog>
-        // `position: absolute`, so it IS the containing block for an absolutely positioned
-        // descendant, and its `overflow: hidden` clips the anchor. A fixed box's containing
-        // block is the viewport, which no ancestor's overflow can clip, while the anchor stays
-        // a DOM descendant of the dialog and so keeps its top layer. autoUpdate already
-        // recomputes on ancestor scroll, which is what a fixed popup needs to stay anchored.
+        // `fixed`, not the default `absolute`: a top-layer box is positioned against the
+        // viewport, and the popup no longer has a positioned ancestor to measure from.
+        // autoUpdate already recomputes on ancestor scroll, which is what a fixed popup
+        // needs to stay glued to its trigger.
         strategy: 'fixed',
         placement: floatingOptions.placement ?? 'bottom-start',
         middleware: [
@@ -340,7 +329,6 @@ export function useListbox(options: UseListboxOptions) {
         optionId,
         activeDescendant,
         floatingStyles: gatedFloatingStyles,
-        teleportTarget,
         onKey,
         close,
         clearHighlighted,

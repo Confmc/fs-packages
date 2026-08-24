@@ -66,42 +66,42 @@
             open && optionLabels.length === 0 ? emptyText : ''
         }}</span>
 
-        <!-- KD-1136. floating-ui positions the ANCHOR, not the <ul>: the size() middleware
-             sizes it to the trigger, so the menu's `min-width: 100%` still measures the
-             trigger after the move. Target is closest('dialog') ?? body. -->
-        <Teleport v-if="open" :to="teleportTarget">
-            <div ref="floating" class="ui-menu-anchor" :style="floatingStyles">
-                <OptionList
-                    variant="ui-multiselect"
-                    multiselectable
-                    :labels="optionLabels"
-                    :keys="optionKeys"
-                    :pointer="pointer"
-                    :listbox-id="listboxId"
-                    :option-id="optionId"
-                    :is-selected="isSelected"
-                    :is-muted="isMuted"
-                    :options-label="optionsLabel"
-                    :empty-text="emptyText"
-                    @hover="pointer = $event"
-                    @commit="commit"
-                >
-                    <!-- Re-scope OptionList's index into the typed per-option payload; the fallback
-                         (the plain labelOf text) keeps slotless consumers byte-identical. -->
-                    <template #option="{index}">
-                        <slot
-                            name="option"
-                            :option="sorted[index]"
-                            :index="index"
-                            :selected="isSelected(index)"
-                            :active="pointer === index"
-                        >
-                            {{ optionLabels[index] }}
-                        </slot>
-                    </template>
-                </OptionList>
-            </div>
-        </Teleport>
+        <!-- KD-1136. The anchor is promoted to the TOP LAYER in place (Popover API) — it is
+             never moved in the DOM, so no ancestor's overflow can clip it and no stacking
+             context can bury it, while scoped `--ui-*` maps still reach it. floating-ui
+             positions the ANCHOR, not the <ul>: the size() middleware sizes it to the
+             trigger, so the menu's `min-width: 100%` measures the trigger. -->
+        <div v-if="open" ref="floating" popover="manual" class="ui-menu-anchor" :style="floatingStyles">
+            <OptionList
+                variant="ui-multiselect"
+                multiselectable
+                :labels="optionLabels"
+                :keys="optionKeys"
+                :pointer="pointer"
+                :listbox-id="listboxId"
+                :option-id="optionId"
+                :is-selected="isSelected"
+                :is-muted="isMuted"
+                :options-label="optionsLabel"
+                :empty-text="emptyText"
+                @hover="pointer = $event"
+                @commit="commit"
+            >
+                <!-- Re-scope OptionList's index into the typed per-option payload; the fallback
+                     (the plain labelOf text) keeps slotless consumers byte-identical. -->
+                <template #option="{index}">
+                    <slot
+                        name="option"
+                        :option="sorted[index]"
+                        :index="index"
+                        :selected="isSelected(index)"
+                        :active="pointer === index"
+                    >
+                        {{ optionLabels[index] }}
+                    </slot>
+                </template>
+            </OptionList>
+        </div>
     </div>
 </template>
 
@@ -221,21 +221,19 @@ const commit = (index: number): boolean => {
     return true;
 };
 
-const {open, pointer, listboxId, optionId, activeDescendant, floatingStyles, teleportTarget, onKey, close} = useListbox(
-    {
-        root,
-        reference,
-        floating,
-        id: () => id,
-        disabled: () => disabled,
-        listLength: () => sorted.value.length,
-        // A closed MultiSelect opens on Enter, ArrowDown, or Space — the SingleSelect skeleton.
-        openKeys: (key) => ['Enter', 'ArrowDown', ' '].includes(key),
-        onCommit: commit,
-        onDismiss: () => close(),
-        onOutside: () => close(),
-    },
-);
+const {open, pointer, listboxId, optionId, activeDescendant, floatingStyles, onKey, close} = useListbox({
+    root,
+    reference,
+    floating,
+    id: () => id,
+    disabled: () => disabled,
+    listLength: () => sorted.value.length,
+    // A closed MultiSelect opens on Enter, ArrowDown, or Space — the SingleSelect skeleton.
+    openKeys: (key) => ['Enter', 'ArrowDown', ' '].includes(key),
+    onCommit: commit,
+    onDismiss: () => close(),
+    onOutside: () => close(),
+});
 
 const toggle = () => {
     open.value = !open.value;

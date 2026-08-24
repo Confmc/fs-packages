@@ -2,7 +2,7 @@
 import {useFloating} from '@floating-ui/vue';
 import {mount} from '@vue/test-utils';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
-import {defineComponent, h, shallowRef} from 'vue';
+import {defineComponent, h, nextTick, shallowRef} from 'vue';
 
 import type {UseListboxOptions} from '../src/composables/useListbox';
 
@@ -258,68 +258,34 @@ describe('useListbox clear-entry option combinations', () => {
     });
 });
 
-describe('useListbox teleportTarget (KD-1136)', () => {
-    it('is the string "body" when the root is not inside a dialog', () => {
-        const wrapper = mount(Harness, {attachTo: document.body});
+describe('useListbox top-layer promotion (KD-1136)', () => {
+    it('calls showPopover() on the floating element once it mounts', async () => {
+        const floatingEl = document.createElement('div');
+        const shown = vi.fn();
+        (floatingEl as HTMLElement & {showPopover: () => void}).showPopover = shown;
+        const floating = shallowRef<HTMLElement | null>(null);
+        const wrapper = mount(Harness, {props: {overrides: {floating}}, attachTo: document.body});
 
-        expect(api.teleportTarget.value).toBe('body');
+        floating.value = floatingEl;
+        await nextTick();
+
+        expect(shown).toHaveBeenCalledTimes(1);
         wrapper.unmount();
     });
 
-    it('is the closest dialog element when the root sits inside one', () => {
-        const dialog = document.createElement('dialog');
-        document.body.append(dialog);
-        const wrapper = mount(Harness, {attachTo: dialog});
+    it('promotes nothing while the floating element is absent (the closed state)', async () => {
+        const floating = shallowRef<HTMLElement | null>(null);
+        const wrapper = mount(Harness, {props: {overrides: {floating}}, attachTo: document.body});
 
-        expect(api.teleportTarget.value).toBe(dialog);
+        floating.value = null;
+        await nextTick();
+
+        expect(floating.value).toBeNull();
         wrapper.unmount();
-        dialog.remove();
-    });
-
-    // `Element.closest()` stops at the ShadowRoot. Without the root -> host hop, a control
-    // inside a custom element would miss a light-DOM <dialog> ancestor, teleport to body, and
-    // paint BEHIND the dialog's top layer — visible but unreachable.
-    const mountInShadow = (outer: HTMLElement) => {
-        const host = document.createElement('div');
-        outer.append(host);
-        const mountPoint = document.createElement('div');
-        host.attachShadow({mode: 'open'}).append(mountPoint);
-        return {host, wrapper: mount(Harness, {attachTo: mountPoint})};
-    };
-
-    it('crosses a shadow boundary to find a light-DOM dialog', () => {
-        const dialog = document.createElement('dialog');
-        document.body.append(dialog);
-        const {wrapper} = mountInShadow(dialog);
-
-        expect(api.teleportTarget.value).toBe(dialog);
-        wrapper.unmount();
-        dialog.remove();
-    });
-
-    it('is "body" for a shadow-hosted control with no dialog anywhere up the chain', () => {
-        const {host, wrapper} = mountInShadow(document.body);
-
-        expect(api.teleportTarget.value).toBe('body');
-        wrapper.unmount();
-        host.remove();
-    });
-
-    it('finds a dialog nested INSIDE the shadow tree without leaving it', () => {
-        const host = document.createElement('div');
-        document.body.append(host);
-        const shadow = host.attachShadow({mode: 'open'});
-        const dialog = document.createElement('dialog');
-        shadow.append(dialog);
-        const wrapper = mount(Harness, {attachTo: dialog});
-
-        expect(api.teleportTarget.value).toBe(dialog);
-        wrapper.unmount();
-        host.remove();
     });
 });
 
-describe('useListbox click-outside after teleport (KD-1136)', () => {
+describe('useListbox click-outside across shadow boundaries (KD-1136)', () => {
     it('does not call onOutside while the list is closed', () => {
         const onOutside = vi.fn();
         const wrapper = mount(Harness, {props: {overrides: {onOutside}}, attachTo: document.body});
@@ -329,20 +295,23 @@ describe('useListbox click-outside after teleport (KD-1136)', () => {
         wrapper.unmount();
     });
 
-    it('does not treat a click on the teleported floating element as outside', () => {
+    // At a DOCUMENT listener a click inside a shadow root is retargeted to the HOST, which is
+    // an ancestor of `root` rather than a descendant — `root.contains(target)` rejects it and
+    // every option click would read as outside (MultiSelect/MultiCombobox would close instead
+    // of toggling). `composedPath()` carries the true chain across the boundary.
+    it('treats a composed click from inside a shadow root as inside', () => {
         const onOutside = vi.fn();
-        const floatingEl = document.createElement('ul');
-        document.body.append(floatingEl);
-        const wrapper = mount(Harness, {
-            props: {overrides: {onOutside, floating: shallowRef(floatingEl)}},
-            attachTo: document.body,
-        });
+        const host = document.createElement('div');
+        document.body.append(host);
+        const mountPoint = document.createElement('div');
+        host.attachShadow({mode: 'open'}).append(mountPoint);
+        const wrapper = mount(Harness, {props: {overrides: {onOutside}}, attachTo: mountPoint});
         api.open.value = true;
 
-        floatingEl.dispatchEvent(new MouseEvent('click', {bubbles: true}));
+        wrapper.element.dispatchEvent(new MouseEvent('click', {bubbles: true, composed: true}));
         expect(onOutside).not.toHaveBeenCalled();
         wrapper.unmount();
-        floatingEl.remove();
+        host.remove();
     });
 
     it('calls onOutside for a click that is in neither root nor floating', () => {

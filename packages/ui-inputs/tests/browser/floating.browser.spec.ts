@@ -200,8 +200,9 @@ describe('listbox teleport — the open menu escapes a clipping ancestor (KD-113
         await userEvent.click(trigger);
         const popup = document.querySelector('.ui-select__menu') as HTMLElement;
         expect(popup).not.toBeNull();
+        // The popup is promoted, NOT moved: it stays inside the clipping control subtree.
         expect(popup.parentElement).toBe(anchorOf(popup));
-        expect(anchorOf(popup).parentElement).toBe(document.body);
+        expect((document.getElementById('clip') as HTMLElement).contains(popup)).toBe(true);
 
         await expect.poll(() => popup.getBoundingClientRect().height).toBeGreaterThan(0);
         const popupRect = popup.getBoundingClientRect();
@@ -256,7 +257,7 @@ describe('listbox teleport — the open menu escapes a clipping ancestor (KD-113
         expect(popup.contains(hit)).toBe(true);
     });
 
-    it('teleports into the nearest dialog rather than body (native-dialog top-layer)', async () => {
+    it('stays inside a control nested in a dialog, with no dialog lookup', async () => {
         const model = ref<number | null>(null);
         render(
             defineComponent(
@@ -279,8 +280,10 @@ describe('listbox teleport — the open menu escapes a clipping ancestor (KD-113
         await userEvent.click(trigger);
         const popup = document.querySelector('.ui-select__menu') as HTMLElement;
         expect(popup).not.toBeNull();
-        expect(anchorOf(popup).parentElement).toBe(document.getElementById('dlg'));
-        expect(anchorOf(popup).parentElement).not.toBe(document.body);
+        // No teleport, so no landing site to pick: the popup is still in the control, and the
+        // top layer is what carries it above the dialog rather than a chosen parent.
+        expect((document.getElementById('dlg') as HTMLElement).contains(popup)).toBe(true);
+        expect(anchorOf(popup).getAttribute('popover')).toBe('manual');
         await expect.poll(() => popup.getBoundingClientRect().height).toBeGreaterThan(0);
     });
 });

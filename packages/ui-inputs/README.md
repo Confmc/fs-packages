@@ -63,27 +63,20 @@ visually muted (`.is-muted`, themed by `--ui-option-text-muted`). Muted is **not
 muted options stay committable and stay in the keyboard path — use it for de-emphasis
 ("already assigned", "archived"), never for gating.
 
-**The open menu teleports.** The listbox renders on `document.body` — or inside the nearest
-native `<dialog>` when the control sits in one — so an `overflow: hidden` (or stacking-context)
-ancestor of the trigger cannot clip or bury it. It lands inside a `.ui-menu-anchor` box sized
-to the trigger, so `--ui-menu-min-width: 100%` still means "as wide as the trigger" and every
-existing width override keeps working. Click-outside treats a click on the teleported menu as
-inside the control.
+**The open menu is promoted to the top layer.** The listbox carries the
+[Popover API](https://developer.mozilla.org/docs/Web/API/Popover_API)'s `popover` attribute, so
+while open the browser paints it in the **top layer** — above everything, clipped by nothing.
+An `overflow: hidden` or stacking-context ancestor of the trigger can no longer cut it off,
+which is the whole of KD-1136.
 
-**Declare your `--ui-*` map on `:root`.** A teleported popup leaves the control's subtree, so
-any token declared on a scope that is not an ancestor of `body` — an app-shell class, a
-`<style scoped>` block — stops applying to the menu. Tokens on the trigger (`--ui-control-*`)
-are unaffected; the menu and option tokens are the ones at risk:
+Crucially the menu is **never moved in the DOM**. It stays inside the control, so:
 
-```
---ui-menu-*     (bg, border-*, radius, pad, shadow, max-height, font-size, min/max-width)
---ui-option-*   (radius, pad, bg-active, bg-selected, text-*)
---ui-clear-text
-```
+- your `--ui-*` map keeps applying, wherever you declared it — an app-shell class or a
+  `<style scoped>` block reaches the menu exactly as it reaches the trigger;
+- a control inside a shadow root keeps its encapsulated styles on the menu;
+- click-outside stays honest, because the menu really is inside the control.
 
-If your theme is deliberately scoped (per-app branding, a style-bleed guard), re-declare those
-tokens at `:root`, or set them on the teleport target. A branded trigger opening an unbranded
-menu is the symptom.
+Requires the Popover API: Chrome 114+, Safari 17+, Firefox 125+ (Baseline since April 2024).
 
 **Home/End + the empty-state announcement.** While the listbox is open, **Home** jumps the
 keyboard highlight to the first option and **End** to the last — one shared keyboard skeleton,
@@ -265,7 +258,7 @@ The listbox options carry the same discipline: `--ui-option-text-muted` (fires o
 
 ### Typography escape hatch
 
-`--ui-control-font-size` (default `inherit`) sizes control text, and `--ui-control-line-height` (default `inherit`) completes the decomposition. The control's `font` is decomposed into longhands (`font-family`/`font-size`/`font-style`/`font-variant`/`font-weight`/`font-stretch`/`line-height`, all inheriting except the two var-keyed ones), so both read from their var rather than from a consumer utility class — which would otherwise lose the source-order tie against the package stylesheet. The defaults are byte-identical to the historical `font: inherit`. The listbox popup has its own hook: `--ui-menu-font-size` (default `inherit` — from the teleport target, body or the nearest dialog, NOT the component root; set the var to match control text).
+`--ui-control-font-size` (default `inherit`) sizes control text, and `--ui-control-line-height` (default `inherit`) completes the decomposition. The control's `font` is decomposed into longhands (`font-family`/`font-size`/`font-style`/`font-variant`/`font-weight`/`font-stretch`/`line-height`, all inheriting except the two var-keyed ones), so both read from their var rather than from a consumer utility class — which would otherwise lose the source-order tie against the package stylesheet. The defaults are byte-identical to the historical `font: inherit`. The listbox popup has its own hook: `--ui-menu-font-size` (default `inherit` — the popup never leaves the control, so it inherits from the component root; set the var to size menu text independently).
 
 ### Menu width clamps
 
@@ -280,10 +273,9 @@ fighting specificity:
 }
 ```
 
-`100%` survived the KD-1136 teleport unchanged. The popup is teleported inside an anchor box that
-floating-ui sizes to the trigger, so the percentage resolves against the trigger exactly as it did
-when the popup sat inside the control. When the menu outgrows the trigger — a floor like the one
-above, or a long option — the anchor grows with it, so the popup stays on-screen.
+`100%` means the trigger width: the popup sits inside a `.ui-menu-anchor` box that floating-ui
+sizes to the trigger. When the menu outgrows the trigger — a floor like the one above, or a long
+option — the anchor grows with it, so the popup stays on-screen.
 
 ### Touch targets
 
