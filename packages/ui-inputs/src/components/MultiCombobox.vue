@@ -70,40 +70,41 @@
             open && optionLabels.length === 0 ? emptyText : ''
         }}</span>
 
-        <!-- Teleport stays OUTSIDE OptionList so the instance `$el` remains the <ul>
-             (componentEl). Target is closest('dialog') ?? body — KD-1136. -->
+        <!-- KD-1136. floating-ui positions the ANCHOR, not the <ul>: the size() middleware
+             sizes it to the trigger, so the menu's `min-width: 100%` still measures the
+             trigger after the move. Target is closest('dialog') ?? body. -->
         <Teleport v-if="open" :to="teleportTarget">
-            <OptionList
-                ref="menu"
-                variant="ui-multicombobox"
-                multiselectable
-                :labels="optionLabels"
-                :keys="optionKeys"
-                :pointer="pointer"
-                :listbox-id="listboxId"
-                :option-id="optionId"
-                :is-selected="isSelected"
-                :is-muted="isMuted"
-                :floating-styles="floatingStyles"
-                :options-label="optionsLabel"
-                :empty-text="emptyText"
-                @hover="pointer = $event"
-                @commit="commit"
-            >
-                <!-- Re-scope OptionList's index into the typed per-option payload; the fallback
-                     (the plain labelOf text) keeps slotless consumers byte-identical. -->
-                <template #option="{index}">
-                    <slot
-                        name="option"
-                        :option="filtered[index]"
-                        :index="index"
-                        :selected="isSelected(index)"
-                        :active="pointer === index"
-                    >
-                        {{ optionLabels[index] }}
-                    </slot>
-                </template>
-            </OptionList>
+            <div ref="floating" class="ui-menu-anchor" :style="floatingStyles">
+                <OptionList
+                    variant="ui-multicombobox"
+                    multiselectable
+                    :labels="optionLabels"
+                    :keys="optionKeys"
+                    :pointer="pointer"
+                    :listbox-id="listboxId"
+                    :option-id="optionId"
+                    :is-selected="isSelected"
+                    :is-muted="isMuted"
+                    :options-label="optionsLabel"
+                    :empty-text="emptyText"
+                    @hover="pointer = $event"
+                    @commit="commit"
+                >
+                    <!-- Re-scope OptionList's index into the typed per-option payload; the fallback
+                         (the plain labelOf text) keeps slotless consumers byte-identical. -->
+                    <template #option="{index}">
+                        <slot
+                            name="option"
+                            :option="filtered[index]"
+                            :index="index"
+                            :selected="isSelected(index)"
+                            :active="pointer === index"
+                        >
+                            {{ optionLabels[index] }}
+                        </slot>
+                    </template>
+                </OptionList>
+            </div>
         </Teleport>
     </div>
 </template>
@@ -114,7 +115,7 @@ import {computed, ref, useTemplateRef} from 'vue';
 import type {LabelKey, SelectItem} from '../types';
 
 import {useListbox} from '../composables/useListbox';
-import {componentEl, ensureRefValueExists} from '../internal/reactivity';
+import {ensureRefValueExists} from '../internal/reactivity';
 import OptionList from './OptionList.vue';
 
 const {
@@ -221,10 +222,9 @@ const root = useTemplateRef<HTMLElement>('root');
 // misplace it. The input stays the ARIA combobox and the focus/imperative-handle target.
 const box = useTemplateRef<HTMLElement>('box');
 const input = useTemplateRef<HTMLInputElement>('input');
-// OptionList's root <ul>, derived from the instance's `$el` (null while closed) — the family
-// keeps `defineExpose` off internal plumbing, see `componentEl`.
-const menu = useTemplateRef<InstanceType<typeof OptionList>>('menu');
-const floating = componentEl(menu);
+// The teleported `.ui-menu-anchor` (null while closed) — floating-ui's floating element, and
+// the box click-outside treats as inside. The <ul> inside it is positioned by nothing.
+const floating = useTemplateRef<HTMLElement>('floating');
 
 /** Toggle an id's membership — add when absent, drop when present. Always emits a fresh array. */
 const toggleValue = (value: T['id']): void => {

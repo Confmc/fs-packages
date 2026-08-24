@@ -324,8 +324,8 @@ describe('useListbox click-outside after teleport (KD-1136)', () => {
     });
 });
 
-describe('useListbox size middleware — --ui-menu-reference-width', () => {
-    it('writes the reference width onto the floating element', () => {
+describe('useListbox size middleware — the anchor tracks the trigger width', () => {
+    it('writes the reference width onto the floating element as min-width', () => {
         const wrapper = mount(Harness);
         const middleware = lastFloatingConfig()?.middleware as
             | {
@@ -338,8 +338,10 @@ describe('useListbox size middleware — --ui-menu-reference-width', () => {
         const sizeMw = middleware?.find((item) => item.name === 'size');
         const floatingEl = document.createElement('div');
 
+        // `elements.floating` is the `.ui-menu-anchor`; min-width (not width) so styles.css's
+        // `width: max-content` can still grow it when the menu outgrows the trigger.
         sizeMw?.config?.apply({rects: {reference: {width: 180}}, elements: {floating: floatingEl}});
-        expect(floatingEl.style.getPropertyValue('--ui-menu-reference-width')).toBe('180px');
+        expect(floatingEl.style.minWidth).toBe('180px');
         wrapper.unmount();
     });
 });

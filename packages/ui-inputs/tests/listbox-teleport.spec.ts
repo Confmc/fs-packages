@@ -66,7 +66,10 @@ describe('select-family listbox teleport (KD-1136)', () => {
 
         const menu = document.querySelector(menuClass);
         expect(menu).not.toBeNull();
-        expect(menu?.parentElement).toBe(document.body);
+        // The menu sits inside the positioning anchor; the ANCHOR is what lands on the target.
+        const anchor = menu?.parentElement;
+        expect(anchor?.className).toBe('ui-menu-anchor');
+        expect(anchor?.parentElement).toBe(document.body);
         // Not a descendant of the control — that is the clip-escape.
         expect(wrapper.element.contains(menu)).toBe(false);
     });
@@ -80,8 +83,10 @@ describe('select-family listbox teleport (KD-1136)', () => {
 
         const menu = document.querySelector('.ui-select__menu');
         expect(menu).not.toBeNull();
-        expect(menu?.parentElement).toBe(dialog);
+        const anchor = menu?.parentElement;
+        expect(anchor?.className).toBe('ui-menu-anchor');
+        expect(anchor?.parentElement).toBe(dialog);
         expect(document.body.contains(menu)).toBe(true);
-        expect(menu?.parentElement).not.toBe(document.body);
+        expect(anchor?.parentElement).not.toBe(document.body);
     });
 });

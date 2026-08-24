@@ -26,6 +26,12 @@ const FRUITS: Fruit[] = [
     {id: 3, name: 'Mango'},
 ];
 
+/**
+ * The `.ui-menu-anchor` box floating-ui actually positions (KD-1136). Position, stacking and
+ * the hide() visibility gate live here; the menu is a static box inside it.
+ */
+const anchorOf = (popup: HTMLElement): HTMLElement => popup.closest('.ui-menu-anchor') as HTMLElement;
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFC in a render-fn host
 const renderSelect = (component: any) => {
     const model = ref<number | null>(null);
@@ -62,9 +68,9 @@ describe('floating-ui reality — the open menu is actually positioned', () => {
         // bottom-start placement with offset(4): below the trigger. Tolerant — assert
         // "at or below the trigger's bottom edge", not the exact 4px offset.
         await expect.poll(() => popup.getBoundingClientRect().top).toBeGreaterThanOrEqual(triggerRect.bottom);
-        // Width tracks the trigger via --ui-menu-reference-width after teleport. This fixture
-        // renders full-bleed, so trigger width and viewport width coincide and the assertion
-        // cannot separate the two — the narrow-wrapper test in the KD-1136 block does that.
+        // Width tracks the trigger through the sized `.ui-menu-anchor`. This fixture renders
+        // full-bleed, so trigger width and viewport width coincide and the assertion cannot
+        // separate the two — the narrow-wrapper test in the KD-1136 block does that.
         await expect.poll(() => popup.getBoundingClientRect().width).toBeGreaterThanOrEqual(triggerRect.width);
         // Horizontally on-screen (shift(8) keeps it inside the viewport).
         expect(popup.getBoundingClientRect().left).toBeGreaterThanOrEqual(0);
@@ -119,16 +125,16 @@ describe('floating-ui hide() — the open menu follows its clipped-away trigger'
 
         // Open in view: positioned, and NOT visibility-gated.
         await expect.poll(() => popup.getBoundingClientRect().height).toBeGreaterThan(0);
-        expect(popup.style.visibility).not.toBe('hidden');
+        expect(anchorOf(popup).style.visibility).not.toBe('hidden');
 
         // Scroll the trigger fully out of the clip box — autoUpdate recomputes on ancestor
         // scroll, hide() reports referenceHidden, and the gate must paint the menu away.
         clip.scrollTop = 400;
-        await expect.poll(() => popup.style.visibility).toBe('hidden');
+        await expect.poll(() => anchorOf(popup).style.visibility).toBe('hidden');
 
         // Scroll back — the gate must release (an overlay, not a one-way latch).
         clip.scrollTop = 0;
-        await expect.poll(() => popup.style.visibility).not.toBe('hidden');
+        await expect.poll(() => anchorOf(popup).style.visibility).not.toBe('hidden');
     });
 });
 
@@ -194,7 +200,8 @@ describe('listbox teleport — the open menu escapes a clipping ancestor (KD-113
         await userEvent.click(trigger);
         const popup = document.querySelector('.ui-select__menu') as HTMLElement;
         expect(popup).not.toBeNull();
-        expect(popup.parentElement).toBe(document.body);
+        expect(popup.parentElement).toBe(anchorOf(popup));
+        expect(anchorOf(popup).parentElement).toBe(document.body);
 
         await expect.poll(() => popup.getBoundingClientRect().height).toBeGreaterThan(0);
         const popupRect = popup.getBoundingClientRect();
@@ -230,8 +237,8 @@ describe('listbox teleport — the open menu escapes a clipping ancestor (KD-113
         await userEvent.click(trigger);
         const popup = document.querySelector('.ui-select__menu') as HTMLElement;
         expect(popup).not.toBeNull();
-        expect(popup.parentElement).toBe(document.getElementById('dlg'));
-        expect(popup.parentElement).not.toBe(document.body);
+        expect(anchorOf(popup).parentElement).toBe(document.getElementById('dlg'));
+        expect(anchorOf(popup).parentElement).not.toBe(document.body);
         await expect.poll(() => popup.getBoundingClientRect().height).toBeGreaterThan(0);
     });
 });

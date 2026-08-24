@@ -275,14 +275,15 @@ export function useListbox(options: UseListboxOptions) {
             offset(floatingOptions.offset ?? 4),
             flip({fallbackPlacements: floatingOptions.fallbackPlacements ?? ['top-start']}),
             shift({padding: floatingOptions.shiftPadding ?? 8}),
-            // After teleport the popup's containing block is the viewport (or the dialog), so
-            // CSS `min-width: 100%` no longer measures the trigger. Publishing the trigger
-            // width onto the popup as `--ui-menu-reference-width` is what keeps the historical
-            // "at least as wide as the trigger" contract alive across the move; styles.css
-            // takes `max()` of it and `--ui-menu-min-width` on the popup itself.
+            // `elements.floating` is the `.ui-menu-anchor` box, not the <ul>. Sizing it to the
+            // trigger is what keeps `--ui-menu-min-width: 100%` meaning "as wide as the
+            // trigger" after the teleport — the menu's percentage resolves against this box.
+            // Without it the percentage would measure body (or the dialog), and every menu
+            // would paint viewport-wide. `min-width`, not `width`: styles.css gives the anchor
+            // `width: max-content` so it still grows when the menu outgrows the trigger.
             size({
                 apply({rects, elements}) {
-                    elements.floating.style.setProperty('--ui-menu-reference-width', `${rects.reference.width}px`);
+                    elements.floating.style.minWidth = `${rects.reference.width}px`;
                 },
             }),
             hide(),

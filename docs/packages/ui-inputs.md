@@ -220,7 +220,11 @@ See [Nullable values](#nullable-values) for why the models are nullable and what
 | `optionsLabel`     | `string`      | `'Options'`    | Accessible name for the listbox popup — a prop so you can localise |
 | `mutedOptions`     | `T['id'][]`   | —              | Ids rendered visually muted (`.is-muted`) — still committable      |
 
-The open listbox **teleports** to `document.body`, or into the nearest native `<dialog>` when the control sits in one, so an `overflow: hidden` or stacking-context ancestor of the trigger cannot clip or bury the menu. Width still tracks the trigger via `--ui-menu-reference-width`; a click on the teleported menu is not click-outside.
+The open listbox **teleports** to `document.body`, or into the nearest native `<dialog>` when the control sits in one, so an `overflow: hidden` or stacking-context ancestor of the trigger cannot clip or bury the menu. It lands inside a `.ui-menu-anchor` box sized to the trigger, so every existing width override keeps working. A click on the teleported menu is not click-outside.
+
+::: warning Declare your `--ui-*` map on `:root`
+A teleported popup leaves the control's subtree, so any `--ui-menu-*`, `--ui-option-*` or `--ui-clear-text` token declared on a scope that is not an ancestor of `body` — an app-shell class, a `<style scoped>` block — stops applying to the menu. Trigger tokens (`--ui-control-*`) are unaffected. If your theme is deliberately scoped, re-declare the menu and option tokens at `:root`, or set them on the teleport target. A branded trigger opening an unbranded menu is the symptom.
+:::
 
 They differ in what they model:
 
@@ -349,21 +353,20 @@ The `.is-open` and `.is-invalid` state classes follow `:focus-visible` in source
 
 ### Typography escape hatch
 
-`--ui-control-font-size` (default `inherit`) sizes control text, and `--ui-control-line-height` (default `inherit`) completes the decomposition. The control's `font` is decomposed into longhands — all inheriting except the two var-keyed ones — so both read from their variable rather than from a consumer utility class, which would otherwise lose the source-order tie against the package stylesheet. The listbox popup gets its own hook, `--ui-menu-font-size` (default `inherit` — from the teleport target, body or the nearest dialog), so an adapter never needs a `text-[13px]` utility on the popup.
+`--ui-control-font-size` (default `inherit`) sizes control text, and `--ui-control-line-height` (default `inherit`) completes the decomposition. The control's `font` is decomposed into longhands — all inheriting except the two var-keyed ones — so both read from their variable rather than from a consumer utility class, which would otherwise lose the source-order tie against the package stylesheet. The listbox popup gets its own hook, `--ui-menu-font-size` (default `inherit` — from the teleport target, body or the nearest dialog, NOT the component root), so an adapter never needs a `text-[13px]` utility on the popup.
 
 ### Menu width clamps
 
-The popup is never narrower than its trigger: the layout engine writes the trigger width onto the popup as `--ui-menu-reference-width`, and the popup rule takes `max()` of that and `--ui-menu-min-width`. So `--ui-menu-min-width` (default `0px`) is an **extra floor on top of the trigger width**, and `--ui-menu-max-width` (default `none`) caps the popup — both without a specificity fight:
+`--ui-menu-min-width` (default `100%` — of the `.ui-menu-anchor`, i.e. the trigger width) and `--ui-menu-max-width` (default `none`) clamp the listbox popup without a specificity fight:
 
 ```css
 :root {
-    /* at least the trigger, and at least 240px */
-    --ui-menu-min-width: 240px;
+    --ui-menu-min-width: max(100%, 240px);
     --ui-menu-max-width: calc(100vw - 16px);
 }
 ```
 
-This replaces the pre-teleport `max(100%, 240px)` idiom. Write a plain length. Do **not** write `var(--ui-menu-reference-width)` into a `:root` declaration — a `var()` there substitutes against `:root`, where the reference width never exists, so it silently bakes in the fallback and the popup never reads its own trigger width. `100%` is out for the same reason it stopped working: teleported, the popup's containing block is the viewport (or the dialog), not the trigger.
+`100%` survived the KD-1136 teleport unchanged. The popup is teleported inside an anchor box that floating-ui sizes to the trigger, so the percentage resolves against the trigger exactly as it did when the popup sat inside the control. When the menu outgrows the trigger, the anchor grows with it.
 
 ### Touch targets
 
