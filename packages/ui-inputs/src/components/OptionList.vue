@@ -5,7 +5,6 @@
         role="listbox"
         :aria-label="optionsLabel"
         :aria-multiselectable="multiselectable || undefined"
-        :style="floatingStyles"
     >
         <!-- The committing clear entry (SingleSelect/Combobox `clearLabel`) renders OUTSIDE
              the index space — its own <li> above the v-for, its own id (`${id}-clear`), its
@@ -53,8 +52,6 @@
 </template>
 
 <script setup lang="ts">
-import type {CSSProperties} from 'vue';
-
 /**
  * The listbox popup shared by every ui-inputs select control — INTERNAL, deliberately not
  * exported from the barrel (like `useListbox`, its behavioural twin). Where the composable
@@ -70,9 +67,10 @@ import type {CSSProperties} from 'vue';
  * clear entry (`clear*` props) sits above the list, outside the index space.
  *
  * The single `<ul>` root is LOAD-BEARING: parents reach the floating element through the
- * instance's `$el` (via `componentEl` in `internal/reactivity`) — no `defineExpose`, which the
- * family reserves for public imperative handles, never internal plumbing. A second root node
- * (or a root comment outside the `<ul>`) would break `$el` resolution for every consumer.
+ * `.ui-menu-anchor` wrapper that parents teleport (KD-1136) — floating-ui positions the
+ * ANCHOR, and this `<ul>` is a static box inside it. That is what keeps `--ui-menu-min-width:
+ * 100%` resolving against the trigger rather than against body. This component renders no
+ * positioning of its own and takes no floating-ui styles.
  */
 const {
     labels,
@@ -82,7 +80,6 @@ const {
     optionId,
     isSelected,
     isMuted,
-    floatingStyles,
     variant,
     optionsLabel,
     emptyText,
@@ -106,8 +103,6 @@ const {
     isSelected: (index: number) => boolean;
     /** whether the option at an index is visually MUTED (`.is-muted`) — still committable. */
     isMuted: (index: number) => boolean;
-    /** floating-ui positioning styles for the popup. */
-    floatingStyles: CSSProperties;
     /** class prefix of the owning control — the only visual divergence across the family. */
     variant: 'ui-select' | 'ui-combobox' | 'ui-multiselect' | 'ui-multicombobox';
     /** accessible name for the listbox popup (`aria-label`). */

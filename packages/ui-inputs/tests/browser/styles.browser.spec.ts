@@ -108,6 +108,63 @@ describe('styles.css — :root overrides (the --ui-* contract)', () => {
         document.documentElement.style.setProperty('--ui-menu-max-height', '100px');
         expect(getComputedStyle(menu).maxHeight).toBe('100px');
     });
+
+    // KD-1136: floating-ui positions a `.ui-menu-anchor` box, and the menu is a static box
+    // inside it. That indirection is what keeps `--ui-menu-min-width: 100%` measuring the
+    // TRIGGER after the teleport — a percentage on the menu resolves against the anchor.
+    const addAnchoredMenu = (referenceWidth: string): {anchor: HTMLElement; menu: HTMLElement} => {
+        const anchor = document.createElement('div');
+        anchor.className = 'ui-menu-anchor';
+        // What the size() middleware writes.
+        anchor.style.minWidth = referenceWidth;
+        const menu = document.createElement('ul');
+        menu.className = 'ui-select__menu';
+        anchor.append(menu);
+        document.body.append(anchor);
+        cleanupTargets.push(anchor);
+        return {anchor, menu};
+    };
+
+    it('gives the anchor the position and stacking the menu used to carry', () => {
+        addStyle(uiCss);
+        const {anchor, menu} = addAnchoredMenu('180px');
+
+        // `fixed` matches useListbox's floating-ui strategy — a top-layer box positions
+        // against the viewport.
+        expect(getComputedStyle(anchor).position).toBe('fixed');
+        expect(getComputedStyle(anchor).zIndex).toBe('50');
+        // The menu itself must NOT be positioned — the anchor owns it now.
+        expect(getComputedStyle(menu).position).toBe('static');
+    });
+
+    it('resolves the default --ui-menu-min-width: 100% against the trigger, not the body', () => {
+        addStyle(uiCss);
+        const {menu} = addAnchoredMenu('180px');
+
+        // body is far wider than 180px; a percentage against body would prove the bug.
+        expect(document.body.getBoundingClientRect().width).toBeGreaterThan(300);
+        expect(menu.getBoundingClientRect().width).toBe(180);
+    });
+
+    it("keeps a territory's max(100%, 240px) floor working, and grows the anchor with it", () => {
+        addStyle(uiCss);
+        // kendo's shipped override, verbatim (shared/styles/ui-inputs.css).
+        document.documentElement.style.setProperty('--ui-menu-min-width', 'max(100%, 240px)');
+        const {anchor, menu} = addAnchoredMenu('180px');
+
+        expect(menu.getBoundingClientRect().width).toBe(240);
+        // The anchor must grow too, or shift()/hide() would measure a box narrower than the
+        // menu and stop keeping it on-screen.
+        expect(anchor.getBoundingClientRect().width).toBe(240);
+    });
+
+    it('lets the trigger win when it is wider than the territory floor', () => {
+        addStyle(uiCss);
+        document.documentElement.style.setProperty('--ui-menu-min-width', 'max(100%, 240px)');
+        const {menu} = addAnchoredMenu('320px');
+
+        expect(menu.getBoundingClientRect().width).toBe(320);
+    });
 });
 
 describe('styles.css — WR-0512 font-size source-order regression pins', () => {

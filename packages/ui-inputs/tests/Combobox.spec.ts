@@ -4,6 +4,7 @@ import {afterEach, describe, expect, it, vi} from 'vitest';
 import {h} from 'vue';
 
 import Combobox from '../src/components/Combobox.vue';
+import {menu} from './find-menu';
 
 type Fruit = {id: number; name: string};
 
@@ -65,15 +66,15 @@ describe('Combobox', () => {
         expect(input.attributes('aria-expanded')).toBe('false');
         expect(input.attributes('placeholder')).toBe('Pick one');
         expect(input.attributes('aria-required')).toBeUndefined();
-        expect(wrapper.find('.ui-combobox__menu').exists()).toBe(false);
+        expect(menu(wrapper).exists()).toBe(false);
 
         await input.trigger('click');
 
         expect(input.attributes('aria-expanded')).toBe('true');
         expect(input.classes()).toContain('is-open');
-        const options = wrapper.findAll('.ui-combobox__option');
+        const options = menu(wrapper).findAll('.ui-combobox__option');
         expect(options.map((o) => o.text())).toEqual(['Apricot', 'Mango', 'Watermelon']);
-        expect(wrapper.find('.ui-combobox__menu').attributes('aria-label')).toBe('Options');
+        expect(menu(wrapper).attributes('aria-label')).toBe('Options');
     });
 
     it('shows the committed value in the input and reflects required/invalid state', () => {
@@ -90,7 +91,7 @@ describe('Combobox', () => {
     it('uses a custom optionsLabel as the listbox accessible name', async () => {
         const wrapper = mountCombobox({optionsLabel: 'Fruits'});
         await wrapper.find('input').trigger('click');
-        expect(wrapper.find('.ui-combobox__menu').attributes('aria-label')).toBe('Fruits');
+        expect(menu(wrapper).attributes('aria-label')).toBe('Fruits');
     });
 
     it('resolves the display value via a getter label', () => {
@@ -101,16 +102,16 @@ describe('Combobox', () => {
     it('preserves given order when alphabeticalSort is false and shows empty text with no options', async () => {
         const unsorted = mountCombobox({alphabeticalSort: false});
         await unsorted.find('input').trigger('click');
-        expect(unsorted.findAll('.ui-combobox__option').map((o) => o.text())).toEqual([
-            'Watermelon',
-            'Apricot',
-            'Mango',
-        ]);
+        expect(
+            menu(unsorted)
+                .findAll('.ui-combobox__option')
+                .map((o) => o.text()),
+        ).toEqual(['Watermelon', 'Apricot', 'Mango']);
 
         const empty = mountCombobox({options: [], emptyText: 'Nothing here'});
         await empty.find('input').trigger('click');
-        expect(empty.find('.ui-combobox__empty').text()).toBe('Nothing here');
-        expect(empty.findAll('.ui-combobox__option')).toHaveLength(0);
+        expect(menu(empty).find('.ui-combobox__empty').text()).toBe('Nothing here');
+        expect(menu(empty).findAll('.ui-combobox__option')).toHaveLength(0);
     });
 
     it('filters the list as the user types, and an empty query shows all options', async () => {
@@ -119,21 +120,29 @@ describe('Combobox', () => {
 
         await input.setValue('ap');
         expect(input.attributes('aria-expanded')).toBe('true'); // typing opens
-        expect(wrapper.findAll('.ui-combobox__option').map((o) => o.text())).toEqual(['Apricot']);
+        expect(
+            menu(wrapper)
+                .findAll('.ui-combobox__option')
+                .map((o) => o.text()),
+        ).toEqual(['Apricot']);
 
         await input.setValue('m');
-        expect(wrapper.findAll('.ui-combobox__option').map((o) => o.text())).toEqual(['Mango', 'Watermelon']);
+        expect(
+            menu(wrapper)
+                .findAll('.ui-combobox__option')
+                .map((o) => o.text()),
+        ).toEqual(['Mango', 'Watermelon']);
 
         await input.setValue('');
-        expect(wrapper.findAll('.ui-combobox__option').map((o) => o.text())).toEqual([
-            'Apricot',
-            'Mango',
-            'Watermelon',
-        ]);
+        expect(
+            menu(wrapper)
+                .findAll('.ui-combobox__option')
+                .map((o) => o.text()),
+        ).toEqual(['Apricot', 'Mango', 'Watermelon']);
 
         await input.setValue('zzz');
-        expect(wrapper.findAll('.ui-combobox__option')).toHaveLength(0);
-        expect(wrapper.find('.ui-combobox__empty').exists()).toBe(true);
+        expect(menu(wrapper).findAll('.ui-combobox__option')).toHaveLength(0);
+        expect(menu(wrapper).find('.ui-combobox__empty').exists()).toBe(true);
     });
 
     it('navigates the filtered list with the keyboard and commits the highlighted option on Enter', async () => {
@@ -143,15 +152,15 @@ describe('Combobox', () => {
 
         await input.setValue('m'); // filtered: Mango, Watermelon
         await root.trigger('keydown', {key: 'ArrowDown'}); // pointer → 0 (Mango)
-        expect(wrapper.findAll('.ui-combobox__option')[0].classes()).toContain('is-active');
-        expect(wrapper.findAll('.ui-combobox__option')[0].attributes('aria-selected')).toBe('false');
+        expect(menu(wrapper).findAll('.ui-combobox__option')[0].classes()).toContain('is-active');
+        expect(menu(wrapper).findAll('.ui-combobox__option')[0].attributes('aria-selected')).toBe('false');
 
         await root.trigger('keydown', {key: 'ArrowDown'}); // pointer → 1 (Watermelon)
         await root.trigger('keydown', {key: 'ArrowUp'}); // pointer → 0 (Mango)
         await root.trigger('keydown', {key: 'Enter'});
 
         expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([3]); // Mango
-        expect(wrapper.find('.ui-combobox__menu').exists()).toBe(false); // closed
+        expect(menu(wrapper).exists()).toBe(false); // closed
         expect(input.element.value).toBe('Mango'); // commit shows the chosen label
     });
 
@@ -166,7 +175,7 @@ describe('Combobox', () => {
 
         await root.trigger('keydown', {key: 'ArrowDown'}); // opens, pointer stays -1
         expect(input().attributes('aria-controls')).toBe('fruit-listbox');
-        expect(wrapper.find('.ui-combobox__menu').attributes('id')).toBe('fruit-listbox');
+        expect(menu(wrapper).attributes('id')).toBe('fruit-listbox');
         expect(input().attributes('aria-activedescendant')).toBeUndefined(); // open, nothing highlighted
 
         await root.trigger('keydown', {key: 'ArrowDown'}); // → Apricot (position 0)
@@ -178,7 +187,9 @@ describe('Combobox', () => {
         await root.trigger('keydown', {key: 'ArrowUp'}); // back to Apricot
         expect(input().attributes('aria-activedescendant')).toBe('fruit-opt-0');
 
-        const ids = wrapper.findAll('.ui-combobox__option').map((o) => o.attributes('id'));
+        const ids = menu(wrapper)
+            .findAll('.ui-combobox__option')
+            .map((o) => o.attributes('id'));
         expect(ids).toEqual(['fruit-opt-0', 'fruit-opt-1', 'fruit-opt-2']);
         expect(new Set(ids).size).toBe(ids.length);
 
@@ -206,9 +217,9 @@ describe('Combobox', () => {
 
         // A narrowing that lands under the pointer must clamp, not dangle.
         await wrapper.setProps({options: FRUITS.slice(0, 1)}); // one option
-        expect(wrapper.findAll('.ui-combobox__option')).toHaveLength(1);
+        expect(menu(wrapper).findAll('.ui-combobox__option')).toHaveLength(1);
         const active = input.attributes('aria-activedescendant');
-        if (active !== undefined) expect(wrapper.find(`#${active}`).exists()).toBe(true);
+        if (active !== undefined) expect(menu(wrapper).find(`#${active}`).exists()).toBe(true);
 
         // Enter must commit the surviving option rather than index off the end.
         await root.trigger('keydown', {key: 'Enter'});
@@ -235,16 +246,16 @@ describe('Combobox', () => {
 
         // Opening shows the FULL list (the committed-label query does not filter, WR-0576).
         await input.trigger('click');
-        const options = wrapper.findAll('.ui-combobox__option'); // Apricot, Mango, Watermelon
+        const options = menu(wrapper).findAll('.ui-combobox__option'); // Apricot, Mango, Watermelon
         expect(options.map((o) => o.attributes('aria-selected'))).toEqual(['false', 'true', 'false']);
 
         await options[2].trigger('mouseover'); // hover Watermelon
         expect(options[2].classes()).toContain('is-active');
-        expect(wrapper.findAll('.ui-combobox__option').map((o) => o.attributes('aria-selected'))).toEqual([
-            'false',
-            'true',
-            'false',
-        ]);
+        expect(
+            menu(wrapper)
+                .findAll('.ui-combobox__option')
+                .map((o) => o.attributes('aria-selected')),
+        ).toEqual(['false', 'true', 'false']);
     });
 
     it('reverts a half-typed non-match to the committed label on Escape and shows empty text meanwhile', async () => {
@@ -254,11 +265,11 @@ describe('Combobox', () => {
 
         await input.trigger('click');
         await input.setValue('zzz'); // no match
-        expect(wrapper.find('.ui-combobox__empty').exists()).toBe(true);
+        expect(menu(wrapper).find('.ui-combobox__empty').exists()).toBe(true);
         expect(input.element.value).toBe('zzz');
 
         await root.trigger('keydown', {key: 'Escape'});
-        expect(wrapper.find('.ui-combobox__menu').exists()).toBe(false);
+        expect(menu(wrapper).exists()).toBe(false);
         expect(input.element.value).toBe('Mango'); // reverted to the committed label
     });
 
@@ -268,11 +279,11 @@ describe('Combobox', () => {
 
         await input.setValue('ap');
         expect(input.element.value).toBe('ap');
-        expect(wrapper.find('.ui-combobox__menu').exists()).toBe(true);
+        expect(menu(wrapper).exists()).toBe(true);
 
         document.body.dispatchEvent(new MouseEvent('click', {bubbles: true}));
         await wrapper.vm.$nextTick();
-        expect(wrapper.find('.ui-combobox__menu').exists()).toBe(false);
+        expect(menu(wrapper).exists()).toBe(false);
         expect(input.element.value).toBe(''); // nothing committed → reverts to empty
     });
 
@@ -313,48 +324,48 @@ describe('Combobox', () => {
         await root.trigger('keydown', {key: 'ArrowDown'}); // opens, pointer -1
         await root.trigger('keydown', {key: 'Enter'}); // pointer < 0 → no commit
         expect(wrapper.emitted('update:modelValue')).toBeUndefined();
-        expect(wrapper.find('.ui-combobox__menu').exists()).toBe(true);
+        expect(menu(wrapper).exists()).toBe(true);
 
         await root.trigger('keydown', {key: 'ArrowRight'}); // unhandled → no state change
-        expect(wrapper.find('.ui-combobox__menu').exists()).toBe(true);
+        expect(menu(wrapper).exists()).toBe(true);
     });
 
     it('ignores a non-opening key while closed', async () => {
         const wrapper = mountCombobox({});
         await wrapper.find('.ui-combobox').trigger('keydown', {key: 'ArrowRight'});
-        expect(wrapper.find('.ui-combobox__menu').exists()).toBe(false);
+        expect(menu(wrapper).exists()).toBe(false);
     });
 
     it('closes and reverts on Escape', async () => {
         const wrapper = mountCombobox({});
         const root = wrapper.find('.ui-combobox');
         await root.trigger('keydown', {key: 'ArrowDown'});
-        expect(wrapper.find('.ui-combobox__menu').exists()).toBe(true);
+        expect(menu(wrapper).exists()).toBe(true);
         await root.trigger('keydown', {key: 'Escape'});
-        expect(wrapper.find('.ui-combobox__menu').exists()).toBe(false);
+        expect(menu(wrapper).exists()).toBe(false);
     });
 
     it('commits an option on click and sets the pointer on mouseover', async () => {
         const wrapper = mountCombobox({});
         await wrapper.find('input').trigger('click');
 
-        const mango = wrapper.findAll('.ui-combobox__option')[1]; // sorted: Apricot, Mango, Watermelon
+        const mango = menu(wrapper).findAll('.ui-combobox__option')[1]; // sorted: Apricot, Mango, Watermelon
         await mango.trigger('mouseover');
         expect(mango.classes()).toContain('is-active');
 
         await mango.trigger('click');
         expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([3]); // Mango
-        expect(wrapper.find('.ui-combobox__menu').exists()).toBe(false);
+        expect(menu(wrapper).exists()).toBe(false);
         expect(wrapper.find('input').element.value).toBe('Mango');
     });
 
     it('does not open when disabled, by click or by keyboard', async () => {
         const wrapper = mountCombobox({disabled: true});
         await wrapper.find('input').trigger('click');
-        expect(wrapper.find('.ui-combobox__menu').exists()).toBe(false);
+        expect(menu(wrapper).exists()).toBe(false);
 
         await wrapper.find('.ui-combobox').trigger('keydown', {key: 'ArrowDown'});
-        expect(wrapper.find('.ui-combobox__menu').exists()).toBe(false);
+        expect(menu(wrapper).exists()).toBe(false);
     });
 
     it('closes and reverts on Tab', async () => {
@@ -362,9 +373,9 @@ describe('Combobox', () => {
         const root = wrapper.find('.ui-combobox');
         const input = wrapper.find('input');
         await input.setValue('zzz'); // open + half-typed non-match
-        expect(wrapper.find('.ui-combobox__menu').exists()).toBe(true);
+        expect(menu(wrapper).exists()).toBe(true);
         await root.trigger('keydown', {key: 'Tab'});
-        expect(wrapper.find('.ui-combobox__menu').exists()).toBe(false);
+        expect(menu(wrapper).exists()).toBe(false);
         expect(input.element.value).toBe(''); // reverted
     });
 
@@ -380,11 +391,11 @@ describe('Combobox', () => {
     it('closes when a click lands outside the component', async () => {
         const wrapper = mountCombobox({});
         await wrapper.find('input').trigger('click');
-        expect(wrapper.find('.ui-combobox__menu').exists()).toBe(true);
+        expect(menu(wrapper).exists()).toBe(true);
 
         document.body.dispatchEvent(new MouseEvent('click', {bubbles: true}));
         await wrapper.vm.$nextTick();
-        expect(wrapper.find('.ui-combobox__menu').exists()).toBe(false);
+        expect(menu(wrapper).exists()).toBe(false);
     });
 
     it('removes its document listener on unmount', async () => {
@@ -407,17 +418,18 @@ describe('Combobox', () => {
 
         await input.trigger('click');
         await input.setValue('m'); // filtered + sorted: Mango, Watermelon
-        expect(wrapper.findAll('.ui-combobox__option .swatch').map((el) => el.text())).toEqual([
-            'Mango#0*',
-            'Watermelon#1',
-        ]);
+        expect(
+            menu(wrapper)
+                .findAll('.swatch')
+                .map((el) => el.text()),
+        ).toEqual(['Mango#0*', 'Watermelon#1']);
     });
 
     it('marks mutedOptions with .is-muted while keeping them committable', async () => {
         const wrapper = mountCombobox({mutedOptions: [2]}); // Apricot
         await wrapper.find('input').trigger('click');
 
-        const options = wrapper.findAll('.ui-combobox__option'); // Apricot, Mango, Watermelon
+        const options = menu(wrapper).findAll('.ui-combobox__option'); // Apricot, Mango, Watermelon
         expect(options.map((o) => o.classes().includes('is-muted'))).toEqual([true, false, false]);
 
         await options[0].trigger('click');
@@ -434,11 +446,11 @@ describe('Combobox', () => {
             // The query EQUALS the committed label, so the filter must NOT engage — the
             // user opened to BROWSE, and a list narrowed to the already-chosen option
             // would force a manual clear before any other option is even visible.
-            expect(wrapper.findAll('.ui-combobox__option').map((o) => o.text())).toEqual([
-                'Apricot',
-                'Mango',
-                'Watermelon',
-            ]);
+            expect(
+                menu(wrapper)
+                    .findAll('.ui-combobox__option')
+                    .map((o) => o.text()),
+            ).toEqual(['Apricot', 'Mango', 'Watermelon']);
         });
 
         it('engages the filter on divergence and disengages again on convergence', async () => {
@@ -447,17 +459,21 @@ describe('Combobox', () => {
 
             await input.trigger('click');
             await input.setValue('Man'); // diverged from the committed label → filter engages
-            expect(wrapper.findAll('.ui-combobox__option').map((o) => o.text())).toEqual(['Mango']);
+            expect(
+                menu(wrapper)
+                    .findAll('.ui-combobox__option')
+                    .map((o) => o.text()),
+            ).toEqual(['Mango']);
 
             // Retyping the EXACT committed label converges back to the full list — the
             // convention is equality, not a typed-once latch (MUI Autocomplete parity):
             // the committed label as a query carries no intent to narrow.
             await input.setValue('Mango');
-            expect(wrapper.findAll('.ui-combobox__option').map((o) => o.text())).toEqual([
-                'Apricot',
-                'Mango',
-                'Watermelon',
-            ]);
+            expect(
+                menu(wrapper)
+                    .findAll('.ui-combobox__option')
+                    .map((o) => o.text()),
+            ).toEqual(['Apricot', 'Mango', 'Watermelon']);
         });
 
         it('does not filter by emptyDisplayValue when the committed-null rendering fills the input', async () => {
@@ -468,8 +484,8 @@ describe('Combobox', () => {
             await input.trigger('click');
             // Same defect shape as the committed label: 'Any fruit' matches no option
             // label, so the un-fixed filter would show an EMPTY list on open.
-            expect(wrapper.findAll('.ui-combobox__option')).toHaveLength(3);
-            expect(wrapper.find('.ui-combobox__empty').exists()).toBe(false);
+            expect(menu(wrapper).findAll('.ui-combobox__option')).toHaveLength(3);
+            expect(menu(wrapper).find('.ui-combobox__empty').exists()).toBe(false);
         });
 
         it('selects the input text when the popup opens holding the committed label', async () => {
@@ -493,7 +509,7 @@ describe('Combobox', () => {
 
             // Commit Mango, then REOPEN — the committed label is back in the input and
             // must be selected again on this open (a live watcher, not a one-shot).
-            await wrapper.findAll('.ui-combobox__option')[1].trigger('click'); // Mango
+            await menu(wrapper).findAll('.ui-combobox__option')[1].trigger('click'); // Mango
             await input.trigger('click');
             expect(select).toHaveBeenCalledTimes(1);
         });
@@ -514,16 +530,17 @@ describe('Combobox', () => {
             const input = wrapper.find('input');
 
             await input.setValue('zzz'); // no option matches — the entry still renders
-            const clear = wrapper.find('.ui-combobox__clear');
+            const clear = menu(wrapper).find('.ui-combobox__clear');
             expect(clear.text()).toBe('No fruit');
             expect(clear.attributes('id')).toBe('fruit-clear');
             expect(clear.attributes('aria-selected')).toBe('true'); // model is null
 
             await input.setValue('m'); // option ids keep mapping to the FILTERED list only
-            expect(wrapper.findAll('.ui-combobox__option').map((o) => o.attributes('id'))).toEqual([
-                'fruit-opt-0',
-                'fruit-opt-1',
-            ]);
+            expect(
+                menu(wrapper)
+                    .findAll('.ui-combobox__option')
+                    .map((o) => o.attributes('id')),
+            ).toEqual(['fruit-opt-0', 'fruit-opt-1']);
         });
 
         it('commits null on Enter, closes, and snaps the input to emptyDisplayValue', async () => {
@@ -538,7 +555,7 @@ describe('Combobox', () => {
             await root.trigger('keydown', {key: 'Enter'});
 
             expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([null]);
-            expect(wrapper.find('.ui-combobox__menu').exists()).toBe(false);
+            expect(menu(wrapper).exists()).toBe(false);
             expect(input.element.value).toBe('Any fruit'); // the named empty state, not ''
         });
 
@@ -557,9 +574,9 @@ describe('Combobox', () => {
             const wrapper = mountCombobox({clearLabel: 'No fruit', modelValue: 3});
             await wrapper.find('input').trigger('click');
 
-            await wrapper.find('.ui-combobox__clear').trigger('click');
+            await menu(wrapper).find('.ui-combobox__clear').trigger('click');
             expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([null]);
-            expect(wrapper.find('.ui-combobox__menu').exists()).toBe(false);
+            expect(menu(wrapper).exists()).toBe(false);
             // No emptyDisplayValue → the committed-null rendering is blank, as before.
             expect(wrapper.find('input').element.value).toBe('');
         });
@@ -569,12 +586,12 @@ describe('Combobox', () => {
             const input = wrapper.find('input');
 
             await input.trigger('click');
-            await wrapper.find('.ui-combobox__clear').trigger('mouseover');
-            expect(wrapper.find('.ui-combobox__clear').classes()).toContain('is-active');
+            await menu(wrapper).find('.ui-combobox__clear').trigger('mouseover');
+            expect(menu(wrapper).find('.ui-combobox__clear').classes()).toContain('is-active');
             expect(input.attributes('aria-activedescendant')).toBe('fruit-clear');
 
             await input.setValue('m'); // typing must reset the highlight to "nothing"
-            expect(wrapper.find('.ui-combobox__clear').classes()).not.toContain('is-active');
+            expect(menu(wrapper).find('.ui-combobox__clear').classes()).not.toContain('is-active');
             expect(input.attributes('aria-activedescendant')).toBeUndefined();
         });
     });

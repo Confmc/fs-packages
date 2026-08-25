@@ -1,7 +1,7 @@
 import type {Placement} from '@floating-ui/vue';
 import type {CSSProperties, Ref} from 'vue';
 
-import {autoUpdate, flip, hide, offset, shift, useFloating} from '@floating-ui/vue';
+import {autoUpdate, flip, hide, offset, shift, size, useFloating} from '@floating-ui/vue';
 import {computed, onBeforeUnmount, onMounted, ref, watch} from 'vue';
 
 import {ensureRefValueExists} from '../internal/reactivity';
@@ -28,7 +28,7 @@ export interface ListboxFloatingOptions {
 }
 
 export interface UseListboxOptions {
-    /** the component root — click-outside is measured against it. */
+    /** the component root — click-outside is measured against it (the popup stays inside it). */
     root: ElementRef;
     /** the floating-ui reference element (the trigger button / the combobox input). */
     reference: ElementRef;
@@ -248,21 +248,64 @@ export function useListbox(options: UseListboxOptions) {
     };
 
     // click-outside — closes/reverts without a shared directive dependency.
+    //
+    // `composedPath()`, never `event.target`: at a DOCUMENT listener a click inside a shadow
+    // root is retargeted to the shadow HOST, which is an ancestor of `root` rather than a
+    // descendant, so `root.contains(target)` rejects it and every option click would read as
+    // outside — MultiSelect and MultiCombobox would close instead of toggling. The composed
+    // path carries the true chain across shadow boundaries. The popup needs no separate check:
+    // it is promoted to the top layer IN PLACE, so it never leaves `root`.
     const onDocumentPointer = (event: MouseEvent) => {
+        if (!open.value) return;
         // The listener is attached only between mount and unmount, so the ref is non-null here.
         // Non-null by lifetime (the listener only exists while mounted) — loud, named accessor
         // over a bare `!`: the same impossible state throws, but names the broken assumption.
-        if (!ensureRefValueExists(root).contains(event.target as Node)) onOutside();
+        if (event.composedPath().includes(ensureRefValueExists(root))) return;
+        onOutside();
     };
     onMounted(() => document.addEventListener('click', onDocumentPointer));
     onBeforeUnmount(() => document.removeEventListener('click', onDocumentPointer));
 
+    // KD-1136. The popup is promoted to the TOP LAYER in place, via the Popover API — it is
+    // never moved in the DOM. A top-layer box paints outside the normal flow, so no ancestor's
+    // `overflow` can clip it and no ancestor's stacking context can bury it, which is the whole
+    // defect. Staying put is what the earlier teleport gave away: CSS inheritance follows the
+    // DOM tree, so a consumer's scoped `--ui-*` map and shadow-encapsulated styles keep
+    // applying, `root.contains()` keeps answering truthfully, and there is no landing site to
+    // choose (no dialog lookup, no shadow-boundary walk, no second clipping ancestor).
+    //
+    // `v-if` builds a fresh element per open, so this can never re-show an already-open popup.
+    // Removal from the DOM drops it from the top layer, which is the close path.
+    watch(
+        floating,
+        (element) => {
+            if (element) element.showPopover();
+        },
+        {flush: 'post'},
+    );
+
     const {floatingStyles, middlewareData} = useFloating(reference, floating, {
+        // `fixed`, not the default `absolute`: a top-layer box is positioned against the
+        // viewport, and the popup no longer has a positioned ancestor to measure from.
+        // autoUpdate already recomputes on ancestor scroll, which is what a fixed popup
+        // needs to stay glued to its trigger.
+        strategy: 'fixed',
         placement: floatingOptions.placement ?? 'bottom-start',
         middleware: [
             offset(floatingOptions.offset ?? 4),
             flip({fallbackPlacements: floatingOptions.fallbackPlacements ?? ['top-start']}),
             shift({padding: floatingOptions.shiftPadding ?? 8}),
+            // `elements.floating` is the `.ui-menu-anchor` box, not the <ul>. Sizing it to the
+            // trigger is what keeps `--ui-menu-min-width: 100%` meaning "as wide as the
+            // trigger" after the teleport — the menu's percentage resolves against this box.
+            // Without it the percentage would measure body (or the dialog), and every menu
+            // would paint viewport-wide. `min-width`, not `width`: styles.css gives the anchor
+            // `width: max-content` so it still grows when the menu outgrows the trigger.
+            size({
+                apply({rects, elements}) {
+                    elements.floating.style.minWidth = `${rects.reference.width}px`;
+                },
+            }),
             hide(),
         ],
         whileElementsMounted: autoUpdate,

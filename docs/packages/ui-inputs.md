@@ -249,6 +249,12 @@ See [Nullable values](#nullable-values) for why the models are nullable and what
 | `optionsLabel`     | `string`      | `'Options'`    | Accessible name for the listbox popup — a prop so you can localise |
 | `mutedOptions`     | `T['id'][]`   | —              | Ids rendered visually muted (`.is-muted`) — still committable      |
 
+The open listbox is promoted to the **top layer** via the [Popover API](https://developer.mozilla.org/docs/Web/API/Popover_API), so an `overflow: hidden` or stacking-context ancestor of the trigger cannot clip or bury the menu. It is **never moved in the DOM** — it stays inside the control, so your `--ui-*` map keeps applying wherever you declared it (an app-shell class, a `<style scoped>` block, a shadow root), and a click on the menu is correctly not a click-outside.
+
+::: tip Browser support
+The Popover API is Baseline since April 2024 — Chrome 114+, Safari 17+, Firefox 125+.
+:::
+
 They differ in what they model:
 
 | Component       | Model             | Extras                                                                                                                |
@@ -403,11 +409,11 @@ The stylesheet ends with two gated blocks that deliberately step **outside** the
 
 ### Typography escape hatch
 
-`--ui-control-font-size` (default `inherit`) sizes control text, and `--ui-control-line-height` (default `inherit`) completes the decomposition. The control's `font` is decomposed into longhands — all inheriting except the two var-keyed ones — so both read from their variable rather than from a consumer utility class, which would otherwise lose the source-order tie against the package stylesheet. The listbox popup gets its own hook, `--ui-menu-font-size` (default `inherit` — it sizes by inheritance from the component root), so an adapter never needs a `text-[13px]` utility on the popup.
+`--ui-control-font-size` (default `inherit`) sizes control text, and `--ui-control-line-height` (default `inherit`) completes the decomposition. The control's `font` is decomposed into longhands — all inheriting except the two var-keyed ones — so both read from their variable rather than from a consumer utility class, which would otherwise lose the source-order tie against the package stylesheet. The listbox popup gets its own hook, `--ui-menu-font-size` (default `inherit` — the popup never leaves the control, so it inherits from the component root), so an adapter never needs a `text-[13px]` utility on the popup.
 
 ### Menu width clamps
 
-`--ui-menu-min-width` (default `100%` — of the positioned ancestor, i.e. at least the trigger) and `--ui-menu-max-width` (default `none`) clamp the listbox popup without a specificity fight:
+`--ui-menu-min-width` (default `100%` — of the `.ui-menu-anchor`, i.e. the trigger width) and `--ui-menu-max-width` (default `none`) clamp the listbox popup without a specificity fight:
 
 ```css
 :root {
@@ -415,6 +421,8 @@ The stylesheet ends with two gated blocks that deliberately step **outside** the
     --ui-menu-max-width: calc(100vw - 16px);
 }
 ```
+
+`100%` means the trigger width: the popup sits inside a `.ui-menu-anchor` box that floating-ui sizes to the trigger. When the menu outgrows the trigger, the anchor grows with it.
 
 ### Touch targets
 
