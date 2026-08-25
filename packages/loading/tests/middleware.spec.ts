@@ -77,6 +77,7 @@ describe('registerLoadingMiddleware', () => {
     });
 
     afterEach(() => {
+        vi.restoreAllMocks();
         vi.useRealTimers();
     });
 
@@ -310,5 +311,91 @@ describe('registerLoadingMiddleware', () => {
         triggerError(undefined);
 
         expect(loadingService.activeCount.value).toBe(1);
+    });
+    it('should clear the pending timeout when the response arrives first', () => {
+        const {httpService, triggerRequest, triggerResponse} = createMockHttpService();
+        const loadingService = createLoadingService();
+        registerLoadingMiddleware(httpService, loadingService, {timeoutMs: 5000});
+
+        const config = triggerRequest();
+        expect(vi.getTimerCount()).toBe(1);
+
+        triggerResponse(config);
+
+        expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('should drop the timeout entry once the request completes', () => {
+        const {httpService, triggerRequest, triggerResponse} = createMockHttpService();
+        const loadingService = createLoadingService();
+        const {unregister} = registerLoadingMiddleware(httpService, loadingService, {timeoutMs: 5000});
+        const clearTimeoutSpy = vi.spyOn(globalThis, 'clearTimeout');
+
+        const config = triggerRequest();
+        triggerResponse(config);
+        expect(clearTimeoutSpy).toHaveBeenCalledTimes(1);
+
+        // The map is not reachable from the public surface; unregister's sweep is
+        // the only reader, so a second clear here would mean the entry outlived
+        // its request.
+        unregister();
+
+        expect(clearTimeoutSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not clear a timeout that was never set when timeouts are disabled', () => {
+        const {httpService, triggerRequest, triggerResponse} = createMockHttpService();
+        const loadingService = createLoadingService();
+        registerLoadingMiddleware(httpService, loadingService, {timeoutMs: 0});
+        const clearTimeoutSpy = vi.spyOn(globalThis, 'clearTimeout');
+
+        const config = triggerRequest();
+        triggerResponse(config);
+
+        expect(clearTimeoutSpy).not.toHaveBeenCalled();
+    });
+
+    it('should stop decrementing on responses after unregister is called', () => {
+        const {httpService, triggerRequest, triggerResponse} = createMockHttpService();
+        const loadingService = createLoadingService();
+        const {unregister} = registerLoadingMiddleware(httpService, loadingService);
+
+        const config = triggerRequest();
+        expect(loadingService.activeCount.value).toBe(1);
+
+        unregister();
+        triggerResponse(config);
+
+        expect(loadingService.activeCount.value).toBe(1);
+    });
+
+    it('should stop decrementing on errors after unregister is called', () => {
+        const {httpService, triggerRequest, triggerError} = createMockHttpService();
+        const loadingService = createLoadingService();
+        const {unregister} = registerLoadingMiddleware(httpService, loadingService);
+
+        const config = triggerRequest();
+        expect(loadingService.activeCount.value).toBe(1);
+
+        unregister();
+        triggerError(config);
+
+        expect(loadingService.activeCount.value).toBe(1);
+    });
+
+    it('should empty the timeout map on unregister, leaving a second unregister nothing to clear', () => {
+        const {httpService, triggerRequest} = createMockHttpService();
+        const loadingService = createLoadingService();
+        const {unregister} = registerLoadingMiddleware(httpService, loadingService, {timeoutMs: 5000});
+        const clearTimeoutSpy = vi.spyOn(globalThis, 'clearTimeout');
+
+        triggerRequest();
+
+        unregister();
+        expect(clearTimeoutSpy).toHaveBeenCalledTimes(1);
+
+        unregister();
+
+        expect(clearTimeoutSpy).toHaveBeenCalledTimes(1);
     });
 });
