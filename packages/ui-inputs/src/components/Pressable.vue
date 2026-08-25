@@ -249,15 +249,22 @@ const onClick = (): void => {
 };
 
 const onKeydown = (event: KeyboardEvent): void => {
-    if (isChildsOwnKey(event)) return;
-    // Stopping — not returning — is what makes a disabled control inert rather than merely
-    // un-activating: a bare return leaves the consumer's own fall-through `@keydown` running on
-    // it. The disabled fallback keeps `tabindex="-1"`, which is still MOUSE-focusable, so a
-    // pointer press followed by keys is a reachable path, not a theoretical one.
+    // The disabled stop runs BEFORE the origin check, and that order is the guard: stopping only
+    // root-origin keys left a key arriving from a focusable DESCENDANT to bare-return here, so the
+    // consumer's fall-through `@keydown` still ran on a control that is supposed to be inert.
+    // Stopping — not returning — is what closes it, and it covers every key, because the leak is
+    // the consumer's handler and that does not care which key produced it. Reachable, not
+    // theoretical: the disabled fallback keeps `tabindex="-1"`, which is out of the tab order but
+    // still MOUSE-focusable, and the control deliberately stays in hit-testing.
+    //
+    // A focusable child keeps its OWN keys either way — its listeners have already run by the time
+    // a bubbling event reaches this root, and the stop does not `preventDefault()`, so a nested
+    // `<input>` still receives its character.
     if (disabled) {
         event.stopImmediatePropagation();
         return;
     }
+    if (isChildsOwnKey(event)) return;
     // A native button already translates Enter/Space itself; repeating it fires every handler twice.
     if (native.value) return;
     if (event.key === 'Enter') {
@@ -279,16 +286,17 @@ const onKeyup = (event: KeyboardEvent): void => {
     const armed = isSpace && spaceArmed.value;
     if (isSpace) spaceArmed.value = false;
 
-    // Origin check AFTER the disarm, deliberately: a keyup from a child still clears a latch the
-    // root armed (focus moved into a nested control mid-press), which is the conservative end of
-    // the same stale-latch failure the disarm exists to close.
-    if (isChildsOwnKey(event)) return;
-    // The disabled stop covers EVERY key, not just Space: the leak is the consumer's fall-through
-    // `@keyup`, and it does not care which key produced it.
+    // Both guards sit AFTER the disarm, deliberately — the latch must be cleared even on the keyup
+    // the control is about to go inert for. Then the disabled stop, ahead of the origin check, for
+    // the reason `onKeydown` states: a descendant-origin keyup leaks to the consumer's handler
+    // otherwise.
     if (disabled) {
         event.stopImmediatePropagation();
         return;
     }
+    // A keyup from a child still clears a latch the root armed (focus moved into a nested control
+    // mid-press), which is the conservative end of the same stale-latch failure above.
+    if (isChildsOwnKey(event)) return;
     if (native.value || !armed) return;
 
     (event.currentTarget as HTMLElement).click();

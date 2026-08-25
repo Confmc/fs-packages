@@ -1018,3 +1018,100 @@ describe('Pressable — a disabled control against real platform behaviour', () 
         expect(keyups.value).toBeGreaterThan(0);
     });
 });
+
+/**
+ * The same disabled-key leak one path over: a key that reaches the control from a focusable
+ * DESCENDANT. The origin check used to run first and bare-return, so the consumer's fall-through
+ * `@keydown`/`@keyup` fired on an inert control exactly as it did for root-origin keys.
+ *
+ * Browser-only, and for two independent reasons. The reachability half is a platform fact —
+ * `tabindex="-1"` is out of the tab order but still MOUSE-focusable, which is what puts focus
+ * inside a disabled control in the first place — and happy-dom neither hit-tests nor focuses on a
+ * pointer press. The "child keeps its own keys" half needs a layout engine to insert a character;
+ * happy-dom can show the event was left alone but not that the field still WORKS.
+ */
+describe('Pressable — a disabled control and a focusable DESCENDANT', () => {
+    const renderDisabledRowWithChildren = (disabled: boolean) => {
+        const keydowns = ref(0);
+        const keyups = ref(0);
+        render(
+            defineComponent(
+                () => () =>
+                    h(
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFC in a render-fn host
+                        Pressable as any,
+                        {
+                            as: 'div',
+                            label: 'Row',
+                            disabled,
+                            onKeydown: () => {
+                                keydowns.value += 1;
+                            },
+                            onKeyup: () => {
+                                keyups.value += 1;
+                            },
+                        },
+                        {default: () => [h('input', {id: 'inner-filter'})]},
+                    ),
+            ),
+        );
+        return {keydowns, keyups, filter: document.getElementById('inner-filter') as HTMLInputElement};
+    };
+
+    it("gives the consumer NOTHING while keeping the child's own keys — real pointer, real keyboard", async () => {
+        const {keydowns, keyups, filter} = renderDisabledRowWithChildren(true);
+
+        // Reachability, measured rather than argued: a real pointer press puts focus INSIDE a
+        // disabled control, because the control stays in hit-testing and the child is focusable.
+        await userEvent.click(filter, {force: true});
+        expect(document.activeElement).toBe(filter);
+
+        await userEvent.keyboard('a b');
+
+        // The stop is propagation-only — no `preventDefault()` — so the field still works. This is
+        // the assertion that keeps the fix from being "disable the subtree's keyboard".
+        expect(filter.value).toBe('a b');
+        // …and none of it reached the consumer's handlers on the inert row.
+        expect(keydowns.value).toBe(0);
+        expect(keyups.value).toBe(0);
+    });
+
+    it('POSITIVE CONTROL — the same fixture, enabled, reaches the consumer AND types', async () => {
+        const {keydowns, keyups, filter} = renderDisabledRowWithChildren(false);
+
+        await userEvent.click(filter);
+        await userEvent.keyboard('a b');
+
+        // Without this arm the two zeros above are equally consistent with a fixture whose
+        // handlers were never wired, or with a row that stopped answering the keyboard entirely.
+        expect(filter.value).toBe('a b');
+        expect(keydowns.value).toBeGreaterThan(0);
+        expect(keyups.value).toBeGreaterThan(0);
+    });
+
+    const dispatchKey = (element: Element, type: 'keydown' | 'keyup', value: string): void => {
+        element.dispatchEvent(new KeyboardEvent(type, {key: value, bubbles: true, cancelable: true}));
+    };
+
+    it('stops a PROGRAMMATIC descendant key too — the leak is the handler, not the input pipeline', () => {
+        const {keydowns, keyups, filter} = renderDisabledRowWithChildren(true);
+
+        dispatchKey(filter, 'keydown', 'Enter');
+        dispatchKey(filter, 'keyup', 'Enter');
+        dispatchKey(filter, 'keydown', ' ');
+        dispatchKey(filter, 'keyup', ' ');
+
+        expect(keydowns.value).toBe(0);
+        expect(keyups.value).toBe(0);
+    });
+
+    it('POSITIVE CONTROL — the same dispatches reach the consumer while enabled', () => {
+        const {keydowns, keyups, filter} = renderDisabledRowWithChildren(false);
+
+        dispatchKey(filter, 'keydown', 'Enter');
+        dispatchKey(filter, 'keyup', 'Enter');
+
+        expect(keydowns.value).toBe(1);
+        expect(keyups.value).toBe(1);
+    });
+});
