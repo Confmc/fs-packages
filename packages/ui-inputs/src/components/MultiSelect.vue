@@ -66,38 +66,42 @@
             open && optionLabels.length === 0 ? emptyText : ''
         }}</span>
 
-        <OptionList
-            v-if="open"
-            ref="menu"
-            variant="ui-multiselect"
-            multiselectable
-            :labels="optionLabels"
-            :keys="optionKeys"
-            :pointer="pointer"
-            :listbox-id="listboxId"
-            :option-id="optionId"
-            :is-selected="isSelected"
-            :is-muted="isMuted"
-            :floating-styles="floatingStyles"
-            :options-label="optionsLabel"
-            :empty-text="emptyText"
-            @hover="pointer = $event"
-            @commit="commit"
-        >
-            <!-- Re-scope OptionList's index into the typed per-option payload; the fallback
-                 (the plain labelOf text) keeps slotless consumers byte-identical. -->
-            <template #option="{index}">
-                <slot
-                    name="option"
-                    :option="sorted[index]"
-                    :index="index"
-                    :selected="isSelected(index)"
-                    :active="pointer === index"
-                >
-                    {{ optionLabels[index] }}
-                </slot>
-            </template>
-        </OptionList>
+        <!-- KD-1136. The anchor is promoted to the TOP LAYER in place (Popover API) — it is
+             never moved in the DOM, so no ancestor's overflow can clip it and no stacking
+             context can bury it, while scoped `--ui-*` maps still reach it. floating-ui
+             positions the ANCHOR, not the <ul>: the size() middleware sizes it to the
+             trigger, so the menu's `min-width: 100%` measures the trigger. -->
+        <div v-if="open" ref="floating" popover="manual" class="ui-menu-anchor" :style="floatingStyles">
+            <OptionList
+                variant="ui-multiselect"
+                multiselectable
+                :labels="optionLabels"
+                :keys="optionKeys"
+                :pointer="pointer"
+                :listbox-id="listboxId"
+                :option-id="optionId"
+                :is-selected="isSelected"
+                :is-muted="isMuted"
+                :options-label="optionsLabel"
+                :empty-text="emptyText"
+                @hover="pointer = $event"
+                @commit="commit"
+            >
+                <!-- Re-scope OptionList's index into the typed per-option payload; the fallback
+                     (the plain labelOf text) keeps slotless consumers byte-identical. -->
+                <template #option="{index}">
+                    <slot
+                        name="option"
+                        :option="sorted[index]"
+                        :index="index"
+                        :selected="isSelected(index)"
+                        :active="pointer === index"
+                    >
+                        {{ optionLabels[index] }}
+                    </slot>
+                </template>
+            </OptionList>
+        </div>
     </div>
 </template>
 
@@ -107,7 +111,6 @@ import {computed, useTemplateRef} from 'vue';
 import type {LabelKey, SelectItem} from '../types';
 
 import {useListbox} from '../composables/useListbox';
-import {componentEl} from '../internal/reactivity';
 import OptionList from './OptionList.vue';
 
 const {
@@ -194,10 +197,9 @@ const isMuted = (index: number): boolean => mutedOptions !== undefined && mutedO
 
 const root = useTemplateRef<HTMLElement>('root');
 const reference = useTemplateRef<HTMLElement>('reference');
-// OptionList's root <ul>, derived from the instance's `$el` (null while closed) — the family
-// keeps `defineExpose` off internal plumbing, see `componentEl`.
-const menu = useTemplateRef<InstanceType<typeof OptionList>>('menu');
-const floating = componentEl(menu);
+// The teleported `.ui-menu-anchor` (null while closed) — floating-ui's floating element, and
+// the box click-outside treats as inside. The <ul> inside it is positioned by nothing.
+const floating = useTemplateRef<HTMLElement>('floating');
 
 /** Toggle an id's membership — add when absent, drop when present. Always emits a fresh array. */
 const toggleValue = (value: T['id']): void => {

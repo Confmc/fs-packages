@@ -4,6 +4,7 @@ import {afterEach, describe, expect, it} from 'vitest';
 import {h} from 'vue';
 
 import MultiSelect from '../src/components/MultiSelect.vue';
+import {menu} from './find-menu';
 
 type Fruit = {id: number; name: string};
 
@@ -56,16 +57,16 @@ describe('MultiSelect', () => {
 
         expect(wrapper.find('.ui-multiselect__placeholder').text()).toBe('Pick some');
         expect(wrapper.find('.ui-multiselect__box').classes()).not.toContain('has-value');
-        expect(wrapper.find('.ui-multiselect__menu').exists()).toBe(false);
+        expect(menu(wrapper).exists()).toBe(false);
         expect(wrapper.find('.ui-multiselect__trigger').attributes('aria-required')).toBeUndefined();
 
         await wrapper.find('.ui-multiselect__trigger').trigger('click');
 
-        const options = wrapper.findAll('.ui-multiselect__option');
+        const options = menu(wrapper).findAll('.ui-multiselect__option');
         expect(options.map((option) => option.text())).toEqual(['Apricot', 'Mango', 'Watermelon']);
         expect(wrapper.find('.ui-multiselect__box').classes()).toContain('is-open');
-        expect(wrapper.find('.ui-multiselect__menu').attributes('aria-label')).toBe('Options');
-        expect(wrapper.find('.ui-multiselect__menu').attributes('aria-multiselectable')).toBe('true');
+        expect(menu(wrapper).attributes('aria-label')).toBe('Options');
+        expect(menu(wrapper).attributes('aria-multiselectable')).toBe('true');
     });
 
     it('renders chips for the committed values, has-value, required and invalid state', () => {
@@ -91,30 +92,32 @@ describe('MultiSelect', () => {
         await trigger.trigger('keydown', {key: 'Enter'}); // commit Apricot
         expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[2]]);
         // The menu STAYS OPEN — toggle-in-place, not choose-and-dismiss.
-        expect(wrapper.find('.ui-multiselect__menu').exists()).toBe(true);
+        expect(menu(wrapper).exists()).toBe(true);
 
         // The committed option remains listed, aria-selected by MEMBERSHIP (not pointer).
         await wrapper.setProps({modelValue: [2]});
-        const selectedFlags = wrapper.findAll('.ui-multiselect__option').map((o) => o.attributes('aria-selected'));
+        const selectedFlags = menu(wrapper)
+            .findAll('.ui-multiselect__option')
+            .map((o) => o.attributes('aria-selected'));
         expect(selectedFlags).toEqual(['true', 'false', 'false']); // sorted: Apricot, Mango, Watermelon
 
         // Committing the same option again toggles it OFF — and still stays open.
         await trigger.trigger('keydown', {key: 'Enter'}); // pointer still 0 (Apricot)
         expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[]]);
-        expect(wrapper.find('.ui-multiselect__menu').exists()).toBe(true);
+        expect(menu(wrapper).exists()).toBe(true);
     });
 
     it('toggles membership on click and stays open, adding to the end of the selection', async () => {
         const wrapper = mountMulti({modelValue: [3]}); // Mango committed
         await wrapper.find('.ui-multiselect__trigger').trigger('click');
 
-        const apricot = wrapper.findAll('.ui-multiselect__option')[0]; // sorted first
+        const apricot = menu(wrapper).findAll('.ui-multiselect__option')[0]; // sorted first
         await apricot.trigger('mouseover');
         expect(apricot.classes()).toContain('is-active');
 
         await apricot.trigger('click');
         expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[3, 2]]); // appended
-        expect(wrapper.find('.ui-multiselect__menu').exists()).toBe(true); // stays open
+        expect(menu(wrapper).exists()).toBe(true); // stays open
     });
 
     it('removes a committed value via its chip button without opening the menu', async () => {
@@ -126,7 +129,7 @@ describe('MultiSelect', () => {
 
         await chips[0].find('.ui-multiselect__chip-remove').trigger('click');
         expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[2]]);
-        expect(wrapper.find('.ui-multiselect__menu').exists()).toBe(false); // chip remove ≠ open
+        expect(menu(wrapper).exists()).toBe(false); // chip remove ≠ open
     });
 
     it('localises the chip-remove accessible name via the removeLabel prop', () => {
@@ -149,7 +152,7 @@ describe('MultiSelect', () => {
 
         await trigger.trigger('keydown', {key: 'Backspace'});
         expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[2]]);
-        expect(wrapper.find('.ui-multiselect__menu').exists()).toBe(false); // Backspace never opens
+        expect(menu(wrapper).exists()).toBe(false); // Backspace never opens
 
         await wrapper.setProps({modelValue: []});
         await trigger.trigger('keydown', {key: 'Backspace'});
@@ -166,7 +169,7 @@ describe('MultiSelect', () => {
 
         await trigger().trigger('keydown', {key: 'ArrowDown'}); // opens, pointer stays -1
         expect(trigger().attributes('aria-controls')).toBe('fruit-listbox');
-        expect(wrapper.find('.ui-multiselect__menu').attributes('id')).toBe('fruit-listbox');
+        expect(menu(wrapper).attributes('id')).toBe('fruit-listbox');
         expect(trigger().attributes('aria-activedescendant')).toBeUndefined();
 
         await trigger().trigger('keydown', {key: 'ArrowDown'}); // → Apricot (position 0)
@@ -175,13 +178,15 @@ describe('MultiSelect', () => {
         expect(trigger().attributes('aria-activedescendant')).toBe('fruit-opt-1');
 
         // The pointer moved to Mango, but aria-selected still marks the COMMITTED Apricot.
-        expect(wrapper.findAll('.ui-multiselect__option').map((o) => o.attributes('aria-selected'))).toEqual([
-            'true',
-            'false',
-            'false',
-        ]);
+        expect(
+            menu(wrapper)
+                .findAll('.ui-multiselect__option')
+                .map((o) => o.attributes('aria-selected')),
+        ).toEqual(['true', 'false', 'false']);
 
-        const ids = wrapper.findAll('.ui-multiselect__option').map((o) => o.attributes('id'));
+        const ids = menu(wrapper)
+            .findAll('.ui-multiselect__option')
+            .map((o) => o.attributes('id'));
         expect(ids).toEqual(['fruit-opt-0', 'fruit-opt-1', 'fruit-opt-2']);
         expect(new Set(ids).size).toBe(ids.length);
     });
@@ -195,7 +200,7 @@ describe('MultiSelect', () => {
         expect(wrapper.find('.ui-multiselect__chip-remove').attributes('disabled')).toBeDefined();
 
         await trigger.trigger('click');
-        expect(wrapper.find('.ui-multiselect__menu').exists()).toBe(false);
+        expect(menu(wrapper).exists()).toBe(false);
 
         // Synthetic keydown must stay inert for BOTH the listbox skeleton and the Backspace
         // pop. Dispatched natively: VTU's trigger() silently SKIPS disabled elements, which
@@ -203,7 +208,7 @@ describe('MultiSelect', () => {
         // the event must actually reach the handler to prove the guard.
         trigger.element.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowDown', bubbles: true}));
         await wrapper.vm.$nextTick();
-        expect(wrapper.find('.ui-multiselect__menu').exists()).toBe(false);
+        expect(menu(wrapper).exists()).toBe(false);
         trigger.element.dispatchEvent(new KeyboardEvent('keydown', {key: 'Backspace', bubbles: true}));
         await wrapper.vm.$nextTick();
         expect(wrapper.emitted('update:modelValue')).toBeUndefined();
@@ -221,9 +226,9 @@ describe('MultiSelect', () => {
 
         // A narrowing that lands under the pointer must clamp, not dangle.
         await wrapper.setProps({options: FRUITS.slice(0, 1)}); // one option
-        expect(wrapper.findAll('.ui-multiselect__option')).toHaveLength(1);
+        expect(menu(wrapper).findAll('.ui-multiselect__option')).toHaveLength(1);
         const active = trigger().attributes('aria-activedescendant');
-        if (active !== undefined) expect(wrapper.find(`#${active}`).exists()).toBe(true);
+        if (active !== undefined) expect(menu(wrapper).find(`#${active}`).exists()).toBe(true);
 
         // Enter must commit the surviving option rather than index off the end.
         await trigger().trigger('keydown', {key: 'Enter'});
@@ -234,7 +239,7 @@ describe('MultiSelect', () => {
         expect(trigger().attributes('aria-activedescendant')).toBeUndefined();
         await trigger().trigger('keydown', {key: 'Enter'});
         expect(wrapper.emitted('update:modelValue')).toHaveLength(1);
-        expect(wrapper.find('.ui-multiselect__empty').text()).toBe('No options');
+        expect(menu(wrapper).find('.ui-multiselect__empty').text()).toBe('No options');
     });
 
     it('round-trips string ids and resolves labels via a getter', async () => {
@@ -248,7 +253,7 @@ describe('MultiSelect', () => {
         expect(wrapper.findAll('.ui-multiselect__chip').map((chip) => chip.text())).toEqual(['ALPHA']);
 
         await wrapper.find('.ui-multiselect__trigger').trigger('click');
-        const options = wrapper.findAll('.ui-multiselect__option');
+        const options = menu(wrapper).findAll('.ui-multiselect__option');
         expect(options.map((option) => option.text())).toEqual(['ALPHA', 'BETA']);
         expect(options.map((option) => option.attributes('aria-selected'))).toEqual(['true', 'false']);
 
@@ -264,11 +269,11 @@ describe('MultiSelect', () => {
         expect(wrapper.find('.ui-multiselect__placeholder').exists()).toBe(false); // model is non-empty
 
         await wrapper.find('.ui-multiselect__trigger').trigger('click');
-        expect(wrapper.findAll('.ui-multiselect__option').map((o) => o.text())).toEqual([
-            'Watermelon',
-            'Apricot',
-            'Mango',
-        ]);
+        expect(
+            menu(wrapper)
+                .findAll('.ui-multiselect__option')
+                .map((o) => o.text()),
+        ).toEqual(['Watermelon', 'Apricot', 'Mango']);
 
         // Backspace pops the unresolved id too — it is committed state, chip or not.
         await wrapper.setProps({modelValue: [3, 99]});
@@ -282,21 +287,21 @@ describe('MultiSelect', () => {
 
         await trigger.trigger('keydown', {key: 'ArrowDown'}); // open
         await trigger.trigger('keydown', {key: 'Escape'});
-        expect(wrapper.find('.ui-multiselect__menu').exists()).toBe(false);
+        expect(menu(wrapper).exists()).toBe(false);
 
         await trigger.trigger('keydown', {key: ' '}); // Space opens
-        expect(wrapper.find('.ui-multiselect__menu').exists()).toBe(true);
+        expect(menu(wrapper).exists()).toBe(true);
         await trigger.trigger('keydown', {key: 'Tab'});
-        expect(wrapper.find('.ui-multiselect__menu').exists()).toBe(false);
+        expect(menu(wrapper).exists()).toBe(false);
 
         await trigger.trigger('click'); // open
         document.body.dispatchEvent(new MouseEvent('click', {bubbles: true}));
         await wrapper.vm.$nextTick();
-        expect(wrapper.find('.ui-multiselect__menu').exists()).toBe(false);
+        expect(menu(wrapper).exists()).toBe(false);
 
         await trigger.trigger('click'); // open
         await trigger.trigger('click'); // toggle closed
-        expect(wrapper.find('.ui-multiselect__menu').exists()).toBe(false);
+        expect(menu(wrapper).exists()).toBe(false);
         expect(wrapper.emitted('update:modelValue')).toBeUndefined(); // nothing committed
     });
 
@@ -305,14 +310,14 @@ describe('MultiSelect', () => {
         const trigger = wrapper.find('.ui-multiselect__trigger');
 
         await trigger.trigger('keydown', {key: 'x'}); // non-opening
-        expect(wrapper.find('.ui-multiselect__menu').exists()).toBe(false);
+        expect(menu(wrapper).exists()).toBe(false);
 
         await trigger.trigger('keydown', {key: 'Enter'}); // opens
-        expect(wrapper.find('.ui-multiselect__menu').attributes('aria-label')).toBe('Fruits');
-        expect(wrapper.find('.ui-multiselect__empty').text()).toBe('Nothing here');
+        expect(menu(wrapper).attributes('aria-label')).toBe('Fruits');
+        expect(menu(wrapper).find('.ui-multiselect__empty').text()).toBe('Nothing here');
 
         await trigger.trigger('keydown', {key: 'x'}); // unhandled while open
-        expect(wrapper.find('.ui-multiselect__menu').exists()).toBe(true);
+        expect(menu(wrapper).exists()).toBe(true);
         await trigger.trigger('keydown', {key: 'Enter'}); // pointer -1 → no commit, stays open
         expect(wrapper.emitted('update:modelValue')).toBeUndefined();
     });
@@ -335,7 +340,7 @@ describe('MultiSelect', () => {
 
         await trigger().trigger('keydown', {key: 'ArrowUp'}); // MultiSelect has no clear entry → nothing
         expect(trigger().attributes('aria-activedescendant')).toBeUndefined();
-        expect(wrapper.find('.ui-multiselect__menu').exists()).toBe(true); // still open
+        expect(menu(wrapper).exists()).toBe(true); // still open
     });
 
     it('renders per-option custom content through the #option scoped slot, chrome outside the slot', async () => {
@@ -350,23 +355,23 @@ describe('MultiSelect', () => {
         await wrapper.find('.ui-multiselect__trigger').trigger('click');
         // Sorted order: Apricot(2), Mango(3, member), Watermelon(1) — `selected` carries
         // committed MEMBERSHIP, and the aria-selected chrome stays on the <li>.
-        expect(wrapper.findAll('.ui-multiselect__option .swatch').map((el) => el.text())).toEqual([
-            'Apricot#0',
-            'Mango#1*',
-            'Watermelon#2',
-        ]);
+        expect(
+            menu(wrapper)
+                .findAll('.swatch')
+                .map((el) => el.text()),
+        ).toEqual(['Apricot#0', 'Mango#1*', 'Watermelon#2']);
 
         // Slotted content toggles exactly like the plain text — and the menu stays open.
-        await wrapper.findAll('.ui-multiselect__option')[0].trigger('click');
+        await menu(wrapper).findAll('.ui-multiselect__option')[0].trigger('click');
         expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[3, 2]]); // + Apricot
-        expect(wrapper.find('.ui-multiselect__menu').exists()).toBe(true);
+        expect(menu(wrapper).exists()).toBe(true);
     });
 
     it('marks mutedOptions with .is-muted while keeping them committable', async () => {
         const wrapper = mountMulti({mutedOptions: [2]}); // Apricot
         await wrapper.find('.ui-multiselect__trigger').trigger('click');
 
-        const options = wrapper.findAll('.ui-multiselect__option'); // Apricot, Mango, Watermelon
+        const options = menu(wrapper).findAll('.ui-multiselect__option'); // Apricot, Mango, Watermelon
         expect(options.map((o) => o.classes().includes('is-muted'))).toEqual([true, false, false]);
 
         // Muted ≠ disabled: a muted option still toggles membership.

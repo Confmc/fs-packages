@@ -30,43 +30,47 @@
             open && optionLabels.length === 0 ? emptyText : ''
         }}</span>
 
-        <OptionList
-            v-if="open"
-            ref="menu"
-            variant="ui-combobox"
-            :labels="optionLabels"
-            :keys="optionKeys"
-            :pointer="pointer"
-            :listbox-id="listboxId"
-            :option-id="optionId"
-            :is-selected="isSelected"
-            :is-muted="isMuted"
-            :floating-styles="floatingStyles"
-            :options-label="optionsLabel"
-            :empty-text="emptyText"
-            :clear-label="clearLabel"
-            :clear-id="clearId"
-            :clear-active="clearHighlighted"
-            :clear-selected="model === null"
-            @hover="pointer = $event"
-            @commit="commit"
-            @clear-hover="highlightClear"
-            @clear-commit="commitClear"
-        >
-            <!-- Re-scope OptionList's index into the typed per-option payload; the fallback
-                 (the plain labelOf text) keeps slotless consumers byte-identical. -->
-            <template #option="{index}">
-                <slot
-                    name="option"
-                    :option="filtered[index]"
-                    :index="index"
-                    :selected="isSelected(index)"
-                    :active="pointer === index"
-                >
-                    {{ optionLabels[index] }}
-                </slot>
-            </template>
-        </OptionList>
+        <!-- KD-1136. The anchor is promoted to the TOP LAYER in place (Popover API) — it is
+             never moved in the DOM, so no ancestor's overflow can clip it and no stacking
+             context can bury it, while scoped `--ui-*` maps still reach it. floating-ui
+             positions the ANCHOR, not the <ul>: the size() middleware sizes it to the
+             trigger, so the menu's `min-width: 100%` measures the trigger. -->
+        <div v-if="open" ref="floating" popover="manual" class="ui-menu-anchor" :style="floatingStyles">
+            <OptionList
+                variant="ui-combobox"
+                :labels="optionLabels"
+                :keys="optionKeys"
+                :pointer="pointer"
+                :listbox-id="listboxId"
+                :option-id="optionId"
+                :is-selected="isSelected"
+                :is-muted="isMuted"
+                :options-label="optionsLabel"
+                :empty-text="emptyText"
+                :clear-label="clearLabel"
+                :clear-id="clearId"
+                :clear-active="clearHighlighted"
+                :clear-selected="model === null"
+                @hover="pointer = $event"
+                @commit="commit"
+                @clear-hover="highlightClear"
+                @clear-commit="commitClear"
+            >
+                <!-- Re-scope OptionList's index into the typed per-option payload; the fallback
+                     (the plain labelOf text) keeps slotless consumers byte-identical. -->
+                <template #option="{index}">
+                    <slot
+                        name="option"
+                        :option="filtered[index]"
+                        :index="index"
+                        :selected="isSelected(index)"
+                        :active="pointer === index"
+                    >
+                        {{ optionLabels[index] }}
+                    </slot>
+                </template>
+            </OptionList>
+        </div>
     </div>
 </template>
 
@@ -76,7 +80,7 @@ import {computed, ref, useTemplateRef, watch} from 'vue';
 import type {LabelKey, SelectItem} from '../types';
 
 import {useListbox} from '../composables/useListbox';
-import {componentEl, ensureRefValueExists} from '../internal/reactivity';
+import {ensureRefValueExists} from '../internal/reactivity';
 import OptionList from './OptionList.vue';
 
 const {
@@ -181,10 +185,9 @@ const root = useTemplateRef<HTMLElement>('root');
 // The input is both the floating-ui reference and the target of the imperative focus
 // handle isms's command-palette focus trap (WR-0448) consumes.
 const input = useTemplateRef<HTMLInputElement>('input');
-// OptionList's root <ul>, derived from the instance's `$el` (null while closed) — the family
-// keeps `defineExpose` off internal plumbing, see `componentEl`.
-const menu = useTemplateRef<InstanceType<typeof OptionList>>('menu');
-const floating = componentEl(menu);
+// The teleported `.ui-menu-anchor` (null while closed) — floating-ui's floating element, and
+// the box click-outside treats as inside. The <ul> inside it is positioned by nothing.
+const floating = useTemplateRef<HTMLElement>('floating');
 
 // Both keyboard (Enter via useListbox) and pointer (OptionList `commit`) funnel through this
 // one guard. Read through a local rather than indexing blind: the clamp watcher normally keeps

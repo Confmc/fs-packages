@@ -4,6 +4,7 @@ import {afterEach, describe, expect, it} from 'vitest';
 import {h} from 'vue';
 
 import MultiCombobox from '../src/components/MultiCombobox.vue';
+import {menu} from './find-menu';
 
 type Fruit = {id: number; name: string};
 
@@ -35,25 +36,25 @@ describe('MultiCombobox', () => {
         expect(input.attributes('aria-expanded')).toBe('false');
         expect(input.attributes('placeholder')).toBe('Pick some');
         expect(input.attributes('aria-required')).toBeUndefined();
-        expect(wrapper.find('.ui-multicombobox__menu').exists()).toBe(false);
+        expect(menu(wrapper).exists()).toBe(false);
 
         await input.trigger('click');
 
         expect(input.attributes('aria-expanded')).toBe('true');
         expect(wrapper.find('.ui-multicombobox__box').classes()).toContain('is-open');
-        expect(wrapper.findAll('.ui-multicombobox__option').map((o) => o.text())).toEqual([
-            'Apricot',
-            'Mango',
-            'Watermelon',
-        ]);
-        expect(wrapper.find('.ui-multicombobox__menu').attributes('aria-label')).toBe('Options');
-        expect(wrapper.find('.ui-multicombobox__menu').attributes('aria-multiselectable')).toBe('true');
+        expect(
+            menu(wrapper)
+                .findAll('.ui-multicombobox__option')
+                .map((o) => o.text()),
+        ).toEqual(['Apricot', 'Mango', 'Watermelon']);
+        expect(menu(wrapper).attributes('aria-label')).toBe('Options');
+        expect(menu(wrapper).attributes('aria-multiselectable')).toBe('true');
     });
 
     it('opens on focus — the input is the trigger, and the list is its context', async () => {
         const wrapper = mountMultiCombobox({});
         await wrapper.find('input').trigger('focus');
-        expect(wrapper.find('.ui-multicombobox__menu').exists()).toBe(true);
+        expect(menu(wrapper).exists()).toBe(true);
     });
 
     it('renders chips for the committed values, has-value, required and invalid state, no placeholder', () => {
@@ -90,21 +91,29 @@ describe('MultiCombobox', () => {
 
         await input.setValue('ap');
         expect(input.attributes('aria-expanded')).toBe('true'); // typing opens
-        expect(wrapper.findAll('.ui-multicombobox__option').map((o) => o.text())).toEqual(['Apricot']);
+        expect(
+            menu(wrapper)
+                .findAll('.ui-multicombobox__option')
+                .map((o) => o.text()),
+        ).toEqual(['Apricot']);
 
         await input.setValue('m');
-        expect(wrapper.findAll('.ui-multicombobox__option').map((o) => o.text())).toEqual(['Mango', 'Watermelon']);
+        expect(
+            menu(wrapper)
+                .findAll('.ui-multicombobox__option')
+                .map((o) => o.text()),
+        ).toEqual(['Mango', 'Watermelon']);
 
         await input.setValue('');
-        expect(wrapper.findAll('.ui-multicombobox__option').map((o) => o.text())).toEqual([
-            'Apricot',
-            'Mango',
-            'Watermelon',
-        ]);
+        expect(
+            menu(wrapper)
+                .findAll('.ui-multicombobox__option')
+                .map((o) => o.text()),
+        ).toEqual(['Apricot', 'Mango', 'Watermelon']);
 
         await input.setValue('zzz');
-        expect(wrapper.findAll('.ui-multicombobox__option')).toHaveLength(0);
-        expect(wrapper.find('.ui-multicombobox__empty').exists()).toBe(true);
+        expect(menu(wrapper).findAll('.ui-multicombobox__option')).toHaveLength(0);
+        expect(menu(wrapper).find('.ui-multicombobox__empty').exists()).toBe(true);
     });
 
     it('commits a filtered option on Enter: toggles, STAYS OPEN, clears the query, and keeps focus on the input', async () => {
@@ -118,9 +127,9 @@ describe('MultiCombobox', () => {
         await input.trigger('keydown', {key: 'Enter'});
 
         expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[3]]); // Mango toggled in
-        expect(wrapper.find('.ui-multicombobox__menu').exists()).toBe(true); // stays open
+        expect(menu(wrapper).exists()).toBe(true); // stays open
         expect(input.element.value).toBe(''); // query cleared — the full list is re-offered
-        expect(wrapper.findAll('.ui-multicombobox__option')).toHaveLength(3);
+        expect(menu(wrapper).findAll('.ui-multicombobox__option')).toHaveLength(3);
         expect(input.attributes('aria-activedescendant')).toBeUndefined(); // highlight reset with the list change
         expect(document.activeElement).toBe(input.element); // focus stays on the input
     });
@@ -138,7 +147,7 @@ describe('MultiCombobox', () => {
         await wrapper.setProps({modelValue: [2]});
         await input.trigger('keydown', {key: 'Enter'}); // toggle Apricot back OUT, same position
         expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[]]);
-        expect(wrapper.find('.ui-multicombobox__menu').exists()).toBe(true);
+        expect(menu(wrapper).exists()).toBe(true);
     });
 
     it('toggles membership on click, stays open, and returns DOM focus to the input', async () => {
@@ -146,13 +155,13 @@ describe('MultiCombobox', () => {
         const input = wrapper.find('input');
         await input.trigger('click');
 
-        const apricot = wrapper.findAll('.ui-multicombobox__option')[0]; // sorted first
+        const apricot = menu(wrapper).findAll('.ui-multicombobox__option')[0]; // sorted first
         await apricot.trigger('mouseover');
         expect(apricot.classes()).toContain('is-active');
 
         await apricot.trigger('click');
         expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[3, 2]]); // appended
-        expect(wrapper.find('.ui-multicombobox__menu').exists()).toBe(true); // stays open
+        expect(menu(wrapper).exists()).toBe(true); // stays open
         expect(document.activeElement).toBe(input.element); // refocused after the pointer commit
     });
 
@@ -165,20 +174,22 @@ describe('MultiCombobox', () => {
 
         await input().trigger('keydown', {key: 'ArrowDown'}); // opens, pointer stays -1
         expect(input().attributes('aria-controls')).toBe('fruit-listbox');
-        expect(wrapper.find('.ui-multicombobox__menu').attributes('id')).toBe('fruit-listbox');
+        expect(menu(wrapper).attributes('id')).toBe('fruit-listbox');
 
         await input().trigger('keydown', {key: 'ArrowDown'}); // → Apricot (position 0)
         await input().trigger('keydown', {key: 'ArrowDown'}); // → Mango (position 1)
         expect(input().attributes('aria-activedescendant')).toBe('fruit-opt-1');
 
         // The pointer moved to Mango, but aria-selected still marks the COMMITTED Apricot.
-        expect(wrapper.findAll('.ui-multicombobox__option').map((o) => o.attributes('aria-selected'))).toEqual([
-            'true',
-            'false',
-            'false',
-        ]);
+        expect(
+            menu(wrapper)
+                .findAll('.ui-multicombobox__option')
+                .map((o) => o.attributes('aria-selected')),
+        ).toEqual(['true', 'false', 'false']);
 
-        const ids = wrapper.findAll('.ui-multicombobox__option').map((o) => o.attributes('id'));
+        const ids = menu(wrapper)
+            .findAll('.ui-multicombobox__option')
+            .map((o) => o.attributes('id'));
         expect(ids).toEqual(['fruit-opt-0', 'fruit-opt-1', 'fruit-opt-2']);
         expect(new Set(ids).size).toBe(ids.length);
     });
@@ -192,7 +203,7 @@ describe('MultiCombobox', () => {
 
         await chips[0].find('.ui-multicombobox__chip-remove').trigger('click');
         expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[2]]);
-        expect(wrapper.find('.ui-multicombobox__menu').exists()).toBe(false); // chip remove ≠ open
+        expect(menu(wrapper).exists()).toBe(false); // chip remove ≠ open
         // Removal unmounts the focused button — focus must land on the input, not the body
         // (#185 review Minor: the APG chip treatment).
         expect(document.activeElement).toBe(wrapper.find('input').element);
@@ -202,11 +213,11 @@ describe('MultiCombobox', () => {
         const wrapper = mountMultiCombobox({modelValue: [1, 2]});
 
         await wrapper.find('input').trigger('focus');
-        expect(wrapper.find('.ui-multicombobox__menu').exists()).toBe(true);
+        expect(menu(wrapper).exists()).toBe(true);
 
         await wrapper.find('.ui-multicombobox__chip-remove').trigger('click');
         expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[2]]);
-        expect(wrapper.find('.ui-multicombobox__menu').exists()).toBe(true); // stays open
+        expect(menu(wrapper).exists()).toBe(true); // stays open
         expect(document.activeElement).toBe(wrapper.find('input').element);
     });
 
@@ -216,7 +227,7 @@ describe('MultiCombobox', () => {
 
         await input.trigger('keydown', {key: 'Backspace'}); // empty query → pop
         expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[2]]);
-        expect(wrapper.find('.ui-multicombobox__menu').exists()).toBe(false); // Backspace never opens
+        expect(menu(wrapper).exists()).toBe(false); // Backspace never opens
 
         await input.setValue('ap'); // now the query holds text…
         await input.trigger('keydown', {key: 'Backspace'}); // …so Backspace stays native editing
@@ -244,18 +255,18 @@ describe('MultiCombobox', () => {
 
         await input.setValue('ap'); // open + half-typed filter
         await input.trigger('keydown', {key: 'Escape'});
-        expect(wrapper.find('.ui-multicombobox__menu').exists()).toBe(false);
+        expect(menu(wrapper).exists()).toBe(false);
         expect(input.element.value).toBe(''); // cleared, never a committed-label snap
 
         await input.setValue('m');
         await input.trigger('keydown', {key: 'Tab'});
-        expect(wrapper.find('.ui-multicombobox__menu').exists()).toBe(false);
+        expect(menu(wrapper).exists()).toBe(false);
         expect(input.element.value).toBe('');
 
         await input.setValue('zzz');
         document.body.dispatchEvent(new MouseEvent('click', {bubbles: true}));
         await wrapper.vm.$nextTick();
-        expect(wrapper.find('.ui-multicombobox__menu').exists()).toBe(false);
+        expect(menu(wrapper).exists()).toBe(false);
         expect(input.element.value).toBe('');
         expect(wrapper.emitted('update:modelValue')).toBeUndefined(); // nothing committed
     });
@@ -272,9 +283,9 @@ describe('MultiCombobox', () => {
 
         // A narrowing that lands under the pointer must clamp, not dangle.
         await wrapper.setProps({options: FRUITS.slice(0, 1)});
-        expect(wrapper.findAll('.ui-multicombobox__option')).toHaveLength(1);
+        expect(menu(wrapper).findAll('.ui-multicombobox__option')).toHaveLength(1);
         const active = input().attributes('aria-activedescendant');
-        if (active !== undefined) expect(wrapper.find(`#${active}`).exists()).toBe(true);
+        if (active !== undefined) expect(menu(wrapper).find(`#${active}`).exists()).toBe(true);
 
         // Enter must commit the surviving option rather than index off the end.
         await input().trigger('keydown', {key: 'Enter'});
@@ -285,7 +296,7 @@ describe('MultiCombobox', () => {
         expect(input().attributes('aria-activedescendant')).toBeUndefined();
         await input().trigger('keydown', {key: 'Enter'});
         expect(wrapper.emitted('update:modelValue')).toHaveLength(1);
-        expect(wrapper.find('.ui-multicombobox__empty').text()).toBe('No options');
+        expect(menu(wrapper).find('.ui-multicombobox__empty').text()).toBe('No options');
     });
 
     it('round-trips string ids, resolves labels via a getter, and preserves given order unsorted', async () => {
@@ -304,7 +315,7 @@ describe('MultiCombobox', () => {
         expect(wrapper.findAll('.ui-multicombobox__chip').map((chip) => chip.text())).toEqual(['ALPHA']);
 
         await wrapper.find('input').trigger('click');
-        const options = wrapper.findAll('.ui-multicombobox__option');
+        const options = menu(wrapper).findAll('.ui-multicombobox__option');
         expect(options.map((option) => option.text())).toEqual(['BETA', 'ALPHA']); // given order kept
         expect(options.map((option) => option.attributes('aria-selected'))).toEqual(['false', 'true']);
 
@@ -324,22 +335,23 @@ describe('MultiCombobox', () => {
 
         await input.trigger('click');
         await input.setValue('m'); // filtered + sorted: Mango, Watermelon
-        expect(wrapper.findAll('.ui-multicombobox__option .swatch').map((el) => el.text())).toEqual([
-            'Mango#0*',
-            'Watermelon#1',
-        ]);
+        expect(
+            menu(wrapper)
+                .findAll('.swatch')
+                .map((el) => el.text()),
+        ).toEqual(['Mango#0*', 'Watermelon#1']);
 
         // Slotted content toggles exactly like the plain text — and the menu stays open.
-        await wrapper.findAll('.ui-multicombobox__option')[1].trigger('click');
+        await menu(wrapper).findAll('.ui-multicombobox__option')[1].trigger('click');
         expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[3, 1]]); // + Watermelon
-        expect(wrapper.find('.ui-multicombobox__menu').exists()).toBe(true);
+        expect(menu(wrapper).exists()).toBe(true);
     });
 
     it('marks mutedOptions with .is-muted while keeping them committable', async () => {
         const wrapper = mountMultiCombobox({mutedOptions: [2]}); // Apricot
         await wrapper.find('input').trigger('click');
 
-        const options = wrapper.findAll('.ui-multicombobox__option'); // Apricot, Mango, Watermelon
+        const options = menu(wrapper).findAll('.ui-multicombobox__option'); // Apricot, Mango, Watermelon
         expect(options.map((o) => o.classes().includes('is-muted'))).toEqual([true, false, false]);
 
         // Muted ≠ disabled: a muted option still toggles membership.
@@ -350,8 +362,8 @@ describe('MultiCombobox', () => {
     it('uses a custom optionsLabel and emptyText', async () => {
         const wrapper = mountMultiCombobox({options: [], optionsLabel: 'Fruits', emptyText: 'Nothing here'});
         await wrapper.find('input').trigger('click');
-        expect(wrapper.find('.ui-multicombobox__menu').attributes('aria-label')).toBe('Fruits');
-        expect(wrapper.find('.ui-multicombobox__empty').text()).toBe('Nothing here');
+        expect(menu(wrapper).attributes('aria-label')).toBe('Fruits');
+        expect(menu(wrapper).find('.ui-multicombobox__empty').text()).toBe('Nothing here');
     });
 
     it('stays fully inert when disabled — synthetic keyboard included', async () => {
@@ -367,7 +379,7 @@ describe('MultiCombobox', () => {
         // event must actually reach the handler to prove the guard.
         input.element.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowDown', bubbles: true}));
         await wrapper.vm.$nextTick();
-        expect(wrapper.find('.ui-multicombobox__menu').exists()).toBe(false);
+        expect(menu(wrapper).exists()).toBe(false);
         input.element.dispatchEvent(new KeyboardEvent('keydown', {key: 'Backspace', bubbles: true}));
         await wrapper.vm.$nextTick();
         expect(wrapper.emitted('update:modelValue')).toBeUndefined();

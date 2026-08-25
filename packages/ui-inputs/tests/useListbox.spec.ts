@@ -2,7 +2,7 @@
 import {useFloating} from '@floating-ui/vue';
 import {mount} from '@vue/test-utils';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
-import {defineComponent, h, shallowRef} from 'vue';
+import {defineComponent, h, nextTick, shallowRef} from 'vue';
 
 import type {UseListboxOptions} from '../src/composables/useListbox';
 
@@ -31,6 +31,7 @@ vi.mock('@floating-ui/vue', () => ({
     flip: vi.fn((config: unknown) => ({name: 'flip', config})),
     shift: vi.fn((config: unknown) => ({name: 'shift', config})),
     hide: vi.fn(() => ({name: 'hide'})),
+    size: vi.fn((config: unknown) => ({name: 'size', config})),
 }));
 
 beforeEach(() => {
@@ -79,6 +80,7 @@ describe('useListbox floating options', () => {
                 {name: 'offset', value: 4},
                 {name: 'flip', config: {fallbackPlacements: ['top-start']}},
                 {name: 'shift', config: {padding: 8}},
+                {name: 'size', config: {apply: expect.any(Function)}},
                 {name: 'hide'},
             ],
         });
@@ -105,6 +107,7 @@ describe('useListbox floating options', () => {
                 {name: 'offset', value: 12},
                 {name: 'flip', config: {fallbackPlacements: ['bottom-end']}},
                 {name: 'shift', config: {padding: 2}},
+                {name: 'size', config: {apply: expect.any(Function)}},
                 {name: 'hide'},
             ],
         });
@@ -251,6 +254,105 @@ describe('useListbox clear-entry option combinations', () => {
         const enter = key('Enter');
         api.onKey(enter); // the callback commits → swallowed
         expect(enter.defaultPrevented).toBe(true);
+        wrapper.unmount();
+    });
+});
+
+describe('useListbox top-layer promotion (KD-1136)', () => {
+    it('calls showPopover() on the floating element once it mounts', async () => {
+        const floatingEl = document.createElement('div');
+        const shown = vi.fn();
+        (floatingEl as HTMLElement & {showPopover: () => void}).showPopover = shown;
+        const floating = shallowRef<HTMLElement | null>(null);
+        const wrapper = mount(Harness, {props: {overrides: {floating}}, attachTo: document.body});
+
+        floating.value = floatingEl;
+        await nextTick();
+
+        expect(shown).toHaveBeenCalledTimes(1);
+        wrapper.unmount();
+    });
+
+    it('promotes nothing while the floating element is absent (the closed state)', async () => {
+        const floating = shallowRef<HTMLElement | null>(null);
+        const wrapper = mount(Harness, {props: {overrides: {floating}}, attachTo: document.body});
+
+        floating.value = null;
+        await nextTick();
+
+        expect(floating.value).toBeNull();
+        wrapper.unmount();
+    });
+});
+
+describe('useListbox click-outside across shadow boundaries (KD-1136)', () => {
+    it('does not call onOutside while the list is closed', () => {
+        const onOutside = vi.fn();
+        const wrapper = mount(Harness, {props: {overrides: {onOutside}}, attachTo: document.body});
+
+        document.body.dispatchEvent(new MouseEvent('click', {bubbles: true}));
+        expect(onOutside).not.toHaveBeenCalled();
+        wrapper.unmount();
+    });
+
+    // At a DOCUMENT listener a click inside a shadow root is retargeted to the HOST, which is
+    // an ancestor of `root` rather than a descendant — `root.contains(target)` rejects it and
+    // every option click would read as outside (MultiSelect/MultiCombobox would close instead
+    // of toggling). `composedPath()` carries the true chain across the boundary.
+    it('treats a composed click from inside a shadow root as inside', () => {
+        const onOutside = vi.fn();
+        const host = document.createElement('div');
+        document.body.append(host);
+        const mountPoint = document.createElement('div');
+        host.attachShadow({mode: 'open'}).append(mountPoint);
+        const wrapper = mount(Harness, {props: {overrides: {onOutside}}, attachTo: mountPoint});
+        api.open.value = true;
+
+        wrapper.element.dispatchEvent(new MouseEvent('click', {bubbles: true, composed: true}));
+        expect(onOutside).not.toHaveBeenCalled();
+        wrapper.unmount();
+        host.remove();
+    });
+
+    it('calls onOutside for a click that is in neither root nor floating', () => {
+        const onOutside = vi.fn();
+        const wrapper = mount(Harness, {props: {overrides: {onOutside}}, attachTo: document.body});
+        api.open.value = true;
+
+        document.body.dispatchEvent(new MouseEvent('click', {bubbles: true}));
+        expect(onOutside).toHaveBeenCalledTimes(1);
+        wrapper.unmount();
+    });
+
+    it('does not call onOutside for a click inside root', () => {
+        const onOutside = vi.fn();
+        const wrapper = mount(Harness, {props: {overrides: {onOutside}}, attachTo: document.body});
+        api.open.value = true;
+
+        wrapper.element.dispatchEvent(new MouseEvent('click', {bubbles: true}));
+        expect(onOutside).not.toHaveBeenCalled();
+        wrapper.unmount();
+    });
+});
+
+describe('useListbox size middleware — the anchor tracks the trigger width', () => {
+    it('writes the reference width onto the floating element as min-width', () => {
+        const wrapper = mount(Harness);
+        const middleware = lastFloatingConfig()?.middleware as
+            | {
+                  name: string;
+                  config?: {
+                      apply: (state: {rects: {reference: {width: number}}; elements: {floating: HTMLElement}}) => void;
+                  };
+              }[]
+            | undefined;
+        const sizeMw = middleware?.find((item) => item.name === 'size');
+        const floatingEl = document.createElement('div');
+
+        // `elements.floating` is the `.ui-menu-anchor`; min-width (not width) so styles.css's
+        // `width: max-content` can still grow it when the menu outgrows the trigger.
+        sizeMw?.config?.apply({rects: {reference: {width: 180}}, elements: {floating: floatingEl}});
+        expect(floatingEl.style.minWidth).toBe('180px');
         wrapper.unmount();
     });
 });

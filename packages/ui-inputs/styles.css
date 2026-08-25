@@ -67,13 +67,15 @@
     --ui-menu-pad: 0.375rem;
     --ui-menu-shadow: 0 8px 32px rgba(0, 0, 0, 0.16);
     --ui-menu-max-height: 15rem;
-    /* width clamps — the defaults reproduce the historical `min-width: 100%` (of the
-       positioned ancestor, i.e. ≥ the trigger) with no max clamp. A territory caps them
-       (e.g. `max(100%, 240px)` / `calc(100vw - 16px)`) without fighting specificity. */
+    /* width clamps — `100%` is the trigger width. The popup sits inside a `.ui-menu-anchor`
+       box sized to the trigger, so a percentage here resolves against the trigger. A territory
+       caps them (e.g. `max(100%, 240px)` / `calc(100vw - 16px)`) without fighting
+       specificity. */
     --ui-menu-min-width: 100%;
     --ui-menu-max-width: none;
-    /* menu typography — `inherit` is the status quo (the popup sizes by inheritance from
-       the non-teleported component root); the var gives the popup its own hook. */
+    /* menu typography — `inherit` walks the DOM tree, and the popup never leaves it, so the
+       popup inherits from the control exactly as it always did. The var is the hook to size
+       menu text independently of the control. */
     --ui-menu-font-size: inherit;
 
     /* option */
@@ -366,9 +368,45 @@
     transform: rotate(180deg);
 }
 
+/* The positioning anchor (KD-1136). floating-ui positions THIS box, never the `<ul>`.
+   It carries `popover`, so the browser promotes it to the TOP LAYER while open — painted
+   outside the normal flow, where no ancestor's `overflow` can clip it and no ancestor's
+   stacking context can bury it. It is never moved in the DOM, so a consumer's scoped
+   `--ui-*` map still reaches it by inheritance.
+
+   The size() middleware writes the trigger width onto it as an inline `min-width`, which is
+   what keeps `--ui-menu-min-width: 100%` meaning "as wide as the trigger" after the move —
+   a percentage on the `<ul>` resolves against this box, not against body. `width: max-content`
+   lets the anchor grow when the menu outgrows the trigger (a territory floor like
+   `max(100%, 240px)`, or a long option), so shift() and hide() keep measuring a box that
+   encloses the whole menu. */
+.ui-menu-anchor {
+    /* `fixed` matches useListbox's floating-ui strategy: a top-layer box positions against
+       the viewport. The pre-layout value; floating-ui writes the same `position` inline. */
+    position: fixed;
+    /* Irrelevant once promoted (the top layer paints above everything), but it keeps the
+       stacking sane in the moment before promotion. */
+    z-index: 50;
+    /* Undo the UA `[popover]` box. The browser centres a popover in the viewport
+       (`inset: 0; margin: auto`) and gives it a chrome border/padding/background — all of
+       which must go, because floating-ui owns the position and the `<ul>` owns the skin. */
+    inset: auto;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    overflow: visible;
+    width: max-content;
+    height: auto;
+    max-width: none;
+    max-height: none;
+}
+
 /* The listbox popup is shared verbatim across the button-triggered SingleSelect, the
    text-input-triggered Combobox, the chip-bar MultiSelect, and the input-as-trigger
-   MultiCombobox — one rule body, all four class families, same --ui-* vars. */
+   MultiCombobox — one rule body, all four class families, same --ui-* vars. It is a static
+   box inside `.ui-menu-anchor` above; the anchor owns position and top-layer promotion. */
 .ui-select__menu,
 .ui-combobox__menu,
 .ui-multiselect__menu,
@@ -376,8 +414,6 @@
     list-style: none;
     margin: 0.25rem 0 0;
     padding: var(--ui-menu-pad);
-    position: absolute;
-    z-index: 50;
     min-width: var(--ui-menu-min-width);
     max-width: var(--ui-menu-max-width);
     font-size: var(--ui-menu-font-size);
