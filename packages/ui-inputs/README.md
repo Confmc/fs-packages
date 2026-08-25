@@ -249,7 +249,9 @@ a bare `<span @click>` is invisible to the keyboard and announces no role (WCAG 
 Enter/Space activation, `disabled` semantics and forced-colors treatment come from the platform,
 correctly, for free — hand-rolled ARIA is the fallback, never the default. The chassis is
 _chrome-less_ (transparent background, no border, no padding, inherited font), so swapping a
-`<span @click>` for a `Pressable` changes the semantics without repainting the control.
+`<span @click>` for a `Pressable` changes the semantics without repainting the control. It lays out
+as `inline-flex` — except on the tags whose own `display` their parent's layout algorithm requires,
+where the component keeps the tag's own: a clickable `<tr>` stays a table row.
 
 ```vue
 <Pressable label="Show example" @click="showExample" />
@@ -272,7 +274,9 @@ on `Pressable` and `Disclosure` alike and their slots may render empty, so nothi
 a consumer producing a focusable, correctly-roled, _unnamed_ control — a WCAG 4.1.2 (Level A)
 failure, and on `Disclosure` a trigger whose only content is the `aria-hidden` chevron. On mount each
 control checks that a name arrives by one of four routes — rendered content, `aria-label`,
-`aria-labelledby` or `title` — and `console.warn`s once, naming all four, when none does. Icon-only
+`aria-labelledby` or `title` — and `console.warn`s once, naming all four, when none does. Rendered
+content is counted the way the accessible name is computed: an `aria-hidden="true"` subtree
+contributes nothing, so a control whose only content is a decorative icon still warns. Icon-only
 usage with `aria-label` is legitimate and stays silent. It takes `aria-labelledby` at its word rather
 than dereferencing the IDREF (the target may legitimately mount later), so a _dangling_ reference
 passes it — axe is the layer that catches that one.
@@ -287,15 +291,22 @@ clickable `<tr>`, an element whose parent forbids interactive content — `as` r
 the component hand-rolls the _whole_ contract together: `role="button"`, `tabindex`, Enter on keydown,
 Space on keyup (dispatching a real click, so your own `@click` still runs), and a disabled emulation
 (`tabindex="-1"` + `aria-disabled`, **plus a click stop**). Half a contract is worse
-than none — and the stop is the half that is easy to miss. The native path is **not** protected by
+than none — and the stop is the half that is easy to miss. `as` is matched **case-insensitively**,
+because `<component :is>` resolves tag names that way: `as="BUTTON"` renders a genuine native button
+and takes the native path with it. The native path is **not** protected by
 the browser here: Chromium withholds a click on a disabled `<button>` only for user activation, and a
 `dispatchEvent` still runs every listener on one (measured). The stop is therefore what keeps a
 fall-through `@click` off a disabled control on **both** paths, not a nicety the fallback needs and
-the button does not. It is a real `stopImmediatePropagation()` in the component, **not** a
-`pointer-events: none` in the stylesheet: that rule takes the control out of hit-testing altogether,
-so a pointer over it targets whatever sits behind it and an _ancestor's_ `@click` fires. Never point
-`as` at an element the browser already activates (`a[href]`, `summary`) — every handler would fire
-twice.
+the button does not. It is a real guard in the component — `preventDefault()` plus
+`stopImmediatePropagation()`, in the **capture** phase — **not** a `pointer-events: none` in the
+stylesheet: that rule takes the control out of hit-testing altogether, so a pointer over it targets
+whatever sits behind it and an _ancestor's_ `@click` fires. The capture phase is what makes the whole
+subtree inert: a bubble-phase stop on the root arrives only after a nested `<a href>` or
+`<button @click>` has already run. And `preventDefault()` is the half no propagation stop can supply —
+it withholds the element's _own_ default action, which is what keeps a disabled `as="a"` from
+following its `href`. Never point `as` at an element the browser already activates (`a[href]`,
+`summary`) — the component would hand-roll a `role="button"` and a second key-to-click translation on
+top of the ones the element already has, and **development warns when you do**.
 
 **Keys inside an `as` fallback belong to the child that has focus.** Both key handlers check the
 event's origin and ignore anything that reached the root by bubbling, so a nested `<input>` keeps
@@ -304,7 +315,10 @@ an inline filter field is swallowed and converted into an activation of the row 
 hold a space at all. The check is deliberately **not** applied to the click handler: a click targets
 the element under the pointer, so the ordinary `<Pressable as="div"><span>Label</span></Pressable>`
 shape legitimately reports a child as the target, and the same guard there would stop the row
-responding to the mouse. Keys follow focus; clicks follow the pointer. One consequence to plan for:
+responding to the mouse. Keys follow focus; clicks follow the pointer. A **disabled** control is deaf to keys in the full
+sense — both handlers stop the event rather than returning, so a consumer's fall-through
+`@keydown`/`@keyup` does not run on it either; a disabled fallback keeps `tabindex="-1"`, which is out
+of the tab order but still mouse-focusable. One consequence to plan for:
 the child's own click still **bubbles**, so a row with its own `@click` counts an activation when a
 nested button is pressed, by keyboard or mouse alike — put `@click.stop` on the child where that is
 not what you want.

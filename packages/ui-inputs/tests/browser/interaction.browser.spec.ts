@@ -795,3 +795,226 @@ describe("Disclosure — a disabled trigger and the consumer's fall-through @cli
         await expect.poll(() => trigger().getAttribute('aria-expanded')).toBe('true');
     });
 });
+
+/**
+ * `.ui-pressable` sets `display: inline-flex`, which is right for a button and wrong for the one
+ * `as` target the documentation puts first: a clickable `<tr>` stops being a table row and its
+ * cells lose their table boxes. Only a real layout engine can settle this — happy-dom computes no
+ * used `display` at all, so the happy-dom suite can prove the marker class is applied and nothing
+ * about what it does.
+ */
+describe('Pressable — `as` must not repaint a structural display', () => {
+    const renderRows = () => {
+        render(
+            defineComponent(
+                () => () =>
+                    h('table', [
+                        h('tbody', [
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFC in a render-fn host
+                            h(
+                                Pressable as any,
+                                {as: 'tr', label: 'Row', id: 'row'},
+                                {default: () => [h('td', {id: 'cell'}, 'Cell')]},
+                            ),
+                        ]),
+                    ]),
+            ),
+        );
+        return {
+            row: document.getElementById('row') as HTMLElement,
+            cell: document.getElementById('cell') as HTMLElement,
+        };
+    };
+
+    it('leaves as="tr" a table row, and its cells table cells', () => {
+        const {row, cell} = renderRows();
+
+        expect(row.tagName).toBe('TR');
+        // The defect: `inline-flex` here takes the row out of the table's layout algorithm and the
+        // cell's own `display: table-cell` is computed against a flex container instead.
+        expect(getComputedStyle(row).display).toBe('table-row');
+        expect(getComputedStyle(cell).display).toBe('table-cell');
+        // …and the chassis is still ON it — this is a display carve-out, not an opt-out.
+        expect(getComputedStyle(row).cursor).toBe('pointer');
+    });
+
+    it('POSITIVE CONTROL — the ordinary button and as="div" keep the chassis display', () => {
+        renderPressable({});
+        expect(getComputedStyle(control()).display).toBe('inline-flex');
+    });
+
+    it('POSITIVE CONTROL — as="div" keeps it too', () => {
+        renderPressable({as: 'div'});
+        expect(getComputedStyle(control()).display).toBe('inline-flex');
+    });
+});
+
+/**
+ * Disabled inertness against the PLATFORM's own behaviour, which is the half no happy-dom spec can
+ * see: a real anchor's navigation, a real pointer's hit-testing, and real keys arriving after a
+ * real mouse-focus. Each arm carries its enabled positive control in the same fixture — the
+ * disabled arms are all zeros, and a zero proves nothing beside a fixture that wires nothing.
+ *
+ * `dispatchEvent` rather than `userEvent.click` on the arms that assert a stop: Chromium's real
+ * input pipeline produces no click on a disabled NATIVE button at all, so a forced user click
+ * leaves both arms at zero and asserts nothing.
+ */
+describe('Pressable — a disabled control against real platform behaviour', () => {
+    const NAV = '#pressable-nav';
+
+    afterEach(() => {
+        if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+    });
+
+    const renderAnchor = (disabled: boolean) => {
+        const clicks = ref(0);
+        render(
+            defineComponent(
+                () => () =>
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFC in a render-fn host
+                    h(Pressable as any, {
+                        as: 'a',
+                        href: NAV,
+                        label: 'Go',
+                        disabled,
+                        onClick: () => {
+                            clicks.value += 1;
+                        },
+                    }),
+            ),
+        );
+        return clicks;
+    };
+
+    const dispatchClick = (element: Element): boolean =>
+        element.dispatchEvent(new MouseEvent('click', {bubbles: true, cancelable: true}));
+
+    it('does not FOLLOW an as="a" href while disabled — the fallback has no native disabled', () => {
+        const clicks = renderAnchor(true);
+
+        const notCancelled = dispatchClick(control());
+
+        expect(notCancelled).toBe(false); // preventDefault() ran
+        expect(location.hash).toBe(''); // …and the browser therefore did not navigate
+        expect(clicks.value).toBe(0);
+    });
+
+    it('POSITIVE CONTROL — the same anchor, enabled, DOES navigate and run the handler', () => {
+        const clicks = renderAnchor(false);
+
+        dispatchClick(control());
+
+        // Without this the assertions above hold on an anchor that never navigates at all, and the
+        // whole finding would read as fixed on code that never had it.
+        expect(location.hash).toBe(NAV);
+        expect(clicks.value).toBe(1);
+    });
+
+    const renderWithInteractiveChild = (disabled: boolean) => {
+        const childClicks = ref(0);
+        render(
+            defineComponent(
+                () => () =>
+                    h(
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFC in a render-fn host
+                        Pressable as any,
+                        {as: 'div', label: 'Row', disabled},
+                        {
+                            default: () => [
+                                h('a', {id: 'child-link', href: NAV}, 'Open'),
+                                h('button', {
+                                    id: 'child-button',
+                                    type: 'button',
+                                    onClick: () => {
+                                        childClicks.value += 1;
+                                    },
+                                }),
+                            ],
+                        },
+                    ),
+            ),
+        );
+        return childClicks;
+    };
+
+    it('is inert for its whole SUBTREE — a real pointer on a nested link or button does nothing', async () => {
+        // The leak a bubble-phase stop on the root cannot close: the child's own handler runs on the
+        // way UP, before the root ever sees the event, and the anchor's navigation is a default
+        // action no `stopImmediatePropagation()` withholds.
+        const childClicks = renderWithInteractiveChild(true);
+        const link = document.getElementById('child-link') as HTMLElement;
+        const button = document.getElementById('child-button') as HTMLElement;
+
+        // The children are still hit-testable — the fix is a guard, not `pointer-events: none`.
+        expect(hitAtCentre(link)).toBe(link);
+
+        await userEvent.click(link, {force: true});
+        await userEvent.click(button, {force: true});
+
+        expect(location.hash).toBe('');
+        expect(childClicks.value).toBe(0);
+    });
+
+    it('POSITIVE CONTROL — the same children, enabled, navigate and fire', async () => {
+        const childClicks = renderWithInteractiveChild(false);
+        const link = document.getElementById('child-link') as HTMLElement;
+        const button = document.getElementById('child-button') as HTMLElement;
+
+        await userEvent.click(button);
+        expect(childClicks.value).toBe(1);
+
+        await userEvent.click(link);
+        expect(location.hash).toBe(NAV);
+    });
+
+    const renderWithKeyHandlers = (disabled: boolean) => {
+        const keydowns = ref(0);
+        const keyups = ref(0);
+        render(
+            defineComponent(
+                () => () =>
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFC in a render-fn host
+                    h(Pressable as any, {
+                        as: 'div',
+                        label: 'Row',
+                        disabled,
+                        onKeydown: () => {
+                            keydowns.value += 1;
+                        },
+                        onKeyup: () => {
+                            keyups.value += 1;
+                        },
+                    }),
+            ),
+        );
+        return {keydowns, keyups};
+    };
+
+    it('is deaf to keys after a real MOUSE focus — tabindex="-1" is still mouse-focusable', async () => {
+        // The reachability argument, measured rather than assumed: a disabled fallback is out of the
+        // TAB order but a pointer press still focuses it, and the control deliberately stays in
+        // hit-testing — so the consumer's fall-through key handlers are reachable on a control that
+        // is supposed to be inert.
+        const {keydowns, keyups} = renderWithKeyHandlers(true);
+
+        await userEvent.click(control(), {force: true});
+        expect(document.activeElement).toBe(control()); // the reachability half
+
+        await userEvent.keyboard('{Enter} a');
+
+        expect(keydowns.value).toBe(0);
+        expect(keyups.value).toBe(0);
+    });
+
+    it('POSITIVE CONTROL — the same handlers run on the ENABLED control', async () => {
+        const {keydowns, keyups} = renderWithKeyHandlers(false);
+
+        await userEvent.click(control());
+        expect(document.activeElement).toBe(control());
+
+        await userEvent.keyboard('{Enter}');
+
+        expect(keydowns.value).toBeGreaterThan(0);
+        expect(keyups.value).toBeGreaterThan(0);
+    });
+});

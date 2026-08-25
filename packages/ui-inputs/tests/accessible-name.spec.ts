@@ -127,3 +127,41 @@ describe.each(CONTROLS)('$name — accessible-name guard', ({name, component, pr
         }
     });
 });
+
+/**
+ * `textContent` is NOT the accessible name. An `aria-hidden="true"` subtree contributes nothing to
+ * the name computation, so counting it lets the exact shape this guard exists for — a control whose
+ * only content is a decorative icon — silence the guard and ship unnamed. Both directions on both
+ * controls: the filter must drop hidden content without dropping content beside it.
+ */
+describe.each(CONTROLS)('$name — aria-hidden content names nothing', ({component, props, slot}) => {
+    it('WARNS when the only slot content is aria-hidden', () => {
+        mount(component, {props, slots: {[slot]: '<span aria-hidden="true">★</span>'}});
+
+        expect(warn).toHaveBeenCalledTimes(1);
+    });
+
+    it('stays silent when a hidden decoration sits BESIDE real text', () => {
+        mount(component, {props, slots: {[slot]: '<span aria-hidden="true">★</span>Details'}});
+
+        expect(warn).not.toHaveBeenCalled();
+    });
+
+    it('stays silent on aria-hidden="false" — only the literal "true" hides a subtree', () => {
+        mount(component, {props, slots: {[slot]: '<span aria-hidden="false">Details</span>'}});
+
+        expect(warn).not.toHaveBeenCalled();
+    });
+
+    it('descends through plain wrappers — nesting does not hide a name', () => {
+        mount(component, {props, slots: {[slot]: '<span><b>Details</b></span>'}});
+
+        expect(warn).not.toHaveBeenCalled();
+    });
+
+    it("WARNS when the slot renders nothing — a v-if'd-out child is not content", () => {
+        mount(component, {props, slots: {[slot]: '<span v-if="false">Details</span>'}});
+
+        expect(warn).toHaveBeenCalledTimes(1);
+    });
+});

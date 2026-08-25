@@ -4,7 +4,7 @@
         ref="control"
         v-bind="chassis"
         class="ui-pressable"
-        :class="{'is-disabled': !native && disabled}"
+        :class="{'is-disabled': !native && disabled, 'keeps-tag-display': keepsTagDisplay}"
         :aria-pressed="pressed"
         @click="onClick"
         @keydown="onKeydown"
@@ -15,7 +15,7 @@
 </template>
 
 <script setup lang="ts">
-import {computed, getCurrentInstance, onMounted, ref, useTemplateRef} from 'vue';
+import {computed, getCurrentInstance, onMounted, ref, useTemplateRef, watch} from 'vue';
 
 import {warnWhenUnnamed} from '../internal/accessible-name';
 import {devWarningsSuppressed} from '../internal/dev-warning';
@@ -40,8 +40,12 @@ const {
      * be used (a clickable `<tr>`, an element whose parent forbids interactive content). The
      * component then hand-rolls the full contract together — `role="button"`, `tabindex`, Enter
      * on keydown, Space on keyup, a disabled emulation — because half of it is worse than none.
-     * Never point it at an element that is ALREADY activatable (`a[href]`, `summary`): the browser
-     * would translate the keypress too and every handler would run twice.
+     * Never point it at an element that is ALREADY activatable (`a[href]`, `summary`): the
+     * component would hand-roll semantics the element already has. Development warns when it does.
+     *
+     * Compared case-insensitively wherever the component branches on it, because
+     * `<component :is>` resolves HTML tag names case-INsensitively: `as="BUTTON"` renders a
+     * genuine native button and must take the native path with it.
      */
     as?: string;
     /** label text; the default slot overrides it (icon-only? supply `aria-label` via attrs — the
@@ -70,7 +74,39 @@ const {
  */
 const pressed = defineModel<boolean | undefined>('pressed', {default: undefined});
 
-const native = computed(() => as === 'button');
+/**
+ * The rendered tag, normalised. `<component :is>` resolves an HTML tag name case-insensitively,
+ * so `as="BUTTON"` mounts a real `<button>`; a case-SENSITIVE `=== 'button'` then read `false`
+ * and handed that button the fallback chassis — no `type="button"` (the default type is SUBMIT)
+ * and no native `disabled`. Only the comparisons normalise: `as` is still rendered verbatim,
+ * because a lowercased string would stop resolving a registered component name.
+ */
+const tag = computed(() => as.toLowerCase());
+
+const native = computed(() => tag.value === 'button');
+
+/**
+ * Tags whose parent's layout algorithm requires the child's own `display` — a `<tr>` forced to
+ * `inline-flex` stops being a table row and its cells lose their table boxes. The clickable
+ * `<tr>` is the documented `as` example, so the chassis must not paint over it.
+ */
+const STRUCTURAL_DISPLAY_TAGS = new Set([
+    'table',
+    'thead',
+    'tbody',
+    'tfoot',
+    'tr',
+    'td',
+    'th',
+    'caption',
+    'colgroup',
+    'col',
+]);
+
+const keepsTagDisplay = computed(() => STRUCTURAL_DISPLAY_TAGS.has(tag.value));
+
+/** Tags the browser activates by itself, from both the pointer and the keyboard. */
+const SELF_ACTIVATING_TAGS = new Set(['a', 'summary']);
 
 const control = useTemplateRef<HTMLElement>('control');
 
@@ -86,7 +122,7 @@ const vnodeProps = getCurrentInstance()?.vnode.props;
  *
  * The two cases ARE distinguishable, just not through the model ref: a binding passes an
  * `onUpdate:pressed` listener alongside the prop. Verified to hold for `v-model:pressed` AND for a
- * hand-written `:pressed` + `@update:pressed` pair, and to stay absent for both a bare `<Pressable>`
+ * hand-written `:pressed` + `@update:pressed` pair, and to stay absent for both a bare <Pressable>
  * and `:pressed` with no listener — so this cannot fire on correct code.
  */
 const warnWhenModelUninitialised = (): void => {
@@ -100,11 +136,39 @@ const warnWhenModelUninitialised = (): void => {
     );
 };
 
+/**
+ * Dev-only bound on the `as` escape hatch. Aiming it at an element the browser already activates
+ * gives that element a hand-rolled `role="button"` and a second Enter/Space translation on top of
+ * the one it already has, and on the disabled path a native default action the fallback chassis
+ * has no `disabled` to withhold. The prohibition was documentation-only; documentation is the
+ * weakest rung of the enforcement ladder and every review round found another leak below it.
+ *
+ * Asserted against the RENDERED element rather than the prop, so `as="a"` without an `href` — an
+ * anchor that activates nothing — stays silent. A warning that fires on correct code would cost
+ * this one its authority, exactly as it would the accessible-name guard.
+ */
+const warnWhenSelfActivating = (element: HTMLElement): void => {
+    if (devWarningsSuppressed()) return;
+
+    const rendered = element.tagName.toLowerCase();
+    if (!SELF_ACTIVATING_TAGS.has(rendered)) return;
+    if (rendered === 'a' && !element.hasAttribute('href')) return;
+
+    console.warn(
+        `[ui-inputs] <Pressable as="${as}"> aims the escape hatch at an element the browser ` +
+            'already activates, so it now carries a hand-rolled `role="button"` and a second ' +
+            'key-to-click translation on top of its own. Render a `<button>`, or an element that ' +
+            'activates nothing.',
+    );
+};
+
 // `label` is optional and the default slot may render empty, so a consumer can end up with a
 // focusable, correctly-roled, UNNAMED control. Dev-only, mount-time, once per instance.
 onMounted(() => {
-    warnWhenUnnamed(ensureRefValueExists(control), 'Pressable', 'the `label` prop, default-slot content');
+    const element = ensureRefValueExists(control);
+    warnWhenUnnamed(element, 'Pressable', 'the `label` prop, default-slot content');
     warnWhenModelUninitialised();
+    warnWhenSelfActivating(element);
 });
 
 /** Per-path chassis: native semantics, or the hand-rolled equivalents the fallback must supply. */
@@ -119,19 +183,13 @@ const chassis = computed(() =>
 const spaceArmed = ref(false);
 
 /**
- * Whether THIS element must translate keys into activation. A native button already does it —
- * repeating it would fire every handler twice — and a disabled control does nothing at all.
- */
-const handlesKeys = (): boolean => !native.value && !disabled;
-
-/**
  * Whether a key event belongs to a focusable DESCENDANT rather than to this control. A keyboard
  * event targets the FOCUSED element and then bubbles, so without this the fallback translates a
  * child's keys as its own: every Space typed into a nested `<input>` is `preventDefault()`ed and
  * converted into an activation of the row — the text box loses its spacebar entirely — and Enter
  * on a nested `<button>` activates the row instead of the button (measured, both).
  *
- * **This must NOT be applied to `onClick`, and the asymmetry is not an oversight.** A click
+ * **This must NOT be applied to the click guard, and the asymmetry is not an oversight.** A click
  * targets the element under the POINTER, so the ordinary `<Pressable as="div"><span>Label</span>`
  * shape legitimately has `target !== currentTarget` — the same check there would make the most
  * common use of the escape hatch stop responding to the mouse. Keys follow focus; clicks follow
@@ -139,26 +197,69 @@ const handlesKeys = (): boolean => !native.value && !disabled;
  */
 const isChildsOwnKey = (event: KeyboardEvent): boolean => event.target !== event.currentTarget;
 
-const onClick = (event: MouseEvent): void => {
-    if (disabled) {
-        // Stopping — not returning — is what keeps the two paths from diverging, and THIS stop is
-        // what makes both of them inert. The browser withholds a click on a disabled <button> only
-        // for USER ACTIVATION; `dispatchEvent` still runs every listener on one (measured in
-        // Chromium: a consumer handler fires on the disabled arm exactly as on the enabled arm).
-        // The fallback has no native protection at all — it stays fully in hit-testing,
-        // deliberately, see the .is-disabled rule. So on BOTH paths a bare early return would leave
-        // a consumer's own fall-through @click running on a control that is supposed to be inert.
-        // Vue merges this handler ahead of the fallthrough one and patches the event so a stop
-        // inside the merged array skips the rest — spec-pinned, not assumed.
-        event.stopImmediatePropagation();
-        return;
-    }
+/**
+ * Disabled inertness for clicks, in the CAPTURE phase — the only phase that reaches a click
+ * before the element it landed on. Three things follow from that and none of them from a
+ * bubble-phase stop:
+ *
+ * - A click on a DESCENDANT (a nested `<a href>`, a nested `<button @click>`) is stopped before
+ *   the child's own handler runs. A bubble-phase stop on the root arrives after it.
+ * - `preventDefault()` withholds the element's own default action, which is what keeps a disabled
+ *   `as="a href"` from navigating: the fallback chassis is role/tabindex/aria-disabled only, so
+ *   there is no native `disabled` to withhold it.
+ * - The consumer's fall-through `@click` is stopped without depending on Vue's handler merge
+ *   order — a capture listener on the target runs before EVERY bubble listener on it.
+ *
+ * The browser is no help on either path: it withholds a click on a disabled <button> only for
+ * USER ACTIVATION (`dispatchEvent` still runs every listener on one — measured in Chromium), and
+ * the fallback stays fully in hit-testing deliberately, see the `.is-disabled` rule. Making the
+ * subtree inert while disabled is also what `role="button"` already claims: its descendants are
+ * presentational to assistive tech, so a live interactive child inside one is the defect.
+ */
+const onClickCapture = (event: Event): void => {
+    if (!disabled) return;
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+};
+
+/**
+ * Attached NATIVELY rather than as a second `@click.capture` binding, and that is load-bearing:
+ * Vue stamps `_vts` on the first of ITS OWN invokers to see an event and then skips every invoker
+ * attached no later than that stamp, so a template capture binding makes the element's bubble
+ * invoker drop the consumer's fall-through `@click` whenever the click lands in the same
+ * millisecond as the patch. Measured — the ENABLED-arm specs went intermittently red on it, which
+ * is the shape a real consumer would hit as an unreproducible dropped click.
+ *
+ * Sync flush, because a Pressable can be clicked in the same tick it mounts; re-aimed on the ref
+ * because `<component :is>` builds a NEW element when `as` changes, and the old listener dies with
+ * the old element.
+ */
+watch(
+    control,
+    (element, previous) => {
+        previous?.removeEventListener('click', onClickCapture, true);
+        element?.addEventListener('click', onClickCapture, true);
+    },
+    {flush: 'sync'},
+);
+
+const onClick = (): void => {
     if (pressed.value !== undefined) pressed.value = !pressed.value;
 };
 
 const onKeydown = (event: KeyboardEvent): void => {
     if (isChildsOwnKey(event)) return;
-    if (!handlesKeys()) return;
+    // Stopping — not returning — is what makes a disabled control inert rather than merely
+    // un-activating: a bare return leaves the consumer's own fall-through `@keydown` running on
+    // it. The disabled fallback keeps `tabindex="-1"`, which is still MOUSE-focusable, so a
+    // pointer press followed by keys is a reachable path, not a theoretical one.
+    if (disabled) {
+        event.stopImmediatePropagation();
+        return;
+    }
+    // A native button already translates Enter/Space itself; repeating it fires every handler twice.
+    if (native.value) return;
     if (event.key === 'Enter') {
         event.preventDefault();
         // Dispatch a REAL click rather than calling the handler: that is what the browser does for
@@ -171,17 +272,25 @@ const onKeydown = (event: KeyboardEvent): void => {
 };
 
 const onKeyup = (event: KeyboardEvent): void => {
-    if (event.key !== ' ') return;
+    const isSpace = event.key === ' ';
     // Disarm on EVERY Space keyup, before anything can bail out: a press interrupted by the
     // control going disabled mid-key would otherwise leave the latch set, and the next Space
     // keyup after re-enable — including the keyup of that same cancelled press — would activate.
-    const armed = spaceArmed.value;
-    spaceArmed.value = false;
+    const armed = isSpace && spaceArmed.value;
+    if (isSpace) spaceArmed.value = false;
+
     // Origin check AFTER the disarm, deliberately: a keyup from a child still clears a latch the
     // root armed (focus moved into a nested control mid-press), which is the conservative end of
     // the same stale-latch failure the disarm exists to close.
     if (isChildsOwnKey(event)) return;
-    if (!handlesKeys() || !armed) return;
+    // The disabled stop covers EVERY key, not just Space: the leak is the consumer's fall-through
+    // `@keyup`, and it does not care which key produced it.
+    if (disabled) {
+        event.stopImmediatePropagation();
+        return;
+    }
+    if (native.value || !armed) return;
+
     (event.currentTarget as HTMLElement).click();
 };
 </script>

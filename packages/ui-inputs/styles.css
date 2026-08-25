@@ -722,11 +722,20 @@
     color: var(--ui-pressable-text-disabled);
     cursor: not-allowed;
 }
+/* `as` renders an arbitrary tag, so the chassis's `display` cannot be applied blindly: on the
+   documented clickable `<tr>` it stops the element being a table row and the row's cells lose
+   their table boxes. The COMPONENT decides — it knows the tag — and marks the elements whose own
+   display is required by their parent's layout algorithm. `revert` rolls back to the UA value, so
+   this needs no per-tag list here and covers every table-internal tag at once. */
+.ui-pressable.keeps-tag-display {
+    display: revert;
+}
 /* The `as` escape hatch renders a non-button, where :disabled cannot match (the
    .ui-multiselect__box precedent) — the component mirrors the state as .is-disabled, which is
    therefore only ever present on the fallback path. Suppressing the fall-through @click is the
-   COMPONENT's job, not this rule's: `onClick` calls stopImmediatePropagation() while disabled, so
-   the event dies at the control. `pointer-events: none` used to stand in for that and must NOT
+   COMPONENT's job, not this rule's: a CAPTURE-phase click guard preventDefault()s and
+   stopImmediatePropagation()s while disabled, so the event dies at the control before it reaches
+   the control's own descendants. `pointer-events: none` used to stand in for that and must NOT
    come back — it removes the control from hit-testing entirely, so a pointer over a disabled
    fallback targets whatever sits BEHIND it and an ancestor's own @click fires (measured with
    document.elementFromPoint; pinned in the browser suite). Transparent is worse than inert.

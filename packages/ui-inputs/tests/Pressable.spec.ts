@@ -431,3 +431,233 @@ describe('Pressable — the uninitialised-model guard', () => {
         expect(warn).not.toHaveBeenCalled();
     });
 });
+
+/**
+ * `<component :is>` resolves an HTML tag name case-INsensitively, so `as="BUTTON"` mounts a genuine
+ * native `<button>`. A case-sensitive `as === 'button'` read `false` for it and handed that button
+ * the fallback chassis: no `type="button"` — and the default type is SUBMIT — and no native
+ * `disabled`, only a cosmetic `aria-disabled`. A capitalisation typo produced an always-enabled
+ * form-submitting button.
+ */
+describe('Pressable — `as` is matched case-insensitively', () => {
+    it('gives as="BUTTON" the NATIVE chassis: type=button and a real disabled', () => {
+        const wrapper = mount(Pressable, {props: {as: 'BUTTON', label: 'Go', disabled: true}});
+
+        expect(wrapper.element.tagName).toBe('BUTTON');
+        expect(wrapper.attributes('type')).toBe('button');
+        expect(wrapper.attributes('disabled')).toBeDefined();
+        // …and none of the hand-rolled emulation the fallback would have supplied.
+        expect(wrapper.attributes('role')).toBeUndefined();
+        expect(wrapper.attributes('aria-disabled')).toBeUndefined();
+        expect(wrapper.classes()).not.toContain('is-disabled');
+    });
+
+    it('POSITIVE CONTROL — as="DIV" still takes the FALLBACK path: the compare was normalised, not deleted', () => {
+        const wrapper = mount(Pressable, {props: {as: 'DIV', label: 'Row', disabled: true}});
+
+        expect(wrapper.element.tagName).toBe('DIV');
+        expect(wrapper.attributes('role')).toBe('button');
+        expect(wrapper.attributes('aria-disabled')).toBe('true');
+        expect(wrapper.attributes('type')).toBeUndefined();
+    });
+});
+
+/**
+ * The chassis renders `display: inline-flex`, which is right for a button and wrong for anything
+ * whose parent's layout algorithm requires the child's own display: a clickable `<tr>` — the
+ * documented `as` example — stops being a table row and its cells lose their table boxes. The
+ * component marks those tags; the stylesheet reverts them. The computed-style proof is in the
+ * browser suite, where a layout engine exists.
+ */
+describe('Pressable — structural display tags keep their own display', () => {
+    it.each(['tr', 'TR', 'td', 'th', 'table', 'thead', 'tbody', 'tfoot', 'caption', 'colgroup', 'col'])(
+        'marks as="%s"',
+        (as) => {
+            expect(mount(Pressable, {props: {as, label: 'Row'}}).classes()).toContain('keeps-tag-display');
+        },
+    );
+
+    it.each(['button', 'div', 'span', 'li'])('leaves as="%s" on the chassis display', (as) => {
+        expect(mount(Pressable, {props: {as, label: 'Row'}}).classes()).not.toContain('keeps-tag-display');
+    });
+});
+
+/**
+ * Disabled inertness for KEYS. Both handlers used to bare-return on a disabled control, which stops
+ * the component activating but leaves a consumer's fall-through `@keydown`/`@keyup` running on it —
+ * the same defect `onClick` was fixed for, unfixed in its two siblings. It is reachable: the
+ * disabled fallback keeps `tabindex="-1"`, which is still MOUSE-focusable, and the stylesheet
+ * deliberately keeps the control in hit-testing. The real-pointer-then-real-keys walk is pinned in
+ * the browser suite; this asserts the component's own half.
+ */
+describe('Pressable — a disabled control is deaf to keys, not merely un-activating', () => {
+    const mountWithKeyHandlers = (props: Record<string, unknown>) => {
+        const onKeydown = vi.fn();
+        const onKeyup = vi.fn();
+        const wrapper = mount(Pressable, {props: {label: 'Row', ...props}, attrs: {onKeydown, onKeyup}});
+
+        return {wrapper, onKeydown, onKeyup};
+    };
+
+    it.each(['div', undefined])('stops the fall-through handlers on the as=%s path', (as) => {
+        const {wrapper, onKeydown, onKeyup} = mountWithKeyHandlers({as, disabled: true});
+
+        key(wrapper.element, 'keydown', 'Enter');
+        key(wrapper.element, 'keydown', ' ');
+        key(wrapper.element, 'keyup', ' ');
+        // Every key, not just the two the component translates: the leak is the consumer's own
+        // handler, and it does not care which key produced it.
+        key(wrapper.element, 'keyup', 'Enter');
+        key(wrapper.element, 'keydown', 'a');
+
+        expect(onKeydown).not.toHaveBeenCalled();
+        expect(onKeyup).not.toHaveBeenCalled();
+    });
+
+    it.each(['div', undefined])('POSITIVE CONTROL — the same handlers run on the ENABLED as=%s path', (as) => {
+        const {wrapper, onKeydown, onKeyup} = mountWithKeyHandlers({as});
+
+        key(wrapper.element, 'keydown', 'Enter');
+        key(wrapper.element, 'keyup', 'Enter');
+
+        expect(onKeydown).toHaveBeenCalledTimes(1);
+        expect(onKeyup).toHaveBeenCalledTimes(1);
+    });
+
+    it('still clears the Space latch on a disabled keyup — the stop comes AFTER the disarm', async () => {
+        // The disarm is load-bearing and must survive the stop: a press interrupted by the control
+        // going disabled mid-key would otherwise leave the latch set, and the next Space keyup after
+        // re-enable would activate a control the user never pressed.
+        const onClick = vi.fn();
+        const wrapper = mount(Pressable, {props: {as: 'div', label: 'Row'}, attrs: {onClick}});
+
+        key(wrapper.element, 'keydown', ' '); // armed
+        await wrapper.setProps({disabled: true});
+        key(wrapper.element, 'keyup', ' '); // stopped — and disarmed on the way through
+        await wrapper.setProps({disabled: false});
+        key(wrapper.element, 'keyup', ' '); // the latch must be gone
+
+        expect(onClick).not.toHaveBeenCalled();
+    });
+});
+
+/**
+ * Disabled inertness for clicks reaching a DESCENDANT. The stop is a CAPTURE-phase listener, which
+ * is the only phase that arrives before the element the click landed on — a bubble-phase stop on the
+ * root runs after a nested `<button @click>` has already fired. The real-pointer and real-navigation
+ * halves are pinned in the browser suite; this is the component's own half.
+ */
+describe('Pressable — a disabled control is inert for its whole subtree', () => {
+    const mountWithChild = (disabled: boolean) => {
+        const child = vi.fn();
+        const consumer = vi.fn();
+        const wrapper = mount(Pressable, {
+            props: {as: 'div', disabled},
+            attrs: {onClick: consumer},
+            slots: {default: '<button id="remove" type="button">Remove</button>'},
+        });
+        (wrapper.find('#remove').element as HTMLElement).addEventListener('click', child);
+
+        return {wrapper, child, consumer};
+    };
+
+    it("stops a click on a descendant before the child's own handler runs", async () => {
+        const {wrapper, child, consumer} = mountWithChild(true);
+
+        wrapper.find('#remove').element.dispatchEvent(new MouseEvent('click', {bubbles: true}));
+        await wrapper.vm.$nextTick();
+
+        expect(child).not.toHaveBeenCalled();
+        expect(consumer).not.toHaveBeenCalled();
+    });
+
+    it('POSITIVE CONTROL — the same fixture, enabled, reaches the child AND the consumer', async () => {
+        const {wrapper, child, consumer} = mountWithChild(false);
+
+        wrapper.find('#remove').element.dispatchEvent(new MouseEvent('click', {bubbles: true}));
+        await wrapper.vm.$nextTick();
+
+        // Without this arm the zeros above are equally consistent with a fixture that wires nothing.
+        expect(child).toHaveBeenCalledTimes(1);
+        expect(consumer).toHaveBeenCalledTimes(1);
+    });
+
+    it('re-aims the guard when `as` changes — <component :is> builds a NEW element', async () => {
+        const consumer = vi.fn();
+        const wrapper = mount(Pressable, {
+            props: {as: 'div', label: 'Row', disabled: true},
+            attrs: {onClick: consumer},
+        });
+
+        await wrapper.setProps({as: 'span'});
+        expect(wrapper.element.tagName).toBe('SPAN');
+
+        wrapper.element.dispatchEvent(new MouseEvent('click', {bubbles: true}));
+        await wrapper.vm.$nextTick();
+        expect(consumer).not.toHaveBeenCalled();
+
+        // Unmounting takes the listener with the element; nothing here should throw.
+        expect(() => wrapper.unmount()).not.toThrow();
+    });
+});
+
+/**
+ * The bound on the escape hatch, at a tier above the docblock that already forbade this. Aiming
+ * `as` at an element the browser activates by itself gives it a hand-rolled `role="button"` and a
+ * second key-to-click translation on top of the one it already has. Asserted in both directions:
+ * this fires on the elements the documentation names and on nothing else, because a warning that
+ * fires on correct code costs the guard its authority.
+ */
+describe('Pressable — the `as` self-activating bound', () => {
+    let warn: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+        warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    });
+
+    afterEach(() => {
+        vi.restoreAllMocks();
+        vi.unstubAllEnvs();
+    });
+
+    it('warns on an anchor that actually activates', () => {
+        mount(Pressable, {props: {as: 'a', label: 'Row'}, attrs: {href: '/somewhere'}});
+
+        expect(warn).toHaveBeenCalledTimes(1);
+        const message = String(warn.mock.calls[0]?.[0]);
+        expect(message).toContain('already activates');
+        expect(message).toContain('as="a"');
+    });
+
+    it('warns on as="A" — the bound normalises case like the native compare does', () => {
+        mount(Pressable, {props: {as: 'A', label: 'Row'}, attrs: {href: '/somewhere'}});
+
+        expect(warn).toHaveBeenCalledTimes(1);
+    });
+
+    it('warns on <summary>, which activates from the pointer AND the keyboard', () => {
+        mount(Pressable, {props: {as: 'summary', label: 'Row'}});
+
+        expect(warn).toHaveBeenCalledTimes(1);
+    });
+
+    it('stays SILENT on an anchor with no href — that one activates nothing', () => {
+        mount(Pressable, {props: {as: 'a', label: 'Row'}});
+
+        expect(warn).not.toHaveBeenCalled();
+    });
+
+    it.each(['div', 'tr', 'span', undefined])('stays SILENT on the supported as=%s', (as) => {
+        mount(Pressable, {props: {as, label: 'Row'}});
+
+        expect(warn).not.toHaveBeenCalled();
+    });
+
+    it('is stripped in production, on the same gate as the other dev warnings', () => {
+        vi.stubEnv('NODE_ENV', 'production');
+
+        mount(Pressable, {props: {as: 'summary', label: 'Row'}});
+
+        expect(warn).not.toHaveBeenCalled();
+    });
+});
