@@ -1200,8 +1200,9 @@ describe('Pressable — a disabled control and a focusable DESCENDANT', () => {
 
         await userEvent.keyboard('a b');
 
-        // The stop is propagation-only — no `preventDefault()` — so the field still works. This is
-        // the assertion that keeps the fix from being "disable the subtree's keyboard".
+        // The guard withholds the consumer's handler and touches the event itself not at all, so
+        // the field still works. This is the assertion that keeps the fix from being "disable the
+        // subtree's keyboard".
         expect(filter.value).toBe('a b');
         // …and none of it reached the consumer's handlers on the inert row.
         expect(keydowns.value).toBe(0);
@@ -1225,7 +1226,7 @@ describe('Pressable — a disabled control and a focusable DESCENDANT', () => {
         element.dispatchEvent(new KeyboardEvent(type, {key: value, bubbles: true, cancelable: true}));
     };
 
-    it('stops a PROGRAMMATIC descendant key too — the leak is the handler, not the input pipeline', () => {
+    it('withholds the consumer on a PROGRAMMATIC descendant key too — the leak is the handler, not the input pipeline', () => {
         const {keydowns, keyups, filter} = renderDisabledRowWithChildren(true);
 
         dispatchKey(filter, 'keydown', 'Enter');
