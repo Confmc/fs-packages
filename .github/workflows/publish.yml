@@ -11,6 +11,39 @@ on:
             - 'packages/*/package.json'
 
 jobs:
+    # Is this push actually a release? The trigger cannot tell.
+    #
+    # `paths: packages/*/package.json` is a proxy for "a version changed", and it is
+    # not the same thing — dependabot edits package manifests too, so its merges match
+    # the filter, change no version, and still raise a full OIDC approval request for a
+    # run that would publish nothing. Measured 2026-08-26: SEVEN such runs (six
+    # dependabot merges on 08-24, cancelled by hand; one echo-string edit in #220).
+    # The comment on the path filter above already promises dependabot churn will not
+    # start this job; the filter cannot keep that promise, so this job keeps it instead.
+    #
+    # The real cost is not minutes. A standing queue of pending approvals trains the
+    # approver to wave them through, on the repository that mints publish credentials
+    # for the whole fleet.
+    #
+    # FAILS CLOSED: every uncertain answer resolves to publishable, so a registry
+    # outage costs one needless approval prompt and can never silently skip a release.
+    # See scripts/detect-publishable.mjs.
+    detect:
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+        outputs:
+            publishable: ${{ steps.check.outputs.publishable }}
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+              with:
+                  node-version: 24
+            # No `npm ci` — the script is zero-dependency by design, and installing the
+            # tree to decide whether to do anything would defeat the point.
+            - id: check
+              run: node scripts/detect-publishable.mjs
+
     build:
         runs-on: ubuntu-latest
         permissions:
@@ -40,7 +73,10 @@ jobs:
                   if-no-files-found: error
 
     publish:
-        needs: build
+        needs: [build, detect]
+        # The approval request itself is the thing being gated. A skipped job raises no
+        # deployment review, so nothing reaches a human unless there is a real release.
+        if: needs.detect.outputs.publishable == 'true'
         runs-on: ubuntu-latest
         # Environment gate: the OIDC mint (id-token: write) is fronted by the
         # 'npm-publish' deployment environment, whose protection rule (required

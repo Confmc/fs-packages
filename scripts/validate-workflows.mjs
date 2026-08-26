@@ -127,6 +127,50 @@ if (!fallback) {
     );
 }
 
+/**
+ * Second invariant, added 2026-08-26: the OIDC approval request must be raised only by
+ * an actual release.
+ *
+ * `publish` sits behind a human approval that mints publish credentials for the whole
+ * fleet. The workflow trigger is `paths: packages/*` + `/package.json`, which is a proxy
+ * for "a version changed" and not the same thing — dependabot edits package manifests
+ * too. Seven runs reached the approval gate with nothing to publish (six dependabot
+ * merges on 2026-08-24, one echo-string edit in #220) before this was closed.
+ *
+ * Guarded here rather than trusted, because the failure is silent in the expensive
+ * direction: if the condition is ever dropped, nothing breaks and nothing is logged —
+ * the queue of pointless approvals simply returns, and an approver trained to wave them
+ * through is the actual risk. Asserting all three legs (the job runs, publish depends on
+ * it, publish is conditioned on its output) because any one alone is satisfiable while
+ * the gate does nothing.
+ */
+const detectStep = steps.find((step) => /scripts\/detect-publishable\.mjs/.test(step.text));
+if (!detectStep) {
+    failures.push(
+        `no step running 'scripts/detect-publishable.mjs' found in ${WORKFLOW}. Without it, every push touching a ` +
+            `package manifest raises an OIDC approval request, including dependency bumps that publish nothing.`,
+    );
+}
+
+const publishNeeds = /^\s*publish:\s*$\n(?:\s+.*\n)*?\s*needs:\s*(.+)$/m.exec(source);
+if (!publishNeeds) {
+    failures.push(
+        `could not find the 'publish' job's 'needs:' in ${WORKFLOW}; this gate's assumptions no longer hold.`,
+    );
+} else if (!/detect/.test(publishNeeds[1])) {
+    failures.push(
+        `the 'publish' job does not list 'detect' in its needs (found: ${publishNeeds[1].trim()}). The release-signal ` +
+            `check cannot gate a job that does not depend on it.`,
+    );
+}
+
+if (!/^\s*if:\s*needs\.detect\.outputs\.publishable\s*==\s*'true'\s*$/m.test(source)) {
+    failures.push(
+        `the 'publish' job is missing "if: needs.detect.outputs.publishable == 'true'". Depending on 'detect' without ` +
+            `branching on its output runs the check and then ignores it — the approval request is raised regardless.`,
+    );
+}
+
 if (failures.length > 0) {
     console.error(`validate:workflows gate FAIL — ${WORKFLOW}:\n`);
     for (const failure of failures) console.error(`  - ${failure}\n`);
@@ -135,5 +179,5 @@ if (failures.length > 0) {
 
 console.log(
     `validate:workflows gate PASS — ${WORKFLOW}: artifact retention >= ${MIN_RETENTION_DAYS}d, ` +
-        `download is soft, rebuild fallback present and loud.`,
+        `download is soft, rebuild fallback present and loud, and the OIDC approval is gated on a real release signal.`,
 );
