@@ -1,7 +1,7 @@
 {
     "name": "@script-development/ui-inputs",
-    "version": "0.11.0",
-    "description": "Headless, themeable Vue 3 form input components (field, label, error, text/number/date input, textarea, select, checkbox/radio/switch) styled entirely through --ui-* CSS custom properties.",
+    "version": "0.12.0",
+    "description": "Headless, themeable Vue 3 UI components — form inputs (field, label, error, text/number/date input, textarea, select, checkbox/radio/switch) plus keyboard-correct interactive controls (pressable, disclosure) — styled entirely through --ui-* CSS custom properties.",
     "homepage": "https://packages.script.nl/packages/ui-inputs",
     "license": "MIT",
     "repository": {
@@ -40,7 +40,7 @@
         "lint:pkg": "publint && attw --pack",
         "test": "vitest run",
         "test:coverage": "vitest run --coverage",
-        "test:mutation": "echo 'ui-inputs: component logic lives in SFCs — Stryker mutates .ts only, so there is nothing to mutate; behaviour is guarded by the 100% component-test coverage gate.'",
+        "test:mutation": "echo 'ui-inputs: mutation testing is NOT wired (WR-1027). This is a stub, not a pass — src/composables/useListbox.ts and src/internal/*.ts are real .ts Stryker would mutate. Behaviour is guarded by the 100% coverage gate alone.'",
         "typecheck": "vue-tsc --noEmit"
     },
     "dependencies": {

@@ -1,6 +1,7 @@
 # @script-development/ui-inputs
 
-Headless, themeable Vue 3 form input components, styled entirely through `--ui-*` CSS custom properties.
+Headless, themeable Vue 3 UI components — **form inputs** plus the **interactive controls that carry no value**
+(`Pressable`, `Disclosure`) — styled entirely through `--ui-*` CSS custom properties.
 
 Part of the Armory `ui-*` family. The components ship **no token vocabulary and no colour literal** — you map your design tokens onto the `--ui-*` contract once, and every component follows. Kendo-soft or brutalist, light or dark, from one component set.
 
@@ -18,22 +19,24 @@ import '@script-development/ui-inputs/style.css';
 
 ## Components
 
-| Component                 | Purpose                                                                                                                                                    |
-| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `FormField`               | Label + error + required-marker composition wrapper (error-as-prop)                                                                                        |
-| `FormLabel` / `FormError` | The atoms `FormField` composes                                                                                                                             |
-| `TextInput`               | Native `text` / `email` / `password` / `search` / `tel` / `url` input                                                                                      |
-| `NumberInput`             | Native `number` input; owns the `NaN`→`null` empty-value guard                                                                                             |
-| `DateInput`               | Native `date` input                                                                                                                                        |
-| `Textarea`                | Native `textarea` with `rows`                                                                                                                              |
-| `Checkbox`                | Native checkbox, visually restyled; non-nullable `boolean` model, `indeterminate` as a visual prop                                                         |
-| `CheckboxGroup`           | Fieldset/legend group of checkboxes — models an array of option ids in **options order**                                                                   |
-| `Switch`                  | The checkbox chassis with `role="switch"` — an on/off toggle with a themeable track + thumb                                                                |
-| `RadioGroup`              | Fieldset/legend radio group (`role="radiogroup"`) — models `T['id'] \| null`; **native** roving focus and arrow-key selection                              |
-| `SingleSelect`            | Accessible button-triggered listbox over `@floating-ui/vue`, generic over your option type                                                                 |
-| `Combobox`                | Accessible **searchable/filtering** single-select — a text input that filters the listbox as you type; exposes an imperative `focus()` handle              |
-| `MultiSelect`             | Accessible **multi-value** select — models an array of option ids; toggle-in-place listbox that stays open on commit, inline chip bar with per-chip remove |
-| `MultiCombobox`           | Accessible **searchable multi-value** select — MultiSelect's array model + chips with Combobox's filter-as-you-type input as the trigger                   |
+| Component                 | Purpose                                                                                                                                                                             |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `FormField`               | Label + error + required-marker composition wrapper (error-as-prop)                                                                                                                 |
+| `FormLabel` / `FormError` | The atoms `FormField` composes                                                                                                                                                      |
+| `TextInput`               | Native `text` / `email` / `password` / `search` / `tel` / `url` input                                                                                                               |
+| `NumberInput`             | Native `number` input; owns the `NaN`→`null` empty-value guard                                                                                                                      |
+| `DateInput`               | Native `date` input                                                                                                                                                                 |
+| `Textarea`                | Native `textarea` with `rows`                                                                                                                                                       |
+| `Checkbox`                | Native checkbox, visually restyled; non-nullable `boolean` model, `indeterminate` as a visual prop                                                                                  |
+| `CheckboxGroup`           | Fieldset/legend group of checkboxes — models an array of option ids in **options order**                                                                                            |
+| `Switch`                  | The checkbox chassis with `role="switch"` — an on/off toggle with a themeable track + thumb                                                                                         |
+| `RadioGroup`              | Fieldset/legend radio group (`role="radiogroup"`) — models `T['id'] \| null`; **native** roving focus and arrow-key selection                                                       |
+| `SingleSelect`            | Accessible button-triggered listbox over `@floating-ui/vue`, generic over your option type                                                                                          |
+| `Combobox`                | Accessible **searchable/filtering** single-select — a text input that filters the listbox as you type; exposes an imperative `focus()` handle                                       |
+| `MultiSelect`             | Accessible **multi-value** select — models an array of option ids; toggle-in-place listbox that stays open on commit, inline chip bar with per-chip remove                          |
+| `MultiCombobox`           | Accessible **searchable multi-value** select — MultiSelect's array model + chips with Combobox's filter-as-you-type input as the trigger                                            |
+| `Pressable`               | A real `<button>` for an interactive control that carries **no value** — the keyboard-correct replacement for `<span @click>` / `<div @click>`; optional `aria-pressed` toggle mode |
+| `Disclosure`              | Show/hide a region from a real `<button>` carrying `aria-expanded` + `aria-controls`; optionally wrapped in a real heading — the replacement for `<h2 @click>`                      |
 
 ```vue
 <FormField id="fruit" label="Fruit" :error="errors.fruit" #default="{controlId, describedby, invalid}">
@@ -235,6 +238,119 @@ size/colour). Every colour default derives from an existing resting token
 (`--ui-control-bg`, `--ui-control-border-color`, `--ui-control-border-open`), so an existing
 `--ui-*` token map themes the checkbox family with no new mappings — remap to opt in.
 
+### Interactive controls that are not form inputs
+
+`Pressable` and `Disclosure` carry no value and belong to no field. They exist because the single most
+common accessibility defect in a Vue codebase is a click handler on an element that cannot receive one:
+a bare `<span @click>` is invisible to the keyboard and announces no role (WCAG 2.1.1 _Keyboard_ and
+4.1.2 _Name, Role, Value_, both Level A). No linter and no input component catches it.
+
+**`Pressable` renders a real `<button type="button">`.** That is the whole design: focusability,
+Enter/Space activation, `disabled` semantics and forced-colors treatment come from the platform,
+correctly, for free — hand-rolled ARIA is the fallback, never the default. The chassis is
+_chrome-less_ (transparent background, no border, no padding, inherited font), so swapping a
+`<span @click>` for a `Pressable` changes the semantics without repainting the control. It lays out
+as `inline-flex` — except on the tags whose own `display` their parent's layout algorithm requires,
+where the component keeps the tag's own: a clickable `<tr>` stays a table row.
+
+```vue
+<Pressable label="Show example" @click="showExample" />
+<Pressable v-model:pressed="bold" label="Bold" />
+```
+
+`v-model:pressed` opts into **toggle mode**: the control conveys `aria-pressed` and flips it on
+activation. Left unbound the attribute is absent — a plain action button must not claim toggle
+semantics. (This is the one place the package sets an ARIA state by hand, and deliberately: unlike
+`Switch`, where `role="switch"` on a native checkbox lets the native checked state map to
+`aria-checked`, a `<button>` has no native pressed state, so `aria-pressed` is the only conveyance
+there is.) **Initialise the ref you bind**: `defineModel` cannot tell an unbound model from one
+bound to `undefined`, so a `ref<boolean>()` left uninitialised produces a control that renders no
+`aria-pressed` and silently never toggles — development warns when it sees a `pressed` binding
+holding `undefined`. Give an icon-only control an accessible name with `aria-label` — undeclared
+attrs fall through to the button, because here the root _is_ the interactive element.
+
+**Both controls warn in development when they render with no accessible name.** `label` is optional
+on `Pressable` and `Disclosure` alike and their slots may render empty, so nothing in the types stops
+a consumer producing a focusable, correctly-roled, _unnamed_ control — a WCAG 4.1.2 (Level A)
+failure, and on `Disclosure` a trigger whose only content is the `aria-hidden` chevron. On mount each
+control checks that a name arrives by one of four routes — rendered content, `aria-label`,
+`aria-labelledby` or `title` — and `console.warn`s once, naming all four, when none does. Rendered
+content is counted the way the accessible name is computed: an `aria-hidden="true"` subtree
+contributes nothing, so a control whose only content is a decorative icon still warns. Icon-only
+usage with `aria-label` is legitimate and stays silent. It takes `aria-labelledby` at its word rather
+than dereferencing the IDREF (the target may legitimately mount later), so a _dangling_ reference
+passes it — axe is the layer that catches that one.
+
+Every dev-only warning here is gated on `process.env.NODE_ENV`, which Vite and webpack substitute for
+you; **rollup needs `@rollup/plugin-replace`**. Where nothing substitutes it the package fails
+_silent_ rather than warning — a library must not `console.warn` into a host it cannot identify, and
+a missing `process` global must not become a `ReferenceError` at mount.
+
+**The `as` escape hatch is discouraged.** For the cases where a button genuinely cannot be used — a
+clickable `<tr>`, an element whose parent forbids interactive content — `as` renders another tag and
+the component hand-rolls the _whole_ contract together: `role="button"`, `tabindex`, Enter on keydown,
+Space on keyup (dispatching a real click, so your own `@click` still runs), and a disabled emulation
+(`tabindex="-1"` + `aria-disabled`, **plus a click stop**). Half a contract is worse
+than none — and the stop is the half that is easy to miss. `as` is matched **case-insensitively**,
+because `<component :is>` resolves tag names that way: `as="BUTTON"` renders a genuine native button
+and takes the native path with it. The native path is **not** protected by
+the browser here: Chromium withholds a click on a disabled `<button>` only for user activation, and a
+`dispatchEvent` still runs every listener on one (measured). The stop is therefore what keeps a
+fall-through `@click` off a disabled control on **both** paths, not a nicety the fallback needs and
+the button does not. It is a real guard in the component — `preventDefault()` plus
+`stopImmediatePropagation()`, in the **capture** phase — **not** a `pointer-events: none` in the
+stylesheet: that rule takes the control out of hit-testing altogether, so a pointer over it targets
+whatever sits behind it and an _ancestor's_ `@click` fires. The capture phase is what makes the whole
+subtree inert: a bubble-phase stop on the root arrives only after a nested `<a href>` or
+`<button @click>` has already run. And `preventDefault()` is the half no propagation stop can supply —
+it withholds the element's _own_ default action, which is what keeps a disabled `as="a"` from
+following its `href`. Never point `as` at an element the browser already activates (`a[href]`,
+`summary`) — the component would hand-roll a `role="button"` and a second key-to-click translation on
+top of the ones the element already has, and **development warns when you do**.
+
+**Keys inside an `as` fallback belong to the child that has focus.** Both key handlers check the
+event's origin and ignore anything that reached the root by bubbling, so a nested `<input>` keeps
+its spacebar and a nested `<button>` keeps its own Enter. Without that check every Space typed into
+an inline filter field is swallowed and converted into an activation of the row — the field cannot
+hold a space at all. The check is deliberately **not** applied to the click handler: a click targets
+the element under the pointer, so the ordinary `<Pressable as="div"><span>Label</span></Pressable>`
+shape legitimately reports a child as the target, and the same guard there would stop the row
+responding to the mouse. Keys follow focus; clicks follow the pointer. A **disabled** control is deaf to keys in the full
+sense — both handlers stop the event rather than returning, so a consumer's fall-through
+`@keydown`/`@keyup` does not run on it either; a disabled fallback keeps `tabindex="-1"`, which is out
+of the tab order but still mouse-focusable. One consequence to plan for:
+the child's own click still **bubbles**, so a row with its own `@click` counts an activation when a
+nested button is pressed, by keyboard or mouse alike — put `@click.stop` on the child where that is
+not what you want.
+
+**`Disclosure`** shows and hides a region from a real button carrying `aria-expanded` and
+`aria-controls`, paired to the panel by the stable `${id}-panel` derived id. Pass `headingLevel` and
+the trigger is wrapped in a real `<h2>`…`<h6>`: **the heading contains the button, it never behaves as
+one** — a heading with a click handler on it is the exact defect this replaces. Omit `headingLevel`
+where the disclosure is not a section heading and the wrapper stays a plain div, leaving the document
+outline untouched.
+
+```vue
+<Disclosure id="details" label="Details" :heading-level="2">
+    <p>Anything at all.</p>
+    <template #trigger>Rich <strong>trigger</strong> content</template>
+</Disclosure>
+```
+
+Expansion is UI state, not form data, so — unlike the value-carrying components, whose model is
+required — `Disclosure` works **uncontrolled** out of the box; bind `v-model:expanded` only when the
+parent needs to drive or observe it. The panel is always mounted and hidden with `v-show`, never
+`v-if`: `aria-controls` is an IDREF, and one pointing at nothing names no relationship for assistive
+tech to expose — the reference has to resolve in both states. Wrap genuinely expensive panel content
+in your own `v-if` inside the slot.
+
+Both theme through `--ui-pressable-*` (gap, padding, min-height, background, text, font-size,
+line-height, border width/colour, radius, disabled text, and the `[aria-pressed="true"]` pair) and
+`--ui-disclosure-panel-pad` / `--ui-disclosure-panel-gap`. Every default is either neutral or derived
+from an existing resting token, with one deliberate exception: `--ui-pressable-bg-pressed` defaults to
+`--ui-option-bg-active` rather than to a no-op, because a toggle whose state reaches only a screen
+reader is invisible to everyone else.
+
 ## Theming
 
 Every visual rule keys on a `--ui-*` custom property — colours **and** structure (`--ui-control-border-width`, `--ui-control-radius`, `--ui-control-shadow`, `--ui-label-transform`, …). Remap them under any selector to theme the whole set; the shipped defaults render out of the box. Dark/light is orthogonal — pair with `@script-development/fs-theme`'s `data-theme` switching.
@@ -255,6 +371,23 @@ The control has a background/text/border hook for each interactive state, so a s
 The `.is-open` and `.is-invalid` state classes follow `:focus-visible` in source order, so they keep winning their border/background where they did before — the focus hooks only take effect on a plain focused control.
 
 The listbox options carry the same discipline: `--ui-option-text-muted` (fires on `.is-muted`, defaults to the resting option text) and the MultiSelect membership pair `--ui-option-bg-selected` / `--ui-option-text-selected` (fire on `[aria-selected="true"]` in the MultiSelect popup, default `transparent` / resting text — the pointer highlight keeps winning its background). All no-ops until you opt in.
+
+### Two media queries the tokens do not reach
+
+The stylesheet ends with two gated blocks that deliberately step **outside** the `--ui-*` contract,
+because the user's own preferences outrank the theme.
+
+`@media (forced-colors: active)` — a high-contrast theme makes the user agent ignore author colours
+outright, so anything conveyed by colour alone disappears. Three states would: keyboard focus
+(painted through `box-shadow`, which forced-colors strips), the `aria-pressed` toggle state, and the
+`as` fallback's disabled state. The block restores each with a **system colour** — `Highlight` for
+the focus outline, `Highlight` / `HighlightText` for the pressed surface, `GrayText` for both
+disabled paths — rather than opting out with `forced-color-adjust`, since speaking the user's
+palette is the point of the mode. Your `--ui-pressable-bg-pressed` / `--ui-pressable-text-disabled`
+overrides do not apply there, and that is correct.
+
+`@media (prefers-reduced-motion: reduce)` zeroes every transition the sheet declares, scoped to the
+`ui-*` surfaces that carry one so your own transitions stay untouched.
 
 ### Typography escape hatch
 

@@ -14,4 +14,10 @@ export {default as Combobox} from './components/Combobox.vue';
 export {default as MultiSelect} from './components/MultiSelect.vue';
 export {default as MultiCombobox} from './components/MultiCombobox.vue';
 
+// Interactive controls that are NOT form inputs: they carry no value and belong to no field.
+// Both exist to make a keyboard-reachable control the path of least resistance — the class of
+// defect a bare `<div @click>` ships (WCAG 2.1.1 / 4.1.2, Level A).
+export {default as Pressable} from './components/Pressable.vue';
+export {default as Disclosure} from './components/Disclosure.vue';
+
 export type {SelectItem, LabelKey} from './types';

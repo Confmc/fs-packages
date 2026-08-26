@@ -17,9 +17,11 @@ import {defineComponent, h, ref} from 'vue';
 import Checkbox from '../../src/components/Checkbox.vue';
 import CheckboxGroup from '../../src/components/CheckboxGroup.vue';
 import Combobox from '../../src/components/Combobox.vue';
+import Disclosure from '../../src/components/Disclosure.vue';
 import FormField from '../../src/components/FormField.vue';
 import MultiCombobox from '../../src/components/MultiCombobox.vue';
 import MultiSelect from '../../src/components/MultiSelect.vue';
+import Pressable from '../../src/components/Pressable.vue';
 import RadioGroup from '../../src/components/RadioGroup.vue';
 import SingleSelect from '../../src/components/SingleSelect.vue';
 import Switch from '../../src/components/Switch.vue';
@@ -325,5 +327,109 @@ describe('axe-core audits — checkbox family, zero violations', () => {
         await userEvent.click(document.getElementById('fruit-choice-opt-1') as HTMLElement);
         expect(choice.value).toBe(2);
         await expectNoViolations(screen.container);
+    });
+});
+
+describe('axe-core audits — interactive non-form controls, zero violations', () => {
+    it('Pressable — the native button, plain and in toggle mode', async () => {
+        const pressed = ref(false);
+        const screen = render(
+            defineComponent(
+                () => () =>
+                    h('div', [
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFC in a render-fn host
+                        h(Pressable as any, {label: 'Show example'}),
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFC in a render-fn host
+                        h(Pressable as any, {
+                            label: 'Bold',
+                            pressed: pressed.value,
+                            'onUpdate:pressed': (value: boolean) => {
+                                pressed.value = value;
+                            },
+                        }),
+                    ]),
+            ),
+        );
+        await expectNoViolations(screen.container);
+
+        await userEvent.click(screen.container.querySelectorAll('button')[1] as HTMLElement);
+        expect(pressed.value).toBe(true);
+        await expectNoViolations(screen.container);
+    });
+
+    // HAND-WRITTEN semantic assertions — axe has no rule for "this control could have been a real
+    // button and is not", which is precisely the WCAG 2.1.1 / 4.1.2 defect class this component
+    // exists to close. A green axe run above must never be read as covering it.
+    it('Pressable renders a REAL button by default — the fallback is opt-in and complete', async () => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFC in a render-fn host
+        const screen = render(defineComponent(() => () => h(Pressable as any, {label: 'Show example'})));
+        const control = screen.container.firstElementChild as HTMLElement;
+
+        expect(control.tagName).toBe('BUTTON');
+        expect(control.getAttribute('type')).toBe('button');
+        // Focusable with no author tabindex, because the platform supplies it.
+        expect(control.hasAttribute('tabindex')).toBe(false);
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFC in a render-fn host
+        const fallback = render(defineComponent(() => () => h(Pressable as any, {as: 'div', label: 'Row'})));
+        const div = fallback.container.firstElementChild as HTMLElement;
+        expect(div.tagName).toBe('DIV');
+        expect(div.getAttribute('role')).toBe('button');
+        expect(div.getAttribute('tabindex')).toBe('0');
+        await expectNoViolations(fallback.container);
+    });
+
+    it('Disclosure — heading-wrapped trigger, collapsed and expanded', async () => {
+        const expanded = ref(false);
+        const screen = render(
+            defineComponent(
+                () => () =>
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFC in a render-fn host
+                    h(
+                        Disclosure as any,
+                        {
+                            id: 'details',
+                            label: 'Details',
+                            headingLevel: 2,
+                            expanded: expanded.value,
+                            'onUpdate:expanded': (value: boolean) => {
+                                expanded.value = value;
+                            },
+                        },
+                        {default: () => h('p', 'Panel body')},
+                    ),
+            ),
+        );
+        // Collapsed: aria-controls already points at a MOUNTED panel, so the IDREF resolves. axe
+        // does NOT check that (measured: a dangling aria-controls raises neither a violation nor an
+        // incomplete), which is why the hand-written assertion in the next test exists.
+        await expectNoViolations(screen.container);
+
+        await userEvent.click(document.getElementById('details') as HTMLElement);
+        expect(expanded.value).toBe(true);
+        await expectNoViolations(screen.container);
+    });
+
+    // The live shape this replaces is `<h2 @click="collapse?.toggle">`. axe cannot see that defect
+    // either (a heading with a click handler violates no ARIA rule), so pin the correct output.
+    it('the Disclosure heading CONTAINS the button and never behaves as one', () => {
+        const screen = render(
+            defineComponent(
+                () => () =>
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFC in a render-fn host
+                    h(Disclosure as any, {id: 'row', label: 'Overview', headingLevel: 2}),
+            ),
+        );
+
+        const heading = screen.container.querySelector('h2') as HTMLElement;
+        expect(heading.getAttribute('role')).toBeNull();
+        expect(heading.getAttribute('tabindex')).toBeNull();
+        expect(heading.firstElementChild?.tagName).toBe('BUTTON');
+
+        const trigger = heading.querySelector('button') as HTMLButtonElement;
+        expect(trigger.getAttribute('aria-expanded')).toBe('false');
+        // The IDREF resolves in the collapsed state, in a real document. This assertion — not the
+        // green axe run above — is what goes red if the panel ever becomes a v-if (teeth-proven).
+        expect(document.getElementById(trigger.getAttribute('aria-controls') as string)).not.toBeNull();
     });
 });
