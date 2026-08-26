@@ -519,6 +519,59 @@ const renderNestedFallback = (props: Record<string, unknown> = {}) => {
     return {ancestorClicks, controlClicks};
 };
 
+/**
+ * The platform consequence of the chassis `type`, and it is browser-only on purpose: implicit form
+ * submission is a real navigation the layout engine performs, not something a DOM shim can be
+ * trusted to model. A consumer's `type="submit"` used to beat the chassis `type="button"` outright
+ * — Vue merges fallthrough attrs onto the root AFTER the template bindings and the fallthrough wins
+ * — so a `<Pressable>` inside a form submitted it, which is the one thing the component's own
+ * docblock promises it never does.
+ */
+describe('Pressable — a consumer `type` cannot make it submit a surrounding form', () => {
+    const renderInForm = (children: (submits: {value: number}) => unknown[]) => {
+        const submits = ref(0);
+        render(
+            defineComponent(
+                () => () =>
+                    h(
+                        'form',
+                        {
+                            onSubmit: (event: Event) => {
+                                event.preventDefault(); // a real submit would navigate the runner away
+                                submits.value += 1;
+                            },
+                        },
+                        children(submits),
+                    ),
+            ),
+        );
+        return submits;
+    };
+
+    it('stays inert as a submitter even when handed type="submit"', async () => {
+        const submits = renderInForm(() => [
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFC in a render-fn host
+            h(Pressable as any, {label: 'Go', type: 'submit'}),
+        ]);
+
+        await userEvent.click(control());
+
+        expect(control().getAttribute('type')).toBe('button');
+        expect(submits.value).toBe(0);
+    });
+
+    it('POSITIVE CONTROL — a plain <button> in the same fixture DOES submit it', async () => {
+        // Both halves of the control. It proves the fixture can submit at all (so the zero above
+        // means "withheld", not "no form here"), and it is the platform fact that makes the chassis
+        // `type` load-bearing: a button in a form with no type of its own IS a submit button.
+        const submits = renderInForm(() => [h('button', {id: 'native-submit'}, 'Go')]);
+
+        await userEvent.click(document.getElementById('native-submit') as HTMLElement);
+
+        expect(submits.value).toBe(1);
+    });
+});
+
 /** What a pointer at the element's own centre would actually target. */
 const hitAtCentre = (element: Element): Element | null => {
     const rect = element.getBoundingClientRect();

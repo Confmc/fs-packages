@@ -75,6 +75,62 @@ describe('Pressable', () => {
         expect(wrapper.attributes('id')).toBe('ex');
     });
 
+    /**
+     * …but an attr the CHASSIS owns must not win that contest. `inheritAttrs` is off and the
+     * template spreads `{...$attrs, ...chassis}` precisely so a consumer cannot dress a Pressable
+     * as something it promises never to be. Left to Vue's own fallthrough this rendered
+     * `type="submit"` and submitted the surrounding form.
+     */
+    it('will not let a consumer-supplied type beat the chassis type="button"', () => {
+        const wrapper = mount(Pressable, {props: {label: 'Go'}, attrs: {type: 'submit'}});
+
+        expect(wrapper.attributes('type')).toBe('button');
+    });
+
+    it('POSITIVE CONTROL — a Pressable with NO type supplied renders type="button" too', () => {
+        // Without this the assertion above passes just as well on a component that drops the attr
+        // on the floor, or on one that never receives it.
+        const wrapper = mount(Pressable, {props: {label: 'Go'}});
+
+        expect(wrapper.attributes('type')).toBe('button');
+    });
+
+    it('holds the fallback chassis against consumer attrs too — role and tabindex', () => {
+        // The same contest one path over, and it is the whole hand-rolled contract rather than one
+        // attribute: a consumer `role` unmakes the control's identity, and a positive `tabindex` on
+        // a DISABLED fallback puts an inert control back in the tab order.
+        // (`disabled` needs no such pin — it is a declared PROP, so it is consumed before `$attrs`
+        // exists and was never fallthrough-reachable. `type` is the risk precisely because it is not.)
+        const wrapper = mount(Pressable, {props: {as: 'div', label: 'Row'}, attrs: {role: 'link', tabindex: '5'}});
+
+        expect(wrapper.attributes('role')).toBe('button');
+        expect(wrapper.attributes('tabindex')).toBe('0');
+    });
+
+    it('leaves the as= fallback chassis untouched — role/tabindex/aria-disabled, and no type', () => {
+        const wrapper = mount(Pressable, {props: {as: 'div', label: 'Row', disabled: true}});
+
+        expect(wrapper.element.tagName).toBe('DIV');
+        expect(wrapper.attributes('role')).toBe('button');
+        expect(wrapper.attributes('tabindex')).toBe('-1');
+        expect(wrapper.attributes('aria-disabled')).toBe('true');
+        // The fallback path's chassis carries no `type`, and turning inheritAttrs off must not have
+        // started inventing one.
+        expect(wrapper.attributes('type')).toBeUndefined();
+    });
+
+    it("still merges a consumer class with the component's own — class is NOT overridden", () => {
+        // `class`/`style` are the two keys `mergeProps` concatenates rather than replaces. Routing
+        // attrs by hand keeps that, but it is now OUR merge rather than Vue's fallthrough, so it
+        // needs its own pin: a consumer class silently replacing `ui-pressable` would unstyle every
+        // Pressable that takes one.
+        const wrapper = mount(Pressable, {props: {label: 'Go', as: 'div', disabled: true}, attrs: {class: 'mine'}});
+
+        expect(wrapper.classes()).toContain('mine');
+        expect(wrapper.classes()).toContain('ui-pressable');
+        expect(wrapper.classes()).toContain('is-disabled');
+    });
+
     it('hand-rolls NO key handling on the native path — the browser already translates Enter/Space', () => {
         const onClick = vi.fn();
         const wrapper = mount(Pressable, {props: {label: 'Go'}, attrs: {onClick}});

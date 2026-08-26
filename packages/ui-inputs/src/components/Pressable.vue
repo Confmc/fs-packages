@@ -2,13 +2,13 @@
     <component
         :is="as"
         ref="control"
-        v-bind="chassis"
         class="ui-pressable"
         :class="{'is-disabled': !native && disabled, 'keeps-tag-display': keepsTagDisplay}"
         :aria-pressed="pressed"
         @click="onClick"
         @keydown="onKeydown"
         @keyup="onKeyup"
+        v-bind="{...$attrs, ...chassis}"
     >
         <slot>{{ label }}</slot>
     </component>
@@ -21,9 +21,25 @@ import {warnWhenUnnamed} from '../internal/accessible-name';
 import {devWarningsSuppressed} from '../internal/dev-warning';
 import {ensureRefValueExists} from '../internal/reactivity';
 
-// The root IS the interactive element here (unlike Checkbox/Switch, whose root is the <label>),
-// so attrs must NOT be re-aimed: `aria-label`, `title`, `data-*`, a consumer's own `@click` —
-// all fall through to the control that actually receives them. inheritAttrs stays on.
+/**
+ * The root IS the interactive element here (unlike Checkbox/Switch, whose root is the <label>), so
+ * attrs must NOT be re-aimed: `aria-label`, `title`, `data-*`, a consumer's own `@click` — all
+ * reach the control that actually receives them. They are routed by HAND rather than by
+ * `inheritAttrs`, because Vue merges fallthrough attrs onto the root AFTER the template bindings
+ * and, for every attribute except `class`/`style`, the fallthrough WINS. That let a consumer's
+ * `type="submit"` beat the chassis `type="button"` and submit the surrounding form — the one thing
+ * the `as` docblock below promises a Pressable never does.
+ *
+ * Two halves, and BOTH are load-bearing:
+ *
+ * - `{...$attrs, ...chassis}` resolves `chassis` last, so the chassis wins the attribute contest.
+ * - The `v-bind` stays the LAST binding in the template. `mergeProps` concatenates handlers in
+ *   SOURCE order, so a spread placed above `@keydown`/`@keyup` would merge the consumer's listener
+ *   FIRST and run it before this component's disabled `stopImmediatePropagation()` — silently
+ *   undoing the disabled-key inertness the specs below pin. (The click guard is a native
+ *   capture-phase listener and is not exposed to template order; the key handlers are.)
+ */
+defineOptions({inheritAttrs: false});
 
 const {
     as = 'button',
