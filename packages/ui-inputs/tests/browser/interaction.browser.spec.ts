@@ -1016,6 +1016,32 @@ describe('Pressable — a disabled control against real platform behaviour', () 
         expect(clicks.value).toBe(1);
     });
 
+    it('lets a real Escape reach an ANCESTOR while disabled — inert is not deaf for everyone', async () => {
+        // Only a real browser closes this chain: the disabled fallback keeps `tabindex="-1"` and
+        // the stylesheet keeps it hit-testable, so a real pointer FOCUSES it (happy-dom cannot
+        // prove that), and the key then originates on the control itself — no interactive
+        // descendant involved. Stopping propagation to silence the consumer's own handler used to
+        // kill this climb too, so a dialog listening for Escape above a disabled row never closed.
+        const ancestor: KeyboardEvent[] = [];
+        const record = (event: Event) => ancestor.push(event as KeyboardEvent);
+        document.addEventListener('keydown', record);
+
+        try {
+            const {clicks} = renderPressable({as: 'div', disabled: true});
+            const element = control();
+
+            await userEvent.click(element, {force: true});
+            expect(document.activeElement).toBe(element); // mouse-focusable at tabindex="-1"
+
+            await userEvent.keyboard('{Escape}');
+
+            expect(ancestor.map((event) => event.key)).toContain('Escape');
+            expect(clicks.value).toBe(0); // …and the control itself stayed inert
+        } finally {
+            document.removeEventListener('keydown', record);
+        }
+    });
+
     const renderWithInteractiveChild = (disabled: boolean) => {
         const childClicks = ref(0);
         render(

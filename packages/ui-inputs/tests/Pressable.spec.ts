@@ -545,6 +545,11 @@ describe('Pressable — structural display tags keep their own display', () => {
  * disabled fallback keeps `tabindex="-1"`, which is still MOUSE-focusable, and the stylesheet
  * deliberately keeps the control in hit-testing. The real-pointer-then-real-keys walk is pinned in
  * the browser suite; this asserts the component's own half.
+ *
+ * The inertness is scoped to the CONSUMER's handler and must not extend to the event's climb — the
+ * distinction the `stopImmediatePropagation()` version could not express. Propagation is a platform
+ * behaviour, so the ancestor arm below is duplicated in the BROWSER suite: a control that passes it
+ * only under happy-dom has been measured against an emulation of the thing it is asserting.
  */
 describe('Pressable — a disabled control is deaf to keys, not merely un-activating', () => {
     const mountWithKeyHandlers = (props: Record<string, unknown>) => {
@@ -578,6 +583,60 @@ describe('Pressable — a disabled control is deaf to keys, not merely un-activa
 
         expect(onKeydown).toHaveBeenCalledTimes(1);
         expect(onKeyup).toHaveBeenCalledTimes(1);
+    });
+
+    it.each(['div', undefined])('lets an ANCESTOR keep receiving keys past a disabled as=%s', (as) => {
+        // The regression this pins: a disabled Pressable is mouse-focusable and stays in
+        // hit-testing, so a key pressed ON it used to be stopImmediatePropagation()'d and never
+        // reached the dialog/table listening above — an Escape that no longer closed the dialog.
+        // No interactive descendant is needed; the root's own key is enough.
+        const host = document.createElement('div');
+        const ancestor = vi.fn();
+        host.addEventListener('keydown', ancestor);
+        document.body.append(host);
+
+        const onKeydown = vi.fn();
+        const wrapper = mount(Pressable, {
+            props: {label: 'Row', as, disabled: true},
+            attrs: {onKeydown},
+            attachTo: host,
+        });
+
+        key(wrapper.element, 'keydown', 'Escape');
+
+        expect(ancestor).toHaveBeenCalledTimes(1); // the climb is untouched…
+        expect(onKeydown).not.toHaveBeenCalled(); // …while the consumer stays deaf
+
+        wrapper.unmount();
+        host.remove();
+    });
+
+    it.each(['div', undefined])('runs the consumer handler for a DESCENDANT key on an enabled as=%s', (as) => {
+        // The component bails out of its own translation for a child's key, and that bail must not
+        // take the consumer's handler with it — the two exits were one merged listener before.
+        const onKeydown = vi.fn();
+        const wrapper = mount(Pressable, {
+            props: {label: 'Row', as},
+            attrs: {onKeydown},
+            slots: {default: '<input id="inner" />'},
+        });
+
+        key(wrapper.find('#inner').element, 'keydown', 'a');
+
+        expect(onKeydown).toHaveBeenCalledTimes(1);
+    });
+
+    it('honours stopImmediatePropagation between MERGED consumer handlers', () => {
+        // A wrapper component spreading its own $attrs into a Pressable arrives as an ARRAY, and
+        // Vue's invoker skips the rest once one stops. Hand-invoking has to reproduce that.
+        const second = vi.fn();
+        const first = vi.fn((event: KeyboardEvent) => event.stopImmediatePropagation());
+        const wrapper = mount(Pressable, {props: {as: 'div', label: 'Row'}, attrs: {onKeydown: [first, second]}});
+
+        key(wrapper.element, 'keydown', 'a');
+
+        expect(first).toHaveBeenCalledTimes(1);
+        expect(second).not.toHaveBeenCalled();
     });
 
     it('still clears the Space latch on a disabled keyup — the stop comes AFTER the disarm', async () => {

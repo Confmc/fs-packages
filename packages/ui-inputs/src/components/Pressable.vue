@@ -8,14 +8,14 @@
         @click="onClick"
         @keydown="onKeydown"
         @keyup="onKeyup"
-        v-bind="{...$attrs, ...chassis}"
+        v-bind="{...forwardedAttrs, ...chassis}"
     >
         <slot>{{ label }}</slot>
     </component>
 </template>
 
 <script setup lang="ts">
-import {computed, getCurrentInstance, onMounted, ref, useTemplateRef, watch} from 'vue';
+import {computed, getCurrentInstance, onMounted, ref, useAttrs, useTemplateRef, watch} from 'vue';
 
 import {warnWhenUnnamed} from '../internal/accessible-name';
 import {devWarningsSuppressed} from '../internal/dev-warning';
@@ -34,10 +34,10 @@ import {ensureRefValueExists} from '../internal/reactivity';
  *
  * - `{...$attrs, ...chassis}` resolves `chassis` last, so the chassis wins the attribute contest.
  * - The `v-bind` stays the LAST binding in the template. `mergeProps` concatenates handlers in
- *   SOURCE order, so a spread placed above `@keydown`/`@keyup` would merge the consumer's listener
- *   FIRST and run it before this component's disabled `stopImmediatePropagation()` — silently
- *   undoing the disabled-key inertness the specs below pin. (The click guard is a native
- *   capture-phase listener and is not exposed to template order; the key handlers are.)
+ *   SOURCE order, so a spread placed above `@click` would merge the consumer's listener FIRST and
+ *   run it ahead of this component's own. The disabled-KEY guard no longer rides this ordering:
+ *   `forwardedAttrs` withholds `onKeydown`/`onKeyup` from the spread entirely and this component
+ *   invokes them by hand — see `runConsumerKeyHandler`.
  */
 defineOptions({inheritAttrs: false});
 
@@ -264,25 +264,68 @@ const onClick = (): void => {
     if (pressed.value !== undefined) pressed.value = !pressed.value;
 };
 
-const onKeydown = (event: KeyboardEvent): void => {
-    // The disabled stop runs BEFORE the origin check, and that order is the guard: stopping only
-    // root-origin keys left a key arriving from a focusable DESCENDANT to bare-return here, so the
-    // consumer's fall-through `@keydown` still ran on a control that is supposed to be inert.
-    // Stopping — not returning — is what closes it, and it covers every key, because the leak is
-    // the consumer's handler and that does not care which key produced it. Reachable, not
-    // theoretical: the disabled fallback keeps `tabindex="-1"`, which is out of the tab order but
-    // still MOUSE-focusable, and the control deliberately stays in hit-testing.
-    //
-    // A focusable child keeps its OWN keys either way — its listeners have already run by the time
-    // a bubbling event reaches this root, and the stop does not `preventDefault()`, so a nested
-    // `<input>` still receives its character.
-    if (disabled) {
-        event.stopImmediatePropagation();
+/**
+ * The consumer's own `@keydown`/`@keyup` are withheld from the fallthrough spread and invoked by
+ * hand at the end of this component's handlers. That indirection IS the disabled-key guard, and it
+ * exists because the DOM has no primitive that silences a sibling listener on one node without also
+ * halting the event's climb. `stopImmediatePropagation()` bought fall-through inertness at the
+ * price of every ANCESTOR: a disabled fallback is mouse-focusable at `tabindex="-1"` and stays in
+ * hit-testing deliberately, so an Escape pressed on one died at the control instead of reaching the
+ * dialog around it. Declining to call a handler this component holds itself costs ancestors
+ * nothing. (PR #211, thread r3861464309.)
+ *
+ * Only the BUBBLE-phase pair is intercepted. `onKeydownCapture`/`onKeydownOnce` and friends stay in
+ * the spread and still fire while disabled — a capture listener runs before this component sees the
+ * event at all, so covering them would need the very propagation stop this removes.
+ */
+const attrs = useAttrs();
+
+const forwardedAttrs = computed(() => {
+    const {onKeydown: _withheldKeydown, onKeyup: _withheldKeyup, ...rest} = attrs;
+
+    return rest;
+});
+
+/**
+ * Replays what Vue's own invoker does for a MERGED handler array, using only public DOM API: a
+ * nested fallthrough (a wrapper component spreading its `$attrs` into a Pressable) arrives here as
+ * an array, and Vue's array path skips the remainder once an earlier handler calls
+ * `stopImmediatePropagation()`. Hand-invoking without this would start running handlers the
+ * consumer had already stopped.
+ */
+const runConsumerKeyHandler = (name: 'onKeydown' | 'onKeyup', event: KeyboardEvent): void => {
+    type KeyHandler = (event: KeyboardEvent) => void;
+    const bound = attrs[name] as KeyHandler | KeyHandler[] | undefined;
+    if (!bound) return;
+
+    if (!Array.isArray(bound)) {
+        bound(event);
         return;
     }
+
+    let stopped = false;
+    const propagate = event.stopImmediatePropagation;
+    event.stopImmediatePropagation = function patched(): void {
+        stopped = true;
+        propagate.call(event);
+    };
+
+    try {
+        for (const handler of bound) {
+            if (stopped) break;
+            handler(event);
+        }
+    } finally {
+        Reflect.deleteProperty(event, 'stopImmediatePropagation');
+    }
+};
+
+/** The component's own key-to-click translation, with no consumer or disabled leg of its own. */
+const translateKeydown = (event: KeyboardEvent): void => {
     if (isChildsOwnKey(event)) return;
     // A native button already translates Enter/Space itself; repeating it fires every handler twice.
     if (native.value) return;
+
     if (event.key === 'Enter') {
         event.preventDefault();
         // Dispatch a REAL click rather than calling the handler: that is what the browser does for
@@ -294,6 +337,16 @@ const onKeydown = (event: KeyboardEvent): void => {
     }
 };
 
+const onKeydown = (event: KeyboardEvent): void => {
+    // Deaf while disabled, and that covers EVERY key rather than the two translated ones: the leak
+    // is the consumer's handler, which does not care which key produced it. Reachable, not
+    // theoretical — see the mouse-focusable note above. Propagation is untouched by design.
+    if (disabled) return;
+
+    translateKeydown(event);
+    runConsumerKeyHandler('onKeydown', event);
+};
+
 const onKeyup = (event: KeyboardEvent): void => {
     const isSpace = event.key === ' ';
     // Disarm on EVERY Space keyup, before anything can bail out: a press interrupted by the
@@ -302,19 +355,14 @@ const onKeyup = (event: KeyboardEvent): void => {
     const armed = isSpace && spaceArmed.value;
     if (isSpace) spaceArmed.value = false;
 
-    // Both guards sit AFTER the disarm, deliberately — the latch must be cleared even on the keyup
-    // the control is about to go inert for. Then the disabled stop, ahead of the origin check, for
-    // the reason `onKeydown` states: a descendant-origin keyup leaks to the consumer's handler
-    // otherwise.
-    if (disabled) {
-        event.stopImmediatePropagation();
-        return;
-    }
-    // A keyup from a child still clears a latch the root armed (focus moved into a nested control
-    // mid-press), which is the conservative end of the same stale-latch failure above.
-    if (isChildsOwnKey(event)) return;
-    if (native.value || !armed) return;
+    // The disabled leg sits AFTER the disarm, deliberately: the latch must be cleared even on the
+    // keyup the control is about to go inert for.
+    if (disabled) return;
 
-    (event.currentTarget as HTMLElement).click();
+    if (!isChildsOwnKey(event) && !native.value && armed) {
+        (event.currentTarget as HTMLElement).click();
+    }
+
+    runConsumerKeyHandler('onKeyup', event);
 };
 </script>
