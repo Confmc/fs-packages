@@ -6,18 +6,24 @@
              wrapper becomes a real <h2>…<h6> whose only child is the trigger, so the section
              keeps its place in the document outline AND the control is a real button. -->
         <component :is="headingTag" class="ui-disclosure__header">
-            <!-- `@click` sits ABOVE `v-bind="$attrs"` on purpose, and moving it back is a
+            <!-- `@click` sits ABOVE the `$attrs` spread on purpose, and moving it back is a
                  regression. `mergeProps` preserves source order, so a consumer's fall-through
                  `onClick` arriving through `$attrs` would otherwise be merged AHEAD of ours and
                  run before `toggle` could stop it — leaving a disabled trigger that still runs
                  the consumer's handler. Measured in real Chromium; spec-pinned in the browser
-                 suite, because happy-dom reports the defect as absent. -->
+                 suite, because happy-dom reports the defect as absent.
+
+                 `type` rides INSIDE the spread rather than sitting above it as a static attribute,
+                 and that is the same source-order rule pointing the other way: an attribute placed
+                 before the spread LOSES to it, so a consumer's `type="submit"` beat the static
+                 `type="button"` and made this trigger submit its surrounding form on toggle
+                 (measured in Chromium: the form submitted AND the panel expanded). The bindings
+                 below the spread — `class`, `:disabled`, `:aria-*` — already win by position. -->
             <button
                 :id="id"
                 ref="trigger"
-                type="button"
                 @click="toggle"
-                v-bind="$attrs"
+                v-bind="{...$attrs, type: 'button'}"
                 class="ui-pressable ui-disclosure__trigger"
                 :disabled="disabled"
                 :aria-expanded="expanded"

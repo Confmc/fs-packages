@@ -572,6 +572,59 @@ describe('Pressable — a consumer `type` cannot make it submit a surrounding fo
     });
 });
 
+/**
+ * The same contest on `Disclosure`'s trigger, and the same browser-only reason: implicit form
+ * submission is a real navigation, not something a DOM shim can be trusted to model. The trigger's
+ * `type="button"` used to sit ABOVE the `$attrs` spread, where an attribute loses to it — so a
+ * consumer's `type="submit"` made a `<Disclosure>` inside a form submit it, while also expanding
+ * (measured pre-fix in this browser: `TYPE=submit SUBMITS=1 EXPANDED=true`).
+ */
+describe('Disclosure — a consumer `type` cannot make its trigger submit a surrounding form', () => {
+    const renderInForm = (children: () => unknown[]) => {
+        const submits = ref(0);
+        render(
+            defineComponent(
+                () => () =>
+                    h(
+                        'form',
+                        {
+                            onSubmit: (event: Event) => {
+                                event.preventDefault(); // a real submit would navigate the runner away
+                                submits.value += 1;
+                            },
+                        },
+                        children(),
+                    ),
+            ),
+        );
+        return submits;
+    };
+
+    it('toggles WITHOUT submitting, even when handed type="submit"', async () => {
+        const submits = renderInForm(() => [
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFC in a render-fn host
+            h(Disclosure as any, {id: 'submitting', label: 'Details', type: 'submit'}),
+        ]);
+        const trigger = document.querySelector('.ui-disclosure__trigger') as HTMLElement;
+
+        await userEvent.click(trigger);
+
+        expect(trigger.getAttribute('type')).toBe('button');
+        expect(submits.value).toBe(0);
+        // …and it still does its own job. A trigger that submitted nothing because it had stopped
+        // working would satisfy the line above just as well.
+        expect(trigger.getAttribute('aria-expanded')).toBe('true');
+    });
+
+    it('POSITIVE CONTROL — a plain <button> in the same fixture DOES submit it', async () => {
+        const submits = renderInForm(() => [h('button', {id: 'disclosure-native-submit'}, 'Go')]);
+
+        await userEvent.click(document.getElementById('disclosure-native-submit') as HTMLElement);
+
+        expect(submits.value).toBe(1);
+    });
+});
+
 /** What a pointer at the element's own centre would actually target. */
 const hitAtCentre = (element: Element): Element | null => {
     const rect = element.getBoundingClientRect();

@@ -119,4 +119,40 @@ describe('Disclosure', () => {
         expect(wrapper.find('button').attributes('title')).toBe('More');
         expect(wrapper.element.getAttribute('data-test')).toBeNull();
     });
+
+    /**
+     * …but not the trigger's own `type`. It used to sit above the `$attrs` spread as a static
+     * attribute, and an attribute placed before a spread LOSES to it — so a consumer's
+     * `type="submit"` turned the trigger into a submit button and a `<Disclosure>` inside a form
+     * submitted it on toggle. The real-form half is pinned in the browser suite.
+     */
+    it('will not let a consumer-supplied type turn the trigger into a submitter', () => {
+        const wrapper = mount(Disclosure, {props: base, attrs: {type: 'submit'}});
+
+        expect(wrapper.find('button').attributes('type')).toBe('button');
+    });
+
+    it('POSITIVE CONTROL — a Disclosure with NO type supplied renders type="button" too', () => {
+        // Without this the assertion above passes just as well on a trigger that drops the attr on
+        // the floor, or on one that never receives it.
+        const wrapper = mount(Disclosure, {props: base});
+
+        expect(wrapper.find('button').attributes('type')).toBe('button');
+    });
+
+    it('leaves the bindings BELOW the spread winning, as they already did', () => {
+        // They are safe by position, not by the fix — and that is worth pinning, because the fix
+        // moved a line in this template and the next edit might move another. A consumer cannot
+        // forge the expanded state, unmake the component class, or re-enable a disabled trigger.
+        const wrapper = mount(Disclosure, {
+            props: {...base, disabled: true},
+            attrs: {class: 'mine', 'aria-expanded': 'true'},
+        });
+        const trigger = wrapper.find('button');
+
+        expect(trigger.attributes('aria-expanded')).toBe('false');
+        expect(trigger.attributes('disabled')).toBeDefined();
+        expect(trigger.classes()).toContain('mine'); // class MERGES rather than replaces
+        expect(trigger.classes()).toContain('ui-disclosure__trigger');
+    });
 });
