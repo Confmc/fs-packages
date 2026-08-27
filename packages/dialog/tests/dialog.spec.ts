@@ -359,6 +359,36 @@ describe('dialog service', () => {
             // Assert
             expect(wrapper.findAll('dialog')).toHaveLength(1);
         });
+
+        it('should not close on backdrop click when closeOnBackdropClick is false', async () => {
+            // Arrange
+            const service = createDialogService();
+            const wrapper = mount(service.DialogContainerComponent);
+            service.open(TestDialogContent, {title: 'Test'}, {closeOnBackdropClick: false});
+            await nextTick();
+
+            // Act
+            await wrapper.find('dialog').trigger('click');
+            await nextTick();
+
+            // Assert
+            expect(wrapper.findAll('dialog')).toHaveLength(1);
+        });
+
+        it('should close on backdrop click when closeOnBackdropClick is true', async () => {
+            // Arrange
+            const service = createDialogService();
+            const wrapper = mount(service.DialogContainerComponent);
+            service.open(TestDialogContent, {title: 'Test'}, {closeOnBackdropClick: true});
+            await nextTick();
+
+            // Act
+            await wrapper.find('dialog').trigger('click');
+            await nextTick();
+
+            // Assert
+            expect(wrapper.findAll('dialog')).toHaveLength(0);
+        });
     });
 
     describe('v-model support', () => {
