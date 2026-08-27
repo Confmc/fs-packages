@@ -22,7 +22,7 @@
  * its tree. The step splitter below is indentation-based, which is sufficient for a
  * file this small and fails loudly (not silently) if the shape ever changes.
  */
-import {readFileSync} from 'node:fs';
+import {existsSync, readFileSync} from 'node:fs';
 
 const WORKFLOW = '.github/workflows/publish.yml';
 
@@ -77,6 +77,38 @@ function stepBlocks() {
 }
 
 const steps = stepBlocks();
+
+/**
+ * One job's own lines, and nothing else.
+ *
+ * The reason this exists rather than another whole-file regex: an unanchored
+ * `source.match` answers "does this string appear ANYWHERE", which is a different
+ * question from "does the publish job carry it". A condition moved onto a sibling job,
+ * or left behind in a comment, satisfies the first and fails the second — and the
+ * failure is silent in the expensive direction, because the gate keeps reporting PASS
+ * while `publish` runs unconditioned. (crit, PR #221.)
+ */
+function jobBlock(name) {
+    const start = lines.findIndex((line) => new RegExp(`^(\\s+)${name}:\\s*$`).test(line));
+    if (start === -1) return null;
+    const indent = /^(\s*)/.exec(lines[start])[1].length;
+    let end = start + 1;
+    let keyIndent = null;
+    while (end < lines.length) {
+        const match = /^(\s*)\S/.exec(lines[end]);
+        if (match && match[1].length <= indent) break;
+        // The job's OWN keys, at the first indentation level inside it. Anything deeper
+        // belongs to a step, and a step's `if:` must never be mistaken for the job's —
+        // that mistake produces a red whose message points at the wrong line, which is
+        // worse than a miss: it sends the reader to a file that is not the problem.
+        if (match && (keyIndent === null || match[1].length < keyIndent)) keyIndent = match[1].length;
+        end += 1;
+    }
+    return {startLine: start + 1, keyIndent: keyIndent ?? indent + 4, text: lines.slice(start, end).join('\n')};
+}
+
+/** One of a job's own top-level keys, ignoring identically-named keys inside its steps. */
+const jobKey = (job, key) => new RegExp(`^ {${job.keyIndent}}${key}:\\s*(.+)$`, 'm').exec(job.text);
 
 // 1. Retention must outlive a plausible approval wait.
 const retentions = [...source.matchAll(/^\s*retention-days:\s*(\d+)/gm)];
@@ -152,22 +184,80 @@ if (!detectStep) {
     );
 }
 
-const publishNeeds = /^\s*publish:\s*$\n(?:\s+.*\n)*?\s*needs:\s*(.+)$/m.exec(source);
-if (!publishNeeds) {
-    failures.push(
-        `could not find the 'publish' job's 'needs:' in ${WORKFLOW}; this gate's assumptions no longer hold.`,
-    );
-} else if (!/detect/.test(publishNeeds[1])) {
-    failures.push(
-        `the 'publish' job does not list 'detect' in its needs (found: ${publishNeeds[1].trim()}). The release-signal ` +
-            `check cannot gate a job that does not depend on it.`,
-    );
+const publishJob = jobBlock('publish');
+if (!publishJob) {
+    failures.push(`could not find the 'publish' job in ${WORKFLOW}; this gate's assumptions no longer hold.`);
+} else {
+    const needs = jobKey(publishJob, 'needs');
+    if (!needs) {
+        failures.push(
+            `could not find the 'publish' job's 'needs:' in ${WORKFLOW}; this gate's assumptions no longer hold.`,
+        );
+    } else if (!/detect/.test(needs[1])) {
+        failures.push(
+            `the 'publish' job does not list 'detect' in its needs (found: ${needs[1].trim()}). The release-signal ` +
+                `check cannot gate a job that does not depend on it.`,
+        );
+    }
+
+    // Read from the publish job's OWN lines. The previous form of this leg matched the
+    // whole file, so the condition passed wherever it appeared — including on another
+    // job, or orphaned in a comment while 'publish' ran unconditioned (crit, PR #221).
+    const condition = jobKey(publishJob, 'if');
+    if (!condition || !/needs\.detect\.outputs\.publishable/.test(condition[1])) {
+        failures.push(
+            `the 'publish' job's own 'if:' does not branch on 'needs.detect.outputs.publishable' ` +
+                `(found: ${condition ? condition[1].trim() : 'no if: at all'}). Depending on 'detect' without ` +
+                `branching on its output runs the check and then ignores it — the approval request is raised regardless.`,
+        );
+    } else if (!/needs\.detect\.outputs\.publishable\s*!=\s*'false'/.test(condition[1])) {
+        // The direction is the guarantee, not a style choice. `== 'true'` reads every
+        // way of NOT hearing an answer — detect crashing, its output write throwing —
+        // as "nothing to publish", which is the one error this pipeline may never make.
+        failures.push(
+            `the 'publish' job branches on the release signal in the fail-OPEN direction ` +
+                `(found: ${condition[1].trim()}). It must be "needs.detect.outputs.publishable != 'false'": only a ` +
+                `POSITIVE "nothing to publish" may suppress the job, because "== 'true'" also suppresses it when ` +
+                `'detect' failed or never wrote its output — silently dropping a real release and reporting success.`,
+        );
+    } else if (!/needs\.build\.result\s*==\s*'success'/.test(condition[1])) {
+        failures.push(
+            `the 'publish' job's 'if:' overrides the implicit needs-gate (found: ${condition[1].trim()}) without ` +
+                `re-asserting "needs.build.result == 'success'". An '!cancelled()'-style condition lets 'publish' ` +
+                `run on a FAILED build, which is a different release defect than the one being fixed.`,
+        );
+    }
 }
 
-if (!/^\s*if:\s*needs\.detect\.outputs\.publishable\s*==\s*'true'\s*$/m.test(source)) {
+/**
+ * Fourth leg: the decision itself must be executed by a gate that runs on PRs.
+ *
+ * The three legs above assert the wiring in `publish.yml` as TEXT — they never invoke
+ * `detect-publishable`. `publish.yml`'s 'detect' job runs it only on push to main, so
+ * without a PR-time test its branches reach the OIDC gate unexecuted, and an inverted
+ * comparison ships fully green (crit blocker, PR #221). The test file and the vitest
+ * project that collects it are asserted together: either one alone is satisfiable while
+ * nothing runs.
+ */
+const DETECT_TEST = 'scripts/detect-publishable.test.mjs';
+if (!existsSync(DETECT_TEST)) {
     failures.push(
-        `the 'publish' job is missing "if: needs.detect.outputs.publishable == 'true'". Depending on 'detect' without ` +
-            `branching on its output runs the check and then ignores it — the approval request is raised regardless.`,
+        `${DETECT_TEST} is missing. The release-signal decision logic would then run for the first time on 'main', ` +
+            `inside the approval gate it exists to make trustworthy.`,
+    );
+}
+const vitestConfig = (() => {
+    try {
+        return readFileSync('vitest.config.ts', 'utf8');
+    } catch (error) {
+        return `__unreadable: ${error.message}`;
+    }
+})();
+if (!/scripts\/\*\*\/\*\.test\.mjs/.test(vitestConfig)) {
+    failures.push(
+        `vitest.config.ts no longer collects 'scripts/**/*.test.mjs'. 'test.projects' is scoped to workspace ` +
+            `packages, so a script test outside an explicit project is silently never run — the test file exists, ` +
+            `the gate reports PASS, and nothing executes the release decision before it gates production.`,
     );
 }
 
@@ -179,5 +269,6 @@ if (failures.length > 0) {
 
 console.log(
     `validate:workflows gate PASS — ${WORKFLOW}: artifact retention >= ${MIN_RETENTION_DAYS}d, ` +
-        `download is soft, rebuild fallback present and loud, and the OIDC approval is gated on a real release signal.`,
+        `download is soft, rebuild fallback present and loud, the OIDC approval is gated on a real release signal ` +
+        `in the fail-closed direction, and that signal's decision logic is exercised at PR time.`,
 );

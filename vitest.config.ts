@@ -34,7 +34,23 @@ export default defineConfig({
         // config — including the ui-inputs Vue plugin (SFC transform) and its
         // tests/browser exclusion. The glob is root-anchored, so full repo
         // copies under .claude/ agent worktrees are never swept in as projects.
-        projects: ['packages/*'],
+        projects: [
+            'packages/*',
+            // The release-gate lane. `scripts/detect-publishable.*` decides whether the
+            // OIDC approval on `main` is raised at all, and `publish.yml`'s `detect` job
+            // runs it ONLY on push — never on a pull request. Without this project its
+            // branches would reach production unexecuted, which is what crit's blocker on
+            // PR #221 named. Kept OUT of the coverage `include` below on purpose: this is
+            // a correctness net for a release gate, not a package whose API is measured.
+            {
+                test: {
+                    name: 'scripts',
+                    root: import.meta.dirname,
+                    include: ['scripts/**/*.test.mjs'],
+                    environment: 'node',
+                },
+            },
+        ],
         coverage: {
             provider: 'v8',
             // Explicit include so a src file no spec ever imports still counts

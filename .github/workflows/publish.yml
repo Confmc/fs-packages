@@ -76,7 +76,15 @@ jobs:
         needs: [build, detect]
         # The approval request itself is the thing being gated. A skipped job raises no
         # deployment review, so nothing reaches a human unless there is a real release.
-        if: needs.detect.outputs.publishable == 'true'
+        #
+        # Conditioned on `!= 'false'`, NOT on `== 'true'`, and that asymmetry is the whole
+        # guarantee. `== 'true'` treats every way of not hearing an answer — `detect`
+        # crashing, its output write throwing, the runner dying mid-step — as "nothing to
+        # publish", which silently drops a real release and reports success doing it. Only
+        # a POSITIVE "nothing to do" may suppress this job; absence must publish. The
+        # explicit `needs.build.result == 'success'` restores the gate that `!cancelled()`
+        # removes: an unpublishable build must still block, and only that.
+        if: ${{ !cancelled() && needs.build.result == 'success' && needs.detect.outputs.publishable != 'false' }}
         runs-on: ubuntu-latest
         # Environment gate: the OIDC mint (id-token: write) is fronted by the
         # 'npm-publish' deployment environment, whose protection rule (required

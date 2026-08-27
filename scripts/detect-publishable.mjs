@@ -22,6 +22,12 @@
  * pending approvals trains the approver to wave them through, on the one repository
  * that mints publish credentials for the whole fleet.
  *
+ * ── THIS FILE IS THE I/O SHELL ────────────────────────────────────────────────────
+ * Every decision lives in `detect-publishable.core.mjs`, which is pure and is exercised
+ * by `detect-publishable.test.mjs` on every PR. What remains here is syscalls and
+ * printing: read the directory, read a manifest, ask the registry, write the output.
+ * Keep it that way — logic that lands in this file is logic no PR ever executes.
+ *
  * ── FAIL CLOSED ──────────────────────────────────────────────────────────────────
  * Every uncertain answer resolves to PUBLISHABLE. A registry lookup that fails for any
  * reason — network, outage, rate limit, a package that has never been published — is
@@ -31,6 +37,11 @@
  * NOT-PUBLISHABLE silently drops a real release and reports success doing it. This
  * script may only ever suppress a run it has POSITIVELY established has nothing to do.
  *
+ * That guarantee does not survive on this side of the boundary alone: if writing the
+ * step output throws, the answer never reaches the workflow. `publish` is therefore
+ * conditioned on `!= 'false'` rather than `== 'true'`, so an absent answer publishes
+ * and only a POSITIVE "nothing to do" suppresses. See publish.yml.
+ *
  * Zero dependencies, matching `validate-workflows.mjs` — this repo mints the fleet's
  * npm credentials via OIDC and a release-convenience guard does not justify adding to
  * that tree.
@@ -39,10 +50,9 @@ import {execFileSync} from 'node:child_process';
 import {appendFileSync, readdirSync, readFileSync} from 'node:fs';
 import {join} from 'node:path';
 
-const PACKAGES_DIR = 'packages';
+import {decideAll, interpretRegistry, summarize} from './detect-publishable.core.mjs';
 
-/** One package's verdict, plus the reason — the reason is the whole audit trail. */
-const verdicts = [];
+const PACKAGES_DIR = 'packages';
 
 const readManifest = (dir) => {
     try {
@@ -52,85 +62,33 @@ const readManifest = (dir) => {
     }
 };
 
-/**
- * The published version, or a sentinel. Never throws: every failure path returns a
- * sentinel that compares unequal to any local version, so the caller publishes.
- */
-const registryVersion = (name) => {
+/** The published version, or a sentinel. Never throws — every failure path is a value. */
+const lookupRegistry = (name) => {
     try {
-        const out = execFileSync('npm', ['view', name, 'version'], {
+        const stdout = execFileSync('npm', ['view', name, 'version'], {
             encoding: 'utf8',
             stdio: ['ignore', 'pipe', 'pipe'],
             timeout: 60_000,
         });
-        const version = out.trim();
-        // An empty stdout with a zero exit is not a version. Treating it as one would
-        // compare '' against the local version, which is the correct outcome by luck
-        // rather than by decision — say so explicitly instead.
-        return version === '' ? {error: 'npm view returned an empty version'} : {version};
+        return interpretRegistry({stdout});
     } catch (error) {
-        const stderr = (error.stderr ?? '').toString();
-        // E404 means genuinely never published — a real release, not an instrument
-        // failure. Reported separately from a lookup failure so the log distinguishes
-        // "first publish" from "could not tell", even though both publish.
-        if (/E404/.test(stderr)) return {error: 'not published yet (E404)', firstPublish: true};
-        return {error: `registry lookup failed: ${(stderr.split('\n')[0] || error.message).trim()}`};
+        return interpretRegistry({stderr: (error.stderr ?? '').toString(), message: error.message});
     }
 };
 
-let dirs;
+let dirs = null;
+let scanError;
 try {
     dirs = readdirSync(PACKAGES_DIR, {withFileTypes: true})
         .filter((entry) => entry.isDirectory())
         .map((entry) => entry.name)
         .sort();
 } catch (error) {
-    // Cannot even enumerate: fail closed, loudly.
-    console.error(
-        `detect:publishable — cannot read ${PACKAGES_DIR}/ (${error.message}). Failing closed: requesting the approval anyway.`,
-    );
-    dirs = null;
+    scanError = error.message;
 }
 
-// § The Null-Result Gate corollary 1 — a guard must assert a non-empty denominator.
-// Zero packages scanned yields "nothing to publish" both when the tree is clean and
-// when the scan is broken, and only one of those may suppress a release.
-if (dirs === null || dirs.length === 0) {
-    const why = dirs === null ? 'the packages directory could not be read' : 'it contains no package directories';
-    console.error(`detect:publishable — FAIL CLOSED: ${why}, so this scan proves nothing about what needs publishing.`);
-    verdicts.push({name: '(scan)', publishable: true, reason: why});
-} else {
-    for (const dir of dirs) {
-        const manifest = readManifest(dir);
-
-        if (manifest.__unreadable) {
-            verdicts.push({name: dir, publishable: true, reason: `manifest unreadable (${manifest.__unreadable})`});
-            continue;
-        }
-        if (manifest.private === true) {
-            verdicts.push({name: manifest.name ?? dir, publishable: false, reason: 'private, never published'});
-            continue;
-        }
-        if (!manifest.name || !manifest.version) {
-            verdicts.push({name: dir, publishable: true, reason: 'manifest has no name or no version'});
-            continue;
-        }
-
-        const registry = registryVersion(manifest.name);
-        if (registry.error) {
-            verdicts.push({name: manifest.name, publishable: true, reason: `${manifest.version} — ${registry.error}`});
-            continue;
-        }
-        verdicts.push(
-            registry.version === manifest.version
-                ? {name: manifest.name, publishable: false, reason: `${manifest.version} already on the registry`}
-                : {name: manifest.name, publishable: true, reason: `${registry.version} -> ${manifest.version}`},
-        );
-    }
-}
-
-const publishable = verdicts.filter((verdict) => verdict.publishable);
-const scanned = verdicts.filter((verdict) => verdict.name !== '(scan)').length;
+const verdicts = decideAll({dirs, scanError, readManifest, lookupRegistry});
+const {answer, publishable, scanned, failClosed} = summarize(verdicts);
 
 console.log(`detect:publishable — ${scanned} package(s) scanned, ${publishable.length} to publish:\n`);
 for (const verdict of verdicts) {
@@ -138,11 +96,33 @@ for (const verdict of verdicts) {
 }
 console.log('');
 
-const answer = publishable.length > 0;
+// A fail-closed branch produced an approval nobody asked for. Say so where the approver
+// actually looks — the run summary and the checks UI — not only in the raw job log, the
+// same reason publish.yml's rebuild fallback emits a '::warning' instead of recovering
+// silently. Without this, the extra prompt is indistinguishable from a real release.
+for (const verdict of failClosed) {
+    console.log(
+        `::warning title=detect:publishable failed closed::${verdict.name} — ${verdict.reason}. Requesting the npm-publish approval anyway, because a suppressed release is the expensive direction.`,
+    );
+}
+
 console.log(
     answer
         ? `detect:publishable — requesting the npm-publish approval for ${publishable.length} package(s).`
         : 'detect:publishable — every package matches the registry; NOT requesting an approval that would publish nothing.',
 );
 
-if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `publishable=${answer}\n`);
+if (process.env.GITHUB_OUTPUT) {
+    try {
+        appendFileSync(process.env.GITHUB_OUTPUT, `publishable=${answer}\n`);
+    } catch (error) {
+        // The one place this script can lose an answer it already computed. Fail LOUD
+        // and fail CLOSED: the job goes red so the cause is visible, and because
+        // `publish` branches on `!= 'false'` rather than `== 'true'`, an answer that
+        // never arrived still raises the approval instead of dropping the release.
+        console.log(
+            `::error title=detect:publishable could not write its output::${error.message}. The computed answer was publishable=${answer}. The npm-publish approval will be requested regardless — verify the release by hand.`,
+        );
+        process.exit(1);
+    }
+}
