@@ -114,6 +114,14 @@ Three properties now make the coupling impossible, all enforced at PR time by `n
 2. The `download-artifact` step is `continue-on-error: true` — a **soft** input, never a hard dependency.
 3. A rebuild fallback (`if: steps.fetch-build.outcome != 'success'`) rebuilds from the same pinned commit and lockfile, and emits a `::warning` **naming the approval delay** rather than recovering silently.
 
+**A fourth property guards the approval itself (2026-08-26).** The workflow's `paths` filter is a *proxy* for "a version changed", not the thing itself — dependabot edits package manifests too, so its merges match the filter, change no version, and still raise a full OIDC approval request for a run that would publish nothing. **Seven such runs reached the gate** (six dependabot merges on 08-24, cancelled by hand; one echo-string edit in PR #220) before a `detect` job was added. `publish` now carries `needs: [build, detect]` + a condition on `detect`'s output, and a **skipped job raises no deployment review** — so nothing reaches a human unless a package's local version differs from the registry.
+
+`scripts/detect-publishable.mjs` **fails closed**: every uncertain answer — registry lookup failure, unreadable manifest, an empty package scan — resolves to *publishable*, and says so with a `::warning` so an unexplained approval is never indistinguishable from a real release. The two error directions are not symmetric and must never be traded off: a false publishable costs one needless approval prompt, a false not-publishable silently drops a real release and reports success doing it.
+
+**The condition is `!= 'false'`, never `== 'true'`, and that asymmetry is the whole guarantee.** `== 'true'` reads every way of *not hearing an answer* — `detect` crashing, its `GITHUB_OUTPUT` write throwing, the runner dying — as "nothing to publish". Only a POSITIVE "nothing to do" may suppress `publish`; absence must publish. `!cancelled()` is therefore paired with an explicit `needs.build.result == 'success'`, because overriding the implicit needs-gate would otherwise let a failed build publish.
+
+**The decision logic is executed before it decides.** `detect-publishable.core.mjs` holds every branch and no I/O; `detect-publishable.mjs` is the syscall shell; `detect-publishable.test.mjs` runs on every PR through the `scripts` project in `vitest.config.ts`. Logic that lands in the shell is logic no PR ever executes — `publish.yml`'s `detect` job fires only on `push`, so before the split an inverted comparison would have shipped fully green and surfaced as a silently dropped release. `validate:workflows` asserts all of it — the job runs, `publish` depends on it, `publish` branches on its output *from its own `if:`* (anchored to the job's keys, not matched anywhere in the file), the branch is in the fail-closed direction, the build-success leg survives, the test file exists, and the vitest project still collects it — because any leg alone is satisfiable while the gate does nothing.
+
 **Provenance is unaffected by the fallback.** `NPM_CONFIG_PROVENANCE` attests repository + workflow + commit SHA from the OIDC token minted in the `publish` job; it does not distinguish which job produced the bytes. The happy path still publishes build-once bytes; the fallback rebuilds the same commit with the same `npm ci --ignore-scripts` lockfile install `publish` already performs, and `validate:dist` gates either path identically.
 
 **Recovery on any historical red run: re-run ALL jobs, never "Re-run failed jobs".** The latter re-runs `publish` alone against the same absent artifact and fails identically — it can never succeed. Documented for humans in `docs/contributing.md § Publishing`.
@@ -133,6 +141,7 @@ Three properties now make the coupling impossible, all enforced at PR time by `n
 | `npm run lint:pkg`      | Run publint + attw on all packages             |
 | `npm run validate:dist` | Assert every package's required dist artifacts are present and non-empty |
 | `npm run validate:workflows` | Assert the release pipeline's artifact clock cannot be outrun by its approval clock |
+| `npm run detect:publishable` | Report which packages differ from the registry — the release signal `publish.yml` gates its OIDC approval on |
 | `npm audit`             | Check for dependency vulnerabilities           |
 
 **Build before typecheck.** Cross-package type resolution requires built `.d.mts` files. The CI pipeline enforces this order.
