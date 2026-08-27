@@ -105,6 +105,7 @@ export const createDialogService = (): DialogService => {
                     onCancel: (event: Event) => event.preventDefault(),
                     onClick: (event: MouseEvent) => {
                         if ((event.target as HTMLElement).tagName !== 'DIALOG') return;
+                        // Opted out: the consumer manages backdrop close (e.g. a dirty-confirm) via onClose.
                         if (options?.closeOnBackdropClick === false) return;
 
                         onClose();
