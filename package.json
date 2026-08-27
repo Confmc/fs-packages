@@ -8,6 +8,7 @@
         "audit": "npm audit",
         "build": "npm run build --workspaces",
         "changeset": "changeset",
+        "detect:publishable": "node scripts/detect-publishable.mjs",
         "docs:build": "vitepress build docs",
         "docs:dev": "vitepress dev docs",
         "docs:preview": "vitepress preview docs",
