@@ -193,6 +193,28 @@ dialog.open(IconOnlyDialog, {/* … */}, {ariaLabel: 'Delete confirmation'});
 
 All three options are independent and optional — pass any combination. Options omitted leave the corresponding attribute off the `<dialog>` element entirely (no empty-string attributes).
 
+## Managing Backdrop Close Yourself
+
+By default, clicking the backdrop closes the topmost dialog. When a dialog holds unsaved work, you may want to confirm before discarding — or otherwise decide for yourself whether a backdrop click should close. Pass `closeOnBackdropClick: false` and the service stops closing on backdrop clicks; closing is then entirely up to you via the injected `onClose`:
+
+```typescript
+dialog.open(EditForm, {/* props */}, {closeOnBackdropClick: false});
+```
+
+```vue
+<!-- EditForm.vue — detect the backdrop click yourself, confirm, then close -->
+<script setup lang="ts">
+const props = defineProps<{onClose: () => void}>();
+
+const onBackdrop = async (event: MouseEvent) => {
+    if ((event.target as HTMLElement).tagName !== 'DIALOG') return;
+    if (!isDirty.value || (await confirmDiscard())) props.onClose();
+};
+</script>
+```
+
+The option only affects backdrop clicks. Programmatic closes (`closeAll()`, or `onClose` after a save) and the ESC key (suppressed by the service) are unaffected.
+
 ## API Reference
 
 ### `createDialogService()`
@@ -215,6 +237,7 @@ interface DialogOpenOptions {
     ariaLabel?: string; // sets aria-label on the host <dialog>
     ariaLabelledBy?: string; // sets aria-labelledby on the host <dialog>
     ariaDescribedBy?: string; // sets aria-describedby on the host <dialog>
+    closeOnBackdropClick?: boolean; // default true; set false to manage backdrop closing yourself
 }
 ```
 

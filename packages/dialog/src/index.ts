@@ -16,6 +16,8 @@ export interface DialogOpenOptions {
     ariaLabelledBy?: string;
     /** Sets `aria-describedby` on the host `<dialog>` element. */
     ariaDescribedBy?: string;
+    /** Whether a backdrop click closes this dialog. Defaults to `true`; set `false` to close it yourself via `onClose`. */
+    closeOnBackdropClick?: boolean;
 }
 
 /** Public API of a dialog service instance. */
@@ -102,9 +104,10 @@ export const createDialogService = (): DialogService => {
                     'aria-describedby': options?.ariaDescribedBy,
                     onCancel: (event: Event) => event.preventDefault(),
                     onClick: (event: MouseEvent) => {
-                        if ((event.target as HTMLElement).tagName === 'DIALOG') {
-                            onClose();
-                        }
+                        if ((event.target as HTMLElement).tagName !== 'DIALOG') return;
+                        if (options?.closeOnBackdropClick === false) return;
+
+                        onClose();
                     },
                     onVnodeMounted: (vnode: VNode) => {
                         (vnode.el as HTMLDialogElement).showModal();
