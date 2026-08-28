@@ -15,6 +15,8 @@ Vue-dependent packages declare `vue` as a peer dependency — your project must 
 npm install @script-development/fs-http
 npm install @script-development/fs-storage
 npm install @script-development/fs-helpers
+
+# Integrations (no Vue required; fs-cloudflare is server-side)
 npm install @script-development/fs-cloudflare
 
 # Services (Vue required)

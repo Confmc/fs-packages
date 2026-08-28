@@ -30,7 +30,6 @@ export default defineConfig({
                         {text: 'fs-http', link: '/packages/http'},
                         {text: 'fs-storage', link: '/packages/storage'},
                         {text: 'fs-helpers', link: '/packages/helpers'},
-                        {text: 'fs-cloudflare', link: '/packages/cloudflare'},
                     ],
                 },
                 {
@@ -54,6 +53,11 @@ export default defineConfig({
                     ],
                 },
                 {text: 'UI Components', collapsed: false, items: [{text: 'ui-inputs', link: '/packages/ui-inputs'}]},
+                {
+                    text: 'Integrations',
+                    collapsed: false,
+                    items: [{text: 'fs-cloudflare', link: '/packages/cloudflare'}],
+                },
             ],
         },
 

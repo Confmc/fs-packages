@@ -38,12 +38,11 @@ All packages are published under the `@script-development` scope on npm.
 
 These packages have zero Vue dependency — they work in any TypeScript project.
 
-| Package                               | Description                                                             |
-| ------------------------------------- | ----------------------------------------------------------------------- |
-| [fs-http](/packages/http)             | HTTP service factory with middleware architecture                       |
-| [fs-storage](/packages/storage)       | localStorage service factory with prefix namespacing                    |
-| [fs-helpers](/packages/helpers)       | Tree-shakeable utilities: deep copy, type guards, case conversion       |
-| [fs-cloudflare](/packages/cloudflare) | Express middleware gating inbound traffic to Cloudflare's egress ranges |
+| Package                         | Description                                                       |
+| ------------------------------- | ----------------------------------------------------------------- |
+| [fs-http](/packages/http)       | HTTP service factory with middleware architecture                 |
+| [fs-storage](/packages/storage) | localStorage service factory with prefix namespacing              |
+| [fs-helpers](/packages/helpers) | Tree-shakeable utilities: deep copy, type guards, case conversion |
 
 ### Services
 
@@ -73,6 +72,14 @@ Headless, themeable Vue components (the `ui-*` family) — behaviour and accessi
 | Package                          | Description                                                                                                                                                                                                        |
 | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | [ui-inputs](/packages/ui-inputs) | Headless UI components — field/label/error, text/number/date/textarea, checkbox/switch/radio, select/combobox/multi-select, plus the valueless controls `Pressable` / `Disclosure` — themed via `--ui-*` variables |
+
+### Integrations
+
+Packages integrating a third-party platform. Runtime differs per package — `fs-cloudflare` runs in your server process (Express SSR/API), not the browser.
+
+| Package                               | Description                                                             |
+| ------------------------------------- | ----------------------------------------------------------------------- |
+| [fs-cloudflare](/packages/cloudflare) | Express middleware gating inbound traffic to Cloudflare's egress ranges |
 
 ## Quality Guarantees
 
