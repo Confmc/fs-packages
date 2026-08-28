@@ -38,11 +38,12 @@ All packages are published under the `@script-development` scope on npm.
 
 These packages have zero Vue dependency — they work in any TypeScript project.
 
-| Package                         | Description                                                       |
-| ------------------------------- | ----------------------------------------------------------------- |
-| [fs-http](/packages/http)       | HTTP service factory with middleware architecture                 |
-| [fs-storage](/packages/storage) | localStorage service factory with prefix namespacing              |
-| [fs-helpers](/packages/helpers) | Tree-shakeable utilities: deep copy, type guards, case conversion |
+| Package                               | Description                                                             |
+| ------------------------------------- | ----------------------------------------------------------------------- |
+| [fs-http](/packages/http)             | HTTP service factory with middleware architecture                       |
+| [fs-storage](/packages/storage)       | localStorage service factory with prefix namespacing                    |
+| [fs-helpers](/packages/helpers)       | Tree-shakeable utilities: deep copy, type guards, case conversion       |
+| [fs-cloudflare](/packages/cloudflare) | Express middleware gating inbound traffic to Cloudflare's egress ranges |
 
 ### Services
 

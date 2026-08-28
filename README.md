@@ -8,11 +8,12 @@ Shared frontend service packages by [Script Development](https://github.com/scri
 
 ### Foundation
 
-| Package                                                                                        | Description                                                       |
-| ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| [@script-development/fs-http](https://www.npmjs.com/package/@script-development/fs-http)       | HTTP service factory with middleware architecture                 |
-| [@script-development/fs-storage](https://www.npmjs.com/package/@script-development/fs-storage) | localStorage service factory with prefix namespacing              |
-| [@script-development/fs-helpers](https://www.npmjs.com/package/@script-development/fs-helpers) | Tree-shakeable utilities: deep copy, type guards, case conversion |
+| Package                                                                                              | Description                                                             |
+| ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| [@script-development/fs-http](https://www.npmjs.com/package/@script-development/fs-http)             | HTTP service factory with middleware architecture                       |
+| [@script-development/fs-storage](https://www.npmjs.com/package/@script-development/fs-storage)       | localStorage service factory with prefix namespacing                    |
+| [@script-development/fs-helpers](https://www.npmjs.com/package/@script-development/fs-helpers)       | Tree-shakeable utilities: deep copy, type guards, case conversion       |
+| [@script-development/fs-cloudflare](https://www.npmjs.com/package/@script-development/fs-cloudflare) | Express middleware gating inbound traffic to Cloudflare's egress ranges |
 
 ### Services
 

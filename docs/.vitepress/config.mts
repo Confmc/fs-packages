@@ -30,6 +30,7 @@ export default defineConfig({
                         {text: 'fs-http', link: '/packages/http'},
                         {text: 'fs-storage', link: '/packages/storage'},
                         {text: 'fs-helpers', link: '/packages/helpers'},
+                        {text: 'fs-cloudflare', link: '/packages/cloudflare'},
                     ],
                 },
                 {
