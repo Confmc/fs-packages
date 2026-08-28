@@ -8,9 +8,18 @@ npm install @script-development/fs-cloudflare
 
 ## What It Does
 
-An app behind Cloudflare is only protected while traffic actually goes through Cloudflare. A bot that resolves the origin — the Fly anycast IP, the `*.fly.dev` hostname — bypasses every WAF rule, rate limit and bot score. The gate 403s any request whose client IP is not a published Cloudflare egress address.
+An app behind Cloudflare is only protected while traffic actually goes through Cloudflare. A bot that resolves the origin — the Fly anycast IP, the `*.fly.dev` hostname — reaches it directly and skips every WAF rule, rate limit and bot score. The gate 403s any request whose client IP is not a published Cloudflare egress address, which closes that direct-hit path.
 
 The ranges are vendored, so the gate does no network I/O at runtime and the package has no dependencies at all.
+
+## Threat Model
+
+The check is "is this address a published Cloudflare egress address" — not "did this request come through _my_ Cloudflare zone". Those ranges are shared by every Cloudflare customer.
+
+- **Closed:** direct hits on the origin — anycast IP, `*.fly.dev`, an origin IP recovered from DNS history or a certificate log.
+- **Still open:** an attacker who knows the origin can point their own Cloudflare zone or Worker at it and arrive from a valid egress address, passing the gate while your zone's WAF, rate limits and bot rules never see the request.
+
+Where that relay matters, authenticate the origin rather than range-matching it — Cloudflare Authenticated Origin Pulls (mTLS), or a shared secret injected by the zone's Transform Rule and verified at the origin. This gate composes with either; it does not replace them.
 
 ## Basic Usage
 

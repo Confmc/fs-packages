@@ -3,9 +3,25 @@
 Express-compatible middleware gating inbound traffic to Cloudflare's egress ranges.
 
 An app behind Cloudflare is only protected while traffic actually goes through Cloudflare. A bot that
-resolves the origin — the Fly anycast IP, the `*.fly.dev` hostname — bypasses every WAF rule, rate
-limit and bot score. This gate 403s any request whose client IP is not a published Cloudflare egress
-address, closing that door.
+resolves the origin — the Fly anycast IP, the `*.fly.dev` hostname — reaches it directly and skips
+every WAF rule, rate limit and bot score. This gate 403s any request whose client IP is not a
+published Cloudflare egress address, which closes the direct-hit path.
+
+## Threat model
+
+The check is "is this address a published Cloudflare egress address" — not "did this request come
+through _my_ Cloudflare zone". Those egress ranges are shared by every Cloudflare customer.
+
+- **Closed:** direct hits on the origin — the Fly anycast IP, `*.fly.dev`, a raw origin IP found in
+  DNS history or a certificate log. That is the traffic this package exists to drop, and it is the
+  bulk of untargeted scanning.
+- **Still open:** an attacker who knows your origin can point their own Cloudflare zone or Worker at
+  it and arrive from a valid Cloudflare egress address. The gate passes them; your zone's WAF, rate
+  limits and bot rules never saw the request.
+
+If that relay matters for your app, authenticate the origin instead of range-matching it —
+Cloudflare Authenticated Origin Pulls (mTLS), or a shared secret injected by your zone's Transform
+Rule and verified at the origin. This gate composes with either; it does not replace them.
 
 ## Installation
 
