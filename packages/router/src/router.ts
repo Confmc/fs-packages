@@ -1,6 +1,6 @@
 import type {LocationQueryRaw, NavigationHookAfter, RouteLocationRaw, RouteRecordRaw} from 'vue-router';
 
-import {computed} from 'vue';
+import {computed, shallowRef} from 'vue';
 import {createRouter, createWebHistory} from 'vue-router';
 
 import type {BeforeRouteMiddleware, RouteName, RouterService, RouterServiceOptions} from './types';
@@ -145,6 +145,22 @@ export const createRouterService = <Routes extends RouteRecordRaw[]>(
 
     const currentRouteRef = router.currentRoute;
 
+    // `router.isReady()` settles after the FIRST navigation attempt — it resolves when that
+    // navigation finalizes and rejects when vue-router calls `markAsReady(error)` (an aborted or
+    // otherwise failed first hop). Both outcomes end the "not navigated yet" window, so both flip
+    // the flag; handling the rejection here also keeps it off the unhandled-rejection channel.
+    // Registered at construction because vue-router drops its ready handlers once it has settled.
+    const readyRef = shallowRef(false);
+    void router.isReady().then(
+        () => {
+            readyRef.value = true;
+        },
+        (error: unknown) => {
+            readyRef.value = true;
+            console.warn('fs-router: the first navigation did not complete, rendering not-found', error);
+        },
+    );
+
     const onPage: RouterService<Routes>['onPage'] = (pageName) => {
         const currentName = currentRouteRef.value.name;
         if (!currentName) return false;
@@ -225,7 +241,7 @@ export const createRouterService = <Routes extends RouteRecordRaw[]>(
             }
         },
 
-        RouterView: createRouterView(currentRouteRef, options?.notFoundComponent),
+        RouterView: createRouterView(currentRouteRef, options?.notFoundComponent, readyRef),
         RouterLink: createRouterLink(getUrlForRouteName, goToRoute),
     };
 };

@@ -183,6 +183,101 @@ describe('createRouterView', () => {
         expect(wrapper.text()).toBe('404');
     });
 
+    it('should render nothing while a service-built view waits for the first navigation, then the page', async () => {
+        // Arrange — the in-flight window through the REAL service (the sentinel spec above builds
+        // the view by hand and so never exercises the readiness flag at all).
+        window.history.pushState({}, '', '/about');
+        const service = createRouterService(createTestRoutes());
+
+        // Act — mount synchronously, before the navigation dispatched by install() settles
+        const navigation = service.install();
+        const wrapper = mount(service.RouterView);
+
+        // Assert — nothing painted yet, and specifically not the bare 404
+        expect(wrapper.text()).toBe('');
+        expect(wrapper.find('p').exists()).toBe(false);
+
+        // ...and the page appears once it settles
+        await navigation;
+        await flushPromises();
+        expect(wrapper.text()).toBe('page content');
+        // Reset
+        window.history.pushState({}, '', '/');
+    });
+
+    it('should render the not-found fallback once an aborted first navigation has settled', async () => {
+        // Arrange — a before-route middleware returning plain `true` cancels the hop WITHOUT
+        // redirecting, so the `beforeEach` wrapper returns `false`. vue-router treats that as an
+        // aborted navigation (failure type 4): `finalizeNavigation` never runs, so `currentRoute`
+        // stays pinned to START_LOCATION forever. Guarding on the sentinel alone would blank the
+        // page permanently — the guard has to lift once the first navigation has SETTLED, however
+        // it settled.
+        const service = createRouterService(createTestRoutes());
+        service.registerBeforeRouteMiddleware(() => true);
+
+        // Act
+        await service.install();
+        await flushPromises();
+
+        // Assert — still pinned to the sentinel, but readiness has settled, so the fallback paints
+        expect(service.currentRouteRef.value).toBe(START_LOCATION);
+        const wrapper = mount(service.RouterView);
+        expect(wrapper.text()).toBe('404');
+    });
+
+    it('should render a custom notFoundComponent after an aborted first navigation', async () => {
+        // Arrange
+        const NotFound = defineComponent({name: 'NotFound', render: () => h('div', 'service-404')});
+        const service = createRouterService(createTestRoutes(), {notFoundComponent: NotFound});
+        service.registerBeforeRouteMiddleware(() => true);
+
+        // Act
+        await service.install();
+        await flushPromises();
+
+        // Assert
+        expect(mount(service.RouterView).text()).toBe('service-404');
+    });
+
+    it('should warn once when the first navigation is aborted without a redirect', async () => {
+        // Arrange — crit's point: before this warning there was NO console signal anywhere on the
+        // aborted-first-navigation path. Lives here rather than in router.spec.ts because an
+        // aborted first navigation leaves vue-router's history listeners attached, and a stale
+        // aborting router reverts later `goBack()` navigations in that file.
+        const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const service = createRouterService(createTestRoutes());
+        service.registerBeforeRouteMiddleware(() => true);
+
+        // Act
+        await service.install();
+        await flushPromises();
+
+        // Assert
+        expect(consoleWarnSpy).toHaveBeenCalledWith(
+            expect.stringContaining('the first navigation did not complete'),
+            expect.anything(),
+        );
+        consoleWarnSpy.mockRestore();
+    });
+
+    it('should end on the redirected route when a middleware redirects the first navigation', async () => {
+        // Arrange — a redirect return is failure type 2, which vue-router DOES finalize onto the
+        // redirected location, so the sentinel is gone and the page paints normally.
+        const service = createRouterService(createTestRoutes());
+        // The initial location is whatever earlier specs left in happy-dom's history, so redirect
+        // anything that is not already the target rather than keying on a specific start route.
+        service.registerBeforeRouteMiddleware((to) => (to.name === 'about' ? false : {name: 'about'}));
+
+        // Act
+        await service.install();
+        await flushPromises();
+
+        // Assert
+        expect(service.currentRouteRef.value).not.toBe(START_LOCATION);
+        expect(service.currentRouteRef.value.name).toBe('about');
+        expect(mount(service.RouterView).text()).toBe('page content');
+    });
+
     it('should thread notFoundComponent from createRouterService options into RouterView', async () => {
         // Arrange — an unmatched depth renders the option-provided fallback
         const NotFound = defineComponent({name: 'NotFound', render: () => h('div', 'service-404')});

@@ -262,7 +262,9 @@ const router = createRouterService(routes, {
 
 Without `notFoundComponent`, `RouterView` renders a bare `404` string for an unmatched depth. Provide a component to render your own designed not-found page instead — pair it with a catch-all route (`{path: '/:pathMatch(.*)*', ...}`) to also own the URL.
 
-The fallback is reserved for a **genuine** miss. Before the first navigation resolves, `currentRouteRef` still holds vue-router's `START_LOCATION` sentinel, and `RouterView` renders nothing at all rather than a not-found page — `await routerService.install()` (or `await routerService.isReady()`) before `mount()` if you want that window closed entirely.
+The fallback is reserved for a **genuine** miss. While the first navigation is still in flight, `currentRouteRef` holds vue-router's `START_LOCATION` sentinel and `RouterView` renders nothing at all rather than a not-found page — `await routerService.install()` (or `await routerService.isReady()`) before `mount()` if you want that window closed entirely.
+
+That blank window ends when the first navigation **settles**, however it settles. A middleware that cancels the first navigation without redirecting (returning plain `true`) aborts it, and vue-router leaves `currentRouteRef` pinned to `START_LOCATION` permanently — so once readiness has settled, a pinned route falls through to the not-found fallback rather than staying blank, and a single `console.warn` records why.
 
 ## API Reference
 

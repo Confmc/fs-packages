@@ -16,9 +16,17 @@ const buildRouteKey = (route: RouteLocationNormalizedLoaded, depth: number): str
     return key;
 };
 
+/**
+ * `readyRef` reports whether the first navigation has SETTLED — resolved, redirected or failed.
+ * It is optional so the existing two-argument signature keeps working, but a consumer who
+ * hand-builds a view without it gets the sentinel-only guard: correct for the transient window,
+ * and a permanently blank page if their first navigation is aborted without a redirect.
+ * `createRouterService` always supplies it.
+ */
 export const createRouterView = (
     currentRouteRef: Ref<RouteLocationNormalizedLoaded>,
     notFoundComponent?: RouteComponent,
+    readyRef?: Ref<boolean>,
 ): RouterViewComponent =>
     defineComponent<{depth?: number}>(
         ({depth = 0}) => {
@@ -33,7 +41,13 @@ export const createRouterView = (
                 // yet", not "no such route" — painting the not-found fallback there is a false 404
                 // on every cold load. Identity against the exported sentinel, never a
                 // `matched.length === 0` heuristic, which also describes a genuine miss.
-                if (currentRouteRef.value === START_LOCATION) return null;
+                //
+                // The sentinel alone cannot say WHY the route is still START_LOCATION: an aborted
+                // first navigation (a middleware cancelling without redirecting) leaves it pinned
+                // there forever, and blanking on that would never paint anything. Readiness
+                // settles either way, so paint nothing only while the first navigation is still
+                // in flight; once it has settled, a pinned route falls through to not-found.
+                if (!readyRef?.value && currentRouteRef.value === START_LOCATION) return null;
 
                 if (!component.value) return notFoundComponent ? h(notFoundComponent) : h('p', ['404']);
 
