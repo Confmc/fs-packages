@@ -109,7 +109,13 @@ export interface RouterService<Routes extends RouteRecordRaw[]> {
      * nothing.
      */
     install: () => Promise<NavigationFailure | void | undefined>;
-    /** Resolves once the first navigation has settled. Delegates to `router.isReady()`. */
+    /**
+     * Resolves once the first navigation that is not an fs-router redirect has finished — whether
+     * it succeeded or was cancelled. Never rejects, and never delegates to `router.isReady()`: an
+     * fs-router redirect is dispatched by ABORTING the pending hop, which vue-router reports as a
+     * failure and which leaves its own readiness permanently unsettled. Stays pending while no
+     * navigation has ever been dispatched.
+     */
     isReady: () => Promise<void>;
     normalizedRouteToSpecificRoute: (route: Pick<RouteLocationNormalized, 'name' | 'path'>) => ActualRoute<Routes>;
     goToRoute: (

@@ -262,9 +262,15 @@ const router = createRouterService(routes, {
 
 Without `notFoundComponent`, `RouterView` renders a bare `404` string for an unmatched depth. Provide a component to render your own designed not-found page instead — pair it with a catch-all route (`{path: '/:pathMatch(.*)*', ...}`) to also own the URL.
 
-The fallback is reserved for a **genuine** miss. While the first navigation is still in flight, `currentRouteRef` holds vue-router's `START_LOCATION` sentinel and `RouterView` renders nothing at all rather than a not-found page — `await routerService.install()` (or `await routerService.isReady()`) before `mount()` if you want that window closed entirely.
+The fallback is reserved for a **genuine** miss. While a navigation is **in flight** and `currentRouteRef` still holds vue-router's `START_LOCATION` sentinel, `RouterView` renders nothing at all rather than a not-found page — `await routerService.install()` (or `await routerService.isReady()`) before `mount()` if you want that window closed entirely.
 
-That blank window ends when the first navigation **settles**, however it settles. A middleware that cancels the first navigation without redirecting (returning plain `true`) aborts it, and vue-router leaves `currentRouteRef` pinned to `START_LOCATION` permanently — so once readiness has settled, a pinned route falls through to the not-found fallback rather than staying blank, and a single `console.warn` records why.
+Both halves of that condition matter:
+
+- A middleware that **redirects** the first navigation keeps the window open across the whole chain. fs-router dispatches the redirect itself and cancels the pending hop, so there is a moment where the route is still `START_LOCATION` and the redirected navigation has not finalized — `RouterView` stays blank there instead of flashing the not-found page, and nothing is written to the console: a redirect is a success in progress, not a failed navigation.
+- A middleware that **cancels** the first navigation without redirecting (returning plain `true`) leaves `currentRouteRef` pinned to `START_LOCATION` permanently. Nothing is in flight any more, so the route falls through to the not-found fallback rather than staying blank, and a single `console.warn` records why.
+- A service **nobody navigates** — no `install()`, no `goToRoute()` — was never in flight at all, so it renders the fallback immediately, exactly as it did before `0.3.0`.
+
+`isReady()` resolves once the first navigation that is not an fs-router redirect has finished, whether it succeeded or was cancelled. It never rejects, so `await routerService.isReady()` is safe to place before `mount()` without a `catch`. It does **not** delegate to vue-router's `router.isReady()`: an fs-router redirect is dispatched by aborting the pending hop, which vue-router records as a failure and which leaves its own readiness permanently unsettled. A service nobody navigates leaves `isReady()` pending — nothing has been asked of the router, so nothing has settled.
 
 ## API Reference
 
@@ -279,17 +285,17 @@ That blank window ends when the first navigation **settles**, however it settles
 
 ### Navigation Methods
 
-| Method                                       | Description                                                              |
-| -------------------------------------------- | ------------------------------------------------------------------------ |
-| `goToRoute(name, id?, query?, parentId?)`    | Navigate to any named route (push)                                       |
-| `replaceRoute(name, id?, query?, parentId?)` | Navigate, replacing the current history entry                            |
-| `goToOverviewPage(name)`                     | Navigate to `name.overview`                                              |
-| `goToCreatePage(name)`                       | Navigate to `name.create`                                                |
-| `goToEditPage(name, id)`                     | Navigate to `name.edit` with `:id`                                       |
-| `goToShowPage(name, id, query?)`             | Navigate to `name.show` with `:id`                                       |
-| `goBack()`                                   | Navigate back in history                                                 |
-| `install()`                                  | Navigate to the current browser location; returns the navigation promise |
-| `isReady()`                                  | Resolves once the first navigation has settled                           |
+| Method                                       | Description                                                                 |
+| -------------------------------------------- | --------------------------------------------------------------------------- |
+| `goToRoute(name, id?, query?, parentId?)`    | Navigate to any named route (push)                                          |
+| `replaceRoute(name, id?, query?, parentId?)` | Navigate, replacing the current history entry                               |
+| `goToOverviewPage(name)`                     | Navigate to `name.overview`                                                 |
+| `goToCreatePage(name)`                       | Navigate to `name.create`                                                   |
+| `goToEditPage(name, id)`                     | Navigate to `name.edit` with `:id`                                          |
+| `goToShowPage(name, id, query?)`             | Navigate to `name.show` with `:id`                                          |
+| `goBack()`                                   | Navigate back in history                                                    |
+| `install()`                                  | Navigate to the current browser location; returns the navigation promise    |
+| `isReady()`                                  | Resolves once the first non-redirect navigation has finished; never rejects |
 
 ### Route State
 

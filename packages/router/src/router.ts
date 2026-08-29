@@ -79,6 +79,38 @@ export const createRouterService = <Routes extends RouteRecordRaw[]>(
     const getUrlForRouteName: RouterService<Routes>['getUrlForRouteName'] = (name, id, query, parentId) =>
         router.resolve({name, params: resolveRouteParams(name as string, id, parentId), query}).fullPath;
 
+    // Readiness is a fact this service knows, not one it asks vue-router for. fs-router redirects
+    // by ABORTING — the wrapper below dispatches its own navigation and returns `false`, which
+    // vue-router records as a type-4 abort and reports through `markAsReady(error)`. Keying
+    // readiness on `router.isReady()` therefore mislabels every redirecting first hop as a failure
+    // (a false warn on every cold load of an auth-guarded app) and leaves `ready === false` with an
+    // emptied handler list, so a later `isReady()` never settles.
+    //
+    // `navigating` is true while a navigation is in flight; `RouterView` paints nothing only while
+    // it is true AND the route is still the sentinel. A redirect chain keeps it true throughout, so
+    // no frame exists in which the route is START_LOCATION with nothing in flight — that is what
+    // would flash the not-found fallback between the abort and the redirected hop finalizing.
+    // A service nobody navigates leaves it false, so an un-navigated view keeps the fallback.
+    const navigating = shallowRef(false);
+
+    // Set once, by the first navigation that is not a redirect-abort of this wrapper's own making.
+    let settled = false;
+    let markSettled!: () => void;
+    // Resolves — never rejects — on both success and genuine failure. A rejecting readiness promise
+    // on a cancelled first hop is what hung consumers before.
+    const readyPromise = new Promise<void>((resolve) => {
+        markSettled = resolve;
+    });
+
+    // `to.fullPath` of every hop this wrapper aborted in order to dispatch a redirect. Keyed rather
+    // than latched: vue-router runs the redirected hop's `beforeEach` BEFORE the aborted hop's
+    // `afterEach` (observed: before:home, before:about, after:home:fail4, after:about:ok), so a
+    // latch cleared on the next `beforeEach` entry would already be gone when `afterEach` reads it.
+    // Every aborted hop always produces exactly one `afterEach`, so the set always drains — which
+    // is also why membership alone is the whole test: no entry can outlive the hop that added it,
+    // so a later navigation can never match a stale path.
+    const redirectAbortedPaths = new Set<string>();
+
     // Bounds the middleware redirect-return chain. Each returned `MiddlewareRedirect` cancels the
     // pending hop and dispatches a fresh navigation, which re-enters `beforeEach` and re-runs the
     // whole chain — so two middleware that redirect into each other's guarded routes (a
@@ -92,6 +124,8 @@ export const createRouterService = <Routes extends RouteRecordRaw[]>(
 
     const beforeRouteMiddleware: BeforeRouteMiddleware<Routes>[] = [];
     router.beforeEach(async (to, from) => {
+        navigating.value = true;
+
         const toNormalized = normalizedRouteToSpecificRoute(to);
         const fromNormalized = from.name ? normalizedRouteToSpecificRoute(from) : toNormalized;
 
@@ -122,7 +156,11 @@ export const createRouterService = <Routes extends RouteRecordRaw[]>(
                     console.error('fs-router: middleware redirect navigation failed', error);
                 });
 
-                // The chain continues in the dispatched navigation — do NOT reset the depth here.
+                // The chain continues in the dispatched navigation — do NOT reset the depth here,
+                // and do NOT let this hop's abort end the in-flight window or reach the console:
+                // the redirect is a success in progress, not a failed navigation.
+                redirectAbortedPaths.add(to.fullPath);
+
                 return false;
             }
 
@@ -140,26 +178,28 @@ export const createRouterService = <Routes extends RouteRecordRaw[]>(
 
     const afterRouteMiddleware: NavigationHookAfter[] = [...(options?.afterRouteCallbacks ?? [])];
     router.afterEach((to, from, failure) => {
+        // An abort this wrapper caused in order to redirect is not the end of anything: the
+        // redirected hop is already in flight and will run its own `afterEach`.
+        const causedByOwnRedirect = redirectAbortedPaths.delete(to.fullPath);
+        if (!causedByOwnRedirect) {
+            navigating.value = false;
+
+            if (!settled) {
+                settled = true;
+                // Only a GENUINE failure of the first navigation is worth a console signal —
+                // a redirect never reaches here, so an auth guard no longer warns on cold load.
+                if (failure) {
+                    console.warn('fs-router: the first navigation did not complete, rendering not-found', failure);
+                }
+
+                markSettled();
+            }
+        }
+
         for (const middleware of afterRouteMiddleware) middleware(to, from, failure);
     });
 
     const currentRouteRef = router.currentRoute;
-
-    // `router.isReady()` settles after the FIRST navigation attempt — it resolves when that
-    // navigation finalizes and rejects when vue-router calls `markAsReady(error)` (an aborted or
-    // otherwise failed first hop). Both outcomes end the "not navigated yet" window, so both flip
-    // the flag; handling the rejection here also keeps it off the unhandled-rejection channel.
-    // Registered at construction because vue-router drops its ready handlers once it has settled.
-    const readyRef = shallowRef(false);
-    void router.isReady().then(
-        () => {
-            readyRef.value = true;
-        },
-        (error: unknown) => {
-            readyRef.value = true;
-            console.warn('fs-router: the first navigation did not complete, rendering not-found', error);
-        },
-    );
 
     const onPage: RouterService<Routes>['onPage'] = (pageName) => {
         const currentName = currentRouteRef.value.name;
@@ -174,8 +214,15 @@ export const createRouterService = <Routes extends RouteRecordRaw[]>(
         location.hash;
 
     return {
-        install: () => router.push(fullPath),
-        isReady: () => router.isReady(),
+        install: () => {
+            // Synchronously, before the push: guards only run on a later microtask, so a consumer
+            // that mounts immediately after calling `install()` would otherwise see a window with
+            // the sentinel route and nothing marked in flight — and paint the fallback.
+            navigating.value = true;
+
+            return router.push(fullPath);
+        },
+        isReady: () => readyPromise,
         normalizedRouteToSpecificRoute,
 
         goToRoute,
@@ -241,7 +288,7 @@ export const createRouterService = <Routes extends RouteRecordRaw[]>(
             }
         },
 
-        RouterView: createRouterView(currentRouteRef, options?.notFoundComponent, readyRef),
+        RouterView: createRouterView(currentRouteRef, options?.notFoundComponent, navigating),
         RouterLink: createRouterLink(getUrlForRouteName, goToRoute),
     };
 };

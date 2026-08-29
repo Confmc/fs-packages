@@ -4,7 +4,7 @@ import type {RouteLocationNormalizedLoaded} from 'vue-router';
 
 import {flushPromises, mount} from '@vue/test-utils';
 import {afterEach, describe, expect, it, vi} from 'vitest';
-import {defineComponent, h, ref, shallowRef} from 'vue';
+import {defineComponent, h, nextTick, ref, shallowRef} from 'vue';
 import {START_LOCATION} from 'vue-router';
 
 import {createRouterLink, createRouterView, createRouterService} from '../src';
@@ -38,15 +38,17 @@ describe('createRouterView', () => {
         expect(wrapper.text()).toBe('404');
     });
 
-    it('should render nothing while the route is still START_LOCATION', () => {
+    it('should render nothing while the route is still START_LOCATION and a navigation is in flight', () => {
         // Arrange — vue-router seeds `currentRoute` with START_LOCATION and only replaces it once
         // the first navigation resolves. `matched` is empty there, but that is "not navigated yet",
         // not "no such route" — painting the not-found fallback in that window is a false 404.
         // `shallowRef`, not `ref`: vue-router holds `currentRoute` as `shallowRef(START_LOCATION)`,
         // and a deep `ref` would hand the component a reactive *proxy* whose identity differs from
         // the sentinel — the fixture has to reproduce the real container, not just the real value.
+        // The in-flight ref is what distinguishes this window from a service nobody navigated;
+        // without it the sentinel alone cannot tell the two apart (see the un-navigated spec).
         const routeRef = shallowRef(START_LOCATION);
-        const RouterView = createRouterView(routeRef);
+        const RouterView = createRouterView(routeRef, undefined, shallowRef(true));
 
         // Act
         const wrapper = mount(RouterView);
@@ -261,8 +263,10 @@ describe('createRouterView', () => {
     });
 
     it('should end on the redirected route when a middleware redirects the first navigation', async () => {
-        // Arrange — a redirect return is failure type 2, which vue-router DOES finalize onto the
-        // redirected location, so the sentinel is gone and the page paints normally.
+        // Arrange — fs-router dispatches the redirect itself and aborts the pending hop, so the
+        // REDIRECTED navigation is the one that finalizes: the sentinel is gone and the page
+        // paints normally. (The aborted hop is a type-4 failure, which is why readiness cannot be
+        // keyed on `router.isReady()` — see the no-false-warn spec below.)
         const service = createRouterService(createTestRoutes());
         // The initial location is whatever earlier specs left in happy-dom's history, so redirect
         // anything that is not already the target rather than keying on a specific start route.
@@ -292,6 +296,202 @@ describe('createRouterView', () => {
 
         // Assert
         expect(wrapper.text()).toBe('service-404');
+    });
+
+    // ---- WR-1119 round 3 — readiness is redirect-aware and service-owned --------------------
+
+    it('should never paint the not-found fallback while a middleware redirects the first navigation', async () => {
+        // Arrange — fs-router redirects by ABORTING: the `beforeEach` wrapper dispatches its own
+        // navigation and returns `false`, which vue-router records as a type-4 abort on the first
+        // hop. Nothing must paint the fallback in the gap between that abort and the redirected
+        // navigation finalizing — the route is still START_LOCATION there, but a navigation IS in
+        // flight, so the correct paint is nothing.
+        window.history.pushState({}, '', '/');
+        const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const service = createRouterService(createTestRoutes());
+        service.registerBeforeRouteMiddleware((to) => (to.name === 'about' ? false : {name: 'about'}));
+
+        // Act — sample every frame between install() and the redirected route finalizing
+        const navigation = service.install();
+        const wrapper = mount(service.RouterView);
+        const frames: string[] = [wrapper.html()];
+        for (let tick = 0; tick < 6; tick += 1) {
+            await nextTick();
+            frames.push(wrapper.html());
+            await flushPromises();
+            frames.push(wrapper.html());
+        }
+        await navigation;
+        await flushPromises();
+        frames.push(wrapper.html());
+
+        // Assert — no frame ever showed the 404, and the redirected page is what settles
+        expect(frames.some((frame) => frame.includes('404'))).toBe(false);
+        expect(wrapper.text()).toBe('page content');
+        expect(service.currentRouteRef.value.name).toBe('about');
+        // ...and the redirect is NOT reported as a failed navigation
+        expect(consoleWarnSpy).not.toHaveBeenCalled();
+        consoleWarnSpy.mockRestore();
+    });
+
+    it('should settle isReady() and warn exactly once when the first navigation is genuinely cancelled', async () => {
+        // Arrange — plain `true` cancels without redirecting: a genuine abort, and the one case
+        // that SHOULD reach the console.
+        window.history.pushState({}, '', '/');
+        const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const service = createRouterService(createTestRoutes());
+        service.registerBeforeRouteMiddleware(() => true);
+
+        // Act
+        await service.install();
+        await flushPromises();
+
+        // Assert — the fallback paints, one warn, and isReady() RESOLVES rather than hanging.
+        // Raced against a short timer so a hang fails the spec instead of stalling the suite.
+        expect(mount(service.RouterView).text()).toBe('404');
+        expect(consoleWarnSpy).toHaveBeenCalledTimes(1);
+        await expect(
+            Promise.race([
+                service.isReady().then(
+                    () => 'resolved',
+                    () => 'rejected',
+                ),
+                new Promise((resolve) => setTimeout(() => resolve('never settled'), 200)),
+            ]),
+        ).resolves.toBe('resolved');
+        consoleWarnSpy.mockRestore();
+    });
+
+    it('should resolve isReady() without warning when the first navigation succeeds', async () => {
+        // Arrange
+        window.history.pushState({}, '', '/about');
+        const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const service = createRouterService(createTestRoutes());
+
+        // Act
+        await service.install();
+        await flushPromises();
+
+        // Assert
+        await expect(
+            Promise.race([
+                service.isReady().then(() => 'resolved'),
+                new Promise((resolve) => setTimeout(() => resolve('never settled'), 200)),
+            ]),
+        ).resolves.toBe('resolved');
+        expect(consoleWarnSpy).not.toHaveBeenCalled();
+        consoleWarnSpy.mockRestore();
+        window.history.pushState({}, '', '/');
+    });
+
+    it('should render the fallback and leave isReady() pending when no navigation is ever dispatched', async () => {
+        // Arrange — a service nobody navigates. Pending is the CORRECT state for isReady() here:
+        // nothing has been asked of the router, so nothing has settled. What must NOT happen is a
+        // permanently blank page — the pre-0.3.0 behaviour was the (visible) fallback, and a
+        // consumer who never calls install() keeps it.
+        const service = createRouterService(createTestRoutes());
+
+        // Act
+        const wrapper = mount(service.RouterView);
+        await flushPromises();
+
+        // Assert
+        expect(service.currentRouteRef.value).toBe(START_LOCATION);
+        expect(wrapper.text()).toBe('404');
+        await expect(
+            Promise.race([
+                service.isReady().then(() => 'resolved'),
+                new Promise((resolve) => setTimeout(() => resolve('still pending'), 200)),
+            ]),
+        ).resolves.toBe('still pending');
+    });
+
+    it('should keep painting the current page while a LATER navigation is in flight', async () => {
+        // Arrange — the blank is for the pre-first-navigation window only. Once a real route is
+        // showing, an in-flight navigation must not blank it: dropping the sentinel half of the
+        // guard would flash an empty page on every subsequent hop, which is the same defect as the
+        // false 404, relocated. A middleware parks the second navigation so the window is
+        // observable rather than raced.
+        window.history.pushState({}, '', '/');
+        let releaseMiddleware!: () => void;
+        const parked = new Promise<void>((resolve) => {
+            releaseMiddleware = resolve;
+        });
+        const service = createRouterService(createTestRoutes());
+        await service.install();
+        await flushPromises();
+        const wrapper = mount(service.RouterView);
+        expect(wrapper.text()).toBe('page content');
+
+        // Act — a second navigation, parked mid-guard
+        service.registerBeforeRouteMiddleware(async () => {
+            await parked;
+            return false;
+        });
+        const navigation = service.goToRoute('about');
+        await flushPromises();
+
+        // Assert — still showing the current page, not a blank
+        expect(wrapper.text()).toBe('page content');
+
+        // Reset
+        releaseMiddleware();
+        await navigation;
+        await flushPromises();
+    });
+
+    it('should warn only for the FIRST navigation, not for a later cancelled one', async () => {
+        // Arrange — the warning names a cold-start failure: the app never got off the ground. A
+        // navigation cancelled later is ordinary guard behaviour (a form guard, an unsaved-changes
+        // prompt) and must stay silent, so readiness settles exactly once and never re-arms.
+        window.history.pushState({}, '', '/');
+        const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const service = createRouterService(createTestRoutes());
+        await service.install();
+        await flushPromises();
+        expect(consoleWarnSpy).not.toHaveBeenCalled();
+
+        // Act — a second navigation, cancelled outright
+        service.registerBeforeRouteMiddleware(() => true);
+        await service.goToRoute('about');
+        await flushPromises();
+
+        // Assert — still silent, and the first navigation's route is untouched
+        expect(consoleWarnSpy).not.toHaveBeenCalled();
+        expect(service.currentRouteRef.value.name).toBe('home');
+        consoleWarnSpy.mockRestore();
+    });
+
+    it('should render nothing while a first navigation dispatched outside install() is in flight', async () => {
+        // Arrange — the in-flight flag is set both by `install()` (synchronously, because guards
+        // only run on a later microtask) and at the top of the `beforeEach` wrapper. This spec
+        // pins the wrapper half: the navigation comes from `goToRoute`, and a middleware parks
+        // inside the wrapper so the in-flight window can be observed deterministically.
+        window.history.pushState({}, '', '/');
+        let releaseMiddleware!: () => void;
+        const parked = new Promise<void>((resolve) => {
+            releaseMiddleware = resolve;
+        });
+        const service = createRouterService(createTestRoutes());
+        service.registerBeforeRouteMiddleware(async () => {
+            await parked;
+            return false;
+        });
+
+        // Act — parked inside beforeEach, route still START_LOCATION
+        const navigation = service.goToRoute('about');
+        await flushPromises();
+        const wrapper = mount(service.RouterView);
+
+        // Assert — nothing painted while in flight, and specifically not the bare 404
+        expect(service.currentRouteRef.value).toBe(START_LOCATION);
+        expect(wrapper.text()).toBe('');
+
+        // ...and the page appears once the middleware lets it through
+        releaseMiddleware();
+        await navigation;
+        await flushPromises();
+        expect(wrapper.text()).toBe('page content');
     });
 });
 

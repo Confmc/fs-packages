@@ -17,16 +17,16 @@ const buildRouteKey = (route: RouteLocationNormalizedLoaded, depth: number): str
 };
 
 /**
- * `readyRef` reports whether the first navigation has SETTLED — resolved, redirected or failed.
- * It is optional so the existing two-argument signature keeps working, but a consumer who
- * hand-builds a view without it gets the sentinel-only guard: correct for the transient window,
- * and a permanently blank page if their first navigation is aborted without a redirect.
- * `createRouterService` always supplies it.
+ * `navigatingRef` reports whether a navigation is currently IN FLIGHT — true from the moment one is
+ * dispatched until it finalizes or genuinely fails, and held true across a middleware redirect
+ * chain. It is optional so the existing two-argument signature keeps working; a consumer who
+ * hand-builds a view without it never blanks, and gets the not-found fallback for an un-navigated
+ * route exactly as before `0.3.0`. `createRouterService` always supplies it.
  */
 export const createRouterView = (
     currentRouteRef: Ref<RouteLocationNormalizedLoaded>,
     notFoundComponent?: RouteComponent,
-    readyRef?: Ref<boolean>,
+    navigatingRef?: Ref<boolean>,
 ): RouterViewComponent =>
     defineComponent<{depth?: number}>(
         ({depth = 0}) => {
@@ -42,12 +42,14 @@ export const createRouterView = (
                 // on every cold load. Identity against the exported sentinel, never a
                 // `matched.length === 0` heuristic, which also describes a genuine miss.
                 //
-                // The sentinel alone cannot say WHY the route is still START_LOCATION: an aborted
-                // first navigation (a middleware cancelling without redirecting) leaves it pinned
-                // there forever, and blanking on that would never paint anything. Readiness
-                // settles either way, so paint nothing only while the first navigation is still
-                // in flight; once it has settled, a pinned route falls through to not-found.
-                if (!readyRef?.value && currentRouteRef.value === START_LOCATION) return null;
+                // The sentinel alone cannot say WHY the route is still START_LOCATION: a
+                // middleware that cancels the first navigation without redirecting leaves it
+                // pinned there forever, and blanking on that would never paint anything. So the
+                // blank is gated on a navigation being IN FLIGHT — which is also true throughout a
+                // middleware redirect chain (fs-router redirects by aborting and re-dispatching),
+                // closing the frame that would otherwise flash the fallback mid-chain. Nothing in
+                // flight and still on the sentinel means nobody has navigated: paint the fallback.
+                if (navigatingRef?.value && currentRouteRef.value === START_LOCATION) return null;
 
                 if (!component.value) return notFoundComponent ? h(notFoundComponent) : h('p', ['404']);
 
