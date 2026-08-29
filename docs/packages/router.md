@@ -262,6 +262,8 @@ const router = createRouterService(routes, {
 
 Without `notFoundComponent`, `RouterView` renders a bare `404` string for an unmatched depth. Provide a component to render your own designed not-found page instead — pair it with a catch-all route (`{path: '/:pathMatch(.*)*', ...}`) to also own the URL.
 
+The fallback is reserved for a **genuine** miss. Before the first navigation resolves, `currentRouteRef` still holds vue-router's `START_LOCATION` sentinel, and `RouterView` renders nothing at all rather than a not-found page — `await routerService.install()` (or `await routerService.isReady()`) before `mount()` if you want that window closed entirely.
+
 ## API Reference
 
 ### `createRouterService(routes, options?)`
@@ -275,15 +277,17 @@ Without `notFoundComponent`, `RouterView` renders a bare `404` string for an unm
 
 ### Navigation Methods
 
-| Method                                       | Description                                   |
-| -------------------------------------------- | --------------------------------------------- |
-| `goToRoute(name, id?, query?, parentId?)`    | Navigate to any named route (push)            |
-| `replaceRoute(name, id?, query?, parentId?)` | Navigate, replacing the current history entry |
-| `goToOverviewPage(name)`                     | Navigate to `name.overview`                   |
-| `goToCreatePage(name)`                       | Navigate to `name.create`                     |
-| `goToEditPage(name, id)`                     | Navigate to `name.edit` with `:id`            |
-| `goToShowPage(name, id, query?)`             | Navigate to `name.show` with `:id`            |
-| `goBack()`                                   | Navigate back in history                      |
+| Method                                       | Description                                                              |
+| -------------------------------------------- | ------------------------------------------------------------------------ |
+| `goToRoute(name, id?, query?, parentId?)`    | Navigate to any named route (push)                                       |
+| `replaceRoute(name, id?, query?, parentId?)` | Navigate, replacing the current history entry                            |
+| `goToOverviewPage(name)`                     | Navigate to `name.overview`                                              |
+| `goToCreatePage(name)`                       | Navigate to `name.create`                                                |
+| `goToEditPage(name, id)`                     | Navigate to `name.edit` with `:id`                                       |
+| `goToShowPage(name, id, query?)`             | Navigate to `name.show` with `:id`                                       |
+| `goBack()`                                   | Navigate back in history                                                 |
+| `install()`                                  | Navigate to the current browser location; returns the navigation promise |
+| `isReady()`                                  | Resolves once the first navigation has settled                           |
 
 ### Route State
 

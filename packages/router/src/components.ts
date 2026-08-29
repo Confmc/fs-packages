@@ -2,6 +2,7 @@ import type {Ref} from 'vue';
 import type {LocationQueryRaw, RouteComponent, RouteLocationNormalizedLoaded, RouteRecordRaw} from 'vue-router';
 
 import {computed, defineComponent, h} from 'vue';
+import {START_LOCATION} from 'vue-router';
 
 import type {RouteName, RouterLinkComponent, RouterService, RouterViewComponent} from './types';
 
@@ -27,6 +28,13 @@ export const createRouterView = (
             });
 
             return () => {
+                // vue-router seeds `currentRoute` with START_LOCATION and only replaces it once the
+                // first navigation resolves. Its `matched` is empty, but that means "not navigated
+                // yet", not "no such route" — painting the not-found fallback there is a false 404
+                // on every cold load. Identity against the exported sentinel, never a
+                // `matched.length === 0` heuristic, which also describes a genuine miss.
+                if (currentRouteRef.value === START_LOCATION) return null;
+
                 if (!component.value) return notFoundComponent ? h(notFoundComponent) : h('p', ['404']);
 
                 return h(component.value, {key: buildRouteKey(currentRouteRef.value, depth)});

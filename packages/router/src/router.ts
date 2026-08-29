@@ -158,7 +158,8 @@ export const createRouterService = <Routes extends RouteRecordRaw[]>(
         location.hash;
 
     return {
-        install: () => void router.push(fullPath),
+        install: () => router.push(fullPath),
+        isReady: () => router.isReady(),
         normalizedRouteToSpecificRoute,
 
         goToRoute,

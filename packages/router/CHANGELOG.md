@@ -1,5 +1,15 @@
 # @script-development/fs-router
 
+## 0.3.0 — 2026-08-29
+
+### Minor Changes
+
+- **`RouterView` no longer paints a false `404` before the first navigation resolves.** vue-router seeds `router.currentRoute` with its exported `START_LOCATION` sentinel and only replaces it once the first navigation settles. `START_LOCATION.matched` is empty, so `RouterView` took the unmatched branch and rendered the not-found fallback — the bare `404`, or a consumer's `notFoundComponent` — for the whole window between `mount()` and that resolution. With a lazily-imported page component or an awaiting `beforeEach` middleware, that window spans at least one painted frame on every cold load. `RouterView` now renders nothing (a comment node) while the route is still `START_LOCATION`. The check is an **identity** comparison against vue-router's exported sentinel, never a `matched.length === 0` shape heuristic — an empty `matched` also describes a genuine miss, and genuine misses keep their existing behaviour unchanged.
+- **`install()` returns the navigation promise.** Its type widens from `() => void` to `() => Promise<NavigationFailure | void | undefined>` — whatever `router.push` returns — so a consumer may `await routerService.install()` before `mount()` and never render the pre-navigation window at all. Widening a return from `void` is assignability-safe, so every existing `routerService.install()` call site keeps compiling and behaving identically.
+- **New method: `isReady()`.** `() => Promise<void>`, delegating to vue-router's `router.isReady()` — the smallest honest way to ask "has the first navigation settled?". Useful when the navigation is dispatched somewhere other than `install()`.
+
+**Consumer note.** Both halves are additive; no consumer has to change anything. `await routerService.install()` before `mount()` if you want no first-paint fallback at all; either way `RouterView` now renders nothing until the first navigation settles, rather than a `404`.
+
 ## 0.2.0 — 2026-07-06
 
 ### Minor Changes

@@ -2,6 +2,7 @@ import type {ComputedRef, DefineSetupFnComponent, Ref} from 'vue';
 import type {
     LocationQuery,
     LocationQueryRaw,
+    NavigationFailure,
     NavigationHookAfter,
     RouteComponent,
     RouteLocationNormalized,
@@ -101,7 +102,15 @@ export interface RouterServiceOptions {
 }
 
 export interface RouterService<Routes extends RouteRecordRaw[]> {
-    install: () => void;
+    /**
+     * Navigates to the current browser location, returning the navigation promise so a
+     * consumer may `await routerService.install()` before mounting — until it settles,
+     * `currentRouteRef` still holds vue-router's `START_LOCATION` and `RouterView` paints
+     * nothing.
+     */
+    install: () => Promise<NavigationFailure | void | undefined>;
+    /** Resolves once the first navigation has settled. Delegates to `router.isReady()`. */
+    isReady: () => Promise<void>;
     normalizedRouteToSpecificRoute: (route: Pick<RouteLocationNormalized, 'name' | 'path'>) => ActualRoute<Routes>;
     goToRoute: (
         name: RouteName<Routes>,

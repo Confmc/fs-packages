@@ -4,7 +4,8 @@ import type {RouteLocationNormalizedLoaded} from 'vue-router';
 
 import {flushPromises, mount} from '@vue/test-utils';
 import {afterEach, describe, expect, it, vi} from 'vitest';
-import {defineComponent, h, ref} from 'vue';
+import {defineComponent, h, ref, shallowRef} from 'vue';
+import {START_LOCATION} from 'vue-router';
 
 import {createRouterLink, createRouterView, createRouterService} from '../src';
 
@@ -35,6 +36,24 @@ describe('createRouterView', () => {
 
         // Assert
         expect(wrapper.text()).toBe('404');
+    });
+
+    it('should render nothing while the route is still START_LOCATION', () => {
+        // Arrange — vue-router seeds `currentRoute` with START_LOCATION and only replaces it once
+        // the first navigation resolves. `matched` is empty there, but that is "not navigated yet",
+        // not "no such route" — painting the not-found fallback in that window is a false 404.
+        // `shallowRef`, not `ref`: vue-router holds `currentRoute` as `shallowRef(START_LOCATION)`,
+        // and a deep `ref` would hand the component a reactive *proxy* whose identity differs from
+        // the sentinel — the fixture has to reproduce the real container, not just the real value.
+        const routeRef = shallowRef(START_LOCATION);
+        const RouterView = createRouterView(routeRef);
+
+        // Act
+        const wrapper = mount(RouterView);
+
+        // Assert — nothing painted at all, and specifically not the bare 404
+        expect(wrapper.text()).toBe('');
+        expect(wrapper.find('p').exists()).toBe(false);
     });
 
     it('should render matched component at depth 0', async () => {
@@ -164,10 +183,14 @@ describe('createRouterView', () => {
         expect(wrapper.text()).toBe('404');
     });
 
-    it('should thread notFoundComponent from createRouterService options into RouterView', () => {
+    it('should thread notFoundComponent from createRouterService options into RouterView', async () => {
         // Arrange — an unmatched depth renders the option-provided fallback
         const NotFound = defineComponent({name: 'NotFound', render: () => h('div', 'service-404')});
         const service = createRouterService(createTestRoutes(), {notFoundComponent: NotFound});
+        // Navigate first: an un-navigated service still sits on START_LOCATION, and this spec is
+        // about a GENUINE miss, not the pre-first-navigation window.
+        await service.goToRoute('about');
+        await flushPromises();
 
         // Act — depth 5 never matches, forcing the fallback path
         const wrapper = mount(service.RouterView, {props: {depth: 5}});

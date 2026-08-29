@@ -4,6 +4,7 @@ import type {RouteRecordRaw} from 'vue-router';
 import {flushPromises} from '@vue/test-utils';
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {defineComponent, h} from 'vue';
+import {START_LOCATION} from 'vue-router';
 
 import {createRouterService} from '../src';
 
@@ -37,6 +38,7 @@ describe('router service', () => {
 
             // Assert
             expect(service).toHaveProperty('install');
+            expect(service).toHaveProperty('isReady');
             expect(service).toHaveProperty('goToRoute');
             expect(service).toHaveProperty('goToCreatePage');
             expect(service).toHaveProperty('goToOverviewPage');
@@ -71,6 +73,38 @@ describe('router service', () => {
 
             // Act & Assert
             expect(() => service.install()).not.toThrow();
+        });
+
+        it('should return the navigation promise so a consumer can await it before mounting', async () => {
+            // Arrange
+            window.history.pushState({}, '', '/about');
+            const service = createRouterService(createTestRoutes());
+
+            // Act — the return is the navigation promise, not undefined
+            const navigation = service.install();
+
+            // Assert — awaiting it is enough; no flushPromises needed to observe the resolved route
+            expect(navigation).toBeInstanceOf(Promise);
+            await navigation;
+            expect(service.currentRouteRef.value.name).toBe('about');
+            // Reset
+            window.history.pushState({}, '', '/');
+        });
+
+        it('should leave currentRouteRef on START_LOCATION until the navigation settles', async () => {
+            // Arrange
+            window.history.pushState({}, '', '/about');
+            const service = createRouterService(createTestRoutes());
+
+            // Act — synchronously after install(), the first navigation has not resolved yet
+            const navigation = service.install();
+
+            // Assert — this is the window in which RouterView must paint nothing
+            expect(service.currentRouteRef.value).toBe(START_LOCATION);
+            await navigation;
+            expect(service.currentRouteRef.value).not.toBe(START_LOCATION);
+            // Reset
+            window.history.pushState({}, '', '/');
         });
 
         it('should navigate to current location', async () => {
@@ -122,6 +156,36 @@ describe('router service', () => {
             expect(afterSpy).toHaveBeenCalled();
             // Reset
             window.history.pushState({}, '', '/');
+        });
+    });
+
+    describe('isReady', () => {
+        it('should resolve once the first navigation dispatched by install has settled', async () => {
+            // Arrange
+            window.history.pushState({}, '', '/about');
+            const service = createRouterService(createTestRoutes());
+
+            // Act
+            service.install();
+            await service.isReady();
+
+            // Assert — the start sentinel is gone by the time isReady resolves
+            expect(service.currentRouteRef.value).not.toBe(START_LOCATION);
+            expect(service.currentRouteRef.value.name).toBe('about');
+            // Reset
+            window.history.pushState({}, '', '/');
+        });
+
+        it('should resolve after a navigation dispatched without install', async () => {
+            // Arrange
+            const service = createRouterService(createTestRoutes());
+
+            // Act — isReady tracks the router's first navigation whatever dispatched it
+            await service.goToRoute('about');
+            await service.isReady();
+
+            // Assert
+            expect(service.currentRouteRef.value.name).toBe('about');
         });
     });
 
