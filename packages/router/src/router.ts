@@ -1,7 +1,7 @@
 import type {LocationQueryRaw, NavigationHookAfter, RouteLocationRaw, RouteRecordRaw} from 'vue-router';
 
 import {computed, shallowRef} from 'vue';
-import {createRouter, createWebHistory} from 'vue-router';
+import {createRouter, createWebHistory, isNavigationFailure, NavigationFailureType} from 'vue-router';
 
 import type {BeforeRouteMiddleware, RouteName, RouterService, RouterServiceOptions} from './types';
 
@@ -178,10 +178,15 @@ export const createRouterService = <Routes extends RouteRecordRaw[]>(
 
     const afterRouteMiddleware: NavigationHookAfter[] = [...(options?.afterRouteCallbacks ?? [])];
     router.afterEach((to, from, failure) => {
-        // An abort this wrapper caused in order to redirect is not the end of anything: the
-        // redirected hop is already in flight and will run its own `afterEach`.
-        const causedByOwnRedirect = redirectAbortedPaths.delete(to.fullPath);
-        if (!causedByOwnRedirect) {
+        // Two hops end nothing, because in both a SUCCESSOR is already in flight and will run its
+        // own `afterEach`: one this wrapper aborted in order to dispatch a redirect, and one a
+        // later navigation overtook — vue-router marks the latter `cancelled` (type 8), which can
+        // only happen because another navigation started. Ending the window on either would drop
+        // the in-flight flag while `currentRoute` is still the sentinel (the false-404 frame this
+        // release exists to close) and warn about a cold start that is in fact proceeding.
+        const supersededByOwnRedirect = redirectAbortedPaths.delete(to.fullPath);
+        const supersededByLaterNavigation = isNavigationFailure(failure, NavigationFailureType.cancelled);
+        if (!supersededByOwnRedirect && !supersededByLaterNavigation) {
             navigating.value = false;
 
             if (!settled) {

@@ -26,6 +26,13 @@ const createTestRoutes = (): RouteRecordRaw[] => [
 ];
 
 describe('createRouterView', () => {
+    // A spec that fails before its own `mockRestore()` would otherwise leak a live console spy
+    // into every following spec in this describe, turning one real red into a cascade of
+    // misleading ones — and a false red costs the gate's authority.
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
     it('should render 404 when no matched route at depth', () => {
         // Arrange
         const routeRef = ref({matched: [], path: '/unknown', params: {}} as unknown as RouteLocationNormalizedLoaded);
@@ -492,6 +499,94 @@ describe('createRouterView', () => {
         await navigation;
         await flushPromises();
         expect(wrapper.text()).toBe('page content');
+    });
+
+    // ---- WR-1119 round 4 — a superseded hop is not a failed one -----------------------------
+
+    it('should stay silent and keep the window open when a second navigation overtakes the first', async () => {
+        // Arrange — a navigation dispatched while the first is still in its guards cancels it:
+        // vue-router records a type-8 `cancelled` failure on the overtaken hop and runs its
+        // `afterEach` while `currentRoute` is STILL the sentinel. Treating that as the end of the
+        // first navigation is wrong twice over — it warns about a cold start that is in fact
+        // proceeding, and it drops the in-flight flag with nothing painted yet, which is the same
+        // false-404 window the release exists to close. A cancel always has a successor hop that
+        // runs its own `afterEach`, so the bookkeeping still drains.
+        window.history.pushState({}, '', '/');
+        const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const service = createRouterService(createTestRoutes());
+        // parks the first hop inside the guard so the second genuinely overtakes it
+        service.registerBeforeRouteMiddleware(async (to) => {
+            if (to.name === 'home') await new Promise((resolve) => setTimeout(resolve, 30));
+            return false;
+        });
+
+        // Act
+        const first = service.install();
+        const wrapper = mount(service.RouterView);
+        const second = service.goToRoute('about');
+        const frames: string[] = [wrapper.html()];
+        for (let tick = 0; tick < 8; tick += 1) {
+            await nextTick();
+            frames.push(wrapper.html());
+            await flushPromises();
+            frames.push(wrapper.html());
+        }
+        await first.catch(() => undefined);
+        await second.catch(() => undefined);
+        await flushPromises();
+
+        // Assert — the overtake is ordinary routing, not a failed cold start. The warn assertion
+        // is the discriminator: it was RED before the fix. The frame sweep is recorded but does
+        // NOT discriminate on its own — the mis-set window is narrower than one happy-dom render
+        // flush, the same limitation stated for the redirect spec above.
+        expect(consoleWarnSpy).not.toHaveBeenCalled();
+        expect(frames.some((frame) => frame.includes('404'))).toBe(false);
+        expect(service.currentRouteRef.value.name).toBe('about');
+        expect(wrapper.text()).toBe('page content');
+        await expect(
+            Promise.race([
+                service.isReady().then(() => 'resolved'),
+                new Promise((resolve) => setTimeout(() => resolve('never settled'), 200)),
+            ]),
+        ).resolves.toBe('resolved');
+        consoleWarnSpy.mockRestore();
+    });
+
+    it('should terminate a redirect loop that starts on the very first navigation', async () => {
+        // Arrange — every other redirect-loop spec navigates once first, so the loop always runs
+        // as the SECOND navigation with readiness already settled. This pins the cold-start shape:
+        // two middleware redirecting into each other before anything has ever rendered. The
+        // failure modes worth excluding are a permanently blank view and an `isReady()` that never
+        // resolves — the depth cap must end the chain and hand back the ordinary fallback.
+        window.history.pushState({}, '', '/');
+        const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const service = createRouterService(createTestRoutes());
+        service.registerBeforeRouteMiddleware((to) => {
+            if (to.name === 'home') return {name: 'about'};
+            if (to.name === 'about') return {name: 'home'};
+
+            return false;
+        });
+
+        // Act
+        const wrapper = mount(service.RouterView);
+        await service.install().catch(() => undefined);
+        await flushPromises();
+
+        // Assert — the cap fires once, the loop is reported once, and the view is the visible
+        // fallback rather than a blank page
+        expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+        expect(consoleWarnSpy).toHaveBeenCalledTimes(1);
+        expect(wrapper.text()).toBe('404');
+        await expect(
+            Promise.race([
+                service.isReady().then(() => 'resolved'),
+                new Promise((resolve) => setTimeout(() => resolve('never settled'), 300)),
+            ]),
+        ).resolves.toBe('resolved');
+        consoleWarnSpy.mockRestore();
+        consoleErrorSpy.mockRestore();
     });
 });
 

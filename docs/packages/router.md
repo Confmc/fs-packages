@@ -270,7 +270,7 @@ Both halves of that condition matter:
 - A middleware that **cancels** the first navigation without redirecting (returning plain `true`) leaves `currentRouteRef` pinned to `START_LOCATION` permanently. Nothing is in flight any more, so the route falls through to the not-found fallback rather than staying blank, and a single `console.warn` records why.
 - A service **nobody navigates** — no `install()`, no `goToRoute()` — was never in flight at all, so it renders the fallback immediately, exactly as it did before `0.3.0`.
 
-`isReady()` resolves once the first navigation that is not an fs-router redirect has finished, whether it succeeded or was cancelled. It never rejects, so `await routerService.isReady()` is safe to place before `mount()` without a `catch`. It does **not** delegate to vue-router's `router.isReady()`: an fs-router redirect is dispatched by aborting the pending hop, which vue-router records as a failure and which leaves its own readiness permanently unsettled. A service nobody navigates leaves `isReady()` pending — nothing has been asked of the router, so nothing has settled.
+`isReady()` resolves once the first navigation that is not _superseded_ has finished, whether it succeeded or was cancelled. A hop is superseded when a successor is already in flight — an fs-router redirect dispatched from a middleware, or a hop a later navigation overtook — and such a hop settles nothing, because its successor will. It never rejects, so `await routerService.isReady()` is safe to place before `mount()` without a `catch`. It does **not** delegate to vue-router's `router.isReady()`: an fs-router redirect is dispatched by aborting the pending hop, which vue-router records as a failure and which leaves its own readiness permanently unsettled. A service nobody navigates leaves `isReady()` pending — nothing has been asked of the router, so nothing has settled.
 
 ## API Reference
 
@@ -285,17 +285,17 @@ Both halves of that condition matter:
 
 ### Navigation Methods
 
-| Method                                       | Description                                                                 |
-| -------------------------------------------- | --------------------------------------------------------------------------- |
-| `goToRoute(name, id?, query?, parentId?)`    | Navigate to any named route (push)                                          |
-| `replaceRoute(name, id?, query?, parentId?)` | Navigate, replacing the current history entry                               |
-| `goToOverviewPage(name)`                     | Navigate to `name.overview`                                                 |
-| `goToCreatePage(name)`                       | Navigate to `name.create`                                                   |
-| `goToEditPage(name, id)`                     | Navigate to `name.edit` with `:id`                                          |
-| `goToShowPage(name, id, query?)`             | Navigate to `name.show` with `:id`                                          |
-| `goBack()`                                   | Navigate back in history                                                    |
-| `install()`                                  | Navigate to the current browser location; returns the navigation promise    |
-| `isReady()`                                  | Resolves once the first non-redirect navigation has finished; never rejects |
+| Method                                       | Description                                                                  |
+| -------------------------------------------- | ---------------------------------------------------------------------------- |
+| `goToRoute(name, id?, query?, parentId?)`    | Navigate to any named route (push)                                           |
+| `replaceRoute(name, id?, query?, parentId?)` | Navigate, replacing the current history entry                                |
+| `goToOverviewPage(name)`                     | Navigate to `name.overview`                                                  |
+| `goToCreatePage(name)`                       | Navigate to `name.create`                                                    |
+| `goToEditPage(name, id)`                     | Navigate to `name.edit` with `:id`                                           |
+| `goToShowPage(name, id, query?)`             | Navigate to `name.show` with `:id`                                           |
+| `goBack()`                                   | Navigate back in history                                                     |
+| `install()`                                  | Navigate to the current browser location; returns the navigation promise     |
+| `isReady()`                                  | Resolves once the first un-superseded navigation has finished; never rejects |
 
 ### Route State
 
