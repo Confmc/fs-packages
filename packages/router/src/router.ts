@@ -3,7 +3,7 @@ import type {LocationQueryRaw, NavigationHookAfter, RouteLocationRaw, RouteRecor
 import {computed, shallowRef} from 'vue';
 import {createRouter, createWebHistory, isNavigationFailure, NavigationFailureType} from 'vue-router';
 
-import type {BeforeRouteMiddleware, RouteName, RouterService, RouterServiceOptions} from './types';
+import type {BeforeRouteMiddleware, MiddlewareRedirect, RouteName, RouterService, RouterServiceOptions} from './types';
 
 import {createRouterLink, createRouterView} from './components';
 import {CREATE_PAGE_NAME, EDIT_PAGE_NAME, OVERVIEW_PAGE_NAME, SHOW_PAGE_NAME} from './routes';
@@ -63,23 +63,38 @@ export const createRouterService = <Routes extends RouteRecordRaw[]>(
     // Guards only run on a later microtask, so a consumer that mounts in the same turn as a
     // programmatic navigation would otherwise observe the sentinel route with nothing marked in
     // flight — and paint the fallback. `install()` opens the window for exactly that reason;
-    // `goToRoute`/`replaceRoute` are the same entry point reached from consumer code. Opening it
-    // again for a redirect this wrapper dispatches is harmless: that runs inside an open window.
-    const dispatchNavigation = async (navigate: () => Promise<unknown>): Promise<void> => {
-        navigating.value = true;
+    // `goToRoute`/`replaceRoute` are the same entry point reached from consumer code.
+    //
+    // Closing in a `finally` is safe BECAUSE the window is a count (WR-1119 r8). The hop this
+    // wrapper aborts in order to dispatch a redirect resolves while its successor is still running
+    // its guards — but the successor's own dispatch was counted in, synchronously, before the
+    // predecessor could be aborted, so the count never reaches zero across a chain. Under the
+    // boolean this was not true and the close had to be withheld here.
+    const dispatchNavigation = async (navigate: () => Promise<unknown>, reportUnreported = true): Promise<void> => {
+        beginDispatch();
 
         try {
             await navigate();
         } catch (error) {
             // `router.push`/`replace` throw SYNCHRONOUSLY for an unknown route name, and reject
-            // when a guard throws. Neither outcome leaves a successor in flight and neither reaches
-            // `afterEach`, so this is the only place left to end the window. Deliberately NOT a
-            // `finally`: the hop this wrapper aborts in order to dispatch a redirect resolves while
-            // its successor is still running its guards, and closing there reopens the false-404
-            // frame the in-flight window exists to prevent.
-            endNavigationWindow(error);
+            // when a guard throws. The synchronous throw reaches neither `afterEach` nor
+            // `triggerError`, so on a cold start this is the only path that can settle readiness.
+            settleReadiness(error);
+
+            // ...and, after the latch has closed, the only path that can REPORT it either: a
+            // post-settle `goToRoute('nope')` reached no reporter at all and was visible solely as
+            // the caller's rejection — invisible to `RouterLink`, which drops the promise. Last
+            // resort by construction: it defers to whoever recorded first. A redirect dispatch
+            // opts OUT (`reportUnreported: false`) because it has its own designated reporter,
+            // which names the redirect rather than the navigation.
+            if (reportUnreported && !alreadyReported(error)) {
+                recordReported(error);
+                console.error('fs-router: navigation failed', error);
+            }
 
             throw error;
+        } finally {
+            endDispatch();
         }
     };
 
@@ -88,6 +103,16 @@ export const createRouterService = <Routes extends RouteRecordRaw[]>(
 
     const replaceRoute: RouterService<Routes>['replaceRoute'] = (name, id, query, parentId) =>
         dispatchNavigation(() => router.replace(buildRouteLocation(name, id, query, parentId)));
+
+    // The redirect a middleware returns, dispatched as its own navigation. It is `goToRoute` /
+    // `replaceRoute` in everything but the last-resort reporter, which it declines: the `.catch`
+    // attached at the call site is this path's designated reporter and names the redirect.
+    const dispatchRedirect = (redirect: MiddlewareRedirect<Routes>): Promise<void> =>
+        dispatchNavigation(() => {
+            const location = buildRouteLocation(redirect.name, redirect.id, redirect.query, redirect.parentId);
+
+            return redirect.replace ? router.replace(location) : router.push(location);
+        }, false);
 
     const normalizedRouteToSpecificRoute: RouterService<Routes>['normalizedRouteToSpecificRoute'] = (route) => {
         const specificRoute = flattenedRoutes.find(({path, name}) => name === route.name || path === route.path);
@@ -112,7 +137,52 @@ export const createRouterService = <Routes extends RouteRecordRaw[]>(
     // no frame exists in which the route is START_LOCATION with nothing in flight — that is what
     // would flash the not-found fallback between the abort and the redirected hop finalizing.
     // A service nobody navigates leaves it false, so an un-navigated view keeps the fallback.
+    //
+    // It is DERIVED from two counts, not set directly (WR-1119 r8). Two navigations can be
+    // outstanding at once — a redirect chain always has two, and nothing stops a consumer
+    // dispatching two hops in one turn — and a boolean cannot say "one of the two ended", so
+    // whichever ended first closed the window for both. The counts answer different questions and
+    // must stay separate:
+    //
+    //   `openHops`       — navigations vue-router entered `beforeEach` for and has not yet ended.
+    //                      This is the one that answers "is a SUCCESSOR still running?", which
+    //                      `onError` needs and can get no other way: it is handed neither a `to`
+    //                      nor a `failure`, so it has none of the evidence `afterEach` reasons on.
+    //   `openDispatches` — navigations THIS service asked for whose promise has not settled. It
+    //                      exists only to cover the microtask gap before guards run. It must stay
+    //                      OUT of the successor test: a lone hop's own dispatch is still open when
+    //                      its terminal fires, and counting it would leave readiness never settling.
     const navigating = shallowRef(false);
+    let openHops = 0;
+    let openDispatches = 0;
+
+    const syncNavigating = (): void => {
+        navigating.value = openHops > 0 || openDispatches > 0;
+    };
+
+    const beginDispatch = (): void => {
+        openDispatches += 1;
+        syncNavigating();
+    };
+
+    const endDispatch = (): void => {
+        openDispatches -= 1;
+        syncNavigating();
+    };
+
+    const beginHop = (): void => {
+        openHops += 1;
+        syncNavigating();
+    };
+
+    // Floored at zero, because ONE vue-router outcome ends a navigation that never entered
+    // `beforeEach`: a push to the location already showing short-circuits to NavigationDuplicated
+    // and goes straight to `afterEach`. Flooring makes that a no-op instead of a negative count
+    // that would report the window closed while a real hop is still running.
+    const endHop = (): void => {
+        openHops = Math.max(0, openHops - 1);
+        syncNavigating();
+    };
 
     // Set once, by the first navigation that is not a redirect-abort of this wrapper's own making.
     let settled = false;
@@ -146,15 +216,16 @@ export const createRouterService = <Routes extends RouteRecordRaw[]>(
     // untrackable case needs no guard here: never recorded, therefore always reported.
     const alreadyReported = (failure: unknown): boolean => reportedFailures.has(failure as object);
 
-    // The one place the in-flight window ends. vue-router has THREE terminal paths and `afterEach`
-    // is only one of them: a guard that throws is routed through `triggerError`, which skips
-    // `afterEach` entirely, and `router.push({name})` throws synchronously for an unknown name.
-    // Closing from a single path is what left a thrown guard with a permanently blank view and an
-    // `isReady()` that never settled. Idempotent by construction — every terminal path may call it,
-    // and a second call is a no-op beyond re-clearing an already-clear flag.
-    const endNavigationWindow = (failure?: unknown): void => {
-        navigating.value = false;
-
+    // The one place readiness settles. vue-router has THREE terminal paths and `afterEach` is only
+    // one of them: a guard that throws is routed through `triggerError`, which skips `afterEach`
+    // entirely, and `router.push({name})` throws synchronously for an unknown name. Settling from
+    // a single path is what left a thrown guard with an `isReady()` that never settled.
+    //
+    // It does NOT touch the in-flight window. Those were one function until r8, and fusing them is
+    // what let a hop that ended early close a window another hop still needed: the window is a
+    // count every terminal decrements, settling is a once-per-service latch each terminal decides
+    // separately whether to trip. Idempotent, so every terminal path may call it.
+    const settleReadiness = (failure?: unknown): void => {
         if (settled) return;
 
         settled = true;
@@ -178,9 +249,10 @@ export const createRouterService = <Routes extends RouteRecordRaw[]>(
     // than latched: vue-router runs the redirected hop's `beforeEach` BEFORE the aborted hop's
     // `afterEach` (observed: before:home, before:about, after:home:fail4, after:about:ok), so a
     // latch cleared on the next `beforeEach` entry would already be gone when `afterEach` reads it.
-    // Every aborted hop always produces exactly one `afterEach`, so the set always drains — which
-    // is also why membership alone is the whole test: no entry can outlive the hop that added it,
-    // so a later navigation can never match a stale path.
+    //
+    // Every aborted hop always produces exactly one `afterEach`, so the set always drains. What
+    // membership CANNOT say is WHICH hop an entry belongs to, and with two hops outstanding on the
+    // same path that matters — see the read order in `afterEach` below (WR-1119 r8).
     const redirectAbortedPaths = new Set<string>();
 
     // Bounds the middleware redirect-return chain. Each returned `MiddlewareRedirect` cancels the
@@ -196,7 +268,7 @@ export const createRouterService = <Routes extends RouteRecordRaw[]>(
 
     const beforeRouteMiddleware: BeforeRouteMiddleware<Routes>[] = [];
     router.beforeEach(async (to, from) => {
-        navigating.value = true;
+        beginHop();
 
         const toNormalized = normalizedRouteToSpecificRoute(to);
         const fromNormalized = from.name ? normalizedRouteToSpecificRoute(from) : toNormalized;
@@ -227,8 +299,7 @@ export const createRouterService = <Routes extends RouteRecordRaw[]>(
                 // `onError`; it still reports on its own for the one failure `onError` CANNOT see,
                 // an unknown route name, where `router.push({name})` throws synchronously and
                 // nothing is ever routed through `triggerError`.
-                const dispatch = result.replace ? replaceRoute : goToRoute;
-                void dispatch(result.name, result.id, result.query, result.parentId).catch((error: unknown) => {
+                void dispatchRedirect(result).catch((error: unknown) => {
                     if (alreadyReported(error)) return;
 
                     console.error('fs-router: middleware redirect navigation failed', error);
@@ -256,15 +327,27 @@ export const createRouterService = <Routes extends RouteRecordRaw[]>(
 
     const afterRouteMiddleware: NavigationHookAfter[] = [...(options?.afterRouteCallbacks ?? [])];
     router.afterEach((to, from, failure) => {
-        // Two hops end nothing, because in both a SUCCESSOR is already in flight and will run its
-        // own `afterEach`: one this wrapper aborted in order to dispatch a redirect, and one a
-        // later navigation overtook — vue-router marks the latter `cancelled` (type 8), which can
-        // only happen because another navigation started. Ending the window on either would drop
-        // the in-flight flag while `currentRoute` is still the sentinel (the false-404 frame this
-        // release exists to close) and warn about a cold start that is in fact proceeding.
-        const supersededByOwnRedirect = redirectAbortedPaths.delete(to.fullPath);
+        // The hop is over either way, so the count comes down unconditionally — the successor's
+        // own entry is what holds the window open, not a withheld decrement.
+        endHop();
+
+        // READINESS is the part two hops must not settle, because in both a SUCCESSOR is already
+        // in flight and will run its own `afterEach`: one this wrapper aborted in order to
+        // dispatch a redirect, and one a later navigation overtook — vue-router marks the latter
+        // `cancelled` (type 8), which can only happen because another navigation started. Settling
+        // on either would warn about a cold start that is in fact proceeding.
+
+        // ORDER IS LOAD-BEARING (WR-1119 r8). A hop a later navigation overtook is cancelled by
+        // vue-router BEFORE its guards run, so it never reached the abort this wrapper's redirect
+        // uses and never marked anything. Reading the mark first let it consume the OTHER hop's:
+        // two `goToRoute` calls in one turn against a redirecting middleware produced one mark
+        // (only the overtaker runs guards), the cancelled hop drained it, and the hop that placed
+        // it then read itself as an ordinary abort and warned about a cold start that was
+        // succeeding. Ask the question a cancelled hop can answer from its own `failure` first,
+        // and only consume a mark for a hop that could actually have placed one.
         const supersededByLaterNavigation = isNavigationFailure(failure, NavigationFailureType.cancelled);
-        if (!supersededByOwnRedirect && !supersededByLaterNavigation) endNavigationWindow(failure);
+        const supersededByOwnRedirect = !supersededByLaterNavigation && redirectAbortedPaths.delete(to.fullPath);
+        if (!supersededByOwnRedirect && !supersededByLaterNavigation) settleReadiness(failure);
 
         for (const middleware of afterRouteMiddleware) middleware(to, from, failure);
     });
@@ -272,21 +355,29 @@ export const createRouterService = <Routes extends RouteRecordRaw[]>(
     // The terminal path `afterEach` never sees. A thrown guard — a consumer middleware, or this
     // wrapper's own `normalizedRouteToSpecificRoute` on any unmatched path, which is every cold
     // load of an unknown URL — reaches `triggerError` and nothing else. It is a genuine failure of
-    // the navigation, so it ends the window exactly as an abort does: the not-found fallback paints
-    // instead of a blank page, and readiness settles instead of hanging.
+    // the navigation, so it ends the hop exactly as an abort does: the not-found fallback paints
+    // instead of a blank page, and readiness settles instead of hanging — unless a successor is
+    // still running, which is the check below.
     //
-    // It is also REPORTED here, unconditionally, and deliberately OUTSIDE `endNavigationWindow`'s
+    // It is also REPORTED here, unconditionally, and deliberately OUTSIDE `settleReadiness`'s
     // once-per-service latch. `triggerError` emits its own `console.error(error)` only while no
     // error listener is registered, so the mere existence of this line makes fs-router the reporter
-    // for every navigation — and closing the window is a once-per-service fact while reporting a
-    // failure is not (WR-1119 r6, ADR-0048). `endNavigationWindow()` is called WITHOUT the error so
-    // the cancel-channel warn above cannot also fire: one failure, one line, first hop or later.
+    // for every navigation — and settling is a once-per-service fact while reporting a failure is
+    // not (WR-1119 r6, ADR-0048). `settleReadiness()` is called WITHOUT the error so the
+    // cancel-channel warn above cannot also fire: one failure, one line, first hop or later.
     // The error is recorded before it is reported so the redirect reporter below can defer to this
     // one; the reporting itself stays unconditional.
     router.onError((error) => {
         recordReported(error);
         console.error('fs-router: navigation failed', error);
-        endNavigationWindow();
+        endHop();
+
+        // The supersession check `afterEach` has carried since round 4, in the only form this path
+        // can express it. `onError` is handed neither a `to` nor a `failure`, so it cannot ask
+        // WHICH hop ended — only whether any other is still running. Without it, a hop whose guard
+        // throws after a successor overtook it settled readiness on the spot, and a consumer that
+        // awaits `isReady()` before mounting mounted on the sentinel.
+        if (openHops === 0) settleReadiness();
     });
 
     const currentRouteRef = router.currentRoute;
@@ -308,9 +399,9 @@ export const createRouterService = <Routes extends RouteRecordRaw[]>(
             // Synchronously, before the push: guards only run on a later microtask, so a consumer
             // that mounts immediately after calling `install()` would otherwise see a window with
             // the sentinel route and nothing marked in flight — and paint the fallback.
-            navigating.value = true;
+            beginDispatch();
 
-            return router.push(fullPath);
+            return router.push(fullPath).finally(endDispatch);
         },
         isReady: () => readyPromise,
         normalizedRouteToSpecificRoute,

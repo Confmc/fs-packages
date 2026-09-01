@@ -1019,6 +1019,129 @@ describe('createRouterView', () => {
         window.history.pushState({}, '', '/');
     });
 
+    // ---- WR-1119 round 8 — two hops at once ------------------------------------------------
+
+    it('should stay silent when two concurrent hops abort into the same redirect target', async () => {
+        // Arrange — two navigations to the SAME redirecting path, dispatched in one turn. Only the
+        // OVERTAKER runs guards: vue-router cancels the hop it overtook before that hop's guards
+        // run, so exactly one redirect mark is placed, by the hop that will later read it. The
+        // cancelled hop's `afterEach` fires FIRST and, reading the mark before its own `failure`,
+        // consumed a mark it never placed — leaving the hop that did place one to read itself as
+        // an ordinary abort and warn about a cold start that is in fact succeeding.
+        //
+        // Measured hook order at the pre-fix commit, both hops on `/`:
+        //   beforeEach /  ·  afterEach / failure=8 (mark consumed)  ·  beforeEach /about
+        //   ·  afterEach / failure=4 (no mark left) -> WARN  ·  afterEach /about
+        //
+        // The WARN is the discriminator, not a frame. The wrongly-closed window is narrower than
+        // one happy-dom render flush (the limitation round 4 recorded), so a frame sweep here
+        // would pass whether or not the defect is present.
+        window.history.pushState({}, '', '/');
+        const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const service = createRouterService(createTestRoutes());
+        service.registerBeforeRouteMiddleware((to) => (to.name === 'home' ? {name: 'about' as const} : false));
+        const wrapper = mount(service.RouterView);
+
+        // Act
+        const first = service.goToRoute('home');
+        const second = service.goToRoute('home');
+        await first.catch(() => undefined);
+        await second.catch(() => undefined);
+        await flushPromises();
+
+        // Assert — the redirect landed and nothing was reported
+        expect(service.currentRouteRef.value.name).toBe('about');
+        expect(wrapper.text()).toBe('page content');
+        expect(fsRouterMessages(consoleWarnSpy, consoleErrorSpy)).toEqual([]);
+        await expect(settlesWithin(service, 300)).resolves.toBe('resolved');
+
+        consoleWarnSpy.mockRestore();
+        consoleErrorSpy.mockRestore();
+    });
+
+    it('should report a post-settle push to an unknown route name exactly once and still reject', async () => {
+        // Arrange — the cold-start shape of this failure is already covered (the settle latch's
+        // warn carries it). AFTER the latch has closed there is no reporter left at all:
+        // `router.push({name})` throws SYNCHRONOUSLY, so nothing reaches `triggerError` and
+        // `onError` never sees it, and the settle latch returns early. The caller's rejection was
+        // the only signal — invisible to `RouterLink`, which drops the promise.
+        window.history.pushState({}, '', '/');
+        const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const service = createRouterService(createTestRoutes());
+        await service.install();
+        await flushPromises();
+        // Positive control — the spies see this service's lines, and the cold start emitted none
+        expect(fsRouterMessages(consoleWarnSpy, consoleErrorSpy)).toEqual([]);
+
+        // Act
+        const rejection = service.goToRoute('definitely-not-a-route-name' as never);
+
+        // Assert — BOTH halves: the caller still learns of it, and so does the console, once
+        await expect(rejection).rejects.toThrow();
+        await flushPromises();
+        expect(fsRouterMessages(consoleWarnSpy, consoleErrorSpy)).toEqual(['fs-router: navigation failed']);
+        expect(service.currentRouteRef.value.name).toBe('home');
+
+        consoleWarnSpy.mockRestore();
+        consoleErrorSpy.mockRestore();
+    });
+
+    it('should not settle readiness on a superseded error while its successor is still in flight', async () => {
+        // Arrange — `afterEach` has carried supersession checks since round 4, but `onError` — the
+        // terminal path a thrown guard takes, and the only one `afterEach` never sees — carried
+        // none. A hop whose guard throws after a successor has overtaken it therefore ends the
+        // FIRST navigation on the spot: readiness resolves while `currentRoute` is still the
+        // sentinel, so a consumer that awaits `isReady()` before mounting mounts on nothing.
+        //
+        // Ordering, not a timeout, is the assertion: readiness must settle AFTER the successor
+        // lands, and both events are recorded in one list so the failure names which came first.
+        window.history.pushState({}, '', '/');
+        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        let releaseThrower!: () => void;
+        let releaseSuccessor!: () => void;
+        const throwerParked = new Promise<void>((resolve) => {
+            releaseThrower = resolve;
+        });
+        const successorParked = new Promise<void>((resolve) => {
+            releaseSuccessor = resolve;
+        });
+        const service = createRouterService(createTestRoutes());
+        service.registerBeforeRouteMiddleware(async (to) => {
+            if (to.name === 'home') {
+                await throwerParked;
+                throw new Error('middleware exploded');
+            }
+            if (to.name === 'about') await successorParked;
+
+            return false;
+        });
+        const order: string[] = [];
+        service.registerAfterRouteMiddleware((to) => {
+            if (to.name === 'about') order.push('successor landed');
+        });
+        void service.isReady().then(() => order.push('readiness settled'));
+
+        // Act — park the first hop in its guard, let a second overtake it, then make the first throw
+        const first = service.install();
+        await flushPromises();
+        const second = service.goToRoute('about');
+        await flushPromises();
+        releaseThrower();
+        await first.catch(() => undefined);
+        await flushPromises();
+        releaseSuccessor();
+        await second.catch(() => undefined);
+        await flushPromises();
+
+        // Assert
+        expect(order).toEqual(['successor landed', 'readiness settled']);
+        expect(service.currentRouteRef.value.name).toBe('about');
+
+        consoleErrorSpy.mockRestore();
+    });
+
     // The invariant, written once over every terminal outcome the suite knows about, so a terminal
     // path added later is covered by construction rather than by remembering to add a case. THREE
     // observable consequences are asserted: nothing is left permanently blank, readiness has
@@ -1204,6 +1327,16 @@ describe('createRouterView', () => {
         if (service.currentRouteRef.value === START_LOCATION) expect(wrapper.text()).toBe('404');
         await expect(settlesWithin(service, 300)).resolves.toBe('resolved');
         expect(fsRouterCalls(consoleWarnSpy, consoleErrorSpy)).toHaveLength(expectedLines);
+
+        // WR-1119 r8 — the leak probe, and the reason it has to pin the view back to the sentinel:
+        // the in-flight window is only OBSERVABLE there. With a real route showing, RouterView
+        // paints the page whatever the window says, so an outcome that ends on a real route hides
+        // a window left open forever — which is round 1's permanently blank page, reintroduced the
+        // moment any terminal path increments the in-flight count without a matching decrement.
+        // Re-pinning the ref is the router's own sentinel state, not a fabricated one.
+        service.currentRouteRef.value = START_LOCATION;
+        await nextTick();
+        expect(wrapper.text()).toBe('404');
 
         consoleWarnSpy.mockRestore();
         consoleErrorSpy.mockRestore();
