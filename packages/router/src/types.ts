@@ -114,10 +114,11 @@ export interface RouterService<Routes extends RouteRecordRaw[]> {
      * Resolves once the first navigation that is not an fs-router redirect has ended — whether it
      * succeeded, was cancelled, or failed. Ended, not `afterEach`-ed: vue-router has three terminal
      * paths and a thrown guard takes `onError` instead, which is why an unmatched URL settles here
-     * rather than hanging. Never rejects, and never delegates to `router.isReady()`: an fs-router
-     * redirect is dispatched by ABORTING the pending hop, which vue-router reports as a failure and
-     * which leaves its own readiness permanently unsettled. Stays pending while no navigation has
-     * ever been dispatched.
+     * rather than hanging. Settling is once-per-service; REPORTING is not — a navigation that
+     * throws is `console.error`-ed every time, long after this promise has resolved. Never rejects,
+     * and never delegates to `router.isReady()`: an fs-router redirect is dispatched by ABORTING
+     * the pending hop, which vue-router reports as a failure and which leaves its own readiness
+     * permanently unsettled. Stays pending while no navigation has ever been dispatched.
      */
     isReady: () => Promise<void>;
     normalizedRouteToSpecificRoute: (route: Pick<RouteLocationNormalized, 'name' | 'path'>) => ActualRoute<Routes>;

@@ -595,11 +595,15 @@ describe('createRouterView', () => {
 
     // vue-router emits its own warnings on an unmatched location (`[VUE_ROUTER_R0004]`, and
     // `[VUE_ROUTER_R0010]` while no `onError` handler is registered). They are not fs-router's and
-    // they are not what these specs are about, so every warn assertion below counts only the
+    // they are not what these specs are about, so every console assertion below counts only the
     // wrapper's own signal. Asserting on the raw call count instead would pin vue-router's console
     // vocabulary, which is neither our contract nor stable across its minors.
-    const fsRouterWarns = (spy: MockInstance): unknown[][] =>
-        spy.mock.calls.filter((call) => String(call[0]).startsWith('fs-router:'));
+    //
+    // Variadic over spies because the WR-1119 r6 contract — exactly ONE fs-router line per genuine
+    // failure — is only meaningful as a total across both channels: counting one channel alone
+    // cannot tell "not reported at all" apart from "reported on the other one".
+    const fsRouterCalls = (...spies: MockInstance[]): unknown[][] =>
+        spies.flatMap((spy) => spy.mock.calls.filter((call) => String(call[0]).startsWith('fs-router:')));
 
     const settlesWithin = async (service: {isReady: () => Promise<void>}, ms: number): Promise<string> =>
         Promise.race([
@@ -662,9 +666,12 @@ describe('createRouterView', () => {
         await flushPromises();
 
         // Assert — `main`'s visible 404 is restored, the miss is reported exactly once, and
-        // readiness settles rather than hanging (raced so a hang fails instead of stalling)
+        // readiness settles rather than hanging (raced so a hang fails instead of stalling).
+        // The one line is an ERROR: the throw is reported on the channel vue-router stopped using
+        // the moment fs-router registered a handler, and the abort-channel warn must not also fire.
         expect(wrapper.text()).toBe('404');
-        expect(fsRouterWarns(consoleWarnSpy)).toHaveLength(1);
+        expect(fsRouterCalls(consoleErrorSpy)).toHaveLength(1);
+        expect(fsRouterCalls(consoleWarnSpy, consoleErrorSpy)).toHaveLength(1);
         await expect(settlesWithin(service, 200)).resolves.toBe('resolved');
 
         consoleWarnSpy.mockRestore();
@@ -672,7 +679,7 @@ describe('createRouterView', () => {
         window.history.replaceState({}, '', '/');
     });
 
-    it('should render the fallback and settle readiness when a middleware throws on the first navigation', async () => {
+    it('should report a FIRST-navigation throw exactly once, render the fallback, and settle readiness', async () => {
         // Arrange — the same terminal path reached from consumer code rather than from fs-router's
         // own unmatched-path throw. A guard that throws is routed through `onError`, never through
         // `afterEach`, so nothing closed the window.
@@ -689,19 +696,24 @@ describe('createRouterView', () => {
         await service.install().catch(() => undefined);
         await flushPromises();
 
-        // Assert
+        // Assert — ONE fs-router line across both channels. Two is the naive fix: reporting the
+        // throw unconditionally while still routing the same error into the first-settle warn path
+        // emits an error AND a warn for one failure. This is the assertion that catches it.
         expect(wrapper.text()).toBe('404');
-        expect(fsRouterWarns(consoleWarnSpy)).toHaveLength(1);
+        expect(fsRouterCalls(consoleErrorSpy)).toHaveLength(1);
+        expect(fsRouterCalls(consoleWarnSpy, consoleErrorSpy)).toHaveLength(1);
         await expect(settlesWithin(service, 200)).resolves.toBe('resolved');
 
         consoleWarnSpy.mockRestore();
         consoleErrorSpy.mockRestore();
     });
 
-    it('should close the window without warning when a middleware throws on a LATER navigation', async () => {
+    it('should report a LATER goToRoute failure exactly once and still reject the caller', async () => {
         // Arrange — readiness has already settled, so a later throw is ordinary guard behaviour: it
         // must end the in-flight window (or every subsequent navigation starts inside a stale one)
-        // without re-arming the cold-start warning and without disturbing the painted page.
+        // and be reported, without re-arming the cold-start warning and without disturbing the
+        // painted page. BOTH halves are asserted below: the console line is what r5 dropped, and
+        // the rejection is what a future round must not "fix" the reporting by swallowing.
         window.history.pushState({}, '', '/');
         const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
         const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -716,15 +728,47 @@ describe('createRouterView', () => {
         service.registerBeforeRouteMiddleware(() => {
             throw new Error('middleware exploded');
         });
-        await service.goToRoute('about').catch(() => undefined);
+        let callerSaw = 'nothing';
+        await service.goToRoute('about').catch((error: unknown) => {
+            callerSaw = String(error);
+        });
         await flushPromises();
 
-        // Assert — the page it was on is still painted, nothing warned, readiness stays resolved.
-        // The window really closed: the next navigation lands normally rather than being swallowed
-        // by a window that never reopened.
+        // Assert — reported exactly once on the error channel, the cold-start warn stays silent
+        // (this is not a cold start), the caller still gets its rejection, the page it was on is
+        // still painted, and readiness stays resolved.
+        expect(fsRouterCalls(consoleErrorSpy)).toHaveLength(1);
+        expect(fsRouterCalls(consoleWarnSpy, consoleErrorSpy)).toHaveLength(1);
+        expect(callerSaw).toBe('Error: middleware exploded');
         expect(wrapper.text()).toBe('page content');
-        expect(fsRouterWarns(consoleWarnSpy)).toHaveLength(0);
         await expect(settlesWithin(service, 200)).resolves.toBe('resolved');
+
+        consoleWarnSpy.mockRestore();
+        consoleErrorSpy.mockRestore();
+    });
+
+    it('should stay silent when a LATER navigation is cancelled rather than failed', async () => {
+        // Arrange — the noise guard. A cancelled hop is not an error: a `true`-returning auth
+        // middleware cancels on every guarded click, and reporting those would turn ordinary
+        // routing into a console stream. The cancel/abort channel therefore stays
+        // first-navigation-only; only a THROWN error survives the settle latch.
+        window.history.pushState({}, '', '/');
+        const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const service = createRouterService(createTestRoutes());
+        await service.install();
+        await flushPromises();
+        const wrapper = mount(service.RouterView);
+
+        // Act
+        service.registerBeforeRouteMiddleware(() => true);
+        await service.goToRoute('about');
+        await service.goToRoute('about');
+        await flushPromises();
+
+        // Assert — two cancelled hops, no console output at all, page undisturbed
+        expect(fsRouterCalls(consoleWarnSpy, consoleErrorSpy)).toHaveLength(0);
+        expect(wrapper.text()).toBe('page content');
 
         consoleWarnSpy.mockRestore();
         consoleErrorSpy.mockRestore();
@@ -756,7 +800,7 @@ describe('createRouterView', () => {
 
         // Assert — still the visible fallback, and the cold-start warning did not fire twice
         expect(wrapper.text()).toBe('404');
-        expect(fsRouterWarns(consoleWarnSpy)).toHaveLength(1);
+        expect(fsRouterCalls(consoleWarnSpy)).toHaveLength(1);
 
         consoleWarnSpy.mockRestore();
         consoleErrorSpy.mockRestore();
@@ -803,19 +847,34 @@ describe('createRouterView', () => {
     });
 
     // The invariant, written once over every terminal outcome the suite knows about, so a terminal
-    // path added later is covered by construction rather than by remembering to add a case. Two
-    // observable consequences of the window being closed are asserted: nothing is left permanently
-    // blank, and readiness has settled. Where the outcome leaves the route on the sentinel the
-    // blank check discriminates the in-flight flag directly (a still-open window paints ''); where
-    // a real route finalized, RouterView paints it regardless and readiness carries the
-    // discrimination. `changeRouteQuery` is deliberately absent — it swallows its navigation
-    // promise the same way and is tracked separately as WR-1120.
+    // path added later is covered by construction rather than by remembering to add a case. THREE
+    // observable consequences are asserted: nothing is left permanently blank, readiness has
+    // settled, and the outcome produced exactly `expectedLines` fs-router console lines. Where the
+    // outcome leaves the route on the sentinel the blank check discriminates the in-flight flag
+    // directly (a still-open window paints ''); where a real route finalized, RouterView paints it
+    // regardless and readiness carries the discrimination.
+    //
+    // `expectedLines` is the WR-1119 r6 axis and it is a TOTAL across both console channels: 1 for
+    // a genuine failure whenever it happens, 1 for a cancelled FIRST navigation (the cold-start
+    // warn), 0 for everything else. A post-settle CANCEL is deliberately not a row here — it has
+    // its own named spec above, which carries the reason the cancel channel must stay quiet.
+    //
+    // The history-driven (`goBack`) case cannot be a row here either, and the reason is a trap
+    // worth naming: `createWebHistory()` registers a `popstate` listener per service and nothing
+    // unregisters it, so ONE `history.back()` drives every service this file ever built. Measured:
+    // an earlier spec's service answered the hop with `fs-router: middleware redirect chain
+    // exceeded 10 hops`, which made a pre-fix run of that case pass on another service's output.
+    // It lives in `history-navigation.spec.ts`, alone in a file, where the listener set is its own.
+    // `changeRouteQuery` is deliberately absent — it swallows its navigation promise the same way
+    // and is tracked separately as WR-1120.
     const terminalOutcomes: {
         name: string;
+        expectedLines: number;
         drive: () => Promise<{service: ReturnType<typeof createRouterService>; wrapper: VueWrapper}>;
     }[] = [
         {
             name: 'a navigation that succeeds',
+            expectedLines: 0,
             drive: async () => {
                 window.history.pushState({}, '', '/about');
                 const service = createRouterService(createTestRoutes());
@@ -828,6 +887,7 @@ describe('createRouterView', () => {
         },
         {
             name: 'a middleware that cancels with plain `true`',
+            expectedLines: 1,
             drive: async () => {
                 window.history.pushState({}, '', '/');
                 const service = createRouterService(createTestRoutes());
@@ -841,6 +901,7 @@ describe('createRouterView', () => {
         },
         {
             name: 'a middleware redirect chain',
+            expectedLines: 0,
             drive: async () => {
                 window.history.pushState({}, '', '/');
                 const service = createRouterService(createTestRoutes());
@@ -854,6 +915,7 @@ describe('createRouterView', () => {
         },
         {
             name: 'a hop a later navigation overtook',
+            expectedLines: 0,
             drive: async () => {
                 window.history.pushState({}, '', '/');
                 const service = createRouterService(createTestRoutes());
@@ -874,6 +936,7 @@ describe('createRouterView', () => {
         },
         {
             name: 'a guard that throws',
+            expectedLines: 1,
             drive: async () => {
                 window.history.pushState({}, '', '/');
                 const service = createRouterService(createTestRoutes());
@@ -889,6 +952,7 @@ describe('createRouterView', () => {
         },
         {
             name: 'a push to an unknown route name, which throws synchronously',
+            expectedLines: 1,
             drive: async () => {
                 window.history.pushState({}, '', '/');
                 const service = createRouterService(createTestRoutes());
@@ -899,9 +963,27 @@ describe('createRouterView', () => {
                 return {service, wrapper};
             },
         },
+        {
+            name: 'a guard that throws on a navigation AFTER the first has settled',
+            expectedLines: 1,
+            drive: async () => {
+                window.history.pushState({}, '', '/');
+                const service = createRouterService(createTestRoutes());
+                const wrapper = mount(service.RouterView);
+                await service.install();
+                await flushPromises();
+                service.registerBeforeRouteMiddleware(() => {
+                    throw new Error('middleware exploded');
+                });
+                await service.goToRoute('about').catch(() => undefined);
+                await flushPromises();
+
+                return {service, wrapper};
+            },
+        },
     ];
 
-    it.each(terminalOutcomes)('should end the in-flight window after $name', async ({drive}) => {
+    it.each(terminalOutcomes)('should end the in-flight window after $name', async ({drive, expectedLines}) => {
         // Arrange
         const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
         const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -913,6 +995,7 @@ describe('createRouterView', () => {
         expect(wrapper.text()).not.toBe('');
         if (service.currentRouteRef.value === START_LOCATION) expect(wrapper.text()).toBe('404');
         await expect(settlesWithin(service, 300)).resolves.toBe('resolved');
+        expect(fsRouterCalls(consoleWarnSpy, consoleErrorSpy)).toHaveLength(expectedLines);
 
         consoleWarnSpy.mockRestore();
         consoleErrorSpy.mockRestore();

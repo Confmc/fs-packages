@@ -135,8 +135,11 @@ export const createRouterService = <Routes extends RouteRecordRaw[]>(
         if (settled) return;
 
         settled = true;
-        // Only a GENUINE failure of the first navigation is worth a console signal — a redirect
-        // never reaches here, so an auth guard no longer warns on cold load.
+        // The CANCEL/ABORT channel, and only it. A cancelled navigation is not an error — an auth
+        // middleware cancels on every guarded click — so it is worth a signal exactly once, on the
+        // cold start it left sitting on the fallback, and never again. A redirect never reaches
+        // here at all. Thrown errors do NOT arrive with a `failure`: they are reported at
+        // `router.onError` below, outside this latch, because reporting is per-failure.
         if (failure) console.warn('fs-router: the first navigation did not complete, rendering not-found', failure);
 
         markSettled();
@@ -235,9 +238,18 @@ export const createRouterService = <Routes extends RouteRecordRaw[]>(
     // wrapper's own `normalizedRouteToSpecificRoute` on any unmatched path, which is every cold
     // load of an unknown URL — reaches `triggerError` and nothing else. It is a genuine failure of
     // the navigation, so it ends the window exactly as an abort does: the not-found fallback paints
-    // instead of a blank page, and readiness settles instead of hanging. Registering a handler at
-    // all also retires vue-router's own `[VUE_ROUTER_R0010]` "register an error handler" warning.
-    router.onError((error) => endNavigationWindow(error));
+    // instead of a blank page, and readiness settles instead of hanging.
+    //
+    // It is also REPORTED here, unconditionally, and deliberately OUTSIDE `endNavigationWindow`'s
+    // once-per-service latch. `triggerError` emits its own `console.error(error)` only while no
+    // error listener is registered, so the mere existence of this line makes fs-router the reporter
+    // for every navigation — and closing the window is a once-per-service fact while reporting a
+    // failure is not (WR-1119 r6, ADR-0048). `endNavigationWindow()` is called WITHOUT the error so
+    // the cancel-channel warn above cannot also fire: one failure, one line, first hop or later.
+    router.onError((error) => {
+        console.error('fs-router: navigation failed', error);
+        endNavigationWindow();
+    });
 
     const currentRouteRef = router.currentRoute;
 
