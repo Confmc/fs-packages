@@ -605,6 +605,11 @@ describe('createRouterView', () => {
     const fsRouterCalls = (...spies: MockInstance[]): unknown[][] =>
         spies.flatMap((spy) => spy.mock.calls.filter((call) => String(call[0]).startsWith('fs-router:')));
 
+    // The same subset as messages, for the specs whose contract is WHICH line survived rather than
+    // how many — a count alone cannot tell "the right reporter deferred" from "the wrong one did".
+    const fsRouterMessages = (...spies: MockInstance[]): string[] =>
+        fsRouterCalls(...spies).map((call) => String(call[0]));
+
     const settlesWithin = async (service: {isReady: () => Promise<void>}, ms: number): Promise<string> =>
         Promise.race([
             service.isReady().then(
@@ -846,6 +851,174 @@ describe('createRouterView', () => {
         expect(service.currentRouteRef.value.name).toBe('about');
     });
 
+    // ---- WR-1119 round 7 — one line per genuine failure, however many reporters can see it ----
+
+    // A middleware redirect dispatches its own navigation and attaches a `.catch` reporter to it,
+    // so a redirect into a target whose guard throws is visible to TWO reporters: `router.onError`,
+    // which covers everything vue-router routes through `triggerError`, and that `.catch`. Both
+    // fired, describing one failure at two levels of context. The `.catch` now defers to whichever
+    // reporter got there first.
+    //
+    // These specs are also the ORDERING probe. The deferral relies on `triggerError` calling its
+    // error handlers SYNCHRONOUSLY and only then returning `Promise.reject(error)`, so `onError`
+    // has always recorded the error by the time the `.catch` runs a microtask later. If that ever
+    // stops being true the record is missing when the `.catch` looks, both lines come back, and
+    // these go red — rather than the contract failing quietly.
+    it('should report a redirect into a throwing target exactly once on a LATER navigation', async () => {
+        // Arrange — readiness settled first, so this is ordinary routing and not a cold start
+        window.history.pushState({}, '', '/items');
+        const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const service = createRouterService(createTestRoutes());
+        await service.install();
+        await flushPromises();
+        const wrapper = mount(service.RouterView);
+
+        // Act — `home` redirects to `about`, whose guard throws
+        service.registerBeforeRouteMiddleware((to) => {
+            if (to.name === 'about') throw new Error('middleware exploded');
+
+            return to.name === 'home' ? {name: 'about' as const} : false;
+        });
+        await service.goToRoute('home').catch(() => undefined);
+        await flushPromises();
+
+        // Assert — ONE line, and specifically the one `onError` owns: it is the reporter that sees
+        // every error vue-router routes, so it is the one the redirect reporter must yield to.
+        expect(fsRouterMessages(consoleWarnSpy, consoleErrorSpy)).toEqual(['fs-router: navigation failed']);
+        expect(wrapper.text()).toBe('layout');
+        await expect(settlesWithin(service, 200)).resolves.toBe('resolved');
+
+        consoleWarnSpy.mockRestore();
+        consoleErrorSpy.mockRestore();
+        window.history.pushState({}, '', '/');
+    });
+
+    it('should report a redirect into a throwing target exactly once on a cold load', async () => {
+        // Arrange — the same chain on the FIRST navigation, where the cold-start warn is also in a
+        // position to fire. The count here is NOT a fixed property of the redirect: it depends on
+        // which reporters the chain's shape puts in play, which is why every assertion in this
+        // block is written as "one line per failure" and never as "two lines became one".
+        window.history.pushState({}, '', '/');
+        const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const service = createRouterService(createTestRoutes());
+        service.registerBeforeRouteMiddleware((to) => {
+            if (to.name === 'about') throw new Error('middleware exploded');
+
+            return to.name === 'home' ? {name: 'about' as const} : false;
+        });
+
+        // Act
+        const wrapper = mount(service.RouterView);
+        await service.install().catch(() => undefined);
+        await flushPromises();
+
+        // Assert — one line, the fallback paints rather than a blank page, and readiness settles
+        expect(fsRouterMessages(consoleWarnSpy, consoleErrorSpy)).toEqual(['fs-router: navigation failed']);
+        expect(wrapper.text()).toBe('404');
+        await expect(settlesWithin(service, 300)).resolves.toBe('resolved');
+
+        consoleWarnSpy.mockRestore();
+        consoleErrorSpy.mockRestore();
+    });
+
+    it('should report a redirect to an unknown route name exactly once, on the redirect channel', async () => {
+        // Arrange — the reason the redirect reporter cannot simply be deleted, which is the obvious
+        // way to turn the two-line case above into one. `router.push({name})` throws SYNCHRONOUSLY
+        // for an unknown name: nothing reaches `triggerError`, so `onError` never sees it and the
+        // redirect `.catch` is the ONLY reporter this path has. Deleting it reopens the silent
+        // failure this release exists to close. This spec is what stops a later round doing it.
+        window.history.pushState({}, '', '/items');
+        const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const service = createRouterService(createTestRoutes());
+        await service.install();
+        await flushPromises();
+
+        // Act
+        service.registerBeforeRouteMiddleware((to) =>
+            to.name === 'home' ? {name: 'definitely-not-a-route-name' as never} : false,
+        );
+        await service.goToRoute('home').catch(() => undefined);
+        await flushPromises();
+
+        // Assert — one line, and it is the redirect reporter's own
+        expect(fsRouterMessages(consoleWarnSpy, consoleErrorSpy)).toEqual([
+            'fs-router: middleware redirect navigation failed',
+        ]);
+
+        consoleWarnSpy.mockRestore();
+        consoleErrorSpy.mockRestore();
+        window.history.pushState({}, '', '/');
+    });
+
+    it('should report a cold-load redirect to an unknown route name exactly once', async () => {
+        // Arrange — the same synchronous throw on the FIRST navigation, where a SECOND reporter can
+        // see it after all: `goToRoute`'s catch hands the error to the settle latch, whose
+        // cold-start warn carries it too. Two lines pre-fix, on two different channels, for one
+        // failure — the same defect as the specs above reached by a path `onError` is not on. The
+        // warn gets there first, so the warn is the line that survives.
+        window.history.pushState({}, '', '/');
+        const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const service = createRouterService(createTestRoutes());
+        service.registerBeforeRouteMiddleware((to) =>
+            to.name === 'home' ? {name: 'definitely-not-a-route-name' as never} : false,
+        );
+
+        // Act
+        const wrapper = mount(service.RouterView);
+        await service.install().catch(() => undefined);
+        await flushPromises();
+
+        // Assert
+        expect(fsRouterMessages(consoleWarnSpy, consoleErrorSpy)).toEqual([
+            'fs-router: the first navigation did not complete, rendering not-found',
+        ]);
+        expect(wrapper.text()).toBe('404');
+        await expect(settlesWithin(service, 300)).resolves.toBe('resolved');
+
+        consoleWarnSpy.mockRestore();
+        consoleErrorSpy.mockRestore();
+    });
+
+    it('should still report a non-object throw from a redirect target rather than swallow it', async () => {
+        // Arrange — the deliberate exception, and the only place this release accepts two lines for
+        // one failure. The ledger of already-reported failures is keyed by object IDENTITY (a
+        // `WeakSet`), which cannot hold a primitive, so `throw 'boom'` is never recorded and every
+        // reporter that sees it reports it. The alternative — a value-keyed ledger — would let two
+        // navigations that happen to throw the same string suppress each other, which is a SILENT
+        // drop, the defect class this whole release exists to close. Loud beats silent on the case
+        // the ledger cannot track.
+        window.history.pushState({}, '', '/items');
+        const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const service = createRouterService(createTestRoutes());
+        await service.install();
+        await flushPromises();
+
+        // Act
+        service.registerBeforeRouteMiddleware((to) => {
+            if (to.name === 'about') throw 'boom';
+
+            return to.name === 'home' ? {name: 'about' as const} : false;
+        });
+        await service.goToRoute('home').catch(() => undefined);
+        await flushPromises();
+
+        // Assert — REPORTED. The count is asserted exactly so that a future change which silences
+        // the untrackable case fails here instead of passing a looser "at least one" check.
+        expect(fsRouterMessages(consoleWarnSpy, consoleErrorSpy)).toEqual([
+            'fs-router: navigation failed',
+            'fs-router: middleware redirect navigation failed',
+        ]);
+
+        consoleWarnSpy.mockRestore();
+        consoleErrorSpy.mockRestore();
+        window.history.pushState({}, '', '/');
+    });
+
     // The invariant, written once over every terminal outcome the suite knows about, so a terminal
     // path added later is covered by construction rather than by remembering to add a case. THREE
     // observable consequences are asserted: nothing is left permanently blank, readiness has
@@ -857,7 +1030,8 @@ describe('createRouterView', () => {
     // `expectedLines` is the WR-1119 r6 axis and it is a TOTAL across both console channels: 1 for
     // a genuine failure whenever it happens, 1 for a cancelled FIRST navigation (the cold-start
     // warn), 0 for everything else. A post-settle CANCEL is deliberately not a row here — it has
-    // its own named spec above, which carries the reason the cancel channel must stay quiet.
+    // its own named spec above, which carries the reason the cancel channel must stay quiet. So is
+    // the non-object throw, the one outcome that deliberately emits TWO — a row cannot carry why.
     //
     // The history-driven (`goBack`) case cannot be a row here either, and the reason is a trap
     // worth naming: `createWebHistory()` registers a `popstate` listener per service and nothing
@@ -958,6 +1132,40 @@ describe('createRouterView', () => {
                 const service = createRouterService(createTestRoutes());
                 const wrapper = mount(service.RouterView);
                 await service.goToRoute('definitely-not-a-route-name' as never).catch(() => undefined);
+                await flushPromises();
+
+                return {service, wrapper};
+            },
+        },
+        {
+            name: 'a middleware redirect into a target whose guard throws',
+            expectedLines: 1,
+            drive: async () => {
+                window.history.pushState({}, '', '/');
+                const service = createRouterService(createTestRoutes());
+                service.registerBeforeRouteMiddleware((to) => {
+                    if (to.name === 'about') throw new Error('middleware exploded');
+
+                    return to.name === 'home' ? {name: 'about' as const} : false;
+                });
+                const wrapper = mount(service.RouterView);
+                await service.install().catch(() => undefined);
+                await flushPromises();
+
+                return {service, wrapper};
+            },
+        },
+        {
+            name: 'a middleware redirect to an unknown route name, which throws synchronously',
+            expectedLines: 1,
+            drive: async () => {
+                window.history.pushState({}, '', '/');
+                const service = createRouterService(createTestRoutes());
+                service.registerBeforeRouteMiddleware((to) =>
+                    to.name === 'home' ? {name: 'definitely-not-a-route-name' as never} : false,
+                );
+                const wrapper = mount(service.RouterView);
+                await service.install().catch(() => undefined);
                 await flushPromises();
 
                 return {service, wrapper};

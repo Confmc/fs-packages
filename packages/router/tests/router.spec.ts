@@ -940,13 +940,18 @@ describe('router service', () => {
             // Act
             await service.goToRoute('about');
 
-            // Assert — the fire-and-forget dispatch's rejection is caught and reported
+            // Assert — the fire-and-forget dispatch's rejection reaches the console rather than
+            // going nowhere. WHICH reporter carries it is not this spec's contract and is asserted
+            // where it belongs, in the round-7 block of `components.spec.ts`: a throw routed through
+            // `triggerError` is reported by `onError`, and the redirect reporter defers to it so one
+            // failure does not produce two lines. Pinning the redirect message here made this spec
+            // fail on a change that lost nothing — the failure is still reported, once.
             await vi.waitFor(() => {
-                expect(consoleErrorSpy).toHaveBeenCalledWith(
-                    'fs-router: middleware redirect navigation failed',
-                    expect.any(Error),
-                );
+                expect(consoleErrorSpy).toHaveBeenCalledWith('fs-router: navigation failed', expect.any(Error));
             });
+            expect(consoleErrorSpy.mock.calls.filter((call) => String(call[0]).startsWith('fs-router:'))).toHaveLength(
+                1,
+            );
         });
     });
 

@@ -123,6 +123,29 @@ export const createRouterService = <Routes extends RouteRecordRaw[]>(
         markSettled = resolve;
     });
 
+    // One fs-router console line per genuine failure, however many reporters are in a position to
+    // see it. THREE are: `onError` below, the cold-start warn inside the settle latch, and the
+    // `.catch` on the navigation a middleware redirect dispatches. A redirect into a target whose
+    // guard throws is seen by two of them at once, and which two depends on the chain's shape — so
+    // the rule is positional, not a count: a reporter records the failure it reports, and the
+    // redirect reporter stays silent for a failure someone already reported. `triggerError` calls
+    // its error handlers SYNCHRONOUSLY and only then returns `Promise.reject(error)`, so `onError`
+    // has always recorded by the time that `.catch` runs.
+    //
+    // Keyed by object identity, so two failures can never be confused for one. A primitive throw
+    // cannot be recorded at all and is therefore always reported — loud on the case the ledger
+    // cannot track, because a silent path is the failure class this release exists to close.
+    const reportedFailures = new WeakSet<object>();
+
+    // `WeakSet.add` THROWS for a primitive, so an untrackable throw is simply never recorded.
+    const recordReported = (failure: unknown): void => {
+        if (failure instanceof Object) reportedFailures.add(failure);
+    };
+
+    // `WeakSet.has`, unlike `add`, answers false for a primitive instead of throwing — so the
+    // untrackable case needs no guard here: never recorded, therefore always reported.
+    const alreadyReported = (failure: unknown): boolean => reportedFailures.has(failure as object);
+
     // The one place the in-flight window ends. vue-router has THREE terminal paths and `afterEach`
     // is only one of them: a guard that throws is routed through `triggerError`, which skips
     // `afterEach` entirely, and `router.push({name})` throws synchronously for an unknown name.
@@ -138,9 +161,15 @@ export const createRouterService = <Routes extends RouteRecordRaw[]>(
         // The CANCEL/ABORT channel, and only it. A cancelled navigation is not an error — an auth
         // middleware cancels on every guarded click — so it is worth a signal exactly once, on the
         // cold start it left sitting on the fallback, and never again. A redirect never reaches
-        // here at all. Thrown errors do NOT arrive with a `failure`: they are reported at
-        // `router.onError` below, outside this latch, because reporting is per-failure.
-        if (failure) console.warn('fs-router: the first navigation did not complete, rendering not-found', failure);
+        // here at all. A thrown error that reaches `triggerError` does NOT arrive with a `failure`:
+        // `router.onError` below reports those, outside this latch, because reporting is
+        // per-failure. The one throw that DOES arrive here is the synchronous unknown-name push,
+        // which `triggerError` never sees — recorded, so the redirect reporter defers to this line
+        // instead of adding a second one for the same failure.
+        if (failure) {
+            recordReported(failure);
+            console.warn('fs-router: the first navigation did not complete, rendering not-found', failure);
+        }
 
         markSettled();
     };
@@ -194,8 +223,14 @@ export const createRouterService = <Routes extends RouteRecordRaw[]>(
                 // `router.push`/`replace` resolve (not reject) for NavigationDuplicated/Aborted, but
                 // they DO reject when a guard or lazy component further down the redirected chain
                 // throws — attach a reporter so that surfaces instead of an unhandled rejection.
+                // It defers to whoever reported first, because a downstream throw also reaches
+                // `onError`; it still reports on its own for the one failure `onError` CANNOT see,
+                // an unknown route name, where `router.push({name})` throws synchronously and
+                // nothing is ever routed through `triggerError`.
                 const dispatch = result.replace ? replaceRoute : goToRoute;
                 void dispatch(result.name, result.id, result.query, result.parentId).catch((error: unknown) => {
+                    if (alreadyReported(error)) return;
+
                     console.error('fs-router: middleware redirect navigation failed', error);
                 });
 
@@ -246,7 +281,10 @@ export const createRouterService = <Routes extends RouteRecordRaw[]>(
     // for every navigation — and closing the window is a once-per-service fact while reporting a
     // failure is not (WR-1119 r6, ADR-0048). `endNavigationWindow()` is called WITHOUT the error so
     // the cancel-channel warn above cannot also fire: one failure, one line, first hop or later.
+    // The error is recorded before it is reported so the redirect reporter below can defer to this
+    // one; the reporting itself stays unconditional.
     router.onError((error) => {
+        recordReported(error);
         console.error('fs-router: navigation failed', error);
         endNavigationWindow();
     });
