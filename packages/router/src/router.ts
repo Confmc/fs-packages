@@ -60,13 +60,34 @@ export const createRouterService = <Routes extends RouteRecordRaw[]>(
         return route;
     };
 
-    const goToRoute: RouterService<Routes>['goToRoute'] = async (name, id, query, parentId) => {
-        await router.push(buildRouteLocation(name, id, query, parentId));
+    // Guards only run on a later microtask, so a consumer that mounts in the same turn as a
+    // programmatic navigation would otherwise observe the sentinel route with nothing marked in
+    // flight — and paint the fallback. `install()` opens the window for exactly that reason;
+    // `goToRoute`/`replaceRoute` are the same entry point reached from consumer code. Opening it
+    // again for a redirect this wrapper dispatches is harmless: that runs inside an open window.
+    const dispatchNavigation = async (navigate: () => Promise<unknown>): Promise<void> => {
+        navigating.value = true;
+
+        try {
+            await navigate();
+        } catch (error) {
+            // `router.push`/`replace` throw SYNCHRONOUSLY for an unknown route name, and reject
+            // when a guard throws. Neither outcome leaves a successor in flight and neither reaches
+            // `afterEach`, so this is the only place left to end the window. Deliberately NOT a
+            // `finally`: the hop this wrapper aborts in order to dispatch a redirect resolves while
+            // its successor is still running its guards, and closing there reopens the false-404
+            // frame the in-flight window exists to prevent.
+            endNavigationWindow(error);
+
+            throw error;
+        }
     };
 
-    const replaceRoute: RouterService<Routes>['replaceRoute'] = async (name, id, query, parentId) => {
-        await router.replace(buildRouteLocation(name, id, query, parentId));
-    };
+    const goToRoute: RouterService<Routes>['goToRoute'] = (name, id, query, parentId) =>
+        dispatchNavigation(() => router.push(buildRouteLocation(name, id, query, parentId)));
+
+    const replaceRoute: RouterService<Routes>['replaceRoute'] = (name, id, query, parentId) =>
+        dispatchNavigation(() => router.replace(buildRouteLocation(name, id, query, parentId)));
 
     const normalizedRouteToSpecificRoute: RouterService<Routes>['normalizedRouteToSpecificRoute'] = (route) => {
         const specificRoute = flattenedRoutes.find(({path, name}) => name === route.name || path === route.path);
@@ -101,6 +122,25 @@ export const createRouterService = <Routes extends RouteRecordRaw[]>(
     const readyPromise = new Promise<void>((resolve) => {
         markSettled = resolve;
     });
+
+    // The one place the in-flight window ends. vue-router has THREE terminal paths and `afterEach`
+    // is only one of them: a guard that throws is routed through `triggerError`, which skips
+    // `afterEach` entirely, and `router.push({name})` throws synchronously for an unknown name.
+    // Closing from a single path is what left a thrown guard with a permanently blank view and an
+    // `isReady()` that never settled. Idempotent by construction — every terminal path may call it,
+    // and a second call is a no-op beyond re-clearing an already-clear flag.
+    const endNavigationWindow = (failure?: unknown): void => {
+        navigating.value = false;
+
+        if (settled) return;
+
+        settled = true;
+        // Only a GENUINE failure of the first navigation is worth a console signal — a redirect
+        // never reaches here, so an auth guard no longer warns on cold load.
+        if (failure) console.warn('fs-router: the first navigation did not complete, rendering not-found', failure);
+
+        markSettled();
+    };
 
     // `to.fullPath` of every hop this wrapper aborted in order to dispatch a redirect. Keyed rather
     // than latched: vue-router runs the redirected hop's `beforeEach` BEFORE the aborted hop's
@@ -186,23 +226,18 @@ export const createRouterService = <Routes extends RouteRecordRaw[]>(
         // release exists to close) and warn about a cold start that is in fact proceeding.
         const supersededByOwnRedirect = redirectAbortedPaths.delete(to.fullPath);
         const supersededByLaterNavigation = isNavigationFailure(failure, NavigationFailureType.cancelled);
-        if (!supersededByOwnRedirect && !supersededByLaterNavigation) {
-            navigating.value = false;
-
-            if (!settled) {
-                settled = true;
-                // Only a GENUINE failure of the first navigation is worth a console signal —
-                // a redirect never reaches here, so an auth guard no longer warns on cold load.
-                if (failure) {
-                    console.warn('fs-router: the first navigation did not complete, rendering not-found', failure);
-                }
-
-                markSettled();
-            }
-        }
+        if (!supersededByOwnRedirect && !supersededByLaterNavigation) endNavigationWindow(failure);
 
         for (const middleware of afterRouteMiddleware) middleware(to, from, failure);
     });
+
+    // The terminal path `afterEach` never sees. A thrown guard — a consumer middleware, or this
+    // wrapper's own `normalizedRouteToSpecificRoute` on any unmatched path, which is every cold
+    // load of an unknown URL — reaches `triggerError` and nothing else. It is a genuine failure of
+    // the navigation, so it ends the window exactly as an abort does: the not-found fallback paints
+    // instead of a blank page, and readiness settles instead of hanging. Registering a handler at
+    // all also retires vue-router's own `[VUE_ROUTER_R0010]` "register an error handler" warning.
+    router.onError((error) => endNavigationWindow(error));
 
     const currentRouteRef = router.currentRoute;
 

@@ -106,15 +106,18 @@ export interface RouterService<Routes extends RouteRecordRaw[]> {
      * Navigates to the current browser location, returning the navigation promise so a
      * consumer may `await routerService.install()` before mounting — until it settles,
      * `currentRouteRef` still holds vue-router's `START_LOCATION` and `RouterView` paints
-     * nothing.
+     * nothing. It is vue-router's own promise and therefore REJECTS when a guard throws,
+     * which includes an unmatched URL; `isReady()` is the non-rejecting alternative.
      */
     install: () => Promise<NavigationFailure | void | undefined>;
     /**
-     * Resolves once the first navigation that is not an fs-router redirect has finished — whether
-     * it succeeded or was cancelled. Never rejects, and never delegates to `router.isReady()`: an
-     * fs-router redirect is dispatched by ABORTING the pending hop, which vue-router reports as a
-     * failure and which leaves its own readiness permanently unsettled. Stays pending while no
-     * navigation has ever been dispatched.
+     * Resolves once the first navigation that is not an fs-router redirect has ended — whether it
+     * succeeded, was cancelled, or failed. Ended, not `afterEach`-ed: vue-router has three terminal
+     * paths and a thrown guard takes `onError` instead, which is why an unmatched URL settles here
+     * rather than hanging. Never rejects, and never delegates to `router.isReady()`: an fs-router
+     * redirect is dispatched by ABORTING the pending hop, which vue-router reports as a failure and
+     * which leaves its own readiness permanently unsettled. Stays pending while no navigation has
+     * ever been dispatched.
      */
     isReady: () => Promise<void>;
     normalizedRouteToSpecificRoute: (route: Pick<RouteLocationNormalized, 'name' | 'path'>) => ActualRoute<Routes>;

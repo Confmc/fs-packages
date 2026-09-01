@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import type {VueWrapper} from '@vue/test-utils';
+import type {MockInstance} from 'vitest';
 import type {RouteRecordRaw} from 'vue-router';
 import type {RouteLocationNormalizedLoaded} from 'vue-router';
 
@@ -587,6 +589,334 @@ describe('createRouterView', () => {
         ).resolves.toBe('resolved');
         consoleWarnSpy.mockRestore();
         consoleErrorSpy.mockRestore();
+    });
+
+    // ---- WR-1119 round 5 — the in-flight window ends on EVERY terminal path -----------------
+
+    // vue-router emits its own warnings on an unmatched location (`[VUE_ROUTER_R0004]`, and
+    // `[VUE_ROUTER_R0010]` while no `onError` handler is registered). They are not fs-router's and
+    // they are not what these specs are about, so every warn assertion below counts only the
+    // wrapper's own signal. Asserting on the raw call count instead would pin vue-router's console
+    // vocabulary, which is neither our contract nor stable across its minors.
+    const fsRouterWarns = (spy: MockInstance): unknown[][] =>
+        spy.mock.calls.filter((call) => String(call[0]).startsWith('fs-router:'));
+
+    const settlesWithin = async (service: {isReady: () => Promise<void>}, ms: number): Promise<string> =>
+        Promise.race([
+            service.isReady().then(
+                () => 'resolved',
+                () => 'rejected',
+            ),
+            new Promise<string>((resolve) => setTimeout(() => resolve('never settled'), ms)),
+        ]);
+
+    it('should not paint the fallback when the FIRST navigation is programmatic rather than install()', async () => {
+        // Arrange — `install()` opens the in-flight window synchronously because guards only run on
+        // a later microtask. `goToRoute` did not, so a consumer whose initial navigation is
+        // programmatic (a landing bounce, a stored deep link) painted the 404 for a frame. The
+        // `install()` leg below is the positive control: it makes the spec fail if the harness has
+        // stopped being able to observe a first frame at all.
+        window.history.pushState({}, '', '/');
+        const programmatic = createRouterService(createTestRoutes());
+
+        // Act — mount in the SAME turn as the dispatch, before any guard has run
+        const navigation = programmatic.goToRoute('about');
+        const wrapper = mount(programmatic.RouterView);
+        const firstFrame = wrapper.text();
+
+        window.history.pushState({}, '', '/about');
+        const control = createRouterService(createTestRoutes());
+        const controlNavigation = control.install();
+        const controlFirstFrame = mount(control.RouterView).text();
+
+        // Assert — neither entry point may flash the fallback, and the control proves the
+        // measurement is real: an inert harness would report '' for both.
+        expect(controlFirstFrame).toBe('');
+        expect(firstFrame).toBe('');
+        expect(wrapper.find('p').exists()).toBe(false);
+
+        // ...and the page still arrives
+        await navigation;
+        await controlNavigation;
+        await flushPromises();
+        expect(wrapper.text()).toBe('page content');
+        window.history.pushState({}, '', '/');
+    });
+
+    it('should render the fallback and settle readiness on a cold load of a genuinely unknown URL', async () => {
+        // Arrange — the real navigation path, not a hand-built un-navigated service: the four
+        // genuine-miss specs above all mount a service nobody navigated, which reaches the fallback
+        // through the sentinel branch and never exercises this one. `normalizedRouteToSpecificRoute`
+        // THROWS for an unmatched path and is called from fs-router's own `beforeEach`, so every
+        // cold load on an unknown URL is routed by vue-router through `triggerError` — which skips
+        // `afterEach` entirely. Before round 5 that left the window open forever: a permanently
+        // blank page and an `isReady()` that never settled.
+        window.history.replaceState({}, '', '/definitely-not-a-route');
+        const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const service = createRouterService(createTestRoutes());
+
+        // Act
+        const wrapper = mount(service.RouterView);
+        await service.install().catch(() => undefined);
+        await flushPromises();
+
+        // Assert — `main`'s visible 404 is restored, the miss is reported exactly once, and
+        // readiness settles rather than hanging (raced so a hang fails instead of stalling)
+        expect(wrapper.text()).toBe('404');
+        expect(fsRouterWarns(consoleWarnSpy)).toHaveLength(1);
+        await expect(settlesWithin(service, 200)).resolves.toBe('resolved');
+
+        consoleWarnSpy.mockRestore();
+        consoleErrorSpy.mockRestore();
+        window.history.replaceState({}, '', '/');
+    });
+
+    it('should render the fallback and settle readiness when a middleware throws on the first navigation', async () => {
+        // Arrange — the same terminal path reached from consumer code rather than from fs-router's
+        // own unmatched-path throw. A guard that throws is routed through `onError`, never through
+        // `afterEach`, so nothing closed the window.
+        window.history.pushState({}, '', '/');
+        const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const service = createRouterService(createTestRoutes());
+        service.registerBeforeRouteMiddleware(() => {
+            throw new Error('middleware exploded');
+        });
+
+        // Act
+        const wrapper = mount(service.RouterView);
+        await service.install().catch(() => undefined);
+        await flushPromises();
+
+        // Assert
+        expect(wrapper.text()).toBe('404');
+        expect(fsRouterWarns(consoleWarnSpy)).toHaveLength(1);
+        await expect(settlesWithin(service, 200)).resolves.toBe('resolved');
+
+        consoleWarnSpy.mockRestore();
+        consoleErrorSpy.mockRestore();
+    });
+
+    it('should close the window without warning when a middleware throws on a LATER navigation', async () => {
+        // Arrange — readiness has already settled, so a later throw is ordinary guard behaviour: it
+        // must end the in-flight window (or every subsequent navigation starts inside a stale one)
+        // without re-arming the cold-start warning and without disturbing the painted page.
+        window.history.pushState({}, '', '/');
+        const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const service = createRouterService(createTestRoutes());
+        await service.install();
+        await flushPromises();
+        const wrapper = mount(service.RouterView);
+        expect(wrapper.text()).toBe('page content');
+        await expect(settlesWithin(service, 200)).resolves.toBe('resolved');
+
+        // Act
+        service.registerBeforeRouteMiddleware(() => {
+            throw new Error('middleware exploded');
+        });
+        await service.goToRoute('about').catch(() => undefined);
+        await flushPromises();
+
+        // Assert — the page it was on is still painted, nothing warned, readiness stays resolved.
+        // The window really closed: the next navigation lands normally rather than being swallowed
+        // by a window that never reopened.
+        expect(wrapper.text()).toBe('page content');
+        expect(fsRouterWarns(consoleWarnSpy)).toHaveLength(0);
+        await expect(settlesWithin(service, 200)).resolves.toBe('resolved');
+
+        consoleWarnSpy.mockRestore();
+        consoleErrorSpy.mockRestore();
+    });
+
+    it('should not blank a sentinel-pinned view when a LATER navigation throws', async () => {
+        // Arrange — the hazard the round-5 fix creates for itself. A first navigation cancelled
+        // without redirecting pins `currentRoute` to the sentinel forever while the fallback
+        // paints. Now that `goToRoute` opens the in-flight window, a later navigation whose guard
+        // throws would blank that view permanently unless the throw also closes the window — the
+        // original defect relocated to the entry point added to fix it.
+        window.history.pushState({}, '', '/');
+        const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const service = createRouterService(createTestRoutes());
+        service.registerBeforeRouteMiddleware(() => true);
+        await service.install();
+        await flushPromises();
+        const wrapper = mount(service.RouterView);
+        expect(service.currentRouteRef.value).toBe(START_LOCATION);
+        expect(wrapper.text()).toBe('404');
+
+        // Act
+        service.registerBeforeRouteMiddleware(() => {
+            throw new Error('middleware exploded');
+        });
+        await service.goToRoute('about').catch(() => undefined);
+        await flushPromises();
+
+        // Assert — still the visible fallback, and the cold-start warning did not fire twice
+        expect(wrapper.text()).toBe('404');
+        expect(fsRouterWarns(consoleWarnSpy)).toHaveLength(1);
+
+        consoleWarnSpy.mockRestore();
+        consoleErrorSpy.mockRestore();
+    });
+
+    it('should keep the window OPEN while a redirect dispatched from goToRoute is still in flight', async () => {
+        // Arrange — the hop `goToRoute` aborted in order to dispatch a redirect resolves while its
+        // successor is still running its guards. Closing the window there (the shape a `finally`
+        // around the push would produce) drops the in-flight flag with `currentRoute` still on the
+        // sentinel — the false-404 frame rounds 2-4 exist to close, reintroduced through the new
+        // programmatic entry point. Parking the redirect TARGET makes that window observable
+        // deterministically instead of racing a render flush.
+        window.history.pushState({}, '', '/');
+        let releaseTarget!: () => void;
+        const parked = new Promise<void>((resolve) => {
+            releaseTarget = resolve;
+        });
+        const service = createRouterService(createTestRoutes());
+        service.registerBeforeRouteMiddleware(async (to) => {
+            if (to.name === 'about') {
+                await parked;
+
+                return false;
+            }
+
+            return {name: 'about' as const};
+        });
+
+        // Act — the aborted hop has resolved by here; the redirect target is parked mid-guard
+        const navigation = service.goToRoute('home');
+        const wrapper = mount(service.RouterView);
+        await flushPromises();
+
+        // Assert — still in flight, so nothing painted, and specifically not the fallback
+        expect(service.currentRouteRef.value).toBe(START_LOCATION);
+        expect(wrapper.text()).toBe('');
+
+        // ...and the redirected page is what lands
+        releaseTarget();
+        await navigation;
+        await flushPromises();
+        expect(wrapper.text()).toBe('page content');
+        expect(service.currentRouteRef.value.name).toBe('about');
+    });
+
+    // The invariant, written once over every terminal outcome the suite knows about, so a terminal
+    // path added later is covered by construction rather than by remembering to add a case. Two
+    // observable consequences of the window being closed are asserted: nothing is left permanently
+    // blank, and readiness has settled. Where the outcome leaves the route on the sentinel the
+    // blank check discriminates the in-flight flag directly (a still-open window paints ''); where
+    // a real route finalized, RouterView paints it regardless and readiness carries the
+    // discrimination. `changeRouteQuery` is deliberately absent — it swallows its navigation
+    // promise the same way and is tracked separately as WR-1120.
+    const terminalOutcomes: {
+        name: string;
+        drive: () => Promise<{service: ReturnType<typeof createRouterService>; wrapper: VueWrapper}>;
+    }[] = [
+        {
+            name: 'a navigation that succeeds',
+            drive: async () => {
+                window.history.pushState({}, '', '/about');
+                const service = createRouterService(createTestRoutes());
+                const wrapper = mount(service.RouterView);
+                await service.install();
+                await flushPromises();
+
+                return {service, wrapper};
+            },
+        },
+        {
+            name: 'a middleware that cancels with plain `true`',
+            drive: async () => {
+                window.history.pushState({}, '', '/');
+                const service = createRouterService(createTestRoutes());
+                service.registerBeforeRouteMiddleware(() => true);
+                const wrapper = mount(service.RouterView);
+                await service.install();
+                await flushPromises();
+
+                return {service, wrapper};
+            },
+        },
+        {
+            name: 'a middleware redirect chain',
+            drive: async () => {
+                window.history.pushState({}, '', '/');
+                const service = createRouterService(createTestRoutes());
+                service.registerBeforeRouteMiddleware((to) => (to.name === 'about' ? false : {name: 'about' as const}));
+                const wrapper = mount(service.RouterView);
+                await service.install();
+                await flushPromises();
+
+                return {service, wrapper};
+            },
+        },
+        {
+            name: 'a hop a later navigation overtook',
+            drive: async () => {
+                window.history.pushState({}, '', '/');
+                const service = createRouterService(createTestRoutes());
+                service.registerBeforeRouteMiddleware(async (to) => {
+                    if (to.name === 'home') await new Promise((resolve) => setTimeout(resolve, 30));
+
+                    return false;
+                });
+                const wrapper = mount(service.RouterView);
+                const first = service.install();
+                const second = service.goToRoute('about');
+                await first.catch(() => undefined);
+                await second.catch(() => undefined);
+                await flushPromises();
+
+                return {service, wrapper};
+            },
+        },
+        {
+            name: 'a guard that throws',
+            drive: async () => {
+                window.history.pushState({}, '', '/');
+                const service = createRouterService(createTestRoutes());
+                service.registerBeforeRouteMiddleware(() => {
+                    throw new Error('middleware exploded');
+                });
+                const wrapper = mount(service.RouterView);
+                await service.install().catch(() => undefined);
+                await flushPromises();
+
+                return {service, wrapper};
+            },
+        },
+        {
+            name: 'a push to an unknown route name, which throws synchronously',
+            drive: async () => {
+                window.history.pushState({}, '', '/');
+                const service = createRouterService(createTestRoutes());
+                const wrapper = mount(service.RouterView);
+                await service.goToRoute('definitely-not-a-route-name' as never).catch(() => undefined);
+                await flushPromises();
+
+                return {service, wrapper};
+            },
+        },
+    ];
+
+    it.each(terminalOutcomes)('should end the in-flight window after $name', async ({drive}) => {
+        // Arrange
+        const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        // Act
+        const {service, wrapper} = await drive();
+
+        // Assert
+        expect(wrapper.text()).not.toBe('');
+        if (service.currentRouteRef.value === START_LOCATION) expect(wrapper.text()).toBe('404');
+        await expect(settlesWithin(service, 300)).resolves.toBe('resolved');
+
+        consoleWarnSpy.mockRestore();
+        consoleErrorSpy.mockRestore();
+        window.history.pushState({}, '', '/');
     });
 });
 
