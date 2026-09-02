@@ -54,6 +54,11 @@ export const createAdapterStoreModule = <
     const isStorableItem = (item: unknown): item is T =>
         typeof item === 'object' && item !== null && Number.isInteger((item as {id?: unknown}).id);
 
+    // A patch may only carry a plain object of changes without an `id`: an `id` inside
+    // `changes` would re-key the row it is merged into, and an array spreads to numeric keys.
+    const isPatchChanges = (changes: unknown): changes is Partial<Omit<T, 'id'>> =>
+        typeof changes === 'object' && changes !== null && !Array.isArray(changes) && !('id' in changes);
+
     const setById = (item: T): void => {
         state.value = {...state.value, [item.id]: Object.freeze(item)};
         storageService.put(domainName, state.value);
@@ -90,6 +95,17 @@ export const createAdapterStoreModule = <
                 throw new BroadcastPayloadError(domainName, 'onDelete', id);
             }
             deleteById(id);
+        },
+        onPatch: (id, changes) => {
+            if (!Number.isInteger(id)) {
+                throw new BroadcastPayloadError(domainName, 'onPatch', id);
+            }
+            if (!isPatchChanges(changes)) {
+                throw new BroadcastPayloadError(domainName, 'onPatch', changes);
+            }
+            const current = state.value[id];
+            if (!current) return;
+            setById({...current, ...changes});
         },
     });
 
