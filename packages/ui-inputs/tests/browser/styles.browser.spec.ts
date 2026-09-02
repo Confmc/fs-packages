@@ -5,8 +5,8 @@
 // asserted through getComputedStyle — the layer no happy-dom spec can see. Includes the
 // WR-0512 regression pins (font-size source-order fight) and the state-variant hooks on a
 // real keyboard :focus-visible.
-import {afterEach, describe, expect, it} from 'vitest';
-import {cdp, userEvent} from 'vitest/browser';
+import {afterEach, beforeEach, describe, expect, it} from 'vitest';
+import {cdp, page, userEvent} from 'vitest/browser';
 
 // `?inline` yields the stylesheet as text so each test controls WHERE in the cascade the
 // package sheet sits — the WR-0512 pins need both orderings, which a plain side-effect
@@ -695,6 +695,21 @@ describe('styles.css — reduced-motion gate (WR-0587 F-7)', () => {
 // through real layout geometry. Vertical is the historical flex column; horizontal is the opt-in
 // grid (label-left / control-right / error-under-control).
 describe('styles.css — FormField orientation layout', () => {
+    // The horizontal grid exists from 48rem; below it the field is the vertical default. That contract
+    // can only be observed by driving the viewport, so this describe is the one place in the suite
+    // that does: it widens when the runner starts out narrower than the breakpoint and puts the
+    // runner's own size back after every test, so nothing here leaks into the specs that follow.
+    const BREAKPOINT_PX = 48 * 16;
+    const runnerViewport = {width: window.innerWidth, height: window.innerHeight};
+
+    beforeEach(async () => {
+        if (window.innerWidth < BREAKPOINT_PX) await page.viewport(1024, 768);
+    });
+
+    afterEach(async () => {
+        await page.viewport(runnerViewport.width, runnerViewport.height);
+    });
+
     /** The FormField chassis: `.ui-field > .ui-label + .ui-field__control(.ui-control) + .ui-error`. */
     const addField = (
         orientation?: 'horizontal',
@@ -736,7 +751,7 @@ describe('styles.css — FormField orientation layout', () => {
 
         // label → error distance is exactly one --ui-field-gap (0.4rem = 6.4px), not two.
         const distance = error.getBoundingClientRect().top - label.getBoundingClientRect().bottom;
-        expect(Math.abs(distance - 6.4)).toBeLessThanOrEqual(0.5);
+        expect(distance).toBeCloseTo(6.4, 0);
     });
 
     it('lets the control column shrink instead of overflowing a narrow field when horizontal', () => {
@@ -821,5 +836,21 @@ describe('styles.css — FormField orientation layout', () => {
 
         expect(l.height).toBeGreaterThan(c.height);
         expect(Math.abs(c.top - field.getBoundingClientRect().top)).toBeLessThanOrEqual(1);
+    });
+
+    it('collapses a horizontal field to the vertical shape below 48rem — a phone has no room for a label column', async () => {
+        addStyle(uiCss);
+        await page.viewport(375, 800);
+        const {field, label, control, input} = addField('horizontal');
+
+        // Byte-identical to the vertical default: flex column, wrapper generating no box, label above the input.
+        expect(getComputedStyle(field).display).toBe('flex');
+        expect(getComputedStyle(field).flexDirection).toBe('column');
+        expect(getComputedStyle(control).display).toBe('contents');
+        expect(label.getBoundingClientRect().bottom).toBeLessThanOrEqual(input.getBoundingClientRect().top + 1);
+
+        // And the grid comes back the moment there is room for it.
+        await page.viewport(1024, 768);
+        expect(getComputedStyle(field).display).toBe('grid');
     });
 });

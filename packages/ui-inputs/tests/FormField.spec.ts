@@ -43,7 +43,7 @@ describe('FormField', () => {
         expect(wrapper.text()).toContain('ctl:search|err:search-error');
     });
 
-    it('is vertical by default: no horizontal class, and the control is wrapped for layout', () => {
+    it('renders the vertical default with the control wrapped and no horizontal class', () => {
         const wrapper = mount(FormField, {props: {id: 'email'}, slots: {default: wiringSlot}});
 
         expect(wrapper.find('.ui-field').classes()).not.toContain('is-horizontal');

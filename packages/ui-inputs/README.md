@@ -51,7 +51,9 @@ in a fixed left column instead — control on the right, error beneath the contr
 `--ui-field-label-width` (default `12rem`) and the label's cross-axis alignment with `--ui-field-label-align`
 (default `start`). The field carries `.is-horizontal`, and the slot content sits inside a `.ui-field__control`
 wrapper (`display: contents` when vertical, so the default layout is unchanged; a selector like
-`.ui-field > .ui-control` now needs `.ui-field .ui-control`):
+`.ui-field > .ui-control` now needs `.ui-field .ui-control`). **Below `48rem` (768px) a horizontal field
+renders vertical** — the label column has no room on a phone, so the sheet collapses it to the default
+shape at that fixed breakpoint (a custom property cannot drive a media query, so it is not a `--ui-*` var):
 
 ```vue
 <FormField
