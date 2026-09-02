@@ -698,7 +698,7 @@ describe('styles.css — FormField orientation layout', () => {
     /** The FormField chassis: `.ui-field > .ui-label + .ui-field__control(.ui-control) + .ui-error`. */
     const addField = (
         orientation?: 'horizontal',
-    ): {field: HTMLElement; label: HTMLElement; control: HTMLElement; error: HTMLElement} => {
+    ): {field: HTMLElement; label: HTMLElement; control: HTMLElement; input: HTMLElement; error: HTMLElement} => {
         const field = document.createElement('div');
         field.className = 'ui-field';
         if (orientation) field.setAttribute('data-orientation', orientation);
@@ -716,7 +716,7 @@ describe('styles.css — FormField orientation layout', () => {
         field.append(label, control, error);
         document.body.append(field);
         cleanupTargets.push(field);
-        return {field, label, control, error};
+        return {field, label, control, input, error};
     };
 
     it('stacks the label above the control by default (vertical flex column)', () => {
@@ -746,5 +746,58 @@ describe('styles.css — FormField orientation layout', () => {
         // The error is BELOW the control and in the control's column — never under the label.
         expect(e.top).toBeGreaterThanOrEqual(c.bottom - 1);
         expect(e.left).toBeGreaterThanOrEqual(c.left - 1);
+    });
+
+    it('sizes the label column from --ui-field-label-width', () => {
+        addStyle(uiCss);
+        document.documentElement.style.setProperty('--ui-field-label-width', '180px');
+        const {label} = addField('horizontal');
+
+        expect(label.getBoundingClientRect().width).toBeCloseTo(180, 0);
+    });
+
+    it('aligns only the label with --ui-field-label-align; the control stays pinned to the row top', () => {
+        addStyle(uiCss);
+        // Controls taller than their label, so the alignment has room to show.
+        const startField = addField('horizontal');
+        startField.input.style.height = '80px';
+        const centerField = addField('horizontal');
+        centerField.input.style.height = '80px';
+        centerField.field.style.setProperty('--ui-field-label-align', 'center');
+
+        const start = {
+            label: startField.label.getBoundingClientRect(),
+            control: startField.control.getBoundingClientRect(),
+        };
+        const center = {
+            label: centerField.label.getBoundingClientRect(),
+            control: centerField.control.getBoundingClientRect(),
+        };
+
+        // start (the default): the label's top meets the control's top.
+        expect(Math.abs(start.label.top - start.control.top)).toBeLessThanOrEqual(1);
+        // center: the label's midpoint meets the control's midpoint.
+        const labelMid = (center.label.top + center.label.bottom) / 2;
+        const controlMid = (center.control.top + center.control.bottom) / 2;
+        expect(Math.abs(labelMid - controlMid)).toBeLessThanOrEqual(1);
+        // The control itself did not move: it starts at its row's top under either alignment.
+        expect(start.control.top - startField.field.getBoundingClientRect().top).toBeCloseTo(
+            center.control.top - centerField.field.getBoundingClientRect().top,
+            0,
+        );
+    });
+
+    it('keeps the control at the row top when a wrapped label makes the row taller than the control', () => {
+        addStyle(uiCss);
+        document.documentElement.style.setProperty('--ui-field-label-width', '60px');
+        const {field, label, control} = addField('horizontal');
+        field.style.setProperty('--ui-field-label-align', 'center');
+        label.textContent = 'A label long enough to wrap onto several lines in a narrow column';
+
+        const l = label.getBoundingClientRect();
+        const c = control.getBoundingClientRect();
+
+        expect(l.height).toBeGreaterThan(c.height);
+        expect(Math.abs(c.top - field.getBoundingClientRect().top)).toBeLessThanOrEqual(1);
     });
 });

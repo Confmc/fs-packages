@@ -14,7 +14,9 @@
     /* field / label */
     --ui-field-gap: 0.4rem;
     --ui-field-margin: 0 0 1.25rem;
-    /* horizontal orientation only: label column width + its cross-axis alignment vs the control */
+    /* horizontal orientation only: label column width + the LABEL's cross-axis alignment in its row.
+       Applied via align-self on the label alone, so a wrapped label that makes the row taller never
+       moves the control — that stays pinned to the row top. */
     --ui-field-label-width: 12rem;
     --ui-field-label-align: start;
     --ui-label-color: #374151;
@@ -186,11 +188,12 @@
 .ui-field[data-orientation='horizontal'] {
     display: grid;
     grid-template-columns: var(--ui-field-label-width) minmax(0, 1fr);
-    align-items: var(--ui-field-label-align);
+    align-items: start;
 }
 .ui-field[data-orientation='horizontal'] > .ui-label {
     grid-column: 1;
     grid-row: 1;
+    align-self: var(--ui-field-label-align);
 }
 .ui-field[data-orientation='horizontal'] > .ui-field__control {
     grid-column: 2;
