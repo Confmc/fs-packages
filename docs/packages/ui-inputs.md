@@ -181,6 +181,22 @@ Models an **array of option ids**. Committing an option toggles its membership a
 </FormField>
 ```
 
+### Horizontal field layout
+
+By default `FormField` stacks the label above the control. Pass `orientation="horizontal"` to place the label in a fixed left column instead — control on the right, error beneath the control. Size the column with `--ui-field-label-width` (default `12rem`) and set the label's cross-axis alignment with `--ui-field-label-align` (default `start`):
+
+```vue
+<FormField
+    id="email"
+    label="Email"
+    orientation="horizontal"
+    :error="errors.email"
+    #default="{controlId, describedby, invalid}"
+>
+    <TextInput :id="controlId" v-model="email" type="email" :invalid="invalid" :describedby="describedby" />
+</FormField>
+```
+
 ## Components
 
 | Component                 | Purpose                                                                                                                                    |

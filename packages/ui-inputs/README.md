@@ -44,6 +44,25 @@ import '@script-development/ui-inputs/style.css';
 </FormField>
 ```
 
+### Horizontal field layout
+
+`FormField` stacks the label above the control by default. Pass `orientation="horizontal"` to place the label
+in a fixed left column instead — control on the right, error beneath the control. Set the column width with
+`--ui-field-label-width` (default `12rem`) and the label's cross-axis alignment with `--ui-field-label-align`
+(default `start`):
+
+```vue
+<FormField
+    id="fruit"
+    label="Fruit"
+    orientation="horizontal"
+    :error="errors.fruit"
+    #default="{controlId, describedby, invalid}"
+>
+    <SingleSelect :id="controlId" v-model="fruit" :options="fruits" label="name" :invalid="invalid" :describedby="describedby" />
+</FormField>
+```
+
 ### The select family's shared extras
 
 **Per-option content — the `#option` scoped slot.** All four selects render each option's

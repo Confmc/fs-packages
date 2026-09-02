@@ -42,4 +42,21 @@ describe('FormField', () => {
         expect(wrapper.find('label').exists()).toBe(false);
         expect(wrapper.text()).toContain('ctl:search|err:search-error');
     });
+
+    it('is vertical by default: no orientation attribute, and the control is wrapped for layout', () => {
+        const wrapper = mount(FormField, {props: {id: 'email'}, slots: {default: wiringSlot}});
+
+        expect(wrapper.find('.ui-field').attributes('data-orientation')).toBeUndefined();
+        expect(wrapper.find('.ui-field__control').exists()).toBe(true);
+        expect(wrapper.find('.ui-field__control').text()).toContain('ctl:email');
+    });
+
+    it('marks the field horizontal when orientation is set', () => {
+        const wrapper = mount(FormField, {
+            props: {id: 'email', orientation: 'horizontal'},
+            slots: {default: wiringSlot},
+        });
+
+        expect(wrapper.find('.ui-field').attributes('data-orientation')).toBe('horizontal');
+    });
 });

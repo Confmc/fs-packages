@@ -690,3 +690,61 @@ describe('styles.css — reduced-motion gate (WR-0587 F-7)', () => {
         expect(getComputedStyle(pressable).transitionDuration).toBe('0s');
     });
 });
+
+// FormField orientation — the label/control/error placement no happy-dom spec can see, asserted
+// through real layout geometry. Vertical is the historical flex column; horizontal is the opt-in
+// grid (label-left / control-right / error-under-control).
+describe('styles.css — FormField orientation layout', () => {
+    /** The FormField chassis: `.ui-field > .ui-label + .ui-field__control(.ui-control) + .ui-error`. */
+    const addField = (
+        orientation?: 'horizontal',
+    ): {field: HTMLElement; label: HTMLElement; control: HTMLElement; error: HTMLElement} => {
+        const field = document.createElement('div');
+        field.className = 'ui-field';
+        if (orientation) field.setAttribute('data-orientation', orientation);
+        const label = document.createElement('label');
+        label.className = 'ui-label';
+        label.textContent = 'Label';
+        const control = document.createElement('div');
+        control.className = 'ui-field__control';
+        const input = document.createElement('input');
+        input.className = 'ui-control';
+        control.append(input);
+        const error = document.createElement('p');
+        error.className = 'ui-error';
+        error.textContent = 'Bad';
+        field.append(label, control, error);
+        document.body.append(field);
+        cleanupTargets.push(field);
+        return {field, label, control, error};
+    };
+
+    it('stacks the label above the control by default (vertical flex column)', () => {
+        addStyle(uiCss);
+        const {field, label, control} = addField();
+
+        expect(getComputedStyle(field).display).toBe('flex');
+        expect(getComputedStyle(field).flexDirection).toBe('column');
+        expect(label.getBoundingClientRect().bottom).toBeLessThanOrEqual(control.getBoundingClientRect().top + 1);
+    });
+
+    it('puts the label in a fixed left column with the error under the control when horizontal', () => {
+        addStyle(uiCss);
+        document.documentElement.style.setProperty('--ui-field-label-width', '180px');
+        const {field, label, control, error} = addField('horizontal');
+
+        expect(getComputedStyle(field).display).toBe('grid');
+
+        const l = label.getBoundingClientRect();
+        const c = control.getBoundingClientRect();
+        const e = error.getBoundingClientRect();
+
+        // Label sits to the LEFT of the control, sharing its row, in a column narrower than the control.
+        expect(l.right).toBeLessThanOrEqual(c.left + 1);
+        expect(l.top).toBeLessThan(c.bottom);
+        expect(l.width).toBeLessThan(c.width);
+        // The error is BELOW the control and in the control's column — never under the label.
+        expect(e.top).toBeGreaterThanOrEqual(c.bottom - 1);
+        expect(e.left).toBeGreaterThanOrEqual(c.left - 1);
+    });
+});
