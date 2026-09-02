@@ -174,33 +174,36 @@
     margin: var(--ui-field-margin);
 }
 
-/* Wraps the control slot so multi-node slot content (e.g. an input plus an inline hint) stays a
-   single layout cell — load-bearing for horizontal orientation. Transparent in the vertical
-   default: a flex column with the same gap reproduces the pre-wrapper spacing exactly. */
+/* Wraps the control slot so multi-node slot content (e.g. an input plus an inline hint) can occupy a
+   single grid cell when horizontal. In the vertical default it generates no box at all, so the
+   field's flex column sees exactly the nodes it saw before the wrapper existed. */
 .ui-field__control {
-    display: flex;
-    flex-direction: column;
-    gap: var(--ui-field-gap);
+    display: contents;
 }
 
-/* Horizontal orientation (opt-in via data-orientation): label in a fixed left column, control on
-   the right, error beneath the control. The base .ui-field flex column stays the default. */
-.ui-field[data-orientation='horizontal'] {
+/* Horizontal orientation (opt-in via the `orientation` prop → `.is-horizontal`, the sheet's state-class
+   vocabulary — a class merges with consumer classes where a data attribute could be clobbered by a
+   fallthrough attr): label in a fixed left column, control on the right, error beneath the control.
+   The base .ui-field flex column stays the default. */
+.ui-field.is-horizontal {
     display: grid;
     grid-template-columns: var(--ui-field-label-width) minmax(0, 1fr);
     align-items: start;
 }
-.ui-field[data-orientation='horizontal'] > .ui-label {
+.ui-field.is-horizontal > .ui-label {
     grid-column: 1;
     grid-row: 1;
     align-self: var(--ui-field-label-align);
 }
-.ui-field[data-orientation='horizontal'] > .ui-field__control {
+.ui-field.is-horizontal > .ui-field__control {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ui-field-gap);
     grid-column: 2;
     grid-row: 1;
     min-width: 0;
 }
-.ui-field[data-orientation='horizontal'] > .ui-error {
+.ui-field.is-horizontal > .ui-error {
     grid-column: 2;
     grid-row: 2;
 }

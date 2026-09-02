@@ -700,8 +700,7 @@ describe('styles.css — FormField orientation layout', () => {
         orientation?: 'horizontal',
     ): {field: HTMLElement; label: HTMLElement; control: HTMLElement; input: HTMLElement; error: HTMLElement} => {
         const field = document.createElement('div');
-        field.className = 'ui-field';
-        if (orientation) field.setAttribute('data-orientation', orientation);
+        field.className = orientation ? 'ui-field is-horizontal' : 'ui-field';
         const label = document.createElement('label');
         label.className = 'ui-label';
         label.textContent = 'Label';
@@ -721,11 +720,34 @@ describe('styles.css — FormField orientation layout', () => {
 
     it('stacks the label above the control by default (vertical flex column)', () => {
         addStyle(uiCss);
-        const {field, label, control} = addField();
+        const {field, label, control, input} = addField();
 
         expect(getComputedStyle(field).display).toBe('flex');
         expect(getComputedStyle(field).flexDirection).toBe('column');
-        expect(label.getBoundingClientRect().bottom).toBeLessThanOrEqual(control.getBoundingClientRect().top + 1);
+        expect(label.getBoundingClientRect().bottom).toBeLessThanOrEqual(input.getBoundingClientRect().top + 1);
+        // The wrapper generates no box of its own here, so the column sees label, input, error — as before it existed.
+        expect(getComputedStyle(control).display).toBe('contents');
+    });
+
+    it('does not add a second gap in the vertical default when the slot renders nothing', () => {
+        addStyle(uiCss);
+        const {label, control, error} = addField();
+        control.replaceChildren();
+
+        // label → error distance is exactly one --ui-field-gap (0.4rem = 6.4px), not two.
+        const distance = error.getBoundingClientRect().top - label.getBoundingClientRect().bottom;
+        expect(Math.abs(distance - 6.4)).toBeLessThanOrEqual(0.5);
+    });
+
+    it('lets the control column shrink instead of overflowing a narrow field when horizontal', () => {
+        addStyle(uiCss);
+        document.documentElement.style.setProperty('--ui-field-label-width', '100px');
+        const {field, input} = addField('horizontal');
+        field.style.width = '300px';
+        input.setAttribute('size', '300');
+        input.style.width = '100%';
+
+        expect(field.scrollWidth).toBeLessThanOrEqual(field.clientWidth + 1);
     });
 
     it('puts the label in a fixed left column with the error under the control when horizontal', () => {

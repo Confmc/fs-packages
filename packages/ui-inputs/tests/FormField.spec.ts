@@ -43,10 +43,10 @@ describe('FormField', () => {
         expect(wrapper.text()).toContain('ctl:search|err:search-error');
     });
 
-    it('is vertical by default: no orientation attribute, and the control is wrapped for layout', () => {
+    it('is vertical by default: no horizontal class, and the control is wrapped for layout', () => {
         const wrapper = mount(FormField, {props: {id: 'email'}, slots: {default: wiringSlot}});
 
-        expect(wrapper.find('.ui-field').attributes('data-orientation')).toBeUndefined();
+        expect(wrapper.find('.ui-field').classes()).not.toContain('is-horizontal');
         expect(wrapper.find('.ui-field__control').exists()).toBe(true);
         expect(wrapper.find('.ui-field__control').text()).toContain('ctl:email');
     });
@@ -57,6 +57,18 @@ describe('FormField', () => {
             slots: {default: wiringSlot},
         });
 
-        expect(wrapper.find('.ui-field').attributes('data-orientation')).toBe('horizontal');
+        expect(wrapper.find('.ui-field').classes()).toContain('is-horizontal');
+    });
+
+    it('keeps multi-node slot content together inside the control wrapper', () => {
+        const wrapper = mount(FormField, {
+            props: {id: 'email', orientation: 'horizontal'},
+            slots: {default: '<input class="ui-control" /><small class="hint">Work address</small>'},
+        });
+
+        const control = wrapper.find('.ui-field__control');
+        expect(control.find('input.ui-control').exists()).toBe(true);
+        expect(control.find('small.hint').exists()).toBe(true);
+        expect(wrapper.findAll('.ui-field > *')).toHaveLength(1);
     });
 });

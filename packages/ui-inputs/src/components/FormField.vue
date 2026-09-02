@@ -1,8 +1,8 @@
 <template>
-    <div class="ui-field" :data-orientation="orientation === 'horizontal' ? 'horizontal' : undefined">
+    <div class="ui-field" :class="{'is-horizontal': orientation === 'horizontal'}">
         <FormLabel v-if="label" :html-for="id" :required="required">{{ label }}</FormLabel>
         <!-- the control slot receives the wiring it needs to stay accessible; the wrapper keeps
-             multi-node slot content in one layout cell so horizontal orientation stays robust -->
+             multi-node slot content in one grid cell when horizontal (display: contents otherwise) -->
         <div class="ui-field__control">
             <slot
                 :control-id="id"
