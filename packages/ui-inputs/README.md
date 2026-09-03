@@ -47,7 +47,7 @@ import '@script-development/ui-inputs/style.css';
 ### Horizontal field layout
 
 `FormField` stacks the label above the control by default. Pass `orientation="horizontal"` to place the label
-in a fixed left column instead — control on the right, error beneath the control. Set the column width with
+in a fixed left column instead — control on the right, error beneath the control. An unlabelled field ignores `orientation` and keeps the vertical default — there is no label to give a column to, so the control uses the full width. Set the column width with
 `--ui-field-label-width` (default `12rem`) and the label's cross-axis alignment with `--ui-field-label-align`
 (default `start`). The field carries `.is-horizontal`, and the slot content sits inside a `.ui-field__control`
 wrapper (`display: contents` when vertical, so the default layout is unchanged; a selector like

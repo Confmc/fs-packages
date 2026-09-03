@@ -51,13 +51,22 @@ describe('FormField', () => {
         expect(wrapper.find('.ui-field__control').text()).toContain('ctl:email');
     });
 
-    it('marks the field horizontal when orientation is set', () => {
+    it('marks the field horizontal when orientation is set on a labelled field', () => {
         const wrapper = mount(FormField, {
-            props: {id: 'email', orientation: 'horizontal'},
+            props: {id: 'email', label: 'Email', orientation: 'horizontal'},
             slots: {default: wiringSlot},
         });
 
         expect(wrapper.find('.ui-field').classes()).toContain('is-horizontal');
+    });
+
+    it('ignores orientation without a label, so no empty label column is reserved', () => {
+        const wrapper = mount(FormField, {
+            props: {id: 'accept', orientation: 'horizontal'},
+            slots: {default: wiringSlot},
+        });
+
+        expect(wrapper.find('.ui-field').classes()).not.toContain('is-horizontal');
     });
 
     it('keeps multi-node slot content together inside the control wrapper', () => {

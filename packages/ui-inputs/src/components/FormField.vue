@@ -1,5 +1,5 @@
 <template>
-    <div class="ui-field" :class="{'is-horizontal': orientation === 'horizontal'}">
+    <div class="ui-field" :class="{'is-horizontal': orientation === 'horizontal' && Boolean(label)}">
         <FormLabel v-if="label" :html-for="id" :required="required">{{ label }}</FormLabel>
         <!-- the control slot receives the wiring it needs to stay accessible; the wrapper keeps
              multi-node slot content in one grid cell when horizontal (display: contents otherwise) -->
@@ -37,7 +37,8 @@ const {
     /**
      * field layout. `'vertical'` (default) stacks the label above the control; `'horizontal'`
      * places the label in a fixed left column (width `--ui-field-label-width`) with the control
-     * to its right and the error beneath the control.
+     * to its right and the error beneath the control. An unlabelled field ignores it — there is
+     * no label to give a column to, so the control keeps the full width.
      */
     orientation?: 'vertical' | 'horizontal';
 }>();
