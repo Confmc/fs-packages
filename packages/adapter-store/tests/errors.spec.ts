@@ -78,7 +78,7 @@ describe('BroadcastPayloadError', () => {
 
         // Assert
         expect(error.message).toBe(
-            'users broadcast onPatch received an invalid payload — expected an integer id and a plain object of changes without an `id` key, got string. The store rejects it rather than corrupting state.',
+            'users broadcast onPatch received an invalid payload — expected an integer id and a non-null, non-array object of changes without an `id` key, got string. The store rejects it rather than corrupting state.',
         );
         expect(error.name).toBe('BroadcastPayloadError');
     });

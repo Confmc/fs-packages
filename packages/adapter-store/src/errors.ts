@@ -15,7 +15,7 @@ export class MissingResponseDataError extends Error {
 const BROADCAST_EXPECTATIONS = {
     onUpdate: 'an object with an integer `id`',
     onDelete: 'an integer id',
-    onPatch: 'an integer id and a plain object of changes without an `id` key',
+    onPatch: 'an integer id and a non-null, non-array object of changes without an `id` key',
 } as const;
 
 export class BroadcastPayloadError extends Error {

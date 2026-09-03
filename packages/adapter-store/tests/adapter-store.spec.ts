@@ -31,6 +31,7 @@ interface TestItem extends Item {
     name: string;
     createdAt: string;
     updatedAt: string;
+    meta?: Record<string, number>;
 }
 
 type TestAdapted = Adapted<TestItem> & {testMethod: () => string};
@@ -959,6 +960,7 @@ describe('createAdapterStoreModule', () => {
             ['an object with a non-numeric id', {id: 'KD-7', name: 'Bad'}],
             ['an object with a NaN id', {id: NaN, name: 'Bad'}],
             ['an object with a non-integer id', {id: 1.5, name: 'Bad'}],
+            ['an object with an inherited id', Object.create({id: 1, name: 'Bad'}) as unknown],
         ])('should reject onUpdate given %s without corrupting state', (_label, payload) => {
             // Arrange
             const httpService: Pick<HttpService, 'getRequest'> = {getRequest: vi.fn()};
@@ -1161,6 +1163,67 @@ describe('createAdapterStoreModule', () => {
                 'test-items',
                 expect.objectContaining({1: expect.objectContaining({name: 'Patched'}) as unknown}),
             );
+        });
+
+        it('should replace a nested value wholesale on onPatch instead of deep-merging it', () => {
+            // Arrange
+            const httpService: Pick<HttpService, 'getRequest'> = {getRequest: vi.fn()};
+            const storageService: TestStorageService = {put: vi.fn(), get: vi.fn().mockReturnValue({})};
+            const loadingService: TestLoadingService = {ensureLoadingFinished: vi.fn().mockResolvedValue(undefined)};
+            const {broadcast, getHandlers} = captureBroadcast();
+            const store = createAdapterStoreModule<TestItem, TestAdapted, TestNewAdapted>({
+                domainName: 'test-items',
+                adapter: createTestAdapter,
+                httpService,
+                storageService,
+                loadingService,
+                broadcast,
+            });
+            getHandlers().onUpdate({
+                id: 1,
+                name: 'Original',
+                createdAt: '2024-01-01T00:00:00Z',
+                updatedAt: '2024-01-01T00:00:00Z',
+                meta: {a: 1, b: 2},
+            });
+
+            // Act
+            getHandlers().onPatch(1, {meta: {a: 9}});
+
+            // Assert
+            expect(store.getById(1).value?.meta).toEqual({a: 9});
+            expect(store.getById(1).value?.name).toBe('Original');
+        });
+
+        it('should key the patched row by the validated id even when the stored row only inherits its id', () => {
+            // Arrange — storage is not validated on load, so a row whose `id` lives on the
+            // prototype can be seeded that way; object spread would drop it.
+            const httpService: Pick<HttpService, 'getRequest'> = {getRequest: vi.fn()};
+            const inherited = Object.create({
+                id: 1,
+                name: 'Original',
+                createdAt: '2024-01-01T00:00:00Z',
+                updatedAt: '2024-01-01T00:00:00Z',
+            }) as TestItem;
+            const storageService: TestStorageService = {put: vi.fn(), get: vi.fn().mockReturnValue({1: inherited})};
+            const loadingService: TestLoadingService = {ensureLoadingFinished: vi.fn().mockResolvedValue(undefined)};
+            const {broadcast, getHandlers} = captureBroadcast();
+            const store = createAdapterStoreModule<TestItem, TestAdapted, TestNewAdapted>({
+                domainName: 'test-items',
+                adapter: createTestAdapter,
+                httpService,
+                storageService,
+                loadingService,
+                broadcast,
+            });
+
+            // Act
+            getHandlers().onPatch(1, {name: 'Patched'});
+
+            // Assert
+            expect(store.getById(1).value?.name).toBe('Patched');
+            expect(store.getById(1).value?.id).toBe(1);
+            expect(Object.keys(vi.mocked(storageService.put).mock.calls[0]?.[1] as object)).toEqual(['1']);
         });
 
         it('should be a no-op when onPatch is fired for an unknown id', () => {

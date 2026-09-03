@@ -62,12 +62,14 @@ export type Adapter<T extends Item, E extends Adapted<T, object>, N extends NewA
  *
  * `onPatch(id, changes)` merges `changes` shallowly into the row the store holds,
  * for channels with a frame-size ceiling where the producer sends only the fields
- * that changed. It rejects a non-integer `id`, a `changes` that is not a plain
- * object (`null`, an array, a primitive), and a `changes` carrying an `id` key —
- * an `id` inside the merge would re-key the row. A patch for an id the store does
- * not hold is a no-op, mirroring `onDelete`: the store cannot fabricate a full `T`
- * from a partial. Nested values replace the stored value wholesale; there is no
- * deep merge.
+ * that changed. It rejects a non-integer `id`, a `changes` that is `null`, an
+ * array, or a primitive, and a `changes` carrying an `id` key — an `id` inside the
+ * merge would re-key the row. The check is on shape, not on the prototype: a class
+ * instance passes and only its own enumerable fields merge. A patch for an id the store
+ * does not hold is a no-op: no state reassignment and no storage write, because a
+ * partial cannot become a full `T`. `onDelete` also does not throw on a missing id, but
+ * it still reassigns state and calls `storageService.put`. Nested values replace the
+ * stored value wholesale; there is no deep merge.
  */
 export type AdapterStoreBroadcast<T extends Item> = {
     subscribe: (handlers: {
