@@ -71,6 +71,26 @@ const {errors, submitting, handleSubmit} = useForm<Field>(http, {keyMapper: came
 The two source territories diverged on exactly one axis: one camelCased the error keys, the other used them raw. `keyMapper` (default identity) is the single injection point that absorbs that divergence, so the package fits both without forking.
 :::
 
+## Scroll to the First Error
+
+On a 422, `useForm` scrolls the first invalid field into view so the user lands on the first thing to fix — it targets the first `[aria-invalid="true"]` element (the marker the presentation layer sets from the error bag) and calls `scrollIntoView({behavior: 'smooth', block: 'center'})` after the mark is painted. `useForm` derives no ids and marks no fields itself.
+
+```typescript
+useForm<Field>(http); // scrolls on error (default)
+useForm<Field>(http, {scrollToError: false}); // opt out
+```
+
+By default the query is **document-wide** — the first `[aria-invalid="true"]` in document order — which is right for a single form. When several forms share a page, pass each form's root as `scrollRoot` so a 422 in one never scrolls to another's field:
+
+```typescript
+const formEl = ref<HTMLElement | null>(null);
+useForm<Field>(http, {scrollRoot: formEl}); // scopes the scroll to formEl's subtree
+```
+
+`scrollRoot` keeps a form's scroll within its own subtree, but it does **not** isolate forms that share one `HttpService`: a 422 fills every such form's error bag (see [Scoping & Backend Contract](#scoping--backend-contract) below), so a co-mounted form still scrolls to its _own_ matching field on an unrelated submit. Give concurrently-mounted forms separate `HttpService` instances to avoid that.
+
+`useValidationErrors` never scrolls (the DOM-free primitive). A consumer that already scrolls on error should opt out with `scrollToError: false` to avoid a double scroll.
+
 ## Composing the Primitives
 
 `useForm` is `useValidationErrors` + `useFormSubmit` wired together. Reach for the primitives directly when you want one half without the other — e.g. a validation-less confirm action needs the submit guard but no 422 middleware:
@@ -106,10 +126,12 @@ const {handleSubmit, submitting} = useFormSubmit(validation);
 
 The one-call entry point. Returns everything from both primitives.
 
-| Parameter           | Type                      | Description                                          |
-| ------------------- | ------------------------- | ---------------------------------------------------- |
-| `httpService`       | `HttpService`             | The `fs-http` service whose 422 responses to observe |
-| `options.keyMapper` | `(key: string) => string` | Remaps raw backend field keys (default: identity)    |
+| Parameter               | Type                       | Description                                                                                                                               |
+| ----------------------- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `httpService`           | `HttpService`              | The `fs-http` service whose 422 responses to observe                                                                                      |
+| `options.keyMapper`     | `(key: string) => string`  | Remaps raw backend field keys (default: identity)                                                                                         |
+| `options.scrollToError` | `boolean`                  | Scroll the first invalid field into view on a 422 (default: `true`; see [Scroll to the First Error](#scroll-to-the-first-error))          |
+| `options.scrollRoot`    | `Ref<HTMLElement \| null>` | Scope the `scrollToError` query to a form's subtree; omit for document-wide (see [Scroll to the First Error](#scroll-to-the-first-error)) |
 
 **Returns:**
 

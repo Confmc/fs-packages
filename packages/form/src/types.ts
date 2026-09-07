@@ -36,8 +36,22 @@ export type UseFormSubmit = {
     submitting: Ref<boolean>;
 };
 
-/** Options for `useForm` (currently the validation options). */
-export type UseFormOptions = UseValidationErrorsOptions;
+/** Options for `useForm`: the validation options plus `useForm`-only behaviour. */
+export type UseFormOptions = UseValidationErrorsOptions & {
+    /**
+     * On a 422, scroll the first `[aria-invalid="true"]` field into view (the mark
+     * the presentation layer sets). `false` opts out; `useValidationErrors` is the
+     * DOM-free alternative.
+     * @default true
+     */
+    scrollToError?: boolean;
+    /**
+     * Scopes the `scrollToError` query to one form's subtree — pass it when forms
+     * share a page. Omitted: document-wide. Provided but `null`: no scroll (never
+     * falls back to document).
+     */
+    scrollRoot?: Ref<HTMLElement | null>;
+};
 
 /**
  * Everything `useForm` returns: the field-error bag and `clearErrors` from
