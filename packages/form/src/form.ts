@@ -19,17 +19,17 @@ import {useValidationErrors} from './validation-errors';
  * validation-less confirm action).
  *
  * @param httpService the fs-http service whose 422 responses to observe.
- * @param options     `keyMapper`, `scrollToError`, `scrollRoot` — see `UseFormOptions`.
+ * @param options     `keyMapper`, `scrollToError`, `scrollRoot`, `scrollTarget` — see `UseFormOptions`.
  */
 export const useForm = <T extends string = string>(
     httpService: HttpService,
     options: UseFormOptions = {},
 ): UseForm<T> => {
-    const {scrollToError = true, scrollRoot} = options;
+    const {scrollToError = true, scrollRoot, scrollTarget} = options;
     const validation = useValidationErrors<T>(httpService, options);
     const {handleSubmit, submitting} = useFormSubmit(validation);
 
-    if (scrollToError) useScrollToFirstError(validation.errors, scrollRoot);
+    if (scrollToError) useScrollToFirstError(validation.errors, scrollRoot, scrollTarget);
 
     return {errors: validation.errors, clearErrors: validation.clearErrors, handleSubmit, submitting};
 };

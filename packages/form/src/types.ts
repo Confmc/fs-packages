@@ -39,18 +39,29 @@ export type UseFormSubmit = {
 /** Options for `useForm`: the validation options plus `useForm`-only behaviour. */
 export type UseFormOptions = UseValidationErrorsOptions & {
     /**
-     * On a 422, scroll the first `[aria-invalid="true"]` field into view (the mark
-     * the presentation layer sets). `false` opts out; `useValidationErrors` is the
-     * DOM-free alternative.
+     * On a 422, scroll the first invalid field into view. Requires the presentation
+     * layer to mark the errored control (the default target is `[aria-invalid="true"]`,
+     * which `@script-development/ui-inputs` renders from `:invalid`); the feature is inert
+     * if nothing is marked. `false` opts out; `useValidationErrors` is the DOM-free
+     * alternative.
      * @default true
      */
     scrollToError?: boolean;
     /**
      * Scopes the `scrollToError` query to one form's subtree — pass it when forms
-     * share a page. Omitted: document-wide. Provided but `null`: no scroll (never
-     * falls back to document).
+     * share a page (a dialog over a page form on the same `HttpService` **must** pass
+     * it). Omitted: document-wide. Provided but `null`: no scroll (never falls back to
+     * document).
      */
     scrollRoot?: Ref<HTMLElement | null>;
+    /**
+     * CSS selector for the invalid-field mark, used by `scrollToError`. Defaults to
+     * `'[aria-invalid="true"]'` (what `@script-development/ui-inputs` renders). Pass your
+     * own when your inputs mark errors differently (e.g. a class) — the package derives
+     * no ids and marks nothing itself.
+     * @default '[aria-invalid="true"]'
+     */
+    scrollTarget?: string;
 };
 
 /**

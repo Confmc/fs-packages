@@ -73,21 +73,31 @@ The two source territories diverged on exactly one axis: one camelCased the erro
 
 ## Scroll to the First Error
 
-On a 422, `useForm` scrolls the first invalid field into view so the user lands on the first thing to fix — it targets the first `[aria-invalid="true"]` element (the marker the presentation layer sets from the error bag) and calls `scrollIntoView({behavior: 'smooth', block: 'center'})` after the mark is painted. `useForm` derives no ids and marks no fields itself.
+On a 422, `useForm` scrolls the first invalid field into view so the user lands on the first thing to fix. It targets the first `[aria-invalid="true"]` element and calls `scrollIntoView({block: 'center'})` after the mark is painted. `useForm` derives no ids and marks no fields itself, so the feature is **inert unless the presentation layer marks the errored control** — `@script-development/ui-inputs` renders `aria-invalid` from `:invalid` out of the box.
 
 ```typescript
 useForm<Field>(http); // scrolls on error (default)
 useForm<Field>(http, {scrollToError: false}); // opt out
 ```
 
-By default the query is **document-wide** — the first `[aria-invalid="true"]` in document order — which is right for a single form. When several forms share a page, pass each form's root as `scrollRoot` so a 422 in one never scrolls to another's field:
+**Reduced motion is honoured.** The scroll is `behavior: 'smooth'`, except under `prefers-reduced-motion: reduce`, where it falls back to `'auto'` — a JS `scrollIntoView` behavior is not subject to the CSS media query, so it is checked explicitly.
+
+**Marks with a class instead of `aria-invalid`?** Point `scrollTarget` at your own selector:
+
+```typescript
+useForm<Field>(http, {scrollTarget: '.field-error'});
+```
+
+### Forms that share a page
+
+By default the query is **document-wide** — the first matching element in document order — which is right for a single form. When forms share a page, pass each form's root as `scrollRoot`:
 
 ```typescript
 const formEl = ref<HTMLElement | null>(null);
 useForm<Field>(http, {scrollRoot: formEl}); // scopes the scroll to formEl's subtree
 ```
 
-`scrollRoot` keeps a form's scroll within its own subtree, but it does **not** isolate forms that share one `HttpService`: a 422 fills every such form's error bag (see [Scoping & Backend Contract](#scoping--backend-contract) below), so a co-mounted form still scrolls to its _own_ matching field on an unrelated submit. Give concurrently-mounted forms separate `HttpService` instances to avoid that.
+`scrollRoot` is **required** for a dialog opened over a page form on the same `HttpService`. A 422 fills every such form's error bag (see [Scoping & Backend Contract](#scoping--backend-contract) below), so both forms mark their fields; a document-wide query then scrolls to whichever comes first in document order — often the _page's_ field, behind the backdrop, not the dialog's. Scope each form with `scrollRoot`, or give concurrently-mounted forms separate `HttpService` instances.
 
 `useValidationErrors` never scrolls (the DOM-free primitive). A consumer that already scrolls on error should opt out with `scrollToError: false` to avoid a double scroll.
 
@@ -132,6 +142,7 @@ The one-call entry point. Returns everything from both primitives.
 | `options.keyMapper`     | `(key: string) => string`  | Remaps raw backend field keys (default: identity)                                                                                         |
 | `options.scrollToError` | `boolean`                  | Scroll the first invalid field into view on a 422 (default: `true`; see [Scroll to the First Error](#scroll-to-the-first-error))          |
 | `options.scrollRoot`    | `Ref<HTMLElement \| null>` | Scope the `scrollToError` query to a form's subtree; omit for document-wide (see [Scroll to the First Error](#scroll-to-the-first-error)) |
+| `options.scrollTarget`  | `string`                   | Selector for the invalid-field mark (default `[aria-invalid="true"]`); pass your own when inputs mark errors with a class                 |
 
 **Returns:**
 

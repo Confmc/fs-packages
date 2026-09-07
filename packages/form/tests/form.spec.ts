@@ -304,4 +304,59 @@ describe('useForm scroll-to-error', () => {
         expect(scrollIntoView).not.toHaveBeenCalled();
         wrapper.unmount();
     });
+
+    it('scrolls with auto behavior under prefers-reduced-motion', async () => {
+        const {httpService, triggerError} = createMockHttpService();
+        vi.spyOn(window, 'matchMedia').mockReturnValue({matches: true} as MediaQueryList);
+        const {wrapper} = mountFieldForm(httpService);
+
+        triggerError(422, {errors: {email: ['Taken']}});
+        await nextTick();
+
+        expect(scrollIntoView).toHaveBeenCalledWith({behavior: 'auto', block: 'center'});
+        wrapper.unmount();
+    });
+
+    it('scrolls after a child paints the mark from a prop (flush: post across the boundary)', async () => {
+        const {httpService, triggerError} = createMockHttpService();
+        const Field = defineComponent({
+            props: {invalid: {type: Boolean, required: true}},
+            setup: (props) => () => h('input', {'aria-invalid': props.invalid ? 'true' : 'false'}),
+        });
+        const wrapper = mount(
+            defineComponent({
+                setup() {
+                    const {errors} = useForm(httpService);
+                    return () => h(Field, {invalid: Object.keys(errors.value).length > 0});
+                },
+            }),
+            {attachTo: document.body},
+        );
+
+        triggerError(422, {errors: {email: ['Taken']}});
+        await nextTick();
+
+        expect(scrollIntoView).toHaveBeenCalledTimes(1);
+        wrapper.unmount();
+    });
+
+    it('targets a custom scrollTarget selector instead of aria-invalid', async () => {
+        const {httpService, triggerError} = createMockHttpService();
+        let result!: UseForm;
+        const wrapper = mount(
+            defineComponent({
+                setup() {
+                    result = useForm(httpService, {scrollTarget: '.field-error'});
+                    return () => h('input', {class: Object.keys(result.errors.value).length > 0 ? 'field-error' : ''});
+                },
+            }),
+            {attachTo: document.body},
+        );
+
+        triggerError(422, {errors: {email: ['Taken']}});
+        await nextTick();
+
+        expect(scrollIntoView).toHaveBeenCalledTimes(1);
+        wrapper.unmount();
+    });
 });
