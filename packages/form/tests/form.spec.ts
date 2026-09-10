@@ -106,6 +106,7 @@ const makeAxiosError = (status: number): AxiosError => ({isAxiosError: true, res
 
 afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
 });
 
 describe('useForm', () => {
@@ -260,6 +261,33 @@ describe('useForm scroll-to-error', () => {
         wrapper.unmount();
     });
 
+    it('does not scroll to an independently invalid field when the bag is cleared', async () => {
+        const {httpService, triggerError} = createMockHttpService();
+        let result!: UseForm;
+        const wrapper = mount(
+            defineComponent({
+                setup() {
+                    result = useForm(httpService);
+                    // This form's own field is marked only while its bag holds errors; the sibling
+                    // stays invalid on its own, unrelated to this form's bag.
+                    const marked = () => (Object.keys(result.errors.value).length > 0 ? 'true' : 'false');
+                    return () =>
+                        h('div', [h('input', {'aria-invalid': marked()}), h('input', {'aria-invalid': 'true'})]);
+                },
+            }),
+            {attachTo: document.body},
+        );
+
+        triggerError(422, {errors: {email: ['Taken']}});
+        await nextTick();
+        expect(scrollIntoView).toHaveBeenCalledTimes(1);
+
+        result.clearErrors();
+        await nextTick();
+        expect(scrollIntoView).toHaveBeenCalledTimes(1);
+        wrapper.unmount();
+    });
+
     it('no-ops when a 422 marks no field invalid', async () => {
         const {httpService, triggerError} = createMockHttpService();
         const {wrapper} = mountFieldForm(httpService, undefined, false);
@@ -314,6 +342,18 @@ describe('useForm scroll-to-error', () => {
         await nextTick();
 
         expect(scrollIntoView).toHaveBeenCalledWith({behavior: 'auto', block: 'center'});
+        wrapper.unmount();
+    });
+
+    it('scrolls with smooth behavior when the runtime has no matchMedia', async () => {
+        const {httpService, triggerError} = createMockHttpService();
+        vi.stubGlobal('matchMedia', undefined);
+        const {wrapper} = mountFieldForm(httpService);
+
+        triggerError(422, {errors: {email: ['Taken']}});
+        await nextTick();
+
+        expect(scrollIntoView).toHaveBeenCalledWith({behavior: 'smooth', block: 'center'});
         wrapper.unmount();
     });
 

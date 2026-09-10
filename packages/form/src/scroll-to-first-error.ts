@@ -9,7 +9,7 @@ const DEFAULT_TARGET = '[aria-invalid="true"]';
 
 /**
  * On every `errors` change, scroll the first invalid field into view (the mark the
- * presentation layer sets); a no-op when nothing is marked.
+ * presentation layer sets); a no-op when the error bag is empty or nothing is marked.
  *
  * - `root` scopes the query to one form's subtree — omitted: document-wide; `null`: no
  *   scroll, never falling back to document.
@@ -29,12 +29,14 @@ export const useScrollToFirstError = (
     watch(
         errors,
         () => {
+            if (!Object.keys(errors.value).length) return;
+
             const scope = root === undefined ? document : root.value;
             const field = scope?.querySelector(target);
             if (!field) return;
 
-            const behavior = matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
-            field.scrollIntoView({behavior, block: 'center'});
+            const reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+            field.scrollIntoView({behavior: reduced ? 'auto' : 'smooth', block: 'center'});
         },
         {flush: 'post'},
     );
