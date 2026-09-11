@@ -73,10 +73,10 @@ The two source territories diverged on exactly one axis: one camelCased the erro
 
 ## Scroll to the First Error
 
-On a 422, `useForm` scrolls the first invalid field into view so the user lands on the first thing to fix. It targets the first `[aria-invalid="true"]` element and calls `scrollIntoView({block: 'center'})` after the mark is painted. `useForm` derives no ids and marks no fields itself, so the feature is **inert unless the presentation layer marks the errored control** — `@script-development/ui-inputs` renders `aria-invalid` from `:invalid` out of the box.
+Pass `scrollToError` and a 422 scrolls the first invalid field into view, so the user lands on the first thing to fix. It targets the first `[aria-invalid="true"]` element and calls `scrollIntoView({block: 'center'})` after the mark is painted. It is **off by default**, and every example below has to opt in. `useForm` derives no ids and marks no fields itself, so it is also **inert unless the presentation layer marks the errored control** — `@script-development/ui-inputs` renders `aria-invalid` from `:invalid` out of the box.
 
 ```typescript
-useForm<Field>(http); // scrolls on error (default)
+useForm<Field>(http); // no scroll — the default
 useForm<Field>(http, {scrollToError: true, scrollRoot}); // opt in, scoped to your form
 ```
 
@@ -85,16 +85,16 @@ useForm<Field>(http, {scrollToError: true, scrollRoot}); // opt in, scoped to yo
 **Marks with a class instead of `aria-invalid`?** Point `scrollTarget` at your own selector:
 
 ```typescript
-useForm<Field>(http, {scrollTarget: '.field-error'});
+useForm<Field>(http, {scrollToError: true, scrollTarget: '.field-error'});
 ```
 
 ### Forms that share a page
 
-By default the query is **document-wide** — the first matching element in document order — which is right for a single form. When forms share a page, pass each form's root as `scrollRoot`:
+Without `scrollRoot` the query is **document-wide** — the first matching element in document order — which is right for a single form. When forms share a page, pass each form's root as `scrollRoot`:
 
 ```typescript
 const formEl = ref<HTMLElement | null>(null);
-useForm<Field>(http, {scrollRoot: formEl}); // scopes the scroll to formEl's subtree
+useForm<Field>(http, {scrollToError: true, scrollRoot: formEl}); // scopes the scroll to formEl's subtree
 ```
 
 `scrollRoot` is **required** for a dialog opened over a page form on the same `HttpService`. A 422 fills every such form's error bag (see [Scoping & Backend Contract](#scoping--backend-contract) below), so both forms mark their fields; a document-wide query then scrolls to whichever comes first in document order — often the _page's_ field, behind the backdrop, not the dialog's. Scope each form with `scrollRoot`, or give concurrently-mounted forms separate `HttpService` instances.
