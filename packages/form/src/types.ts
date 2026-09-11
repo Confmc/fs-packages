@@ -39,12 +39,13 @@ export type UseFormSubmit = {
 /** Options for `useForm`: the validation options plus `useForm`-only behaviour. */
 export type UseFormOptions = UseValidationErrorsOptions & {
     /**
-     * On a 422, scroll the first invalid field into view. Requires the presentation
-     * layer to mark the errored control (the default target is `[aria-invalid="true"]`,
-     * which `@script-development/ui-inputs` renders from `:invalid`); the feature is inert
-     * if nothing is marked. `false` opts out; `useValidationErrors` is the DOM-free
-     * alternative.
-     * @default true
+     * On a 422, scroll the first invalid field into view. Off unless you ask for it: an
+     * `HttpService` is shared, so a 422 fills every mounted form's bag and this cannot tell
+     * whose refusal it was — turning it on without a `scrollRoot` lets one form's refusal
+     * scroll the page to another form's field. Requires the presentation layer to mark the
+     * errored control (the default target is `[aria-invalid="true"]`, which
+     * `@script-development/ui-inputs` renders from `:invalid`).
+     * @default false
      */
     scrollToError?: boolean;
     /**

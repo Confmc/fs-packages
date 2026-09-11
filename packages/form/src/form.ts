@@ -25,7 +25,7 @@ export const useForm = <T extends string = string>(
     httpService: HttpService,
     options: UseFormOptions = {},
 ): UseForm<T> => {
-    const {scrollToError = true, scrollRoot, scrollTarget} = options;
+    const {scrollToError = false, scrollRoot, scrollTarget} = options;
     const validation = useValidationErrors<T>(httpService, options);
     const {handleSubmit, submitting} = useFormSubmit(validation);
 

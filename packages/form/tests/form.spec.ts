@@ -60,7 +60,8 @@ const mountFieldForm = (httpService: HttpService, options?: UseFormOptions, mark
     const wrapper = mount(
         defineComponent({
             setup() {
-                result = useForm(httpService, options);
+                // The scroll is opt-in; these cases are about what it does once asked for.
+                result = useForm(httpService, {scrollToError: true, ...options});
                 return () =>
                     h('input', {
                         'aria-invalid': markInvalid && Object.keys(result.errors.value).length > 0 ? 'true' : 'false',
@@ -80,7 +81,7 @@ const mountScopedForm = (httpService: HttpService, fieldInsideRoot: boolean) => 
     const wrapper = mount(
         defineComponent({
             setup() {
-                result = useForm(httpService, {scrollRoot});
+                result = useForm(httpService, {scrollToError: true, scrollRoot});
                 const marked = () => (Object.keys(result.errors.value).length > 0 ? 'true' : 'false');
                 return () =>
                     h('div', [
@@ -217,7 +218,7 @@ describe('useForm scroll-to-error', () => {
         const wrapper = mount(
             defineComponent({
                 setup() {
-                    result = useForm(httpService);
+                    result = useForm(httpService, {scrollToError: true});
                     const marked = () => (Object.keys(result.errors.value).length > 0 ? 'true' : 'false');
                     return () =>
                         h('div', [h('input', {'aria-invalid': marked()}), h('input', {'aria-invalid': marked()})]);
@@ -233,6 +234,18 @@ describe('useForm scroll-to-error', () => {
         expect(invalid).toHaveLength(2);
         expect(scrollIntoView).toHaveBeenCalledTimes(1);
         expect(scrollIntoView.mock.contexts[0]).toBe(invalid[0]);
+        wrapper.unmount();
+    });
+
+    it('does not scroll unless the caller asks for it', async () => {
+        const {httpService, triggerError} = createMockHttpService();
+        // No `scrollToError`, so the default decides.
+        const {wrapper} = mountFieldForm(httpService, {scrollToError: undefined});
+
+        triggerError(422, {errors: {email: ['Taken']}});
+        await nextTick();
+
+        expect(scrollIntoView).not.toHaveBeenCalled();
         wrapper.unmount();
     });
 
@@ -267,7 +280,7 @@ describe('useForm scroll-to-error', () => {
         const wrapper = mount(
             defineComponent({
                 setup() {
-                    result = useForm(httpService);
+                    result = useForm(httpService, {scrollToError: true});
                     // This form's own field is marked only while its bag holds errors; the sibling
                     // stays invalid on its own, unrelated to this form's bag.
                     const marked = () => (Object.keys(result.errors.value).length > 0 ? 'true' : 'false');
@@ -366,7 +379,7 @@ describe('useForm scroll-to-error', () => {
         const wrapper = mount(
             defineComponent({
                 setup() {
-                    const {errors} = useForm(httpService);
+                    const {errors} = useForm(httpService, {scrollToError: true});
                     return () => h(Field, {invalid: Object.keys(errors.value).length > 0});
                 },
             }),
@@ -386,7 +399,7 @@ describe('useForm scroll-to-error', () => {
         const wrapper = mount(
             defineComponent({
                 setup() {
-                    result = useForm(httpService, {scrollTarget: '.field-error'});
+                    result = useForm(httpService, {scrollToError: true, scrollTarget: '.field-error'});
                     return () => h('input', {class: Object.keys(result.errors.value).length > 0 ? 'field-error' : ''});
                 },
             }),
