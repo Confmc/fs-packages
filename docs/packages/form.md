@@ -155,7 +155,7 @@ The one-call entry point. Returns everything from both primitives.
 
 ### `useValidationErrors(httpService, options?)`
 
-Primitive: registers the 422 middleware and owns the error bag. Same `httpService` / `options` as `useForm`; returns `{errors, clearErrors}`.
+Primitive: registers the 422 middleware and owns the error bag. Takes the same `httpService` and the same `keyMapper`, but **none of the scroll options** — only `useForm` installs the scroll. Returns `{errors, clearErrors}`.
 
 ### `useFormSubmit(validationErrors)`
 
