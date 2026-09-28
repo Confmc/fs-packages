@@ -30,7 +30,10 @@ import Switch from '../../src/components/Switch.vue';
 import TextInput from '../../src/components/TextInput.vue';
 import '../../styles.css';
 
-type Fruit = {id: number; name: string};
+interface Fruit {
+    id: number;
+    name: string;
+}
 
 const FRUITS: Fruit[] = [
     {id: 1, name: 'Watermelon'},
@@ -49,7 +52,13 @@ const FRUIT_GROUPS: {options: Fruit[]; text: string}[] = [
     {text: 'Stone', options: [{id: 3, name: 'Apricot'}]},
 ];
 
-type FieldSlot = {controlId: string; errorId: string; required: boolean; invalid: boolean; describedby?: string};
+interface FieldSlot {
+    controlId: string;
+    errorId: string;
+    required: boolean;
+    invalid: boolean;
+    describedby?: string;
+}
 
 /** Compose a control inside FormField — the documented consuming shape (label + error wiring). */
 const renderInField = async (make: (slot: FieldSlot) => VNode, fieldProps: Record<string, unknown> = {}) =>
