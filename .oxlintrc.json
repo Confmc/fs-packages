@@ -15,9 +15,10 @@
         "unicorn/import-style": "warn",
         // Arrow-function ruling (Commander 2026-09-21) — `function` declarations hoist and bind
         // their own `this`; arrows do neither. The six canonical lines, war-room `templates/oxlintrc.json`.
-        // `no-use-before-define` is the same-scope form: it guards the class case only, and the
-        // all-scope form (`variables: true`) was run to its irreducible residual as a one-off
-        // migration instrument (see the execution report's mutual-recursion note).
+        // `no-use-before-define` is the same-scope form: a same-scope read of a later `const` (the TDZ
+        // a `function` → arrow conversion can create) or a forward class reference is an error, while a
+        // forward reference inside a callback body is legitimate — so the all-scope form
+        // (`variables: true`) is not a gate here.
         "func-style": ["error", "expression"],
         "prefer-arrow-callback": ["error", {"allowNamedFunctions": false, "allowUnboundThis": true}],
         "arrow-body-style": ["error", "as-needed"],
