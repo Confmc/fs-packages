@@ -12,8 +12,9 @@
         :aria-invalid="invalid || undefined"
         :aria-describedby="describedby"
     >
-        <legend ref="legend" class="ui-label ui-check-group__legend">
-            {{ label }}<span v-if="required" class="ui-label__req" aria-hidden="true">*</span
+        <legend class="ui-label ui-check-group__legend">
+            <span ref="legendText">{{ label }}</span
+            ><span v-if="required" class="ui-label__req" aria-hidden="true">*</span
             ><span v-if="required" class="ui-check-group__sr">{{ requiredLabel }}</span>
         </legend>
         <Checkbox
@@ -77,13 +78,14 @@ const {
 const model = defineModel<T['id'][]>({required: true});
 
 const group = useTemplateRef<HTMLElement>('group');
-const legend = useTemplateRef<HTMLElement>('legend');
+const legendText = useTemplateRef<HTMLElement>('legendText');
 
-// `label` is typed as a string but `''` passes the type. The legend alone names the group: the option
-// text inside the fieldset names the options, never the question. Dev-only, mount-time.
+// `label` is typed as a string but `''` passes the type. Only the label names the group: the option
+// text inside the fieldset names the options, and the legend's sr-only `requiredLabel` is a status,
+// never the question. Dev-only, mount-time.
 onMounted(() =>
     warnWhenUnnamed(ensureRefValueExists(group), 'CheckboxGroup', 'the `label` prop (the legend)', [
-        ensureRefValueExists(legend),
+        ensureRefValueExists(legendText),
     ]),
 );
 

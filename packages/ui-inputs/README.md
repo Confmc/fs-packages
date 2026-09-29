@@ -296,8 +296,10 @@ group-level conveyance.
 actually lands: on `Checkbox`/`Switch` the attributes (`aria-label`, `aria-labelledby`, `title`)
 are re-aimed onto the input, while the text comes from the input's labels — the wrapping root or an
 external `<label for>` already in the document at mount. On the groups the attributes fall
-through to the fieldset and only the **legend** counts as content: option text names the options,
-never the question, so a group with an empty `label` warns however well its options are named.
+through to the fieldset and only the **`label` text** in the legend counts as content: option text
+names the options and the required conveyance (`*`, `requiredLabel`) is a status, neither is the
+question, so a group with an empty `label` warns however well its options are named and whether or
+not it is `required`.
 
 ```vue
 <Checkbox id="terms" v-model="accepted" label="Accept the terms" />

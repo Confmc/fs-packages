@@ -12,8 +12,9 @@
         :aria-invalid="invalid || undefined"
         :aria-describedby="describedby"
     >
-        <legend ref="legend" class="ui-label ui-radio-group__legend">
-            {{ label }}<span v-if="required" class="ui-label__req" aria-hidden="true">*</span>
+        <legend class="ui-label ui-radio-group__legend">
+            <span ref="legendText">{{ label }}</span
+            ><span v-if="required" class="ui-label__req" aria-hidden="true">*</span>
         </legend>
         <!-- Native radios sharing one name: the browser provides the roving tabindex and the
              arrow-key selection (never hand-rolled here) — the component only mirrors the
@@ -86,12 +87,12 @@ const {
 const model = defineModel<T['id'] | null>({required: true});
 
 const group = useTemplateRef<HTMLElement>('group');
-const legend = useTemplateRef<HTMLElement>('legend');
+const legendText = useTemplateRef<HTMLElement>('legendText');
 
-// The same legend-only naming guard as CheckboxGroup — see there.
+// The same label-only naming guard as CheckboxGroup — see there.
 onMounted(() =>
     warnWhenUnnamed(ensureRefValueExists(group), 'RadioGroup', 'the `label` prop (the legend)', [
-        ensureRefValueExists(legend),
+        ensureRefValueExists(legendText),
     ]),
 );
 

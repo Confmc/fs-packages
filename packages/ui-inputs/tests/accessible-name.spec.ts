@@ -256,6 +256,20 @@ describe.each(GROUPS)('$name — accessible-name guard', ({name, component, mode
         expect(warn).not.toHaveBeenCalled();
     });
 
+    // The required conveyance lives in the legend too (CheckboxGroup's sr-only `requiredLabel`), and
+    // a status is not a name: "(required)" alone must not silence the guard.
+    it('warns when the legend is empty on a REQUIRED group — the required text is not a name', () => {
+        mount(component, {props: {...props(''), required: true}});
+
+        expect(warn).toHaveBeenCalledTimes(1);
+    });
+
+    it('stays silent on a required group with a real label', () => {
+        mount(component, {props: {...props('Fruit'), required: true}});
+
+        expect(warn).not.toHaveBeenCalled();
+    });
+
     it('is stripped in production', () => {
         vi.stubEnv('NODE_ENV', 'production');
 
