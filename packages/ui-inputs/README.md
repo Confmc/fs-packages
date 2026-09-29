@@ -291,6 +291,14 @@ nothing selected, the SingleSelect shape). The fieldset carries `role="radiogrou
 unlike plain `group` — legitimately carries `aria-required`, so here the attribute is the
 group-level conveyance.
 
+**All four warn in development when they render unnamed**, on the same four routes and the same
+`process.env.NODE_ENV` gate as `Pressable`/`Disclosure` (below). Each route is read where it
+actually lands: on `Checkbox`/`Switch` the attributes (`aria-label`, `aria-labelledby`, `title`)
+are re-aimed onto the input, while the text comes from the input's labels — the wrapping root or an
+external `<label for>` already in the document at mount. On the groups the attributes fall
+through to the fieldset and only the **legend** counts as content: option text names the options,
+never the question, so a group with an empty `label` warns however well its options are named.
+
 ```vue
 <Checkbox id="terms" v-model="accepted" label="Accept the terms" />
 <Switch id="notify" v-model="notifications" label="Email notifications" />

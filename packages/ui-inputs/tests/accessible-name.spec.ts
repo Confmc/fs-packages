@@ -3,19 +3,32 @@ import type {Component} from 'vue';
 
 import {mount} from '@vue/test-utils';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
+import {defineComponent, h} from 'vue';
 
+import Checkbox from '../src/components/Checkbox.vue';
+import CheckboxGroup from '../src/components/CheckboxGroup.vue';
 import Disclosure from '../src/components/Disclosure.vue';
 import Pressable from '../src/components/Pressable.vue';
+import RadioGroup from '../src/components/RadioGroup.vue';
+import Switch from '../src/components/Switch.vue';
+import {warnWhenUnnamed} from '../src/internal/accessible-name';
 
 /**
- * `Pressable` and `Disclosure` are the two family members whose name is OPTIONAL in the types —
- * both take an optional `label` and a slot that may render empty — so both can produce a
- * focusable, correctly-roled, unnamed control. The guard is asserted in BOTH directions on BOTH:
- * a false positive here would teach consumers to ignore it, which costs more than the catch.
+ * The family members whose name is OPTIONAL in the types — each takes an optional `label` and a
+ * slot that may render empty — so each can produce a focusable, correctly-roled, unnamed control.
+ * The guard is asserted in BOTH directions on ALL of them: a false positive here would teach
+ * consumers to ignore it, which costs more than the catch.
+ *
+ * Checkbox and Switch are the label-root shape: the attribute routes land on the re-aimed
+ * `<input>` while the text sits in the wrapping `<label>`. The shared cases below already split
+ * the two — the `label`/slot cases carry text and no attribute, the attribute cases carry an
+ * attribute and no text — so a guard reading both routes off either single element fails one set.
  */
 const CONTROLS = [
     {name: 'Pressable', component: Pressable as Component, props: {}, slot: 'default'},
     {name: 'Disclosure', component: Disclosure as Component, props: {id: 'details'}, slot: 'trigger'},
+    {name: 'Checkbox', component: Checkbox as Component, props: {id: 'agree', modelValue: false}, slot: 'default'},
+    {name: 'Switch', component: Switch as Component, props: {id: 'alerts', modelValue: false}, slot: 'default'},
 ] as const;
 
 let warn: ReturnType<typeof vi.spyOn>;
@@ -162,6 +175,107 @@ describe.each(CONTROLS)('$name — aria-hidden content names nothing', ({compone
     it("WARNS when the slot renders nothing — a v-if'd-out child is not content", () => {
         mount(component, {props, slots: {[slot]: '<span v-if="false">Details</span>'}});
 
+        expect(warn).toHaveBeenCalledTimes(1);
+    });
+});
+
+/** The label-root pair can also be named from OUTSIDE — the `<label for>` their `id` exists to pair with. */
+describe.each(CONTROLS.filter(({name}) => name === 'Checkbox' || name === 'Switch'))(
+    '$name — an external <label for> names it',
+    ({component, props}) => {
+        const withExternalLabel = (text: string): Component =>
+            defineComponent({render: () => [h('label', {for: props.id}, text), h(component, props)]});
+
+        afterEach(() => {
+            document.body.innerHTML = '';
+        });
+
+        it('stays silent when a paired external label carries text', () => {
+            mount(withExternalLabel('Accept the terms'), {attachTo: document.body});
+
+            expect(warn).not.toHaveBeenCalled();
+        });
+
+        it('WARNS when the paired external label is empty — pairing is not naming', () => {
+            mount(withExternalLabel('  '), {attachTo: document.body});
+
+            expect(warn).toHaveBeenCalledTimes(1);
+        });
+
+        it('lands the attribute routes on the INPUT, where the guard reads them', () => {
+            const wrapper = mount(component, {props, attrs: {'aria-label': 'Accept the terms'}});
+
+            expect(wrapper.element.hasAttribute('aria-label')).toBe(false);
+            expect(wrapper.find('input').attributes('aria-label')).toBe('Accept the terms');
+            expect(warn).not.toHaveBeenCalled();
+        });
+    },
+);
+
+/**
+ * A fieldset group is named by its legend. The guard is the same defect one level up, and it has
+ * its own wrong-element trap: the fieldset's own text includes every OPTION label, so reading
+ * content off the fieldset would let the options silence a group whose question is missing.
+ */
+const OPTIONS = [
+    {id: 1, name: 'Apple'},
+    {id: 2, name: 'Pear'},
+];
+const GROUPS = [
+    {name: 'CheckboxGroup', component: CheckboxGroup as Component, modelValue: []},
+    {name: 'RadioGroup', component: RadioGroup as Component, modelValue: null},
+] as const;
+
+describe.each(GROUPS)('$name — accessible-name guard', ({name, component, modelValue}) => {
+    const props = (label: string) => ({id: 'fruit', options: OPTIONS, optionLabel: 'name', label, modelValue});
+
+    it('warns when the legend is empty, however well its options are named', () => {
+        mount(component, {props: props('')});
+
+        expect(warn).toHaveBeenCalledTimes(1);
+        const message = String(warn.mock.calls[0]?.[0]);
+        expect(message).toContain(`<${name}>`);
+        expect(message).toContain('legend');
+    });
+
+    it('warns when the legend is whitespace-only', () => {
+        mount(component, {props: props('   ')});
+
+        expect(warn).toHaveBeenCalledTimes(1);
+    });
+
+    it('stays silent when the label names the legend', () => {
+        mount(component, {props: props('Fruit')});
+
+        expect(warn).not.toHaveBeenCalled();
+    });
+
+    it.each(['aria-label', 'aria-labelledby', 'title'])('stays silent on %s on the fieldset alone', (attribute) => {
+        mount(component, {props: props(''), attrs: {[attribute]: 'Fruit'}});
+
+        expect(warn).not.toHaveBeenCalled();
+    });
+
+    it('is stripped in production', () => {
+        vi.stubEnv('NODE_ENV', 'production');
+
+        mount(component, {props: props('')});
+
+        expect(warn).not.toHaveBeenCalled();
+    });
+});
+
+describe('warnWhenUnnamed — a non-labelable element', () => {
+    it('reads the attribute routes alone when `labels` is null', () => {
+        // The spec returns null from `labels` on a non-labelable element (a hidden input); happy-dom
+        // returns an empty list instead, so the null is passed literally to reach that leg.
+        const element = document.createElement('input');
+
+        warnWhenUnnamed(element, 'Probe', 'content', null);
+        expect(warn).toHaveBeenCalledTimes(1);
+
+        element.setAttribute('aria-label', 'Named');
+        warnWhenUnnamed(element, 'Probe', 'content', null);
         expect(warn).toHaveBeenCalledTimes(1);
     });
 });

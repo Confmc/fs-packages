@@ -3,6 +3,7 @@
         <span class="ui-check__control">
             <input
                 :id="id"
+                ref="input"
                 v-bind="$attrs"
                 type="checkbox"
                 class="ui-check__input"
@@ -33,10 +34,25 @@
 </template>
 
 <script setup lang="ts">
+import {onMounted, useTemplateRef} from 'vue';
+
+import {warnWhenUnnamed} from '../internal/accessible-name';
+import {ensureRefValueExists} from '../internal/reactivity';
+
 // The root is the <label> (implicit labelling — the whole row is the hit target), so attrs
 // must be re-aimed at the native input: `name`, `autocomplete`, `data-*`, … fall through to
 // the control a form actually posts, per the family's attribute fall-through contract.
 defineOptions({inheritAttrs: false});
+
+const input = useTemplateRef<HTMLInputElement>('input');
+
+// `label` is optional and the slot may render empty, leaving a box with no accessible name. The
+// attribute routes land on the re-aimed input while the text lives in its labels (this wrapping
+// root, or an external `<label for>`), so each is read where it lands. Dev-only, mount-time.
+onMounted(() => {
+    const control = ensureRefValueExists(input);
+    warnWhenUnnamed(control, 'Checkbox', 'the `label` prop, default-slot content, a `<label for>`', control.labels);
+});
 
 const {
     label,

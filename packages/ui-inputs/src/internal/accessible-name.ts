@@ -15,7 +15,7 @@ const trimmedAttribute = (element: HTMLElement, name: string): string => (elemen
  * walk cannot disagree with the platform about what `textContent` collects. Only the literal
  * `aria-hidden="true"` hides — `"false"` and an absent attribute both name.
  */
-const namingText = (element: HTMLElement): string => {
+const namingText = (element: Element): string => {
     const copy = element.cloneNode(true) as Element;
     for (const hidden of copy.querySelectorAll('[aria-hidden="true"]')) hidden.remove();
 
@@ -37,10 +37,21 @@ const namingText = (element: HTMLElement): string => {
  *   this control (a later sibling, a teleport), and a check that fired on that would cost the
  *   guard its authority. A dangling IDREF therefore passes here; axe in the browser suite is the
  *   layer that catches it.
+ * - **Where each route is read** is not always one element. A label-root control (Checkbox,
+ *   Switch) re-aims its attributes onto the native `<input>` while its visible text sits in the
+ *   wrapping `<label>`, and a fieldset group is named by its `<legend>`, not by the option text it
+ *   also contains. `contentFrom` names the elements whose content can name `element`; reading
+ *   either route off the wrong element false-positives one legitimate naming shape. `null` is the
+ *   platform's `labels` on a non-labelable element: no content route at all.
  */
-export const warnWhenUnnamed = (element: HTMLElement, component: string, contentRoutes: string): void => {
+export const warnWhenUnnamed = (
+    element: HTMLElement,
+    component: string,
+    contentRoutes: string,
+    contentFrom: ArrayLike<Element> | null = [element],
+): void => {
     if (devWarningsSuppressed()) return;
-    if (namingText(element).trim() !== '') return;
+    if (Array.from(contentFrom ?? []).some((source) => namingText(source).trim() !== '')) return;
     if (NAME_ATTRIBUTES.some((name) => trimmedAttribute(element, name) !== '')) return;
 
     console.warn(
