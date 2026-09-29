@@ -678,6 +678,119 @@ describe('styles.css — forced-colors keyboard focus (WR-0587 F-1)', () => {
         expect(getComputedStyle(fbEnabled).color).not.toBe(grey);
     });
 
+    // The WR-0919 specs build their fixtures AFTER the emulation flip: flipping forced-colors over
+    // already-styled elements returned a stale border-color on a disabled <input> (measured: black
+    // or GrayText depending on unrelated rules elsewhere in the sheet), and a real forced-colors
+    // user never flips mid-render.
+    it('conveys the keyboard-ACTIVE option (and clear entry) with Highlight across the listbox family (WR-0919)', async () => {
+        // Pinned to the system colours, never to mere inequality: before the fix the active and
+        // inactive options computed different strings over identical pixels.
+        addStyle(uiCss);
+        await enableForcedColors();
+        const menu = document.createElement('ul');
+        document.body.append(menu);
+        cleanupTargets.push(menu);
+        const row = (className: string): HTMLElement => {
+            const li = document.createElement('li');
+            li.className = className;
+            li.textContent = 'Mango';
+            menu.append(li);
+            return li;
+        };
+        const rows = ['select', 'combobox', 'multiselect', 'multicombobox', 'groupselect', 'groupcombobox'].flatMap(
+            (variant) => {
+                const pairs = [[row(`ui-${variant}__option`), row(`ui-${variant}__option is-active`)]];
+                if (!variant.startsWith('multi'))
+                    pairs.push([row(`ui-${variant}__clear`), row(`ui-${variant}__clear is-active`)]);
+                return pairs;
+            },
+        );
+        // A muted option under the pointer must still read as active — the muted colour rule sits
+        // after the membership rule in the base sheet and must not win here.
+        const mutedActive = row('ui-select__option is-muted is-active');
+
+        const highlight = systemColour('backgroundColor', 'Highlight');
+        const highlightText = systemColour('color', 'HighlightText');
+        expect(rows).toHaveLength(10);
+        for (const [inactive, active] of rows) {
+            expect(getComputedStyle(active).backgroundColor).toBe(highlight);
+            expect(getComputedStyle(active).color).toBe(highlightText);
+            // NEGATIVE CONTROL — the inactive sibling in the same sheet is NOT highlighted.
+            expect(getComputedStyle(inactive).backgroundColor).not.toBe(highlight);
+            expect(getComputedStyle(inactive).color).not.toBe(highlightText);
+        }
+        expect(getComputedStyle(mutedActive).color).toBe(highlightText);
+    });
+
+    it('conveys DISABLED on the MultiSelect / MultiCombobox box and a type-less .ui-control with GrayText, as the UA does for a typed input (WR-0919)', async () => {
+        // The UA greys a disabled <input type="text"> (text AND border) in forced-colors; the div
+        // boxes and a type-less <input> match no UA rule, so at HEAD they computed identical to
+        // their enabled siblings.
+        addStyle(uiCss);
+        await enableForcedColors();
+        const box = (className: string): HTMLElement => {
+            const el = document.createElement('div');
+            el.className = className;
+            el.textContent = 'Mango';
+            document.body.append(el);
+            cleanupTargets.push(el);
+            return el;
+        };
+        const disabled = [
+            box('ui-control ui-multiselect__box is-disabled'),
+            box('ui-control ui-multicombobox__box is-disabled'),
+        ];
+        const enabled = [box('ui-control ui-multiselect__box'), box('ui-control ui-multicombobox__box')];
+        const typeless = addControl();
+        typeless.disabled = true;
+        const uaReference = document.createElement('input');
+        uaReference.type = 'text';
+        uaReference.disabled = true;
+        document.body.append(uaReference);
+        cleanupTargets.push(uaReference);
+
+        const grey = systemColour('color', 'GrayText');
+        expect(getComputedStyle(uaReference).color).toBe(grey);
+        expect(getComputedStyle(uaReference).borderTopColor).toBe(grey);
+        for (const el of [...disabled, typeless]) {
+            expect(getComputedStyle(el).color).toBe(grey);
+            expect(getComputedStyle(el).borderTopColor).toBe(grey);
+        }
+        // NEGATIVE CONTROL — the enabled boxes in the same sheet are not greyed.
+        for (const el of enabled) {
+            expect(getComputedStyle(el).color).not.toBe(grey);
+            expect(getComputedStyle(el).borderTopColor).not.toBe(grey);
+        }
+    });
+
+    it('conveys DISABLED on the check / radio / switch row with GrayText (WR-0919)', async () => {
+        addStyle(uiCss);
+        await enableForcedColors();
+        const row = (className: string): HTMLElement => {
+            const label = document.createElement('label');
+            label.className = className;
+            const text = document.createElement('span');
+            text.className = 'ui-check__label';
+            text.textContent = 'Notify';
+            label.append(text);
+            document.body.append(label);
+            cleanupTargets.push(label);
+            return text;
+        };
+        const disabled = [
+            row('ui-check is-disabled'),
+            row('ui-check ui-radio is-disabled'),
+            row('ui-switch is-disabled'),
+        ];
+        const enabled = [row('ui-check'), row('ui-check ui-radio'), row('ui-switch')];
+
+        const grey = systemColour('color', 'GrayText');
+        // Asserted on the label TEXT, which inherits from the row — the pixels a user reads.
+        for (const el of disabled) expect(getComputedStyle(el).color).toBe(grey);
+        // NEGATIVE CONTROL — the enabled rows in the same sheet are not greyed.
+        for (const el of enabled) expect(getComputedStyle(el).color).not.toBe(grey);
+    });
+
     it('restores the outline on the MultiSelect / MultiCombobox box (:focus-within) and the check + switch inputs (:focus-visible)', async () => {
         addStyle(uiCss);
 
