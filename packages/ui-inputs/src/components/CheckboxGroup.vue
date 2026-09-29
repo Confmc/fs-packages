@@ -5,9 +5,16 @@
          is conveyed group-level through the legend instead: the family's visual * marker plus
          screen-reader-only text (localisable via requiredLabel), announced when AT enters the
          fieldset. -->
-    <fieldset :id="id" class="ui-check-group" :aria-invalid="invalid || undefined" :aria-describedby="describedby">
+    <fieldset
+        :id="id"
+        ref="group"
+        class="ui-check-group"
+        :aria-invalid="invalid || undefined"
+        :aria-describedby="describedby"
+    >
         <legend class="ui-label ui-check-group__legend">
-            {{ label }}<span v-if="required" class="ui-label__req" aria-hidden="true">*</span
+            <span ref="legendText">{{ label }}</span
+            ><span v-if="required" class="ui-label__req" aria-hidden="true">*</span
             ><span v-if="required" class="ui-check-group__sr">{{ requiredLabel }}</span>
         </legend>
         <Checkbox
@@ -24,8 +31,12 @@
 </template>
 
 <script setup lang="ts" generic="T extends SelectItem">
+import {onMounted, useTemplateRef} from 'vue';
+
 import type {LabelKey, SelectItem} from '../types';
 
+import {warnWhenUnnamed} from '../internal/accessible-name';
+import {ensureRefValueExists} from '../internal/reactivity';
 import Checkbox from './Checkbox.vue';
 
 const {
@@ -65,6 +76,18 @@ const {
 
 /** The committed membership: an array of option ids, kept in OPTIONS order. */
 const model = defineModel<T['id'][]>({required: true});
+
+const group = useTemplateRef<HTMLElement>('group');
+const legendText = useTemplateRef<HTMLElement>('legendText');
+
+// `label` is typed as a string but `''` passes the type. Only the label names the group: the option
+// text inside the fieldset names the options, and the legend's sr-only `requiredLabel` is a status,
+// never the question. Dev-only, mount-time.
+onMounted(() =>
+    warnWhenUnnamed(ensureRefValueExists(group), 'CheckboxGroup', 'the `label` prop (the legend)', [
+        ensureRefValueExists(legendText),
+    ]),
+);
 
 /** Resolve an option's display string from the `optionLabel` prop (property name or getter). */
 const labelOf = (option: T): string =>

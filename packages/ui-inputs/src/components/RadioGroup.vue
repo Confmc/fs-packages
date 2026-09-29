@@ -5,6 +5,7 @@
          error IDREF lives on the fieldset only. -->
     <fieldset
         :id="id"
+        ref="group"
         class="ui-radio-group"
         role="radiogroup"
         :aria-required="required || undefined"
@@ -12,7 +13,8 @@
         :aria-describedby="describedby"
     >
         <legend class="ui-label ui-radio-group__legend">
-            {{ label }}<span v-if="required" class="ui-label__req" aria-hidden="true">*</span>
+            <span ref="legendText">{{ label }}</span
+            ><span v-if="required" class="ui-label__req" aria-hidden="true">*</span>
         </legend>
         <!-- Native radios sharing one name: the browser provides the roving tabindex and the
              arrow-key selection (never hand-rolled here) — the component only mirrors the
@@ -45,7 +47,12 @@
 </template>
 
 <script setup lang="ts" generic="T extends SelectItem">
+import {onMounted, useTemplateRef} from 'vue';
+
 import type {LabelKey, SelectItem} from '../types';
+
+import {warnWhenUnnamed} from '../internal/accessible-name';
+import {ensureRefValueExists} from '../internal/reactivity';
 
 const {
     options,
@@ -78,6 +85,16 @@ const {
 
 /** The committed choice — `null` while nothing is selected (the SingleSelect model shape). */
 const model = defineModel<T['id'] | null>({required: true});
+
+const group = useTemplateRef<HTMLElement>('group');
+const legendText = useTemplateRef<HTMLElement>('legendText');
+
+// The same label-only naming guard as CheckboxGroup — see there.
+onMounted(() =>
+    warnWhenUnnamed(ensureRefValueExists(group), 'RadioGroup', 'the `label` prop (the legend)', [
+        ensureRefValueExists(legendText),
+    ]),
+);
 
 /** Resolve an option's display string from the `optionLabel` prop (property name or getter). */
 const labelOf = (option: T): string =>
