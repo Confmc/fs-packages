@@ -931,6 +931,35 @@
     .ui-pressable.is-disabled {
         color: GrayText;
     }
+
+    /* The keyboard-active option is conveyed ONLY by --ui-option-bg-active, so an open listbox
+       showed no active option at all (measured: identical pixels to its inactive siblings). */
+    .ui-select__option.is-active,
+    .ui-combobox__option.is-active,
+    .ui-multiselect__option.is-active,
+    .ui-multicombobox__option.is-active,
+    .ui-groupselect__option.is-active,
+    .ui-groupcombobox__option.is-active,
+    .ui-select__clear.is-active,
+    .ui-combobox__clear.is-active,
+    .ui-groupselect__clear.is-active,
+    .ui-groupcombobox__clear.is-active {
+        background: Highlight;
+        color: HighlightText;
+    }
+    /* The UA paints a disabled typed <input>, <textarea> and <button> with GrayText text AND
+       border; the div boxes and the check/switch rows get nothing from it, and a type-less
+       <input class="ui-control"> does not match the UA rule either. */
+    .ui-control:disabled,
+    .ui-multiselect__box.is-disabled,
+    .ui-multicombobox__box.is-disabled {
+        color: GrayText;
+        border-color: GrayText;
+    }
+    .ui-check.is-disabled,
+    .ui-switch.is-disabled {
+        color: GrayText;
+    }
 }
 
 /* Respect a reduced-motion preference — zero every transition the stylesheet declares (the 0.12s
