@@ -94,6 +94,7 @@ Per-bump checklist:
 3. Patch-bump the affected sibling packages — the peer-range widening is observable in published metadata and deserves its own version.
 4. Regenerate `package-lock.json` and verify every `node_modules/@script-development/*` resolves to the workspace (`"resolved": "packages/*"`, `"link": true`). No nested registry copies anywhere in the lock.
 5. CI passing `npm ci` is necessary but not sufficient — inspect the lock for nested copies after every cross-minor bump.
+6. **Rename the bumped package's `## Unreleased` CHANGELOG section to the new version** (`## x.y.z — YYYY-MM-DD`). Notes owed to a future cut wait there (WR-1637). A package with no `## Unreleased` section owes none.
 
 Cascade peers as of 2026-05-13:
 
