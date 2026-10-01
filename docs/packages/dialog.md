@@ -64,7 +64,8 @@ Each dialog renders inside a native `<dialog>` element using `showModal()`, whic
 - **Backdrop** — clicking outside the topmost dialog is detected
 - **Scroll lock** — body scrolling is disabled while dialogs are open
 - **Focus trapping** — keyboard focus stays within the dialog
-- **ESC key handling** — managed by the service, not the browser default
+- **Escape** — closes the topmost dialog through the service (see [Escape](#escape))
+- **Focus restore** — on close, focus returns to the element that opened the dialog (see [Focus](#focus))
 
 ## Closing Dialogs
 
@@ -213,7 +214,33 @@ const onBackdrop = async (event: MouseEvent) => {
 </script>
 ```
 
-The option only affects backdrop clicks. Programmatic closes (`closeAll()`, or `onClose` after a save) and the ESC key (suppressed by the service) are unaffected.
+The option only affects backdrop clicks. Programmatic closes (`closeAll()`, or `onClose` after a save) and Escape are unaffected — see `closeOnEscape` below for the Escape counterpart.
+
+## Escape
+
+Escape closes the topmost dialog, and only that one. The service cancels the browser's own close and closes through the same path as `onClose`, so the stack stays in step with what is on screen and focus is restored the same way as for every other close.
+
+A dialog that must not be dismissed by Escape — unsaved work behind a dirty-confirm, say — passes `closeOnEscape: false` and decides for itself:
+
+```typescript
+dialog.open(EditForm, {/* props */}, {closeOnEscape: false, closeOnBackdropClick: false});
+```
+
+## Focus
+
+When a dialog closes — by `onClose`, a backdrop click, Escape or `closeAll()` — focus goes back to the element that had focus when that dialog was opened. Stacked dialogs restore in LIFO order: closing the top dialog returns focus to the control inside the dialog below that opened it; closing a lower dialog (which closes everything above it too) returns focus to that lower dialog's opener. Focus moves after the dialog has left the DOM, since nothing outside an open modal can take focus.
+
+When the opener can no longer take focus — the dialog's action removed it from the page, or it is disabled — pass `restoreFocusTo`. A getter is read at close time, so it can name an element that only exists after the action ran:
+
+```typescript
+dialog.open(
+    ConfirmDelete,
+    {onConfirm: () => removeRow(id)},
+    {restoreFocusTo: () => document.querySelector<HTMLElement>('#rows-heading')},
+);
+```
+
+Without a usable opener or fallback, the service leaves focus where the browser put it.
 
 ## API Reference
 
@@ -238,6 +265,8 @@ interface DialogOpenOptions {
     ariaLabelledBy?: string; // sets aria-labelledby on the host <dialog>
     ariaDescribedBy?: string; // sets aria-describedby on the host <dialog>
     closeOnBackdropClick?: boolean; // default true; set false to manage backdrop closing yourself
+    closeOnEscape?: boolean; // default true; set false to manage Escape yourself
+    restoreFocusTo?: HTMLElement | null | (() => HTMLElement | null); // focus target when the opener cannot take focus back
 }
 ```
 

@@ -1,7 +1,7 @@
 import type {Component, VNode} from 'vue';
 import type {ComponentProps} from 'vue-component-type-helpers';
 
-import {Suspense, defineComponent, h, markRaw, onErrorCaptured, reactive, ref} from 'vue';
+import {Suspense, defineComponent, h, markRaw, nextTick, onErrorCaptured, reactive, ref} from 'vue';
 
 type UnregisterMiddleware = () => void;
 
@@ -18,6 +18,13 @@ export interface DialogOpenOptions {
     ariaDescribedBy?: string;
     /** Whether a backdrop click closes this dialog. Defaults to `true`; set `false` to close it yourself via `onClose`. */
     closeOnBackdropClick?: boolean;
+    /** Whether Escape closes this dialog. Defaults to `true`; set `false` to close it yourself via `onClose`. */
+    closeOnEscape?: boolean;
+    /**
+     * Where focus goes on close when the element that had focus at open can no longer take it
+     * (removed from the document, or disabled). A getter is read at close time.
+     */
+    restoreFocusTo?: HTMLElement | null | (() => HTMLElement | null);
 }
 
 /** Public API of a dialog service instance. */
@@ -35,6 +42,7 @@ export interface DialogService {
 interface DialogEntry {
     render: () => VNode;
     key: string;
+    restoreFocus: () => void;
 }
 
 const DIALOG_STYLE = 'padding:0;margin:auto;background:transparent;border:none';
@@ -61,8 +69,8 @@ const prepareVModelProps = (props: Record<string, unknown>, onClose: () => void)
  * Create a dialog service that manages a LIFO stack of dialogs.
  *
  * Each dialog is rendered in a native `<dialog>` element with `showModal()`.
- * The service handles body scroll lock, backdrop click detection, ESC key
- * prevention, v-model prop synchronization, and error middleware.
+ * The service handles body scroll lock, backdrop and Escape closing, focus
+ * restore to the opener, v-model prop synchronization, and error middleware.
  *
  * Dialog content is wrapped in `Suspense` to support `defineAsyncComponent`.
  */
@@ -76,14 +84,15 @@ export const createDialogService = (): DialogService => {
     };
 
     const closeFrom = (index: number) => {
-        dialogs.value.splice(index);
+        const [lowestClosed] = dialogs.value.splice(index);
         updateBodyScroll();
+
+        // A modal makes everything outside it inert, so focus can only go back once the
+        // removal has rendered.
+        if (lowestClosed !== undefined) void nextTick(lowestClosed.restoreFocus);
     };
 
-    const closeAll = () => {
-        dialogs.value.splice(0);
-        updateBodyScroll();
-    };
+    const closeAll = () => closeFrom(0);
 
     const open = <C extends Component>(component: C, props: ComponentProps<C>, options?: DialogOpenOptions): void => {
         const key = `dialog-${dialogId++}`;
@@ -91,6 +100,18 @@ export const createDialogService = (): DialogService => {
 
         const index = dialogs.value.length;
         const onClose = () => closeFrom(index);
+        const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+
+        const restoreFocus = () => {
+            if (opener?.isConnected === true) {
+                opener.focus();
+                if (document.activeElement === opener) return;
+            }
+
+            const fallback = options?.restoreFocusTo;
+            (typeof fallback === 'function' ? fallback() : fallback)?.focus();
+        };
+
         const prepared = prepareVModelProps(props as Record<string, unknown>, onClose);
 
         const render = () =>
@@ -102,7 +123,13 @@ export const createDialogService = (): DialogService => {
                     'aria-label': options?.ariaLabel,
                     'aria-labelledby': options?.ariaLabelledBy,
                     'aria-describedby': options?.ariaDescribedBy,
-                    onCancel: (event: Event) => event.preventDefault(),
+                    // The native close would leave this entry on the stack, so Escape closes through onClose.
+                    onCancel: (event: Event) => {
+                        event.preventDefault();
+                        if (options?.closeOnEscape === false) return;
+
+                        onClose();
+                    },
                     onClick: (event: MouseEvent) => {
                         if ((event.target as HTMLElement).tagName !== 'DIALOG') return;
                         // Opted out: the consumer manages backdrop close (e.g. a dirty-confirm) via onClose.
@@ -117,7 +144,7 @@ export const createDialogService = (): DialogService => {
                 h(Suspense, null, {default: () => h(rawComponent, prepared)}),
             );
 
-        dialogs.value.push({render, key});
+        dialogs.value.push({render, key, restoreFocus});
         updateBodyScroll();
     };
 

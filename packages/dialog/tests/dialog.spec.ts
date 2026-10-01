@@ -1,4 +1,4 @@
-import {mount} from '@vue/test-utils';
+import {flushPromises, mount} from '@vue/test-utils';
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {defineComponent, h, nextTick} from 'vue';
 
@@ -309,8 +309,17 @@ describe('dialog service', () => {
         });
     });
 
-    describe('cancel event prevention', () => {
-        it('should prevent default on cancel events', async () => {
+    describe('Escape (the native cancel event)', () => {
+        // happy-dom fires no cancel on a key press, so each spec dispatches it on the
+        // dialog element; a browser fires it on the top-most modal only.
+        const dispatchCancel = (element: Element): Event => {
+            const cancelEvent = new Event('cancel', {cancelable: true});
+            element.dispatchEvent(cancelEvent);
+
+            return cancelEvent;
+        };
+
+        it('should close the dialog and still prevent the native close', async () => {
             // Arrange
             const service = createDialogService();
             const wrapper = mount(service.DialogContainerComponent);
@@ -318,12 +327,62 @@ describe('dialog service', () => {
             await nextTick();
 
             // Act
-            const dialog = wrapper.find('dialog');
-            const cancelEvent = new Event('cancel', {cancelable: true});
-            dialog.element.dispatchEvent(cancelEvent);
+            const cancelEvent = dispatchCancel(wrapper.find('dialog').element);
+            await nextTick();
 
             // Assert
             expect(cancelEvent.defaultPrevented).toBe(true);
+            expect(wrapper.findAll('dialog')).toHaveLength(0);
+        });
+
+        it('should close only the dialog it fires on when two are stacked', async () => {
+            // Arrange
+            const service = createDialogService();
+            const wrapper = mount(service.DialogContainerComponent);
+            service.open(TestDialogContent, {title: 'Bottom'});
+            service.open(TestDialogContent, {title: 'Top'});
+            await nextTick();
+
+            // Act
+            const cancelEvent = dispatchCancel(wrapper.findAll('dialog')[1]!.element);
+            await nextTick();
+
+            // Assert
+            expect(cancelEvent.defaultPrevented).toBe(true);
+            expect(wrapper.findAll('dialog')).toHaveLength(1);
+            expect(wrapper.text()).toContain('Bottom');
+            expect(wrapper.text()).not.toContain('Top');
+        });
+
+        it('should leave the dialog open when closeOnEscape is false', async () => {
+            // Arrange
+            const service = createDialogService();
+            const wrapper = mount(service.DialogContainerComponent);
+            service.open(TestDialogContent, {title: 'Test'}, {closeOnEscape: false});
+            await nextTick();
+
+            // Act
+            const cancelEvent = dispatchCancel(wrapper.find('dialog').element);
+            await nextTick();
+
+            // Assert
+            expect(cancelEvent.defaultPrevented).toBe(true);
+            expect(wrapper.findAll('dialog')).toHaveLength(1);
+        });
+
+        it('should close on Escape when closeOnEscape is true', async () => {
+            // Arrange
+            const service = createDialogService();
+            const wrapper = mount(service.DialogContainerComponent);
+            service.open(TestDialogContent, {title: 'Test'}, {closeOnEscape: true});
+            await nextTick();
+
+            // Act
+            dispatchCancel(wrapper.find('dialog').element);
+            await nextTick();
+
+            // Assert
+            expect(wrapper.findAll('dialog')).toHaveLength(0);
         });
     });
 
@@ -388,6 +447,321 @@ describe('dialog service', () => {
 
             // Assert
             expect(wrapper.findAll('dialog')).toHaveLength(0);
+        });
+    });
+
+    describe('focus restore', () => {
+        const wrappers: ReturnType<typeof mount>[] = [];
+
+        const mountAttached = (service: ReturnType<typeof createDialogService>) => {
+            const wrapper = mount(service.DialogContainerComponent, {attachTo: document.body});
+            wrappers.push(wrapper);
+
+            return wrapper;
+        };
+
+        const focusedButton = (label: string): HTMLButtonElement => {
+            const button = document.createElement('button');
+            button.textContent = label;
+            document.body.append(button);
+            button.focus();
+
+            return button;
+        };
+
+        // Stand in for the browser moving focus into the modal, so a missing restore
+        // cannot pass on focus that simply never left the opener.
+        const focusInside = (dialog: Element) => {
+            (dialog.querySelector('.close-btn') as HTMLButtonElement).focus();
+        };
+
+        afterEach(() => {
+            for (const wrapper of wrappers.splice(0)) wrapper.unmount();
+            document.body.innerHTML = '';
+        });
+
+        it('should return focus to the opener when the dialog closes via onClose', async () => {
+            // Arrange
+            const service = createDialogService();
+            const wrapper = mountAttached(service);
+            const opener = focusedButton('Open');
+            service.open(TestDialogContent, {title: 'Test'});
+            await nextTick();
+            focusInside(wrapper.find('dialog').element);
+
+            // Act
+            await wrapper.find('.close-btn').trigger('click');
+            await flushPromises();
+
+            // Assert
+            expect(wrapper.findAll('dialog')).toHaveLength(0);
+            expect(document.activeElement).toBe(opener);
+        });
+
+        it('should restore focus only after the dialog has left the DOM', async () => {
+            // Arrange — a modal makes everything outside it inert, so a restore that
+            // runs before the removal is refused by a browser; happy-dom does not.
+            const service = createDialogService();
+            mountAttached(service);
+            const opener = focusedButton('Open');
+            const dialogsInDomAtFocus: number[] = [];
+            const originalFocus = opener.focus.bind(opener);
+            opener.focus = (options?: FocusOptions) => {
+                dialogsInDomAtFocus.push(document.querySelectorAll('dialog').length);
+                originalFocus(options);
+            };
+            service.open(TestDialogContent, {title: 'Test'});
+            await nextTick();
+
+            // Act
+            service.closeAll();
+            await flushPromises();
+
+            // Assert
+            expect(dialogsInDomAtFocus).toEqual([0]);
+        });
+
+        it('should return focus to the opener when the dialog closes via a backdrop click', async () => {
+            // Arrange
+            const service = createDialogService();
+            const wrapper = mountAttached(service);
+            const opener = focusedButton('Open');
+            service.open(TestDialogContent, {title: 'Test'});
+            await nextTick();
+            focusInside(wrapper.find('dialog').element);
+
+            // Act
+            await wrapper.find('dialog').trigger('click');
+            await flushPromises();
+
+            // Assert
+            expect(wrapper.findAll('dialog')).toHaveLength(0);
+            expect(document.activeElement).toBe(opener);
+        });
+
+        it('should return focus to the opener when the dialog closes via Escape', async () => {
+            // Arrange
+            const service = createDialogService();
+            const wrapper = mountAttached(service);
+            const opener = focusedButton('Open');
+            service.open(TestDialogContent, {title: 'Test'});
+            await nextTick();
+            focusInside(wrapper.find('dialog').element);
+
+            // Act
+            wrapper.find('dialog').element.dispatchEvent(new Event('cancel', {cancelable: true}));
+            await flushPromises();
+
+            // Assert
+            expect(wrapper.findAll('dialog')).toHaveLength(0);
+            expect(document.activeElement).toBe(opener);
+        });
+
+        it('should return focus to the bottom-most opener when closeAll clears a stack', async () => {
+            // Arrange
+            const service = createDialogService();
+            const wrapper = mountAttached(service);
+            const opener = focusedButton('Open A');
+            service.open(TestDialogContent, {title: 'A'});
+            await nextTick();
+            focusInside(wrapper.findAll('dialog')[0]!.element);
+            service.open(TestDialogContent, {title: 'B'});
+            await nextTick();
+            focusInside(wrapper.findAll('dialog')[1]!.element);
+
+            // Act
+            service.closeAll();
+            await flushPromises();
+
+            // Assert
+            expect(document.activeElement).toBe(opener);
+        });
+
+        it('should restore stacked dialogs in LIFO order, each to its own opener', async () => {
+            // Arrange — A opened from X, B opened from the close button inside A
+            const service = createDialogService();
+            const wrapper = mountAttached(service);
+            const openerX = focusedButton('Open A');
+            service.open(TestDialogContent, {title: 'A'});
+            await nextTick();
+            const openerInsideA = wrapper
+                .findAll('dialog')[0]!
+                .element.querySelector('.close-btn') as HTMLButtonElement;
+            openerInsideA.focus();
+            service.open(TestDialogContent, {title: 'B'});
+            await nextTick();
+            focusInside(wrapper.findAll('dialog')[1]!.element);
+
+            // Act — close B
+            await wrapper.findAll('.close-btn')[1]!.trigger('click');
+            await flushPromises();
+
+            // Assert
+            expect(wrapper.findAll('dialog')).toHaveLength(1);
+            expect(document.activeElement).toBe(openerInsideA);
+
+            // Act — close A
+            await wrapper.find('.close-btn').trigger('click');
+            await flushPromises();
+
+            // Assert
+            expect(wrapper.findAll('dialog')).toHaveLength(0);
+            expect(document.activeElement).toBe(openerX);
+        });
+
+        it('should return focus to the lower dialog opener when it closes with a dialog above it', async () => {
+            // Arrange
+            const service = createDialogService();
+            const wrapper = mountAttached(service);
+            const openerX = focusedButton('Open A');
+            service.open(TestDialogContent, {title: 'A'});
+            await nextTick();
+            focusInside(wrapper.findAll('dialog')[0]!.element);
+            service.open(TestDialogContent, {title: 'B'});
+            await nextTick();
+            focusInside(wrapper.findAll('dialog')[1]!.element);
+
+            // Act — close A (index 0) while B is open
+            await wrapper.findAll('.close-btn')[0]!.trigger('click');
+            await flushPromises();
+
+            // Assert
+            expect(wrapper.findAll('dialog')).toHaveLength(0);
+            expect(document.activeElement).toBe(openerX);
+        });
+
+        it('should focus restoreFocusTo when the opener has left the document', async () => {
+            // Arrange
+            const service = createDialogService();
+            const wrapper = mountAttached(service);
+            const opener = focusedButton('Delete');
+            const fallback = document.createElement('button');
+            document.body.append(fallback);
+            service.open(TestDialogContent, {title: 'Confirm'}, {restoreFocusTo: fallback});
+            await nextTick();
+            opener.remove();
+
+            // Act
+            await wrapper.find('.close-btn').trigger('click');
+            await flushPromises();
+
+            // Assert
+            expect(document.activeElement).toBe(fallback);
+        });
+
+        it('should read a restoreFocusTo getter at close time, not at open time', async () => {
+            // Arrange
+            const service = createDialogService();
+            const wrapper = mountAttached(service);
+            const opener = focusedButton('Delete');
+            const atOpen = document.createElement('button');
+            const atClose = document.createElement('button');
+            document.body.append(atOpen, atClose);
+            let target: HTMLElement = atOpen;
+            service.open(TestDialogContent, {title: 'Confirm'}, {restoreFocusTo: () => target});
+            await nextTick();
+            opener.remove();
+            target = atClose;
+
+            // Act
+            await wrapper.find('.close-btn').trigger('click');
+            await flushPromises();
+
+            // Assert
+            expect(document.activeElement).toBe(atClose);
+        });
+
+        it('should fall back to restoreFocusTo when the opener is connected but refuses focus', async () => {
+            // Arrange — a disabled button stays in the document and cannot take focus
+            const service = createDialogService();
+            const wrapper = mountAttached(service);
+            const opener = focusedButton('Save');
+            const fallback = document.createElement('button');
+            document.body.append(fallback);
+            service.open(TestDialogContent, {title: 'Saving'}, {restoreFocusTo: fallback});
+            await nextTick();
+            focusInside(wrapper.find('dialog').element);
+            opener.disabled = true;
+
+            // Act
+            await wrapper.find('.close-btn').trigger('click');
+            await flushPromises();
+
+            // Assert
+            expect(document.activeElement).toBe(fallback);
+        });
+
+        it('should use restoreFocusTo when no element held focus at open', async () => {
+            // Arrange — activeElement can be null, or an element that is not an HTMLElement
+            const service = createDialogService();
+            const wrapper = mountAttached(service);
+            const fallback = document.createElement('button');
+            document.body.append(fallback);
+            const activeElementSpy = vi.spyOn(document, 'activeElement', 'get').mockReturnValueOnce(null);
+            service.open(TestDialogContent, {title: 'Test'}, {restoreFocusTo: fallback});
+            activeElementSpy.mockRestore();
+            await nextTick();
+            focusInside(wrapper.find('dialog').element);
+
+            // Act
+            await wrapper.find('.close-btn').trigger('click');
+            await flushPromises();
+
+            // Assert
+            expect(document.activeElement).toBe(fallback);
+        });
+
+        it('should not try to focus a disconnected opener and not throw when there is no fallback', async () => {
+            // Arrange
+            const service = createDialogService();
+            const wrapper = mountAttached(service);
+            const opener = focusedButton('Delete');
+            const focusSpy = vi.spyOn(opener, 'focus');
+            service.open(TestDialogContent, {title: 'Confirm'});
+            await nextTick();
+            opener.remove();
+            const getterFallback = vi.fn((): HTMLElement | null => null);
+            service.open(TestDialogContent, {title: 'Second'}, {restoreFocusTo: getterFallback});
+            await nextTick();
+
+            // Act
+            service.closeAll();
+            await flushPromises();
+
+            // Assert
+            expect(wrapper.findAll('dialog')).toHaveLength(0);
+            expect(focusSpy).not.toHaveBeenCalled();
+            expect(getterFallback).not.toHaveBeenCalled();
+        });
+
+        it('should not restore focus when a stale onClose closes nothing', async () => {
+            // Arrange
+            let capturedOnClose: (() => void) | undefined;
+            const CapturingComponent = defineComponent({
+                props: {onClose: Function},
+                setup(props) {
+                    capturedOnClose = props.onClose as () => void;
+                },
+                render() {
+                    return h('div', 'Capturing');
+                },
+            });
+            const service = createDialogService();
+            mountAttached(service);
+            const opener = focusedButton('Open');
+            service.open(CapturingComponent, {});
+            await nextTick();
+            service.closeAll();
+            await flushPromises();
+            const elsewhere = focusedButton('Elsewhere');
+
+            // Act
+            capturedOnClose?.();
+            await flushPromises();
+
+            // Assert
+            expect(document.activeElement).toBe(elsewhere);
+            expect(document.activeElement).not.toBe(opener);
         });
     });
 
