@@ -1,6 +1,6 @@
 # @script-development/fs-dialog
 
-## Unreleased
+## 0.4.0 — 2026-10-01
 
 ### Minor Changes
 
