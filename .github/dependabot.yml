@@ -18,6 +18,11 @@ updates:
               patterns:
                   - 'vitest'
                   - '@vitest/*'
+      ignore:
+          # @types/node major tracks the Node runtime major (24: engines + setup-node).
+          - dependency-name: '@types/node'
+            update-types:
+                - 'version-update:semver-major'
       open-pull-requests-limit: 10
 
     - package-ecosystem: github-actions
