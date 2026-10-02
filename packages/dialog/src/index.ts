@@ -138,13 +138,17 @@ export const createDialogService = (): DialogService => {
                     'aria-label': options?.ariaLabel,
                     'aria-labelledby': options?.ariaLabelledBy,
                     'aria-describedby': options?.ariaDescribedBy,
-                    // The native close would leave this entry on the stack, so Escape closes through onClose.
+                    // Cancelled so a refused Escape keeps the dialog open; an accepted one closes through onClose.
                     onCancel: (event: Event) => {
                         event.preventDefault();
                         if (!allowsClose(options?.closeOnEscape)) return;
 
                         onClose();
                     },
+                    // Chromium closes the element natively on a second Escape with no user activation
+                    // in between, whatever onCancel did (WR-1913); the entry follows it off the stack.
+                    // A close the service made itself finds no entry and does nothing.
+                    onClose,
                     onClick: (event: MouseEvent) => {
                         if ((event.target as HTMLElement).tagName !== 'DIALOG') return;
                         // Opted out: the consumer manages backdrop close (e.g. a dirty-confirm) via onClose.

@@ -534,6 +534,105 @@ describe('dialog service', () => {
         });
     });
 
+    describe('a native close (WR-1913)', () => {
+        // Chromium closes a dialog natively on a second Escape with no user activation in
+        // between (a non-cancelable cancel); happy-dom has no close watcher, so these specs
+        // dispatch the resulting close event. tests/browser drives the real key presses.
+        const dispatchClose = (element: Element) => element.dispatchEvent(new Event('close'));
+
+        it('should take the dialog off the stack and unlock the body', async () => {
+            // Arrange
+            const service = createDialogService();
+            const wrapper = mount(service.DialogContainerComponent);
+            service.open(TestDialogContent, {title: 'Test'}, {closeOnEscape: false});
+            await nextTick();
+
+            // Act
+            dispatchClose(wrapper.find('dialog').element);
+            await nextTick();
+
+            // Assert
+            expect(wrapper.findAll('dialog')).toHaveLength(0);
+            expect(document.body.style.overflowY).toBe('auto');
+        });
+
+        it('should close the dialogs above the one that closed natively', async () => {
+            // Arrange
+            const service = createDialogService();
+            const wrapper = mount(service.DialogContainerComponent);
+            service.open(TestDialogContent, {title: 'Bottom'});
+            service.open(TestDialogContent, {title: 'Middle'});
+            service.open(TestDialogContent, {title: 'Top'});
+            await nextTick();
+
+            // Act
+            dispatchClose(wrapper.findAll('dialog')[1]!.element);
+            await nextTick();
+
+            // Assert
+            expect(wrapper.findAll('dialog')).toHaveLength(1);
+            expect(wrapper.text()).toContain('Bottom');
+        });
+
+        it('should restore focus to the opener once', async () => {
+            // Arrange
+            const service = createDialogService();
+            const wrapper = mount(service.DialogContainerComponent, {attachTo: document.body});
+            const opener = document.createElement('button');
+            document.body.append(opener);
+            opener.focus();
+            service.open(TestDialogContent, {title: 'Test'});
+            await nextTick();
+            const focusSpy = vi.spyOn(opener, 'focus');
+
+            // Act
+            dispatchClose(wrapper.find('dialog').element);
+            await flushPromises();
+
+            // Assert
+            expect(focusSpy).toHaveBeenCalledTimes(1);
+            expect(document.activeElement).toBe(opener);
+
+            wrapper.unmount();
+            opener.remove();
+        });
+
+        it('should do nothing more when the close follows a close the service made itself', async () => {
+            // Arrange
+            const service = createDialogService();
+            const wrapper = mount(service.DialogContainerComponent, {attachTo: document.body});
+            const opener = document.createElement('button');
+            document.body.append(opener);
+            opener.focus();
+            service.open(TestDialogContent, {title: 'Bottom'});
+            await nextTick();
+            const lowerOpener = document.createElement('button');
+            document.body.append(lowerOpener);
+            lowerOpener.focus();
+            service.open(TestDialogContent, {title: 'Top'});
+            await nextTick();
+            const topElement = wrapper.findAll('dialog')[1]!.element;
+            const focusSpy = vi.spyOn(lowerOpener, 'focus');
+            await wrapper.findAll('.close-btn')[1]!.trigger('click');
+            await nextTick();
+            service.open(TestDialogContent, {title: 'Replacement'});
+            await nextTick();
+
+            // Act
+            dispatchClose(topElement);
+            await flushPromises();
+
+            // Assert
+            expect(wrapper.findAll('dialog')).toHaveLength(2);
+            expect(wrapper.text()).toContain('Replacement');
+            expect(focusSpy).toHaveBeenCalledTimes(1);
+
+            wrapper.unmount();
+            opener.remove();
+            lowerOpener.remove();
+        });
+    });
+
     describe('backdrop click', () => {
         it('should close dialog when clicking backdrop (the dialog element itself)', async () => {
             // Arrange
