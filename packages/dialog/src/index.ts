@@ -16,10 +16,16 @@ export interface DialogOpenOptions {
     ariaLabelledBy?: string;
     /** Sets `aria-describedby` on the host `<dialog>` element. */
     ariaDescribedBy?: string;
-    /** Whether a backdrop click closes this dialog. Defaults to `true`; set `false` to close it yourself via `onClose`. */
-    closeOnBackdropClick?: boolean;
-    /** Whether Escape closes this dialog. Defaults to `true`; set `false` to close it yourself via `onClose`. */
-    closeOnEscape?: boolean;
+    /**
+     * Whether a backdrop click closes this dialog. Defaults to `true`; set `false` to close it yourself
+     * via `onClose`. A getter is read at the click, so a dialog can refuse only while it is busy.
+     */
+    closeOnBackdropClick?: boolean | (() => boolean);
+    /**
+     * Whether Escape closes this dialog. Defaults to `true`; set `false` to close it yourself via
+     * `onClose`. A getter is read at the key press, so a dialog can refuse only while it is busy.
+     */
+    closeOnEscape?: boolean | (() => boolean);
     /**
      * Where focus goes on close when the element that had focus at open can no longer take it
      * (removed from the document, or disabled). A getter is read at close time.
@@ -43,9 +49,14 @@ interface DialogEntry {
     render: () => VNode;
     key: string;
     restoreFocus: () => void;
+    /** True once the element has been shown and has closed since. */
+    isClosed: () => boolean;
 }
 
 const DIALOG_STYLE = 'padding:0;margin:auto;background:transparent;border:none';
+
+const allowsClose = (option: boolean | (() => boolean) | undefined): boolean =>
+    (typeof option === 'function' ? option() : option) !== false;
 
 const prepareVModelProps = (props: Record<string, unknown>, onClose: () => void): Record<string, unknown> => {
     const prepared: Record<string, unknown> = reactive({...props, onClose});
@@ -92,14 +103,26 @@ export const createDialogService = (): DialogService => {
         if (lowestClosed !== undefined) void nextTick(lowestClosed.restoreFocus);
     };
 
+    // By key, not by the index at open: a late onClose from a dialog already gone would close
+    // whichever dialog now holds that index (WR-1914).
+    const closeByKey = (key: string) => {
+        const index = dialogs.value.findIndex((dialog) => dialog.key === key);
+        if (index !== -1) closeFrom(index);
+    };
+
     const closeAll = () => closeFrom(0);
 
     const open = <C extends Component>(component: C, props: ComponentProps<C>, options?: DialogOpenOptions): void => {
+        // The browser queues a native close event, so an entry whose element closed may still be on
+        // the stack; it goes first, or its late event would close this dialog with it (LIFO).
+        const stale = dialogs.value.findIndex((dialog) => dialog.isClosed());
+        if (stale !== -1) closeFrom(stale);
+
         const key = `dialog-${dialogId++}`;
         const rawComponent = markRaw(component);
 
-        const index = dialogs.value.length;
-        const onClose = () => closeFrom(index);
+        const onClose = () => closeByKey(key);
+        let element: HTMLDialogElement | null = null;
         const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
         const restoreFocus = () => {
@@ -123,28 +146,33 @@ export const createDialogService = (): DialogService => {
                     'aria-label': options?.ariaLabel,
                     'aria-labelledby': options?.ariaLabelledBy,
                     'aria-describedby': options?.ariaDescribedBy,
-                    // The native close would leave this entry on the stack, so Escape closes through onClose.
+                    // Cancelled so a refused Escape keeps the dialog open; an accepted one closes through onClose.
                     onCancel: (event: Event) => {
                         event.preventDefault();
-                        if (options?.closeOnEscape === false) return;
+                        if (!allowsClose(options?.closeOnEscape)) return;
 
                         onClose();
                     },
+                    // Chromium closes the element natively on a second Escape with no user activation
+                    // in between, whatever onCancel did (WR-1913); the entry follows it off the stack.
+                    // A close the service made itself finds no entry and does nothing.
+                    onClose,
                     onClick: (event: MouseEvent) => {
                         if ((event.target as HTMLElement).tagName !== 'DIALOG') return;
                         // Opted out: the consumer manages backdrop close (e.g. a dirty-confirm) via onClose.
-                        if (options?.closeOnBackdropClick === false) return;
+                        if (!allowsClose(options?.closeOnBackdropClick)) return;
 
                         onClose();
                     },
                     onVnodeMounted: (vnode: VNode) => {
-                        (vnode.el as HTMLDialogElement).showModal();
+                        element = vnode.el as HTMLDialogElement;
+                        element.showModal();
                     },
                 },
                 h(Suspense, null, {default: () => h(rawComponent, prepared)}),
             );
 
-        dialogs.value.push({render, key, restoreFocus});
+        dialogs.value.push({render, key, restoreFocus, isClosed: () => element?.open === false});
         updateBodyScroll();
     };
 

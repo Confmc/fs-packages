@@ -118,8 +118,7 @@ describe('dialog service', () => {
 
         it('should call showModal on the dialog element via onVnodeMounted', async () => {
             // Arrange
-            const showModalSpy = vi.fn();
-            HTMLDialogElement.prototype.showModal = showModalSpy;
+            const showModalSpy = vi.spyOn(HTMLDialogElement.prototype, 'showModal');
 
             const service = createDialogService();
             const wrapper = mount(service.DialogContainerComponent, {attachTo: document.body});
@@ -238,6 +237,20 @@ describe('dialog service', () => {
             expect(wrapper.findAll('dialog')).toHaveLength(0);
         });
 
+        it('should do nothing and not throw on an empty stack', async () => {
+            // Arrange
+            const service = createDialogService();
+            const wrapper = mount(service.DialogContainerComponent);
+
+            // Act
+            service.closeAll();
+            await flushPromises();
+
+            // Assert
+            expect(wrapper.findAll('dialog')).toHaveLength(0);
+            expect(document.body.style.overflowY).toBe('auto');
+        });
+
         it('should restore body overflow to auto', () => {
             // Arrange
             const service = createDialogService();
@@ -306,6 +319,115 @@ describe('dialog service', () => {
 
             // Assert — no crash, no effect
             expect(wrapper.findAll('dialog')).toHaveLength(0);
+        });
+    });
+
+    describe('a stale onClose closes its own dialog or nothing (WR-1914)', () => {
+        const captured = new Map<string, () => void>();
+        const NamedCapturing = defineComponent({
+            props: {name: {type: String, required: true}, onClose: Function},
+            setup(props) {
+                captured.set(props.name, props.onClose as () => void);
+            },
+            render() {
+                return h('div', {class: 'named'}, this.name);
+            },
+        });
+
+        afterEach(() => {
+            captured.clear();
+        });
+
+        it('should not close a dialog that took the index of a closed one', async () => {
+            // Arrange
+            const service = createDialogService();
+            const wrapper = mount(service.DialogContainerComponent);
+            service.open(NamedCapturing, {name: 'A'});
+            await nextTick();
+            service.closeAll();
+            await nextTick();
+            service.open(NamedCapturing, {name: 'C'});
+            await nextTick();
+
+            // Act
+            captured.get('A')?.();
+            await nextTick();
+
+            // Assert
+            expect(wrapper.findAll('dialog')).toHaveLength(1);
+            expect(wrapper.text()).toContain('C');
+            expect(document.body.style.overflowY).toBe('hidden');
+        });
+
+        it('should not close a dialog that took the index of a closed one a level up', async () => {
+            // Arrange
+            const service = createDialogService();
+            const wrapper = mount(service.DialogContainerComponent);
+            service.open(NamedCapturing, {name: 'A'});
+            service.open(NamedCapturing, {name: 'B'});
+            await nextTick();
+            captured.get('B')?.();
+            await nextTick();
+            service.open(NamedCapturing, {name: 'C'});
+            await nextTick();
+
+            // Act
+            captured.get('B')?.();
+            await nextTick();
+
+            // Assert
+            expect(wrapper.findAll('dialog')).toHaveLength(2);
+            expect(wrapper.text()).toContain('A');
+            expect(wrapper.text()).toContain('C');
+        });
+
+        it('should close a live dialog once when its onClose is called twice', async () => {
+            // Arrange
+            const service = createDialogService();
+            const wrapper = mount(service.DialogContainerComponent, {attachTo: document.body});
+            const opener = document.createElement('button');
+            document.body.append(opener);
+            opener.focus();
+            service.open(NamedCapturing, {name: 'A'});
+            await nextTick();
+            const lowerOpener = document.createElement('button');
+            document.body.append(lowerOpener);
+            lowerOpener.focus();
+            service.open(NamedCapturing, {name: 'B'});
+            await nextTick();
+            const focusSpy = vi.spyOn(lowerOpener, 'focus');
+
+            // Act
+            captured.get('B')?.();
+            captured.get('B')?.();
+            await flushPromises();
+
+            // Assert
+            expect(wrapper.findAll('dialog')).toHaveLength(1);
+            expect(wrapper.text()).toContain('A');
+            expect(focusSpy).toHaveBeenCalledTimes(1);
+
+            wrapper.unmount();
+            opener.remove();
+            lowerOpener.remove();
+        });
+
+        it('should still close the dialogs above a lower dialog that closes', async () => {
+            // Arrange
+            const service = createDialogService();
+            const wrapper = mount(service.DialogContainerComponent);
+            service.open(NamedCapturing, {name: 'A'});
+            service.open(NamedCapturing, {name: 'B'});
+            service.open(NamedCapturing, {name: 'C'});
+            await nextTick();
+
+            // Act
+            captured.get('B')?.();
+            await nextTick();
+
+            // Assert
+            expect(wrapper.findAll('dialog')).toHaveLength(1);
+            expect(wrapper.text()).toContain('A');
         });
     });
 
@@ -384,6 +506,299 @@ describe('dialog service', () => {
             // Assert
             expect(wrapper.findAll('dialog')).toHaveLength(0);
         });
+
+        it('should leave the dialog open while a closeOnEscape getter returns false', async () => {
+            // Arrange
+            const service = createDialogService();
+            const wrapper = mount(service.DialogContainerComponent);
+            service.open(TestDialogContent, {title: 'Test'}, {closeOnEscape: () => false});
+            await nextTick();
+
+            // Act
+            const cancelEvent = dispatchCancel(wrapper.find('dialog').element);
+            await nextTick();
+
+            // Assert
+            expect(cancelEvent.defaultPrevented).toBe(true);
+            expect(wrapper.findAll('dialog')).toHaveLength(1);
+        });
+
+        it('should read a closeOnEscape getter when Escape fires, not at open', async () => {
+            // Arrange
+            let busy = true;
+            const closeOnEscape = vi.fn(() => !busy);
+            const service = createDialogService();
+            const wrapper = mount(service.DialogContainerComponent);
+            service.open(TestDialogContent, {title: 'Test'}, {closeOnEscape});
+            await nextTick();
+            expect(closeOnEscape).not.toHaveBeenCalled();
+            dispatchCancel(wrapper.find('dialog').element);
+            await nextTick();
+            expect(wrapper.findAll('dialog')).toHaveLength(1);
+
+            // Act
+            busy = false;
+            dispatchCancel(wrapper.find('dialog').element);
+            await nextTick();
+
+            // Assert
+            expect(closeOnEscape).toHaveBeenCalledTimes(2);
+            expect(wrapper.findAll('dialog')).toHaveLength(0);
+        });
+    });
+
+    describe('a native close (WR-1913)', () => {
+        // Chromium closes a dialog natively on a second Escape with no user activation in
+        // between (a non-cancelable cancel); happy-dom has no close watcher, so these specs
+        // dispatch the resulting close event. tests/browser drives the real key presses.
+        const dispatchClose = (element: Element) => element.dispatchEvent(new Event('close'));
+
+        it('should take the dialog off the stack and unlock the body', async () => {
+            // Arrange
+            const service = createDialogService();
+            const wrapper = mount(service.DialogContainerComponent);
+            service.open(TestDialogContent, {title: 'Test'}, {closeOnEscape: false});
+            await nextTick();
+
+            // Act
+            dispatchClose(wrapper.find('dialog').element);
+            await nextTick();
+
+            // Assert
+            expect(wrapper.findAll('dialog')).toHaveLength(0);
+            expect(document.body.style.overflowY).toBe('auto');
+        });
+
+        it('should close the dialogs above the one that closed natively', async () => {
+            // Arrange
+            const service = createDialogService();
+            const wrapper = mount(service.DialogContainerComponent);
+            service.open(TestDialogContent, {title: 'Bottom'});
+            service.open(TestDialogContent, {title: 'Middle'});
+            service.open(TestDialogContent, {title: 'Top'});
+            await nextTick();
+
+            // Act
+            dispatchClose(wrapper.findAll('dialog')[1]!.element);
+            await nextTick();
+
+            // Assert
+            expect(wrapper.findAll('dialog')).toHaveLength(1);
+            expect(wrapper.text()).toContain('Bottom');
+        });
+
+        it('should take a dialog above whose element closed as well', async () => {
+            // Arrange
+            const service = createDialogService();
+            const wrapper = mount(service.DialogContainerComponent);
+            service.open(TestDialogContent, {title: 'Bottom'});
+            service.open(TestDialogContent, {title: 'Middle'});
+            service.open(TestDialogContent, {title: 'Top'});
+            await nextTick();
+            const [, middle, top] = wrapper.findAll('dialog').map((dialog) => dialog.element);
+            top!.removeAttribute('open');
+
+            // Act
+            dispatchClose(middle!);
+            await nextTick();
+
+            // Assert
+            expect(wrapper.findAll('dialog')).toHaveLength(1);
+            expect(wrapper.text()).toContain('Bottom');
+        });
+
+        it('should keep a dialog opened after the element closed that has not rendered yet', async () => {
+            // Arrange
+            const service = createDialogService();
+            const wrapper = mount(service.DialogContainerComponent);
+            service.open(TestDialogContent, {title: 'Closed'});
+            await nextTick();
+            const closed = wrapper.find('dialog').element;
+            closed.removeAttribute('open');
+
+            // Act
+            service.open(TestDialogContent, {title: 'Replacement'});
+            dispatchClose(closed);
+            await nextTick();
+
+            // Assert
+            expect(wrapper.findAll('dialog')).toHaveLength(1);
+            expect(wrapper.text()).toContain('Replacement');
+            expect(document.body.style.overflowY).toBe('hidden');
+        });
+
+        it('should restore focus to the opener once', async () => {
+            // Arrange
+            const service = createDialogService();
+            const wrapper = mount(service.DialogContainerComponent, {attachTo: document.body});
+            const opener = document.createElement('button');
+            document.body.append(opener);
+            opener.focus();
+            service.open(TestDialogContent, {title: 'Test'});
+            await nextTick();
+            const focusSpy = vi.spyOn(opener, 'focus');
+
+            // Act
+            dispatchClose(wrapper.find('dialog').element);
+            await flushPromises();
+
+            // Assert
+            expect(focusSpy).toHaveBeenCalledTimes(1);
+            expect(document.activeElement).toBe(opener);
+
+            wrapper.unmount();
+            opener.remove();
+        });
+
+        it('should do nothing more when the close follows a close the service made itself', async () => {
+            // Arrange
+            const service = createDialogService();
+            const wrapper = mount(service.DialogContainerComponent, {attachTo: document.body});
+            const opener = document.createElement('button');
+            document.body.append(opener);
+            opener.focus();
+            service.open(TestDialogContent, {title: 'Bottom'});
+            await nextTick();
+            const lowerOpener = document.createElement('button');
+            document.body.append(lowerOpener);
+            lowerOpener.focus();
+            service.open(TestDialogContent, {title: 'Top'});
+            await nextTick();
+            const topElement = wrapper.findAll('dialog')[1]!.element;
+            const focusSpy = vi.spyOn(lowerOpener, 'focus');
+            await wrapper.findAll('.close-btn')[1]!.trigger('click');
+            await nextTick();
+            service.open(TestDialogContent, {title: 'Replacement'});
+            await nextTick();
+
+            // Act
+            dispatchClose(topElement);
+            await flushPromises();
+
+            // Assert
+            expect(wrapper.findAll('dialog')).toHaveLength(2);
+            expect(wrapper.text()).toContain('Replacement');
+            expect(focusSpy).toHaveBeenCalledTimes(1);
+
+            wrapper.unmount();
+            opener.remove();
+            lowerOpener.remove();
+        });
+    });
+
+    describe('focus after a native close of a dialog with one opened from it (#276)', () => {
+        const closers = new Map<string, () => void>();
+        const Chained = defineComponent({
+            props: {name: {type: String, required: true}, onClose: Function},
+            setup(props) {
+                closers.set(props.name, props.onClose as () => void);
+            },
+            render() {
+                return h('button', {class: `inner-${this.name}`}, this.name);
+            },
+        });
+        const cleanups: (() => void)[] = [];
+
+        const setUp = () => {
+            const service = createDialogService();
+            const wrapper = mount(service.DialogContainerComponent, {attachTo: document.body});
+            const outside = document.createElement('button');
+            document.body.append(outside);
+            cleanups.push(() => {
+                wrapper.unmount();
+                outside.remove();
+            });
+            const focusInner = (name: string) => (document.querySelector(`.inner-${name}`) as HTMLElement).focus();
+            const elementOf = (name: string) => document.querySelector(`.inner-${name}`)!.closest('dialog')!;
+
+            return {service, outside, focusInner, elementOf};
+        };
+
+        afterEach(() => {
+            for (const cleanup of cleanups.splice(0)) cleanup();
+            closers.clear();
+        });
+
+        it('should return focus to where the chain was opened when the last dialog closes', async () => {
+            // Arrange
+            const {service, outside, focusInner, elementOf} = setUp();
+            outside.focus();
+            service.open(Chained, {name: 'A'});
+            await nextTick();
+            focusInner('A');
+            service.open(Chained, {name: 'B'});
+            await nextTick();
+            elementOf('A').close();
+            await flushPromises();
+
+            // Act
+            closers.get('B')?.();
+            await flushPromises();
+
+            // Assert
+            expect(document.querySelectorAll('dialog')).toHaveLength(0);
+            expect(document.activeElement).toBe(outside);
+        });
+
+        it('should walk every removed dialog down to where the chain was opened', async () => {
+            // Arrange
+            const {service, outside, focusInner, elementOf} = setUp();
+            outside.focus();
+            service.open(Chained, {name: 'A'});
+            await nextTick();
+            focusInner('A');
+            service.open(Chained, {name: 'B'});
+            await nextTick();
+            focusInner('B');
+            service.open(Chained, {name: 'C'});
+            await nextTick();
+            elementOf('B').close();
+            await flushPromises();
+            elementOf('A').close();
+            await flushPromises();
+
+            // Act
+            closers.get('C')?.();
+            await flushPromises();
+
+            // Assert
+            expect(document.querySelectorAll('dialog')).toHaveLength(0);
+            expect(document.activeElement).toBe(outside);
+        });
+
+        it('should restore focus at each of two outside closes on lower dialogs', async () => {
+            // Arrange
+            const {service, outside, focusInner, elementOf} = setUp();
+            const own = document.createElement('button');
+            document.body.append(own);
+            cleanups.push(() => own.remove());
+            outside.focus();
+            service.open(Chained, {name: 'A'});
+            await nextTick();
+            focusInner('A');
+            service.open(Chained, {name: 'B'}, {restoreFocusTo: own});
+            await nextTick();
+            focusInner('B');
+            service.open(Chained, {name: 'C'});
+            await nextTick();
+            focusInner('C');
+            service.open(Chained, {name: 'D'});
+            await nextTick();
+            const innerA = document.querySelector('.inner-A');
+
+            // Act
+            elementOf('B').close();
+            await flushPromises();
+            const afterFirst = {count: document.querySelectorAll('dialog').length, focused: document.activeElement};
+            elementOf('A').close();
+            await flushPromises();
+
+            // Assert
+            expect(afterFirst.count).toBe(1);
+            expect(afterFirst.focused).toBe(innerA);
+            expect(document.querySelectorAll('dialog')).toHaveLength(0);
+            expect(document.activeElement).toBe(outside);
+        });
     });
 
     describe('backdrop click', () => {
@@ -447,6 +862,61 @@ describe('dialog service', () => {
 
             // Assert
             expect(wrapper.findAll('dialog')).toHaveLength(0);
+        });
+
+        it('should leave the dialog open while a closeOnBackdropClick getter returns false', async () => {
+            // Arrange
+            const service = createDialogService();
+            const wrapper = mount(service.DialogContainerComponent);
+            service.open(TestDialogContent, {title: 'Test'}, {closeOnBackdropClick: () => false});
+            await nextTick();
+
+            // Act
+            await wrapper.find('dialog').trigger('click');
+            await nextTick();
+
+            // Assert
+            expect(wrapper.findAll('dialog')).toHaveLength(1);
+        });
+
+        it('should read a closeOnBackdropClick getter when the click fires, not at open', async () => {
+            // Arrange
+            let busy = true;
+            const closeOnBackdropClick = vi.fn(() => !busy);
+            const service = createDialogService();
+            const wrapper = mount(service.DialogContainerComponent);
+            service.open(TestDialogContent, {title: 'Test'}, {closeOnBackdropClick});
+            await nextTick();
+            expect(closeOnBackdropClick).not.toHaveBeenCalled();
+            await wrapper.find('dialog').trigger('click');
+            await nextTick();
+            expect(wrapper.findAll('dialog')).toHaveLength(1);
+
+            // Act
+            busy = false;
+            await wrapper.find('dialog').trigger('click');
+            await nextTick();
+
+            // Assert
+            expect(closeOnBackdropClick).toHaveBeenCalledTimes(2);
+            expect(wrapper.findAll('dialog')).toHaveLength(0);
+        });
+
+        it('should not read the closeOnBackdropClick getter for a click inside the content', async () => {
+            // Arrange
+            const closeOnBackdropClick = vi.fn(() => true);
+            const service = createDialogService();
+            const wrapper = mount(service.DialogContainerComponent);
+            service.open(TestDialogContent, {title: 'Test'}, {closeOnBackdropClick});
+            await nextTick();
+
+            // Act
+            await wrapper.find('.dialog-content').trigger('click');
+            await nextTick();
+
+            // Assert
+            expect(closeOnBackdropClick).not.toHaveBeenCalled();
+            expect(wrapper.findAll('dialog')).toHaveLength(1);
         });
     });
 

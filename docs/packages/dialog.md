@@ -214,6 +214,8 @@ const onBackdrop = async (event: MouseEvent) => {
 </script>
 ```
 
+Pass a getter instead of a boolean and it is read at each click, so a dialog can refuse a backdrop close only while it is busy: `closeOnBackdropClick: () => !saving.value`.
+
 The option only affects backdrop clicks. Programmatic closes (`closeAll()`, or `onClose` after a save) and Escape are unaffected — see `closeOnEscape` below for the Escape counterpart.
 
 ## Escape
@@ -225,6 +227,17 @@ A dialog that must not be dismissed by Escape — unsaved work behind a dirty-co
 ```typescript
 dialog.open(EditForm, {/* props */}, {closeOnEscape: false, closeOnBackdropClick: false});
 ```
+
+Both options also take a getter, read when the key press or click happens. A dialog that must stay open only while a request is in flight passes the same getter to both:
+
+```typescript
+const saving = ref(false);
+const whileIdle = () => !saving.value;
+
+dialog.open(EditForm, {/* props */}, {closeOnEscape: whileIdle, closeOnBackdropClick: whileIdle});
+```
+
+A refused Escape is not final. Chromium closes a dialog natively when Escape is pressed a second time with no click or key press in between, whatever the dialog asked for. The service follows that close: the dialog leaves the stack, scrolling unlocks and focus is restored, exactly as for any other close.
 
 ## Focus
 
@@ -264,8 +277,8 @@ interface DialogOpenOptions {
     ariaLabel?: string; // sets aria-label on the host <dialog>
     ariaLabelledBy?: string; // sets aria-labelledby on the host <dialog>
     ariaDescribedBy?: string; // sets aria-describedby on the host <dialog>
-    closeOnBackdropClick?: boolean; // default true; set false to manage backdrop closing yourself
-    closeOnEscape?: boolean; // default true; set false to manage Escape yourself
+    closeOnBackdropClick?: boolean | (() => boolean); // default true; false (or a getter returning false, read at the click) to manage backdrop closing yourself
+    closeOnEscape?: boolean | (() => boolean); // default true; false (or a getter returning false, read at the key press) to manage Escape yourself
     restoreFocusTo?: HTMLElement | null | (() => HTMLElement | null); // focus target when the opener cannot take focus back
 }
 ```
