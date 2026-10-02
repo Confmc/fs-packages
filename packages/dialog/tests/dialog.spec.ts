@@ -238,6 +238,20 @@ describe('dialog service', () => {
             expect(wrapper.findAll('dialog')).toHaveLength(0);
         });
 
+        it('should do nothing and not throw on an empty stack', async () => {
+            // Arrange
+            const service = createDialogService();
+            const wrapper = mount(service.DialogContainerComponent);
+
+            // Act
+            service.closeAll();
+            await flushPromises();
+
+            // Assert
+            expect(wrapper.findAll('dialog')).toHaveLength(0);
+            expect(document.body.style.overflowY).toBe('auto');
+        });
+
         it('should restore body overflow to auto', () => {
             // Arrange
             const service = createDialogService();
