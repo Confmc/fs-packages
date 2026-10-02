@@ -118,8 +118,7 @@ describe('dialog service', () => {
 
         it('should call showModal on the dialog element via onVnodeMounted', async () => {
             // Arrange
-            const showModalSpy = vi.fn();
-            HTMLDialogElement.prototype.showModal = showModalSpy;
+            const showModalSpy = vi.spyOn(HTMLDialogElement.prototype, 'showModal');
 
             const service = createDialogService();
             const wrapper = mount(service.DialogContainerComponent, {attachTo: document.body});
@@ -570,7 +569,7 @@ describe('dialog service', () => {
             expect(document.body.style.overflowY).toBe('auto');
         });
 
-        it('should close the dialogs above the one that closed natively', async () => {
+        it('should keep a dialog above that is still open', async () => {
             // Arrange
             const service = createDialogService();
             const wrapper = mount(service.DialogContainerComponent);
@@ -584,8 +583,76 @@ describe('dialog service', () => {
             await nextTick();
 
             // Assert
+            expect(wrapper.findAll('dialog')).toHaveLength(2);
+            expect(wrapper.text()).toContain('Bottom');
+            expect(wrapper.text()).not.toContain('Middle');
+            expect(wrapper.text()).toContain('Top');
+        });
+
+        it('should take a dialog above whose element closed as well', async () => {
+            // Arrange
+            const service = createDialogService();
+            const wrapper = mount(service.DialogContainerComponent);
+            service.open(TestDialogContent, {title: 'Bottom'});
+            service.open(TestDialogContent, {title: 'Middle'});
+            service.open(TestDialogContent, {title: 'Top'});
+            await nextTick();
+            const [, middle, top] = wrapper.findAll('dialog').map((dialog) => dialog.element);
+            top!.removeAttribute('open');
+
+            // Act
+            dispatchClose(middle!);
+            await nextTick();
+
+            // Assert
             expect(wrapper.findAll('dialog')).toHaveLength(1);
             expect(wrapper.text()).toContain('Bottom');
+        });
+
+        it('should keep a dialog opened after the element closed that has not rendered yet', async () => {
+            // Arrange
+            const service = createDialogService();
+            const wrapper = mount(service.DialogContainerComponent);
+            service.open(TestDialogContent, {title: 'Closed'});
+            await nextTick();
+            const closed = wrapper.find('dialog').element;
+            closed.removeAttribute('open');
+
+            // Act
+            service.open(TestDialogContent, {title: 'Replacement'});
+            dispatchClose(closed);
+            await nextTick();
+
+            // Assert
+            expect(wrapper.findAll('dialog')).toHaveLength(1);
+            expect(wrapper.text()).toContain('Replacement');
+            expect(document.body.style.overflowY).toBe('hidden');
+        });
+
+        it('should leave focus alone when a dialog stays open above the one that closed', async () => {
+            // Arrange
+            const service = createDialogService();
+            const wrapper = mount(service.DialogContainerComponent, {attachTo: document.body});
+            const opener = document.createElement('button');
+            document.body.append(opener);
+            opener.focus();
+            service.open(TestDialogContent, {title: 'Closed'});
+            await nextTick();
+            const closed = wrapper.find('dialog').element;
+            service.open(TestDialogContent, {title: 'Replacement'});
+            await nextTick();
+            const focusSpy = vi.spyOn(opener, 'focus');
+
+            // Act
+            dispatchClose(closed);
+            await flushPromises();
+
+            // Assert
+            expect(wrapper.findAll('dialog')).toHaveLength(1);
+            expect(focusSpy).not.toHaveBeenCalled();
+
+            wrapper.unmount();
+            opener.remove();
         });
 
         it('should restore focus to the opener once', async () => {

@@ -77,6 +77,49 @@ describe('native close in Chromium (WR-1913)', () => {
         expect(document.body.style.overflowY).toBe('auto');
     });
 
+    // Chromium queues the close event as a task, so a dialog opened in between is already on the
+    // stack when the closed element's event arrives.
+    it('should keep a dialog opened in the same turn as a native close', async () => {
+        // Arrange
+        const {service, stack} = mountService();
+        service.open(Content, {});
+        await settle();
+        const closed = stack()[0]!;
+
+        // Act
+        closed.close();
+        service.open(Content, {});
+        await settle();
+
+        // Assert
+        expect(stack()).toHaveLength(1);
+        expect(stack()[0]).not.toBe(closed);
+        expect(stack()[0]!.open).toBe(true);
+        expect(stack()[0]!.contains(document.activeElement)).toBe(true);
+        expect(document.body.style.overflowY).toBe('hidden');
+    });
+
+    it('should keep a dialog opened in a microtask after a native close', async () => {
+        // Arrange
+        const {service, stack} = mountService();
+        service.open(Content, {});
+        await settle();
+        const closed = stack()[0]!;
+
+        // Act
+        closed.close();
+        await Promise.resolve();
+        service.open(Content, {});
+        await settle();
+
+        // Assert
+        expect(stack()).toHaveLength(1);
+        expect(stack()[0]).not.toBe(closed);
+        expect(stack()[0]!.open).toBe(true);
+        expect(stack()[0]!.contains(document.activeElement)).toBe(true);
+        expect(document.body.style.overflowY).toBe('hidden');
+    });
+
     it('should keep the stack in sync when the element is closed from outside', async () => {
         // Arrange
         const {service, stack} = mountService();
