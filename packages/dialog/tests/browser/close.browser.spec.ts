@@ -120,6 +120,39 @@ describe('native close in Chromium (WR-1913)', () => {
         expect(document.body.style.overflowY).toBe('hidden');
     });
 
+    it('should return focus to the outside opener after closing a dialog opened from inside a closed one', async () => {
+        // Arrange
+        const {service, stack} = mountService();
+        const outside = document.createElement('button');
+        document.body.append(outside);
+        outside.focus();
+        let closeUpper: (() => void) | undefined;
+        const Upper = defineComponent({
+            props: {onClose: Function},
+            setup: (props) => {
+                closeUpper = props.onClose as () => void;
+            },
+            render: () => h('button', 'upper'),
+        });
+        service.open(Content, {});
+        await settle();
+        const lower = stack()[0]!;
+        lower.querySelector('button')!.focus();
+        service.open(Upper, {});
+        await settle();
+        lower.close();
+        await settle();
+
+        // Act
+        closeUpper?.();
+        await settle();
+
+        // Assert
+        expect(stack()).toHaveLength(0);
+        expect(document.activeElement).toBe(outside);
+        outside.remove();
+    });
+
     it('should keep the stack in sync when the element is closed from outside', async () => {
         // Arrange
         const {service, stack} = mountService();

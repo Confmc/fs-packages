@@ -48,7 +48,10 @@ export interface DialogService {
 interface DialogEntry {
     render: () => VNode;
     key: string;
-    restoreFocus: () => void;
+    /** Returns whether focus landed on the target it chose. */
+    restoreFocus: () => boolean;
+    /** Adds a restore tried after this entry's own targets, in the order added. */
+    inheritRestore: (restore: () => boolean) => void;
     /** False once the element has been shown and has closed since. */
     isShown: () => boolean;
 }
@@ -121,7 +124,11 @@ export const createDialogService = (): DialogService => {
         dialogs.value = [...dialogs.value.slice(0, index), ...kept];
         updateBodyScroll();
 
-        if (kept.length === 0) void nextTick(entry.restoreFocus);
+        // The dialog opened from inside this one holds an opener that has just left the page, so
+        // it carries this entry's target until the chain is closed.
+        const [lowestKept] = kept;
+        if (lowestKept === undefined) void nextTick(entry.restoreFocus);
+        else lowestKept.inheritRestore(entry.restoreFocus);
     };
 
     const closeAll = () => closeFrom(0);
@@ -134,14 +141,22 @@ export const createDialogService = (): DialogService => {
         let element: HTMLDialogElement | null = null;
         const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
-        const restoreFocus = () => {
+        const inherited: (() => boolean)[] = [];
+
+        const restoreFocus = (): boolean => {
             if (opener?.isConnected === true) {
                 opener.focus();
-                if (document.activeElement === opener) return;
+                if (document.activeElement === opener) return true;
             }
 
-            const fallback = options?.restoreFocusTo;
-            (typeof fallback === 'function' ? fallback() : fallback)?.focus();
+            const option = options?.restoreFocusTo;
+            const fallback = typeof option === 'function' ? option() : option;
+            if (fallback) {
+                fallback.focus();
+                if (document.activeElement === fallback) return true;
+            }
+
+            return inherited.some((restore) => restore());
         };
 
         const prepared = prepareVModelProps(props as Record<string, unknown>, onClose);
@@ -181,7 +196,13 @@ export const createDialogService = (): DialogService => {
                 h(Suspense, null, {default: () => h(rawComponent, prepared)}),
             );
 
-        dialogs.value.push({render, key, restoreFocus, isShown: () => element === null || element.open});
+        dialogs.value.push({
+            render,
+            key,
+            restoreFocus,
+            inheritRestore: (restore) => inherited.push(restore),
+            isShown: () => element === null || element.open,
+        });
         updateBodyScroll();
     };
 
