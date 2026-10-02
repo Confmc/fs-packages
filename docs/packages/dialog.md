@@ -253,9 +253,7 @@ dialog.open(
 );
 ```
 
-A dialog can also be closed natively while a dialog opened from inside it stays open (something calls `close()` on the lower `<dialog>`). The dialog left open then carries the closed one's focus target behind its own opener and `restoreFocusTo`, so when it closes, focus still returns to where the chain was opened.
-
-Without a usable opener, fallback or carried target, the service leaves focus where the browser put it.
+Without a usable opener or fallback, the service leaves focus where the browser put it.
 
 ## API Reference
 

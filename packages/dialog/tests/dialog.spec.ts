@@ -569,7 +569,7 @@ describe('dialog service', () => {
             expect(document.body.style.overflowY).toBe('auto');
         });
 
-        it('should keep a dialog above that is still open', async () => {
+        it('should close the dialogs above the one that closed natively', async () => {
             // Arrange
             const service = createDialogService();
             const wrapper = mount(service.DialogContainerComponent);
@@ -583,10 +583,8 @@ describe('dialog service', () => {
             await nextTick();
 
             // Assert
-            expect(wrapper.findAll('dialog')).toHaveLength(2);
+            expect(wrapper.findAll('dialog')).toHaveLength(1);
             expect(wrapper.text()).toContain('Bottom');
-            expect(wrapper.text()).not.toContain('Middle');
-            expect(wrapper.text()).toContain('Top');
         });
 
         it('should take a dialog above whose element closed as well', async () => {
@@ -627,32 +625,6 @@ describe('dialog service', () => {
             expect(wrapper.findAll('dialog')).toHaveLength(1);
             expect(wrapper.text()).toContain('Replacement');
             expect(document.body.style.overflowY).toBe('hidden');
-        });
-
-        it('should leave focus alone when a dialog stays open above the one that closed', async () => {
-            // Arrange
-            const service = createDialogService();
-            const wrapper = mount(service.DialogContainerComponent, {attachTo: document.body});
-            const opener = document.createElement('button');
-            document.body.append(opener);
-            opener.focus();
-            service.open(TestDialogContent, {title: 'Closed'});
-            await nextTick();
-            const closed = wrapper.find('dialog').element;
-            service.open(TestDialogContent, {title: 'Replacement'});
-            await nextTick();
-            const focusSpy = vi.spyOn(opener, 'focus');
-
-            // Act
-            dispatchClose(closed);
-            await flushPromises();
-
-            // Assert
-            expect(wrapper.findAll('dialog')).toHaveLength(1);
-            expect(focusSpy).not.toHaveBeenCalled();
-
-            wrapper.unmount();
-            opener.remove();
         });
 
         it('should restore focus to the opener once', async () => {
@@ -768,29 +740,6 @@ describe('dialog service', () => {
             expect(document.activeElement).toBe(outside);
         });
 
-        it('should prefer the upper dialog own restoreFocusTo over the inherited target', async () => {
-            // Arrange
-            const {service, outside, focusInner, elementOf} = setUp();
-            const own = document.createElement('button');
-            document.body.append(own);
-            cleanups.push(() => own.remove());
-            outside.focus();
-            service.open(Chained, {name: 'A'});
-            await nextTick();
-            focusInner('A');
-            service.open(Chained, {name: 'B'}, {restoreFocusTo: own});
-            await nextTick();
-            elementOf('A').close();
-            await flushPromises();
-
-            // Act
-            closers.get('B')?.();
-            await flushPromises();
-
-            // Assert
-            expect(document.activeElement).toBe(own);
-        });
-
         it('should walk every removed dialog down to where the chain was opened', async () => {
             // Arrange
             const {service, outside, focusInner, elementOf} = setUp();
@@ -817,84 +766,38 @@ describe('dialog service', () => {
             expect(document.activeElement).toBe(outside);
         });
 
-        it('should take the nearest removed dialog restoreFocusTo before one further down', async () => {
+        it('should restore focus at each of two outside closes on lower dialogs', async () => {
             // Arrange
             const {service, outside, focusInner, elementOf} = setUp();
-            const nearer = document.createElement('button');
-            document.body.append(nearer);
-            cleanups.push(() => nearer.remove());
+            const own = document.createElement('button');
+            document.body.append(own);
+            cleanups.push(() => own.remove());
             outside.focus();
             service.open(Chained, {name: 'A'});
             await nextTick();
             focusInner('A');
-            service.open(Chained, {name: 'B'}, {restoreFocusTo: nearer});
+            service.open(Chained, {name: 'B'}, {restoreFocusTo: own});
             await nextTick();
             focusInner('B');
             service.open(Chained, {name: 'C'});
             await nextTick();
+            focusInner('C');
+            service.open(Chained, {name: 'D'});
+            await nextTick();
+            const innerA = document.querySelector('.inner-A');
+
+            // Act
             elementOf('B').close();
             await flushPromises();
+            const afterFirst = {count: document.querySelectorAll('dialog').length, focused: document.activeElement};
             elementOf('A').close();
             await flushPromises();
 
-            // Act
-            closers.get('C')?.();
-            await flushPromises();
-
             // Assert
-            expect(document.activeElement).toBe(nearer);
-        });
-
-        it('should fall through to the inherited target when the own restoreFocusTo refuses focus', async () => {
-            // Arrange
-            const {service, outside, focusInner, elementOf} = setUp();
-            const disabled = document.createElement('button');
-            disabled.disabled = true;
-            document.body.append(disabled);
-            cleanups.push(() => disabled.remove());
-            outside.focus();
-            service.open(Chained, {name: 'A'});
-            await nextTick();
-            focusInner('A');
-            service.open(Chained, {name: 'B'}, {restoreFocusTo: disabled});
-            await nextTick();
-            elementOf('A').close();
-            await flushPromises();
-
-            // Act
-            closers.get('B')?.();
-            await flushPromises();
-
-            // Assert
+            expect(afterFirst.count).toBe(1);
+            expect(afterFirst.focused).toBe(innerA);
+            expect(document.querySelectorAll('dialog')).toHaveLength(0);
             expect(document.activeElement).toBe(outside);
-        });
-
-        it('should stop at the first removed dialog whose opener takes focus', async () => {
-            // Arrange
-            const {service, outside, focusInner, elementOf} = setUp();
-            const second = document.createElement('button');
-            document.body.append(second);
-            cleanups.push(() => second.remove());
-            outside.focus();
-            service.open(Chained, {name: 'A'});
-            await nextTick();
-            second.focus();
-            service.open(Chained, {name: 'B'});
-            await nextTick();
-            focusInner('B');
-            service.open(Chained, {name: 'C'});
-            await nextTick();
-            elementOf('B').close();
-            await flushPromises();
-            elementOf('A').close();
-            await flushPromises();
-
-            // Act
-            closers.get('C')?.();
-            await flushPromises();
-
-            // Assert
-            expect(document.activeElement).toBe(second);
         });
     });
 

@@ -48,12 +48,9 @@ export interface DialogService {
 interface DialogEntry {
     render: () => VNode;
     key: string;
-    /** Returns whether focus landed on the target it chose. */
-    restoreFocus: () => boolean;
-    /** Adds a restore tried after this entry's own targets, in the order added. */
-    inheritRestore: (restore: () => boolean) => void;
-    /** False once the element has been shown and has closed since. */
-    isShown: () => boolean;
+    restoreFocus: () => void;
+    /** True once the element has been shown and has closed since. */
+    isClosed: () => boolean;
 }
 
 const DIALOG_STYLE = 'padding:0;margin:auto;background:transparent;border:none';
@@ -113,27 +110,14 @@ export const createDialogService = (): DialogService => {
         if (index !== -1) closeFrom(index);
     };
 
-    // The browser queues the close event, so a dialog opened between the native close and the
-    // event is already above this entry; only entries whose element closed as well go with it.
-    const closeNatively = (key: string) => {
-        const entry = dialogs.value.find((dialog) => dialog.key === key);
-        if (entry === undefined) return;
-
-        const index = dialogs.value.indexOf(entry);
-        const kept = dialogs.value.slice(index + 1).filter((dialog) => dialog.isShown());
-        dialogs.value = [...dialogs.value.slice(0, index), ...kept];
-        updateBodyScroll();
-
-        // The dialog opened from inside this one holds an opener that has just left the page, so
-        // it carries this entry's target until the chain is closed.
-        const [lowestKept] = kept;
-        if (lowestKept === undefined) void nextTick(entry.restoreFocus);
-        else lowestKept.inheritRestore(entry.restoreFocus);
-    };
-
     const closeAll = () => closeFrom(0);
 
     const open = <C extends Component>(component: C, props: ComponentProps<C>, options?: DialogOpenOptions): void => {
+        // The browser queues a native close event, so an entry whose element closed may still be on
+        // the stack; it goes first, or its late event would close this dialog with it (LIFO).
+        const stale = dialogs.value.findIndex((dialog) => dialog.isClosed());
+        if (stale !== -1) closeFrom(stale);
+
         const key = `dialog-${dialogId++}`;
         const rawComponent = markRaw(component);
 
@@ -141,22 +125,14 @@ export const createDialogService = (): DialogService => {
         let element: HTMLDialogElement | null = null;
         const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
-        const inherited: (() => boolean)[] = [];
-
-        const restoreFocus = (): boolean => {
+        const restoreFocus = () => {
             if (opener?.isConnected === true) {
                 opener.focus();
-                if (document.activeElement === opener) return true;
+                if (document.activeElement === opener) return;
             }
 
-            const option = options?.restoreFocusTo;
-            const fallback = typeof option === 'function' ? option() : option;
-            if (fallback) {
-                fallback.focus();
-                if (document.activeElement === fallback) return true;
-            }
-
-            return inherited.some((restore) => restore());
+            const fallback = options?.restoreFocusTo;
+            (typeof fallback === 'function' ? fallback() : fallback)?.focus();
         };
 
         const prepared = prepareVModelProps(props as Record<string, unknown>, onClose);
@@ -180,7 +156,7 @@ export const createDialogService = (): DialogService => {
                     // Chromium closes the element natively on a second Escape with no user activation
                     // in between, whatever onCancel did (WR-1913); the entry follows it off the stack.
                     // A close the service made itself finds no entry and does nothing.
-                    onClose: () => closeNatively(key),
+                    onClose,
                     onClick: (event: MouseEvent) => {
                         if ((event.target as HTMLElement).tagName !== 'DIALOG') return;
                         // Opted out: the consumer manages backdrop close (e.g. a dirty-confirm) via onClose.
@@ -196,13 +172,7 @@ export const createDialogService = (): DialogService => {
                 h(Suspense, null, {default: () => h(rawComponent, prepared)}),
             );
 
-        dialogs.value.push({
-            render,
-            key,
-            restoreFocus,
-            inheritRestore: (restore) => inherited.push(restore),
-            isShown: () => element === null || element.open,
-        });
+        dialogs.value.push({render, key, restoreFocus, isClosed: () => element?.open === false});
         updateBodyScroll();
     };
 
