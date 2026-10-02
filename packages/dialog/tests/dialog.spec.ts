@@ -309,6 +309,115 @@ describe('dialog service', () => {
         });
     });
 
+    describe('a stale onClose closes its own dialog or nothing (WR-1914)', () => {
+        const captured = new Map<string, () => void>();
+        const NamedCapturing = defineComponent({
+            props: {name: {type: String, required: true}, onClose: Function},
+            setup(props) {
+                captured.set(props.name, props.onClose as () => void);
+            },
+            render() {
+                return h('div', {class: 'named'}, this.name);
+            },
+        });
+
+        afterEach(() => {
+            captured.clear();
+        });
+
+        it('should not close a dialog that took the index of a closed one', async () => {
+            // Arrange
+            const service = createDialogService();
+            const wrapper = mount(service.DialogContainerComponent);
+            service.open(NamedCapturing, {name: 'A'});
+            await nextTick();
+            service.closeAll();
+            await nextTick();
+            service.open(NamedCapturing, {name: 'C'});
+            await nextTick();
+
+            // Act
+            captured.get('A')?.();
+            await nextTick();
+
+            // Assert
+            expect(wrapper.findAll('dialog')).toHaveLength(1);
+            expect(wrapper.text()).toContain('C');
+            expect(document.body.style.overflowY).toBe('hidden');
+        });
+
+        it('should not close a dialog that took the index of a closed one a level up', async () => {
+            // Arrange
+            const service = createDialogService();
+            const wrapper = mount(service.DialogContainerComponent);
+            service.open(NamedCapturing, {name: 'A'});
+            service.open(NamedCapturing, {name: 'B'});
+            await nextTick();
+            captured.get('B')?.();
+            await nextTick();
+            service.open(NamedCapturing, {name: 'C'});
+            await nextTick();
+
+            // Act
+            captured.get('B')?.();
+            await nextTick();
+
+            // Assert
+            expect(wrapper.findAll('dialog')).toHaveLength(2);
+            expect(wrapper.text()).toContain('A');
+            expect(wrapper.text()).toContain('C');
+        });
+
+        it('should close a live dialog once when its onClose is called twice', async () => {
+            // Arrange
+            const service = createDialogService();
+            const wrapper = mount(service.DialogContainerComponent, {attachTo: document.body});
+            const opener = document.createElement('button');
+            document.body.append(opener);
+            opener.focus();
+            service.open(NamedCapturing, {name: 'A'});
+            await nextTick();
+            const lowerOpener = document.createElement('button');
+            document.body.append(lowerOpener);
+            lowerOpener.focus();
+            service.open(NamedCapturing, {name: 'B'});
+            await nextTick();
+            const focusSpy = vi.spyOn(lowerOpener, 'focus');
+
+            // Act
+            captured.get('B')?.();
+            captured.get('B')?.();
+            await flushPromises();
+
+            // Assert
+            expect(wrapper.findAll('dialog')).toHaveLength(1);
+            expect(wrapper.text()).toContain('A');
+            expect(focusSpy).toHaveBeenCalledTimes(1);
+
+            wrapper.unmount();
+            opener.remove();
+            lowerOpener.remove();
+        });
+
+        it('should still close the dialogs above a lower dialog that closes', async () => {
+            // Arrange
+            const service = createDialogService();
+            const wrapper = mount(service.DialogContainerComponent);
+            service.open(NamedCapturing, {name: 'A'});
+            service.open(NamedCapturing, {name: 'B'});
+            service.open(NamedCapturing, {name: 'C'});
+            await nextTick();
+
+            // Act
+            captured.get('B')?.();
+            await nextTick();
+
+            // Assert
+            expect(wrapper.findAll('dialog')).toHaveLength(1);
+            expect(wrapper.text()).toContain('A');
+        });
+    });
+
     describe('Escape (the native cancel event)', () => {
         // happy-dom fires no cancel on a key press, so each spec dispatches it on the
         // dialog element; a browser fires it on the top-most modal only.

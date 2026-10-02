@@ -92,14 +92,20 @@ export const createDialogService = (): DialogService => {
         if (lowestClosed !== undefined) void nextTick(lowestClosed.restoreFocus);
     };
 
+    // By key, not by the index at open: a late onClose from a dialog already gone would close
+    // whichever dialog now holds that index (WR-1914).
+    const closeByKey = (key: string) => {
+        const index = dialogs.value.findIndex((dialog) => dialog.key === key);
+        if (index !== -1) closeFrom(index);
+    };
+
     const closeAll = () => closeFrom(0);
 
     const open = <C extends Component>(component: C, props: ComponentProps<C>, options?: DialogOpenOptions): void => {
         const key = `dialog-${dialogId++}`;
         const rawComponent = markRaw(component);
 
-        const index = dialogs.value.length;
-        const onClose = () => closeFrom(index);
+        const onClose = () => closeByKey(key);
         const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
         const restoreFocus = () => {
