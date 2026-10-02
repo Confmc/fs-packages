@@ -493,6 +493,45 @@ describe('dialog service', () => {
             // Assert
             expect(wrapper.findAll('dialog')).toHaveLength(0);
         });
+
+        it('should leave the dialog open while a closeOnEscape getter returns false', async () => {
+            // Arrange
+            const service = createDialogService();
+            const wrapper = mount(service.DialogContainerComponent);
+            service.open(TestDialogContent, {title: 'Test'}, {closeOnEscape: () => false});
+            await nextTick();
+
+            // Act
+            const cancelEvent = dispatchCancel(wrapper.find('dialog').element);
+            await nextTick();
+
+            // Assert
+            expect(cancelEvent.defaultPrevented).toBe(true);
+            expect(wrapper.findAll('dialog')).toHaveLength(1);
+        });
+
+        it('should read a closeOnEscape getter when Escape fires, not at open', async () => {
+            // Arrange
+            let busy = true;
+            const closeOnEscape = vi.fn(() => !busy);
+            const service = createDialogService();
+            const wrapper = mount(service.DialogContainerComponent);
+            service.open(TestDialogContent, {title: 'Test'}, {closeOnEscape});
+            await nextTick();
+            expect(closeOnEscape).not.toHaveBeenCalled();
+            dispatchCancel(wrapper.find('dialog').element);
+            await nextTick();
+            expect(wrapper.findAll('dialog')).toHaveLength(1);
+
+            // Act
+            busy = false;
+            dispatchCancel(wrapper.find('dialog').element);
+            await nextTick();
+
+            // Assert
+            expect(closeOnEscape).toHaveBeenCalledTimes(2);
+            expect(wrapper.findAll('dialog')).toHaveLength(0);
+        });
     });
 
     describe('backdrop click', () => {
@@ -556,6 +595,61 @@ describe('dialog service', () => {
 
             // Assert
             expect(wrapper.findAll('dialog')).toHaveLength(0);
+        });
+
+        it('should leave the dialog open while a closeOnBackdropClick getter returns false', async () => {
+            // Arrange
+            const service = createDialogService();
+            const wrapper = mount(service.DialogContainerComponent);
+            service.open(TestDialogContent, {title: 'Test'}, {closeOnBackdropClick: () => false});
+            await nextTick();
+
+            // Act
+            await wrapper.find('dialog').trigger('click');
+            await nextTick();
+
+            // Assert
+            expect(wrapper.findAll('dialog')).toHaveLength(1);
+        });
+
+        it('should read a closeOnBackdropClick getter when the click fires, not at open', async () => {
+            // Arrange
+            let busy = true;
+            const closeOnBackdropClick = vi.fn(() => !busy);
+            const service = createDialogService();
+            const wrapper = mount(service.DialogContainerComponent);
+            service.open(TestDialogContent, {title: 'Test'}, {closeOnBackdropClick});
+            await nextTick();
+            expect(closeOnBackdropClick).not.toHaveBeenCalled();
+            await wrapper.find('dialog').trigger('click');
+            await nextTick();
+            expect(wrapper.findAll('dialog')).toHaveLength(1);
+
+            // Act
+            busy = false;
+            await wrapper.find('dialog').trigger('click');
+            await nextTick();
+
+            // Assert
+            expect(closeOnBackdropClick).toHaveBeenCalledTimes(2);
+            expect(wrapper.findAll('dialog')).toHaveLength(0);
+        });
+
+        it('should not read the closeOnBackdropClick getter for a click inside the content', async () => {
+            // Arrange
+            const closeOnBackdropClick = vi.fn(() => true);
+            const service = createDialogService();
+            const wrapper = mount(service.DialogContainerComponent);
+            service.open(TestDialogContent, {title: 'Test'}, {closeOnBackdropClick});
+            await nextTick();
+
+            // Act
+            await wrapper.find('.dialog-content').trigger('click');
+            await nextTick();
+
+            // Assert
+            expect(closeOnBackdropClick).not.toHaveBeenCalled();
+            expect(wrapper.findAll('dialog')).toHaveLength(1);
         });
     });
 

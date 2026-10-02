@@ -16,10 +16,16 @@ export interface DialogOpenOptions {
     ariaLabelledBy?: string;
     /** Sets `aria-describedby` on the host `<dialog>` element. */
     ariaDescribedBy?: string;
-    /** Whether a backdrop click closes this dialog. Defaults to `true`; set `false` to close it yourself via `onClose`. */
-    closeOnBackdropClick?: boolean;
-    /** Whether Escape closes this dialog. Defaults to `true`; set `false` to close it yourself via `onClose`. */
-    closeOnEscape?: boolean;
+    /**
+     * Whether a backdrop click closes this dialog. Defaults to `true`; set `false` to close it yourself
+     * via `onClose`. A getter is read at the click, so a dialog can refuse only while it is busy.
+     */
+    closeOnBackdropClick?: boolean | (() => boolean);
+    /**
+     * Whether Escape closes this dialog. Defaults to `true`; set `false` to close it yourself via
+     * `onClose`. A getter is read at the key press, so a dialog can refuse only while it is busy.
+     */
+    closeOnEscape?: boolean | (() => boolean);
     /**
      * Where focus goes on close when the element that had focus at open can no longer take it
      * (removed from the document, or disabled). A getter is read at close time.
@@ -46,6 +52,9 @@ interface DialogEntry {
 }
 
 const DIALOG_STYLE = 'padding:0;margin:auto;background:transparent;border:none';
+
+const allowsClose = (option: boolean | (() => boolean) | undefined): boolean =>
+    (typeof option === 'function' ? option() : option) !== false;
 
 const prepareVModelProps = (props: Record<string, unknown>, onClose: () => void): Record<string, unknown> => {
     const prepared: Record<string, unknown> = reactive({...props, onClose});
@@ -132,14 +141,14 @@ export const createDialogService = (): DialogService => {
                     // The native close would leave this entry on the stack, so Escape closes through onClose.
                     onCancel: (event: Event) => {
                         event.preventDefault();
-                        if (options?.closeOnEscape === false) return;
+                        if (!allowsClose(options?.closeOnEscape)) return;
 
                         onClose();
                     },
                     onClick: (event: MouseEvent) => {
                         if ((event.target as HTMLElement).tagName !== 'DIALOG') return;
                         // Opted out: the consumer manages backdrop close (e.g. a dirty-confirm) via onClose.
-                        if (options?.closeOnBackdropClick === false) return;
+                        if (!allowsClose(options?.closeOnBackdropClick)) return;
 
                         onClose();
                     },
