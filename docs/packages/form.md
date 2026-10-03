@@ -6,7 +6,7 @@ Reactive form-submit helpers: a double-submit guard plus 422 validation-error bi
 npm install @script-development/fs-form
 ```
 
-**Peer dependencies:** `vue ^3.5.39`, `@script-development/fs-http ^0.5.0`
+**Peer dependencies:** `vue ^3.5.43`, `@script-development/fs-http ^0.5.0 || ^0.6.0`
 
 ## What It Does
 
@@ -71,6 +71,41 @@ const {errors, submitting, handleSubmit} = useForm<Field>(http, {keyMapper: came
 The two source territories diverged on exactly one axis: one camelCased the error keys, the other used them raw. `keyMapper` (default identity) is the single injection point that absorbs that divergence, so the package fits both without forking.
 :::
 
+## Fields, Refusals and the Submit Window
+
+### Keep only the form's own fields
+
+A 422 can name keys the form has no input for (a `token`, a field another screen owns). Pass `fields` to keep only the ones you can mark. It is matched against the **`keyMapper` output**, so list the names your form uses:
+
+```typescript
+const {errors, unmapped} = useForm<Field>(http, {keyMapper: camel, fields: ['name', 'email']});
+// 422 {errors: {email: ['Taken'], token: ['Expired']}} → errors {email: 'Taken'}, unmapped ['token']
+```
+
+Omit `fields` and every key binds, as before.
+
+### A refusal the form cannot mark
+
+A 422 whose keys are all dropped leaves `errors` empty, and a screen that draws only `errors` then refuses in silence. Three readonly refs report the refusal itself:
+
+| Ref              | Meaning                                                                                                    |
+| ---------------- | ---------------------------------------------------------------------------------------------------------- |
+| `refused`        | A 422 was accepted since the last `clearErrors`                                                            |
+| `unmapped`       | The mapped keys of that 422 that `errors` does not hold (not in `fields`, or not a string list), each once |
+| `refusedUnnamed` | `refused` and `errors` is empty: show a form-level message                                                 |
+
+`refused` is raised by the 422 middleware, at the moment the bag is written, not in `handleSubmit`'s catch. A store that catches and classifies the 422 itself, so `handleSubmit` sees a resolved action, still gets the signal. `clearErrors` resets all three, and `handleSubmit` calls it before each attempt. "The refusal named a key this form has no field for" is `unmapped.value.length > 0`.
+
+### Take a 422 only while submitting
+
+The middleware sees every 422 the shared `HttpService` answers, so a late 422 from a screen the user already left lands in the next mounted form's bag. `onlyWhileSubmitting` takes a 422 only while this form's `handleSubmit` is in flight:
+
+```typescript
+useForm<Field>(http, {onlyWhileSubmitting: true});
+```
+
+fs-http runs the middleware synchronously inside the axios interceptor, before the rejection reaches the awaiting action, so a submit's own 422 arrives while `submitting` is still `true`. **The gate is a time window, not request identity.** Any request on the same `HttpService` that answers 422 while this form is submitting lands in this form's bag: another form's submit, a background save, a dialog's request. Telling requests apart needs a marker the consumer threads into its request options (WR-1992; `packages/form/DECISIONS.md` D1). Off by default. When wiring the primitives by hand, pass the predicate yourself: `useValidationErrors(http, {acceptWhen: () => submit.submitting.value})`.
+
 ## Scroll to the First Error
 
 Pass `scrollToError` and a 422 scrolls the first invalid field into view, so the user lands on the first thing to fix. It targets the first `[aria-invalid="true"]` element and calls `scrollIntoView({block: 'center'})` after the mark is painted. It is **off by default**, and every example below has to opt in. `useForm` derives no ids and marks no fields itself, so it is also **inert unless the presentation layer marks the errored control** — `@script-development/ui-inputs` renders `aria-invalid` from `:invalid` out of the box.
@@ -118,17 +153,17 @@ const {handleSubmit, submitting} = useFormSubmit(validation);
 
 ## Scoping & Backend Contract
 
-**One error-scope per form.** `useValidationErrors` (and therefore `useForm`) registers a 422 observer on the `HttpService` you pass and keeps its own error bag. If two forms share **one** `HttpService` instance, a 422 from either fills **both** bags — cross-form bleed, with green types. Give each form its own error scope: one form per `HttpService` instance, or don't share a service across concurrently-mounted forms. (The single-form-per-scope shape matches the source territories; a multi-form-per-service layout is the case to watch.)
+**One error-scope per form.** `useValidationErrors` (and therefore `useForm`) registers a 422 observer on the `HttpService` you pass and keeps its own error bag. If two forms share **one** `HttpService` instance, a 422 from either fills **both** bags — cross-form bleed, with green types. `onlyWhileSubmitting` closes this only while the form is idle; any 422 on the service during its submit still lands in its bag. Give each form its own error scope where that matters: one form per `HttpService` instance, or don't share a service across concurrently-mounted forms.
 
-**Laravel 422 contract.** `fs-form` targets **Laravel**'s validation-error response shape — `{ message?: string, errors: Record<string, string[]> }` — and binds the first message per field. It deliberately does **not** defensively handle other backends' error shapes: a field whose value is not a `string[]` is passed through unguarded (Laravel guarantees arrays, so the cast is safe against every intended consumer). If you point `fs-form` at a non-Laravel backend, revisit the parse in `useValidationErrors` first.
+**Laravel 422 contract.** `fs-form` targets **Laravel**'s validation-error response shape — `{ message?: string, errors: Record<string, string[]> }` — and binds the first message per field. A field whose value is not a list with a string first entry is **not bound**: it is left out of `errors` and listed in `unmapped` (before 0.3.0 a bare string bound its first character). An `errors` container that is not a plain object (an array, say) is read as no field map. If you point `fs-form` at a non-Laravel backend, revisit the parse in `useValidationErrors` first.
 
 ## Middleware Safety (Principle #8)
 
-`useValidationErrors` wraps its response-error middleware body with `fs-http`'s `guarded()`. A throwing `keyMapper` — or any parse hiccup — is caught and surfaced loudly (via `guarded`'s default `console.error`) **without** rejecting a resolved request or masking the real API error. `fs-form` is a compliant `fs-http` consumer out of the box per the [Middleware Sync Contract](../architecture#middleware-sync-contract).
+`useValidationErrors` wraps its response-error middleware body with `fs-http`'s `guarded()`. A throwing `keyMapper` — or any parse hiccup — is caught and surfaced loudly (via `guarded`'s default `console.error`) **without** rejecting a resolved request or masking the real API error. `refused` is raised before the parse, so such a 422 still reads as refused; `errors` and `unmapped` keep their previous values. `fs-form` is a compliant `fs-http` consumer out of the box per the [Middleware Sync Contract](../architecture#middleware-sync-contract).
 
 ## Cleanup
 
-`useValidationErrors` (and therefore `useForm`) registers `onUnmounted(unregister)` for you, so a component-scoped instance cleans up its middleware automatically. If you construct one **outside** a component setup, unmount cleanup does not fire — scope it to a component.
+`useValidationErrors` (and therefore `useForm`) registers `onUnmounted(unregister)` for you, so a component-scoped instance cleans up its middleware automatically. Call it in a page's or component's `setup()`, never in a module-level store: outside a component, unmount cleanup does not fire and the middleware outlives every screen.
 
 ## API Reference
 
@@ -136,26 +171,31 @@ const {handleSubmit, submitting} = useFormSubmit(validation);
 
 The one-call entry point. Returns everything from both primitives.
 
-| Parameter               | Type                       | Description                                                                                                                                                   |
-| ----------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `httpService`           | `HttpService`              | The `fs-http` service whose 422 responses to observe                                                                                                          |
-| `options.keyMapper`     | `(key: string) => string`  | Remaps raw backend field keys (default: identity)                                                                                                             |
-| `options.scrollToError` | `boolean`                  | Scroll the first invalid field into view on a 422 (default: `false`; pass `scrollRoot` with it — see [Scroll to the First Error](#scroll-to-the-first-error)) |
-| `options.scrollRoot`    | `Ref<HTMLElement \| null>` | Scope the `scrollToError` query to a form's subtree; omit for document-wide (see [Scroll to the First Error](#scroll-to-the-first-error))                     |
-| `options.scrollTarget`  | `string`                   | Selector for the invalid-field mark (default `[aria-invalid="true"]`); pass your own when inputs mark errors with a class                                     |
+| Parameter                     | Type                       | Description                                                                                                                                                                                      |
+| ----------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `httpService`                 | `HttpService`              | The `fs-http` service whose 422 responses to observe                                                                                                                                             |
+| `options.keyMapper`           | `(key: string) => string`  | Remaps raw backend field keys (default: identity)                                                                                                                                                |
+| `options.fields`              | `readonly T[]`             | Keep only these fields (by mapped name) in `errors`; others go to `unmapped` (default: every key)                                                                                                |
+| `options.onlyWhileSubmitting` | `boolean`                  | Take a 422 only while this form's `handleSubmit` is in flight; a time window, not request identity (default: `false`; see [Take a 422 only while submitting](#take-a-422-only-while-submitting)) |
+| `options.scrollToError`       | `boolean`                  | Scroll the first invalid field into view on a 422 (default: `false`; pass `scrollRoot` with it — see [Scroll to the First Error](#scroll-to-the-first-error))                                    |
+| `options.scrollRoot`          | `Ref<HTMLElement \| null>` | Scope the `scrollToError` query to a form's subtree; omit for document-wide (see [Scroll to the First Error](#scroll-to-the-first-error))                                                        |
+| `options.scrollTarget`        | `string`                   | Selector for the invalid-field mark (default `[aria-invalid="true"]`); pass your own when inputs mark errors with a class                                                                        |
 
 **Returns:**
 
-| Property        | Type                                             | Description                                        |
-| --------------- | ------------------------------------------------ | -------------------------------------------------- |
-| `errors`        | `Ref<ValidationErrors<T>>`                       | Reactive `Partial<Record<T, string>>` field bag    |
-| `clearErrors()` | `() => void`                                     | Empty the bag                                      |
-| `handleSubmit`  | `(action: () => Promise<void>) => Promise<void>` | Runs `action` with double-submit + 422-swallow     |
-| `submitting`    | `Ref<boolean>`                                   | `true` while a submit is in flight (loading state) |
+| Property         | Type                                             | Description                                        |
+| ---------------- | ------------------------------------------------ | -------------------------------------------------- |
+| `errors`         | `Ref<ValidationErrors<T>>`                       | Reactive `Partial<Record<T, string>>` field bag    |
+| `clearErrors()`  | `() => void`                                     | Empty the bag and reset the refusal                |
+| `refused`        | `Readonly<Ref<boolean>>`                         | A 422 was accepted since the last clear            |
+| `unmapped`       | `Readonly<Ref<readonly string[]>>`               | Mapped keys of that 422 not held in `errors`       |
+| `refusedUnnamed` | `Readonly<Ref<boolean>>`                         | `refused` with an empty bag                        |
+| `handleSubmit`   | `(action: () => Promise<void>) => Promise<void>` | Runs `action` with double-submit + 422-swallow     |
+| `submitting`     | `Ref<boolean>`                                   | `true` while a submit is in flight (loading state) |
 
 ### `useValidationErrors(httpService, options?)`
 
-Primitive: registers the 422 middleware and owns the error bag. Takes the same `httpService` and the same `keyMapper`, but **none of the scroll options** — only `useForm` installs the scroll. Returns `{errors, clearErrors}`.
+Primitive: registers the 422 middleware and owns the error bag. Takes the same `httpService`, `keyMapper` and `fields`, plus `acceptWhen` (a `() => boolean` consulted on every 422; while it returns `false` the 422 is ignored), but **none of the scroll options** and not `onlyWhileSubmitting`. Returns `{errors, clearErrors, refused, unmapped, refusedUnnamed}`.
 
 ### `useFormSubmit(validationErrors)`
 
