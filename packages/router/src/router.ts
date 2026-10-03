@@ -282,6 +282,12 @@ export const createRouterService = <Routes extends RouteRecordRaw[]>(
     router.beforeEach(async (to, from) => {
         beginHop();
 
+        // An unmatched URL is a 404, not a failed navigation (WR-1160): let it land on nothing so
+        // `RouterView` paints the fallback. The test is vue-router's own verdict, never the
+        // flattened lookup below — that sees two levels only, and treating its miss as a 404 would
+        // walk a deeper matched route past every middleware.
+        if (to.matched.length === 0) return undefined;
+
         const toNormalized = normalizedRouteToSpecificRoute(to);
         const fromNormalized = from.name ? normalizedRouteToSpecificRoute(from) : toNormalized;
 
@@ -364,12 +370,10 @@ export const createRouterService = <Routes extends RouteRecordRaw[]>(
         for (const middleware of afterRouteMiddleware) middleware(to, from, failure);
     });
 
-    // The terminal path `afterEach` never sees. A thrown guard — a consumer middleware, or this
-    // wrapper's own `normalizedRouteToSpecificRoute` on any unmatched path, which is every cold
-    // load of an unknown URL — reaches `triggerError` and nothing else. It is a genuine failure of
-    // the navigation, so it ends the hop exactly as an abort does: the not-found fallback paints
-    // instead of a blank page, and readiness settles instead of hanging — unless a successor is
-    // still running, which is the check below.
+    // The terminal path `afterEach` never sees. A thrown guard reaches `triggerError` and nothing
+    // else. It is a genuine failure of the navigation, so it ends the hop exactly as an abort does:
+    // the not-found fallback paints instead of a blank page, and readiness settles instead of
+    // hanging — unless a successor is still running, which is the check below.
     //
     // It is also REPORTED here, unconditionally, and deliberately OUTSIDE `settleReadiness`'s
     // once-per-service latch. `triggerError` emits its own `console.error(error)` only while no
