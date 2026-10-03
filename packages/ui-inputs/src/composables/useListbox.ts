@@ -65,7 +65,16 @@ export interface UseListboxOptions {
     clearEntry?: () => boolean;
     /** Commit the clear entry; returns whether a commit happened (decides preventDefault). */
     onClearCommit?: () => boolean;
+    /**
+     * The rendered options' display strings, index-aligned with the list — supplying it turns on
+     * typeahead. Select-only listboxes pass it; a combobox never does, because its typed
+     * characters belong to its text input.
+     */
+    typeaheadLabels?: () => string[];
 }
+
+/** How long the typed string survives without a keystroke (the APG listbox examples' 500 ms). */
+const TYPEAHEAD_RESET_MS = 500;
 
 /**
  * The behavioural core shared by every ui-inputs listbox control (SingleSelect, Combobox, and —
@@ -89,6 +98,7 @@ export const useListbox = (options: UseListboxOptions) => {
         floatingOptions = {},
         clearEntry,
         onClearCommit,
+        typeaheadLabels,
     } = options;
 
     const open = ref(false);
@@ -121,9 +131,53 @@ export const useListbox = (options: UseListboxOptions) => {
     // as a phantom highlight (and a phantom aria-activedescendant) on the next open. The
     // composable still never calls this on commit: closing after a commit stays the caller's
     // decision (`onCommit` — the MultiSelect toggle-and-stay-open contract).
+    let typed = '';
+    let typedTimer: ReturnType<typeof setTimeout> | undefined;
+    const dropTyped = () => {
+        clearTimeout(typedTimer);
+        typed = '';
+    };
+
     const close = () => {
         open.value = false;
         resetHighlight();
+        dropTyped();
+    };
+
+    // A key is typeahead when it prints one character with no command modifier. Space counts only
+    // inside a string already being typed — on its own it keeps its open/toggle meaning.
+    const isTypeahead = (event: KeyboardEvent): boolean =>
+        event.key.length === 1 &&
+        !event.ctrlKey &&
+        !event.metaKey &&
+        !event.altKey &&
+        (event.key !== ' ' || typed !== '');
+
+    /**
+     * The WAI-ARIA listbox typeahead, with native <select> parity: the typed string grows while keys
+     * arrive within TYPEAHEAD_RESET_MS; a single character (or the same character repeated) moves
+     * to the NEXT option starting with it, so repeating it cycles; a longer string matches by
+     * prefix from the current option, so a highlight that still matches stays put. The search
+     * wraps, compares case-insensitively, and moves nothing when no option matches. Returns
+     * whether it found one.
+     */
+    const typeahead = (key: string, labels: string[]): boolean => {
+        clearTimeout(typedTimer);
+        typed += key.toLocaleLowerCase();
+        typedTimer = setTimeout(dropTyped, TYPEAHEAD_RESET_MS);
+
+        const repeated = [...typed].every((character) => character === typed[0]);
+        const needle = repeated ? typed[0] : typed;
+        const start = repeated ? pointer.value + 1 : Math.max(pointer.value, 0);
+        for (let step = 0; step < labels.length; step++) {
+            const index = (start + step) % labels.length;
+            if (labels[index].toLocaleLowerCase().startsWith(needle)) {
+                clearActive.value = false;
+                pointer.value = index;
+                return true;
+            }
+        }
+        return false;
     };
 
     // Keyboard focus lives on the trigger, so the focused option is conveyed to assistive
@@ -173,6 +227,12 @@ export const useListbox = (options: UseListboxOptions) => {
         if (disabled()) return;
         if (event.key === 'Tab') {
             onDismiss();
+            return;
+        }
+        if (typeaheadLabels !== undefined && isTypeahead(event)) {
+            event.preventDefault();
+            // Closed, a match OPENS the list on it (the APG select-only combobox), never commits.
+            if (typeahead(event.key, typeaheadLabels()) && !open.value) open.value = true;
             return;
         }
         if (!open.value) {
@@ -264,7 +324,10 @@ export const useListbox = (options: UseListboxOptions) => {
         onOutside();
     };
     onMounted(() => document.addEventListener('click', onDocumentPointer));
-    onBeforeUnmount(() => document.removeEventListener('click', onDocumentPointer));
+    onBeforeUnmount(() => {
+        document.removeEventListener('click', onDocumentPointer);
+        dropTyped();
+    });
 
     // KD-1136. The popup is promoted to the TOP LAYER in place, via the Popover API — it is
     // never moved in the DOM. A top-layer box paints outside the normal flow, so no ancestor's

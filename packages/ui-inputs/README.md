@@ -115,6 +115,15 @@ persistent, visually-hidden `aria-live="polite"` region that speaks the empty te
 the (filtered) list drains to nothing — which matters most on the filterable components,
 where typing can drain the list silently.
 
+**Typeahead (`SingleSelect`, `MultiSelect`, `GroupSelect`).** Typing on the focused trigger
+moves the keyboard highlight the way a native `<select>` does: a character moves to the next
+option starting with it (so repeating it cycles through those options), a string typed quickly —
+spaces included — matches by prefix, and the string resets after 500 ms without a keystroke.
+Matching ignores case and wraps past the last option, and a character no option starts with
+moves nothing. On a closed control a match **opens** the list on that option and commits
+nothing; Enter commits, as always. The comboboxes have no typeahead: what you type there is the
+query.
+
 **The committing clear entry (`SingleSelect` / `Combobox`).** `clearLabel` renders a
 committing entry **above** the options — choosing it commits `null` and closes, exactly like
 choosing an option. It lives outside the option index space: its own keyboard slot between

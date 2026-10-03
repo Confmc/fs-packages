@@ -110,6 +110,32 @@ const groupMenu = () => document.querySelector('.ui-groupselect__menu, .ui-group
 const groupHeaders = (variant: 'groupselect' | 'groupcombobox'): string[] =>
     [...document.querySelectorAll(`.ui-${variant}__group-header`)].map((h) => h.textContent?.trim() ?? '');
 
+describe('SingleSelect — real typeahead (WR-1991)', () => {
+    const SPACED: Fruit[] = [
+        {id: 1, name: 'Blue moon'},
+        {id: 2, name: 'Blueberry'},
+        {id: 3, name: 'Banana'},
+    ];
+
+    it('typed from the closed trigger, opens on the match; a space inside the string keeps the list open', async () => {
+        const model = await renderControlled<number | null>(SingleSelect, null, {
+            options: SPACED,
+            alphabeticalSort: false,
+        });
+        const trigger = document.getElementById('fruit') as HTMLButtonElement;
+
+        await userEvent.tab();
+        await userEvent.keyboard('blue m');
+
+        // A Space that reached the button's default would click it on keyup and close the list.
+        expect(menu()).not.toBeNull();
+        expect(trigger.getAttribute('aria-activedescendant')).toBe('fruit-opt-0');
+
+        await userEvent.keyboard('{Enter}');
+        expect(model.value).toBe(1);
+    });
+});
+
 describe('SingleSelect — real keyboard walk', () => {
     it('Tab focuses, Enter opens, ArrowDown navigates, Enter commits, menu closes', async () => {
         const model = await renderControlled<number | null>(SingleSelect, null, {});

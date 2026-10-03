@@ -216,6 +216,7 @@ const {
     onCommit: commit,
     onDismiss: () => close(),
     onOutside: () => close(),
+    typeaheadLabels: () => flatOptions.value.map(labelOf),
     clearEntry: () => clearLabel !== undefined,
     onClearCommit: commitClear,
 });

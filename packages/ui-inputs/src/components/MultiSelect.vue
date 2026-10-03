@@ -237,6 +237,7 @@ const {open, pointer, listboxId, optionId, activeDescendant, floatingStyles, onK
     onCommit: commit,
     onDismiss: () => close(),
     onOutside: () => close(),
+    typeaheadLabels: () => optionLabels.value,
 });
 
 const toggle = () => {
