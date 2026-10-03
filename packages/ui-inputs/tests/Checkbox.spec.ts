@@ -85,6 +85,22 @@ describe('Checkbox', () => {
         expect(wrapper.emitted('update:modelValue')).toBeUndefined();
     });
 
+    it('follows `disabled` as it changes after mount — the guard reads the current value', async () => {
+        let heard = 0;
+        const wrapper = mount(Checkbox, {
+            props: {id: 'c', modelValue: false, disabled: false},
+            attrs: {onChange: () => (heard += 1)},
+        });
+        const input = wrapper.find('input').element;
+
+        await wrapper.setProps({disabled: true});
+        input.dispatchEvent(new Event('change', {bubbles: true}));
+        await wrapper.setProps({disabled: false});
+        input.dispatchEvent(new Event('change', {bubbles: true}));
+
+        expect(heard).toBe(1);
+    });
+
     it('falls native attrs through to the input, not the label root', () => {
         const wrapper = mount(Checkbox, {
             props: {id: 'c', modelValue: false},
