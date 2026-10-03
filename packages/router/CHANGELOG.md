@@ -1,9 +1,11 @@
 # @script-development/fs-router
 
-## Unreleased
+## 0.3.1 — 2026-10-03
 
 ### Patch Changes
 
+- **An unmatched URL is a miss, not a navigation failure (WR-1160).** fs-router's own `beforeEach` called `normalizedRouteToSpecificRoute`, which throws when no route record matches. So a stale bookmark or a typed bad URL reached `router.onError`, printed `fs-router: navigation failed`, and made `install()` reject, although this package tells consumers to await `install()` before `mount()`. Now, when vue-router matches nothing, the hop lands on the unmatched location: `RouterView` paints the not-found fallback, `install()` resolves, `isReady()` settles, and nothing is written to the console. No before-route middleware runs for such a hop, as before, because there is no route record to pass it. Such a hop also ends any middleware redirect chain, exactly as a clean proceed does, so the next chain starts with the full redirect budget. The test is vue-router's own (nothing matched), not fs-router's flattened lookup: a route vue-router matches, at any depth, never takes this path, so it cannot skip middleware by being mistaken for a miss. A matched route nested deeper than two levels still fails in fs-router's two-level lookup, as before. A middleware that throws is unchanged: it still reaches `onError`, ends the in-flight window and is reported once. `normalizedRouteToSpecificRoute` itself still throws for an unknown route.
+- **`RouterLink` renders an `href` that carries the history base (WR-1928).** It used `getUrlForRouteName`, which returns vue-router's `fullPath` — a path relative to the base. Under `createRouterService(routes, {base: '/colleague'})` every link rendered `href="/…"`: a plain click still worked because `RouterLink` intercepts it, but middle-click, open-in-new-tab, copy-link and crawlers followed the bare path out of the app. The anchor now uses vue-router's `href`. Without a `base` the rendered `href` is unchanged. `getUrlForRouteName` keeps its contract and still returns the base-relative path.
 - **Published object-shape type aliases are now declared as `interface` (WR-1633).** Runtime is unchanged. An `interface` has no implicit index signature, so a converted type is no longer assignable to `Record<string, unknown>` without one (0 consumers measured across 64,338 fleet files). Declaration merging becomes possible, which is additive.
 
 ## 0.3.0 — 2026-08-29
