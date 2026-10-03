@@ -4,11 +4,14 @@ on:
     push:
         branches: [main]
     pull_request:
-        branches: [main]
+
+permissions:
+    contents: read
 
 jobs:
     check:
         runs-on: ubuntu-latest
+        timeout-minutes: 20
         steps:
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
             - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
@@ -68,6 +71,7 @@ jobs:
     # cache only holds ~/.cache/ms-playwright).
     browser-tests:
         runs-on: ubuntu-latest
+        timeout-minutes: 15
         steps:
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
             - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
@@ -85,25 +89,27 @@ jobs:
                   key: playwright-chromium-${{ steps.playwright-version.outputs.version }}
             - name: Install chromium (browser + system deps)
               if: steps.playwright-cache.outputs.cache-hit != 'true'
+              timeout-minutes: 10
               run: npx playwright install chromium --with-deps
             - name: Install chromium system deps only (browser cache hit)
               if: steps.playwright-cache.outputs.cache-hit == 'true'
+              timeout-minutes: 10
               run: npx playwright install-deps chromium
             - run: npm run test:browser
 
-    # Aggregate check the town-crier trial tracks (TC-0069): the bus mirrors each
-    # PR's CI verdict by matching exactly one check-run name, case-sensitively,
-    # `ci-passed`. This job fans in every CI lane and is intended to become the
-    # single required status check on `main` — branch protection swaps from
-    # `check` to `ci-passed` after this merges.
+    # The town-crier bus matches this check-run name exactly and case-sensitively.
     ci-passed:
         name: ci-passed
         runs-on: ubuntu-latest
+        timeout-minutes: 5
         needs: [check, browser-tests]
         if: always()
         steps:
-            - name: Verify all lanes passed
-              if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
-              run: |
-                  echo "One or more CI lanes did not pass."
-                  exit 1
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+              with:
+                  node-version: 24
+            - name: Verify every lane reported success
+              env:
+                  NEEDS: ${{ toJSON(needs) }}
+              run: node scripts/ci-rollup.mjs

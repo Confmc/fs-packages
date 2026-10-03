@@ -11,7 +11,7 @@ Shared frontend service packages monorepo under the `@script-development` npm sc
 - **Format:** oxfmt
 - **Package lint:** publint + attw (Are The Types Wrong) — `lint:pkg` enforces fail-on-any-advisory via `scripts/lint-pkg.mjs` (suggestions, warnings, and errors all treat as fatal — publint CLI default and `--strict` both exit 0 on suggestions). Motivated by enforcement queue #33 + the PR #35 `git+` prefix regression that silently drifted across 10 packages because the unenforced gate only printed the suggestion. The same wrapper also asserts `engines.node` presence across the root manifest + all workspace packages — closes enforcement queue #31 (drift-prevention gate, deployed 2026-05-12; declarations themselves landed 2026-04-22 via commit `0605d99`). Presence-only check; the value (`>=24.0.0` today) is not validated — value alignment is a separate doctrine question tracked alongside the CI `node-version`.
 - **Publish:** OIDC Trusted Publishing to public npm registry (no stored tokens)
-- **CI:** three jobs. `check` — 10 sequential gates: audit → format → lint → build → validate:dist → **validate:workflows** → typecheck → lint:pkg → coverage → mutation; `browser-tests` — real Chromium via Playwright + axe-core; `ci-passed` — the fan-in rollup. (`validate:workflows` is the release-pipeline invariant gate, WR-0615 — see § Release Pipeline below.)
+- **CI:** three jobs. `check` — 10 sequential gates: audit → format → lint → build → validate:dist → **validate:workflows** → typecheck → lint:pkg → coverage → mutation; `browser-tests` — real Chromium via Playwright + axe-core; `ci-passed` — the fan-in rollup, green only when every lane it needs reports `success` (`scripts/ci-rollup.mjs`, tested by `ci-rollup.test.mjs`: a skipped lane or an empty `needs` set reds it). Lint runs `--deny-warnings`. (`validate:workflows` is the release-pipeline invariant gate, WR-0615 — see § Release Pipeline below — and also asserts every job in every workflow declares `timeout-minutes`, WR-0892.)
 
 ## Doctrine #8 — HTTP Timeout Surface (fs-http)
 
@@ -137,12 +137,12 @@ Three properties now make the coupling impossible, all enforced at PR time by `n
 | `npm test`              | Run all tests                                  |
 | `npm run test:coverage` | Run tests with coverage (100% threshold)       |
 | `npm run test:mutation` | Run Stryker mutation testing (90% threshold)   |
-| `npm run lint`          | Lint with oxlint                               |
+| `npm run lint`          | Lint with oxlint (warnings fail)               |
 | `npm run format:check`  | Check formatting with oxfmt                    |
 | `npm run format`        | Fix formatting with oxfmt                      |
 | `npm run lint:pkg`      | Run publint + attw on all packages             |
 | `npm run validate:dist` | Assert every package's required dist artifacts are present and non-empty |
-| `npm run validate:workflows` | Assert the release pipeline's artifact clock cannot be outrun by its approval clock |
+| `npm run validate:workflows` | Assert the release pipeline's artifact clock cannot be outrun by its approval clock, and every workflow job is time-bounded |
 | `npm run detect:publishable` | Report which packages differ from the registry — the release signal `publish.yml` gates its OIDC approval on |
 | `npm audit`             | Check for dependency vulnerabilities           |
 
