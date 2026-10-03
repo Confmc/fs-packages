@@ -7,6 +7,7 @@
             <input
                 :id="id"
                 ref="input"
+                v-guard-while-disabled="disabled"
                 v-bind="$attrs"
                 type="checkbox"
                 role="switch"
@@ -31,7 +32,7 @@
 import {nextTick, onMounted, useTemplateRef} from 'vue';
 
 import {warnWhenUnnamed} from '../internal/accessible-name';
-import {guardWhileDisabled} from '../internal/disabled-guard';
+import {vGuardWhileDisabled} from '../internal/disabled-guard';
 import {ensureRefValueExists} from '../internal/reactivity';
 
 // The root is the <label> (implicit labelling), so attrs are re-aimed at the native input —
@@ -69,8 +70,6 @@ const {
 // On/off is boolean by nature — non-nullable, like Checkbox (and no indeterminate: a switch
 // has no mixed state).
 const model = defineModel<boolean>({required: true});
-
-guardWhileDisabled(input, () => disabled);
 
 // change (not input) is the native checkbox commit event; the input follows the model once the host
 // has rendered, for the reason Checkbox gives (WR-1922).

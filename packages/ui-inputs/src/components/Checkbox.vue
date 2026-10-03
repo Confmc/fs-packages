@@ -4,6 +4,7 @@
             <input
                 :id="id"
                 ref="input"
+                v-guard-while-disabled="disabled"
                 v-bind="$attrs"
                 type="checkbox"
                 class="ui-check__input"
@@ -37,7 +38,7 @@
 import {nextTick, onMounted, useTemplateRef} from 'vue';
 
 import {warnWhenUnnamed} from '../internal/accessible-name';
-import {guardWhileDisabled} from '../internal/disabled-guard';
+import {vGuardWhileDisabled} from '../internal/disabled-guard';
 import {ensureRefValueExists} from '../internal/reactivity';
 
 // The root is the <label> (implicit labelling — the whole row is the hit target), so attrs
@@ -84,8 +85,6 @@ const {
 // A checkbox is never "empty" — unchecked IS false, so the boolean model is non-nullable
 // (unlike the family's string/number inputs, which model a nullable backend column).
 const model = defineModel<boolean>({required: true});
-
-guardWhileDisabled(input, () => disabled);
 
 // change (not input) is the native checkbox commit event. The browser has already flipped the input,
 // and a host that declines or decides later leaves the model where it was, so Vue never re-patches

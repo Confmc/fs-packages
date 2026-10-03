@@ -2,10 +2,12 @@
     <!-- role="radiogroup" (overriding fieldset's implicit `group`) because radiogroup — unlike
          group — legitimately carries aria-required, giving the group-level required conveyance
          as a real attribute; the legend still names the fieldset. ONE described-by story: the
-         error IDREF lives on the fieldset only. -->
+         error IDREF lives on the fieldset only. The disabled guard sits on the fieldset for the
+         reason CheckboxGroup gives. -->
     <fieldset
         :id="id"
         ref="group"
+        v-guard-while-disabled="disabled"
         class="ui-radio-group"
         role="radiogroup"
         :aria-required="required || undefined"
@@ -52,7 +54,7 @@ import {nextTick, onMounted, useTemplateRef} from 'vue';
 import type {LabelKey, SelectItem} from '../types';
 
 import {warnWhenUnnamed} from '../internal/accessible-name';
-import {guardWhileDisabled} from '../internal/disabled-guard';
+import {vGuardWhileDisabled} from '../internal/disabled-guard';
 import {ensureRefValueExists} from '../internal/reactivity';
 
 const {
@@ -89,9 +91,6 @@ const model = defineModel<T['id'] | null>({required: true});
 
 const group = useTemplateRef<HTMLElement>('group');
 const legendText = useTemplateRef<HTMLElement>('legendText');
-
-// On the fieldset for the reason CheckboxGroup gives — see there.
-guardWhileDisabled(group, () => disabled);
 
 // The same label-only naming guard as CheckboxGroup — see there.
 onMounted(() =>

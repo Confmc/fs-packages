@@ -4,10 +4,13 @@
          aria-required is NOT valid on `group` (axe aria-allowed-attr), so the required state
          is conveyed group-level through the legend instead: the family's visual * marker plus
          screen-reader-only text (localisable via requiredLabel), announced when AT enters the
-         fieldset. -->
+         fieldset. The disabled guard sits on the fieldset, not only on the inputs: consumer attrs
+         land here, and a pointer on an option's label text reaches them without touching a
+         disabled input. -->
     <fieldset
         :id="id"
         ref="group"
+        v-guard-while-disabled="disabled"
         class="ui-check-group"
         :aria-invalid="invalid || undefined"
         :aria-describedby="describedby"
@@ -36,7 +39,7 @@ import {onMounted, useTemplateRef} from 'vue';
 import type {LabelKey, SelectItem} from '../types';
 
 import {warnWhenUnnamed} from '../internal/accessible-name';
-import {guardWhileDisabled} from '../internal/disabled-guard';
+import {vGuardWhileDisabled} from '../internal/disabled-guard';
 import {ensureRefValueExists} from '../internal/reactivity';
 import Checkbox from './Checkbox.vue';
 
@@ -80,10 +83,6 @@ const model = defineModel<T['id'][]>({required: true});
 
 const group = useTemplateRef<HTMLElement>('group');
 const legendText = useTemplateRef<HTMLElement>('legendText');
-
-// On the fieldset, not only the inputs: consumer attrs fall through to the fieldset, so a pointer on an
-// option's label text reaches a consumer `@click` there without ever touching a disabled input.
-guardWhileDisabled(group, () => disabled);
 
 // `label` is typed as a string but `''` passes the type. Only the label names the group: the option
 // text inside the fieldset names the options, and the legend's sr-only `requiredLabel` is a status,

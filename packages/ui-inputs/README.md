@@ -298,17 +298,16 @@ and the host has rendered, each control sets its input back to the bound value: 
 goes back, a deferred one shows the old value until you commit it, and a change you take at once
 behaves as before.
 
-**A disabled control runs none of your `click`, `input` or `change` listeners** — the rule
-`Pressable` and `Disclosure` keep (below). The browser withholds these events only for _user_
+**A disabled control runs none of the `click`, `input` or `change` listeners you bind on it** — the
+rule `Pressable` and `Disclosure` keep (below). The browser withholds these events only for _user_
 interaction: a dispatched `change` runs every listener on a disabled input, and a dispatched click
-on a disabled checkbox or radio also flips it (measured in Chromium). Each control stops them in
-the capture phase, before your fall-through handler and before any ancestor, and withholds the
-click's flip. On `CheckboxGroup` and `RadioGroup` the stop sits on the fieldset, where your attrs
-land, so the whole group is inert — a pointer on an option's label text included. An **enabled**
-control runs your listeners exactly as before. One shape no component can undo: a click
-dispatched with `cancelable: false` flips the native input regardless, because only a cancelable
-click's default action can be withheld; a real click and `HTMLElement.click()` are both
-cancelable.
+on a disabled checkbox or radio also flips it (measured in Chromium). Each control stops them ahead
+of every listener you bound on the component, in either phase, and withholds the click's flip. On
+`CheckboxGroup` and `RadioGroup` the stop sits on the fieldset, where your attrs land, so the whole
+group is inert — a pointer on an option's label text included. An **enabled** control runs your
+listeners exactly as before. One shape no component can undo: a click dispatched with `cancelable:
+false` flips the native input regardless, because only a cancelable click's default action can be
+withheld; a real click and `HTMLElement.click()` are both cancelable.
 
 **All four warn in development when they render unnamed**, on the same four routes and the same
 `process.env.NODE_ENV` gate as `Pressable`/`Disclosure` (below). Each route is read where it

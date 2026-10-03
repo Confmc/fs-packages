@@ -520,7 +520,11 @@ describe('checkbox family — a disabled control runs no consumer listener (WR-0
         },
     ] as const;
 
-    const renderWithConsumer = async (member: (typeof FAMILY)[number], disabled: boolean) => {
+    const renderWithConsumer = async (
+        member: (typeof FAMILY)[number],
+        disabled: boolean,
+        phase: '' | 'Capture' = '',
+    ) => {
         const heard: string[] = [];
         const model = ref<unknown>(member.initial);
         await render(
@@ -534,9 +538,9 @@ describe('checkbox family — a disabled control runs no consumer listener (WR-0
                         'onUpdate:modelValue': (value: unknown) => {
                             model.value = value;
                         },
-                        onClick: () => heard.push('click'),
-                        onInput: () => heard.push('input'),
-                        onChange: () => heard.push('change'),
+                        [`onClick${phase}`]: () => heard.push('click'),
+                        [`onInput${phase}`]: () => heard.push('input'),
+                        [`onChange${phase}`]: () => heard.push('change'),
                     }),
             ),
         );
@@ -576,6 +580,30 @@ describe('checkbox family — a disabled control runs no consumer listener (WR-0
             expect(heard).toEqual(['click', 'input', 'change']);
             expect(input.checked).toBe(true);
             expect(model.value).not.toEqual(member.initial);
+        });
+    }
+
+    for (const member of FAMILY) {
+        // A consumer `@click.capture` arrives through $attrs and is attached while the element is
+        // created; the guard must still run ahead of it, on the very same element.
+        it(`${member.name}: a consumer's CAPTURE listeners do not run either`, async () => {
+            const {heard, input} = await renderWithConsumer(member, true, 'Capture');
+
+            input.dispatchEvent(new MouseEvent('click', {bubbles: true, cancelable: true}));
+            input.dispatchEvent(new Event('input', {bubbles: true}));
+            input.dispatchEvent(new Event('change', {bubbles: true}));
+            await nextTick();
+
+            expect(heard).toEqual([]);
+        });
+
+        it(`POSITIVE CONTROL — ${member.name}, enabled, runs the consumer's capture listeners`, async () => {
+            const {heard, input} = await renderWithConsumer(member, false, 'Capture');
+
+            input.dispatchEvent(new MouseEvent('click', {bubbles: true, cancelable: true}));
+            await nextTick();
+
+            expect(heard).toEqual(['click', 'input', 'change']);
         });
     }
 
