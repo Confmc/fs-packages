@@ -46,7 +46,9 @@ export const session = createSessionStore<Employer>({
   it on the event; your exit writes it under your own query name.
 - **`user` is readonly outward.** `setUser(next)` is the one writer, and it
   throws while the session is not authenticated.
-- **`state` and `user` move together.** Every sign-out clears the user and,
+- **`state` and `user` move together.** They are one snapshot, assigned in one
+  statement, so even a `watch(…, {flush: 'sync'})` never sees one without the
+  other, and it fires once per transition. Every sign-out clears the user and,
   where a live session actually ended, fires `onSessionEnd` exactly once. An
   `outage` keeps the user — an outage is not a sign-out.
 - **Ending a session stales every read issued before it.** A `me` still in
