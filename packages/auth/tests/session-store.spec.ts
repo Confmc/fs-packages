@@ -329,7 +329,7 @@ describe('createSessionStore', () => {
                 // The session ended INSIDE this read's own write. Writing
                 // `authenticated` over it would leave `isAuthenticated` true with
                 // no user, after the consumer was told the session was over.
-                expect(read).toBeUndefined();
+                expect(read).toEqual({state: 'authenticated', status: 200, body: {id: 9}});
                 expect(store.state.value).toBe('signed_out');
                 expect(store.user.value).toBeUndefined();
                 expect(store.isAuthenticated.value).toBe(false);
@@ -358,7 +358,7 @@ describe('createSessionStore', () => {
 
                 stop();
 
-                expect(outer).toBeUndefined();
+                expect(outer).toEqual({state: 'authenticated', status: 200, body: {id: 1}});
                 await expect(inner).resolves.toEqual({state: 'authenticated', status: 200, body: {id: 2}});
                 expect(store.user.value).toEqual({id: 2});
                 expect(store.state.value).toBe('authenticated');
