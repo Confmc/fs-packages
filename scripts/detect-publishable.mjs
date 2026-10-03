@@ -48,7 +48,7 @@
  */
 import {execFileSync} from 'node:child_process';
 import {appendFileSync, readdirSync, readFileSync} from 'node:fs';
-import {join} from 'node:path';
+import path from 'node:path';
 
 import {decideAll, interpretRegistry, summarize} from './detect-publishable.core.mjs';
 
@@ -56,7 +56,7 @@ const PACKAGES_DIR = 'packages';
 
 const readManifest = (dir) => {
     try {
-        return JSON.parse(readFileSync(join(PACKAGES_DIR, dir, 'package.json'), 'utf8'));
+        return JSON.parse(readFileSync(path.join(PACKAGES_DIR, dir, 'package.json'), 'utf8'));
     } catch (error) {
         return {__unreadable: error.message};
     }

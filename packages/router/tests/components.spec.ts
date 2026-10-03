@@ -652,32 +652,76 @@ describe('createRouterView', () => {
         window.history.pushState({}, '', '/');
     });
 
-    it('should render the fallback and settle readiness on a cold load of a genuinely unknown URL', async () => {
+    it('should treat a cold load of a genuinely unknown URL as a miss, not an error', async () => {
         // Arrange — the real navigation path, not a hand-built un-navigated service: the four
         // genuine-miss specs above all mount a service nobody navigated, which reaches the fallback
-        // through the sentinel branch and never exercises this one. `normalizedRouteToSpecificRoute`
-        // THROWS for an unmatched path and is called from fs-router's own `beforeEach`, so every
-        // cold load on an unknown URL is routed by vue-router through `triggerError` — which skips
-        // `afterEach` entirely. Before round 5 that left the window open forever: a permanently
-        // blank page and an `isReady()` that never settled.
+        // through the sentinel branch and never exercises this one. A stale bookmark or a typed bad
+        // URL is a 404, not a failed navigation (WR-1160): it must not reach `onError`, and
+        // `install()`, which consumers are told to await before mounting, must not reject.
         window.history.replaceState({}, '', '/definitely-not-a-route');
         const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
         const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
         const service = createRouterService(createTestRoutes());
+        const middleware = vi.fn(() => false as const);
+        service.registerBeforeRouteMiddleware(middleware);
 
         // Act
         const wrapper = mount(service.RouterView);
-        await service.install().catch(() => undefined);
+        const installed = await service.install().then(
+            () => 'resolved',
+            (error: unknown) => `rejected: ${String(error)}`,
+        );
         await flushPromises();
 
-        // Assert — `main`'s visible 404 is restored, the miss is reported exactly once, and
-        // readiness settles rather than hanging (raced so a hang fails instead of stalling).
-        // The one line is an ERROR: the throw is reported on the channel vue-router stopped using
-        // the moment fs-router registered a handler, and the abort-channel warn must not also fire.
+        // Assert — the fallback paints, nothing fs-router-shaped reaches either channel, readiness
+        // settles (raced so a hang fails instead of stalling), and no middleware is handed a
+        // location there is no route record for.
+        expect(installed).toBe('resolved');
         expect(wrapper.text()).toBe('404');
-        expect(fsRouterCalls(consoleErrorSpy)).toHaveLength(1);
-        expect(fsRouterCalls(consoleWarnSpy, consoleErrorSpy)).toHaveLength(1);
+        expect(fsRouterCalls(consoleWarnSpy, consoleErrorSpy)).toHaveLength(0);
         await expect(settlesWithin(service, 200)).resolves.toBe('resolved');
+        expect(middleware).not.toHaveBeenCalled();
+
+        consoleWarnSpy.mockRestore();
+        consoleErrorSpy.mockRestore();
+        window.history.replaceState({}, '', '/');
+    });
+
+    it('should never read a route vue-router matched as a miss, at any depth', async () => {
+        // Arrange — the miss is vue-router's verdict (nothing matched), never fs-router's two-level
+        // flattened lookup. A matched grandchild must therefore take the lookup, not the miss path
+        // that skips middleware. The lookup still rejects at that depth, as it did before WR-1160;
+        // landing on the leaf instead would mean it slipped past the cancelling middleware.
+        window.history.replaceState({}, '', '/deep/inner/leaf');
+        const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const layout = defineComponent({render: () => h('div', 'layout')});
+        const service = createRouterService([
+            {path: '/', name: 'home', component: TestPage},
+            {
+                path: '/deep',
+                component: layout,
+                children: [
+                    {
+                        path: 'inner',
+                        component: layout,
+                        children: [{path: 'leaf', name: 'deep.leaf', component: TestPage}],
+                    },
+                ],
+            },
+        ]);
+        service.registerBeforeRouteMiddleware(() => true);
+
+        // Act
+        const installed = await service.install().then(
+            () => 'resolved',
+            (error: unknown) => String(error),
+        );
+        await flushPromises();
+
+        // Assert
+        expect(installed).toBe('Error: /deep/inner/leaf is an unknown route');
+        expect(service.currentRouteRef.value.name).not.toBe('deep.leaf');
 
         consoleWarnSpy.mockRestore();
         consoleErrorSpy.mockRestore();
@@ -1499,5 +1543,46 @@ describe('createRouterLink', () => {
 
         // Assert
         expect(getUrl).toHaveBeenCalledWith('nested', 10, {tab: 'info'}, 5);
+    });
+});
+
+describe('RouterLink from createRouterService', () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    // WR-1928: the anchor is followed by the BROWSER on middle-click, open-in-new-tab, copy-link and
+    // crawlers — none of which go through `onClick` — so its href must be a document URL, base included.
+    it('should render an href that carries the history base', () => {
+        // Arrange
+        const service = createRouterService(createTestRoutes(), {base: '/colleague'});
+
+        // Act
+        const wrapper = mount(service.RouterLink, {props: {to: {name: 'items.show', id: 5}}});
+
+        // Assert
+        expect(wrapper.find('a').attributes('href')).toBe('/colleague/items/5');
+    });
+
+    it('should render the same href as before when no base is set (regression pin)', () => {
+        // Arrange
+        const service = createRouterService(createTestRoutes());
+
+        // Act
+        const wrapper = mount(service.RouterLink, {props: {to: {name: 'items.show', id: 5, query: {tab: '1'}}}});
+
+        // Assert
+        expect(wrapper.find('a').attributes('href')).toBe('/items/5?tab=1');
+    });
+
+    it('should leave getUrlForRouteName base-relative under a base (contract pin)', () => {
+        // Arrange
+        const service = createRouterService(createTestRoutes(), {base: '/colleague'});
+
+        // Act
+        const url = service.getUrlForRouteName('items.show', 5);
+
+        // Assert
+        expect(url).toBe('/items/5');
     });
 });

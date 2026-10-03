@@ -62,7 +62,7 @@ export const createRouterView = (
     );
 
 export const createRouterLink = <Routes extends RouteRecordRaw[]>(
-    getUrlForRouteName: RouterService<Routes>['getUrlForRouteName'],
+    getHref: RouterService<Routes>['getUrlForRouteName'],
     goToRoute: RouterService<Routes>['goToRoute'],
 ): RouterLinkComponent<Routes> =>
     defineComponent<{to: {name: RouteName<Routes>; query?: LocationQueryRaw; id?: number | string; parentId?: number}}>(
@@ -74,7 +74,7 @@ export const createRouterLink = <Routes extends RouteRecordRaw[]>(
                         // Merge consumer-set fallthrough attrs (class/style/data-*/aria-*) onto the
                         // anchor; spread first so the owned href/onClick stay authoritative.
                         ...attrs,
-                        href: getUrlForRouteName(props.to.name, props.to.id, props.to.query, props.to.parentId),
+                        href: getHref(props.to.name, props.to.id, props.to.query, props.to.parentId),
                         onClick: (event: MouseEvent) => {
                             if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
 
