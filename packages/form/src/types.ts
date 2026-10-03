@@ -38,7 +38,7 @@ export interface UseValidationErrorsOptions<T extends string = string> {
     fields?: readonly T[];
     /**
      * Consulted on every 422; while it returns `false` the 422 is ignored — `errors`,
-     * `refused` and `unmapped` stay as they were. `useForm`'s `ownSubmitsOnly` passes
+     * `refused` and `unmapped` stay as they were. `useForm`'s `onlyWhileSubmitting` passes
      * one that reads its own `submitting`. Omitted: every 422 is taken.
      */
     acceptWhen?: () => boolean;
@@ -60,15 +60,15 @@ export interface UseFormSubmit {
 /** Options for `useForm`: the validation options plus `useForm`-only behaviour. */
 export type UseFormOptions<T extends string = string> = Omit<UseValidationErrorsOptions<T>, 'acceptWhen'> & {
     /**
-     * Take a 422 only while this form's own `handleSubmit` is in flight, so a late refusal
-     * from a screen the user left does not land in this form's bag. fs-http runs the
-     * middleware synchronously inside the axios interceptor, before the rejection reaches
-     * the awaiting action, so `submitting` is still `true` for the sender at that moment.
-     * It cannot separate two submits in flight on one `HttpService` at once: both are
-     * `submitting`, and each takes whichever 422 lands. Telling them apart needs the request.
+     * Take a 422 only while this form's `handleSubmit` is in flight, so a refusal that lands
+     * while the form is idle (a late answer from a screen the user left) does not enter its bag.
+     * This is a time window, not request identity: ANY request on the same `HttpService` that
+     * answers 422 during the window lands here too — another form's submit, a background save,
+     * a dialog's request. Telling the requests apart needs a marker the consumer threads into
+     * its request options (WR-1992; DECISIONS D1).
      * @default false
      */
-    ownSubmitsOnly?: boolean;
+    onlyWhileSubmitting?: boolean;
     /**
      * On a 422, scroll the first invalid field into view. Off unless you ask for it: an
      * `HttpService` is shared, so a 422 fills every mounted form's bag and this cannot tell

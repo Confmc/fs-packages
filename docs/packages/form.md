@@ -71,7 +71,7 @@ const {errors, submitting, handleSubmit} = useForm<Field>(http, {keyMapper: came
 The two source territories diverged on exactly one axis: one camelCased the error keys, the other used them raw. `keyMapper` (default identity) is the single injection point that absorbs that divergence, so the package fits both without forking.
 :::
 
-## Fields, Refusals and Ownership
+## Fields, Refusals and the Submit Window
 
 ### Keep only the form's own fields
 
@@ -96,15 +96,15 @@ A 422 whose keys are all dropped leaves `errors` empty, and a screen that draws 
 
 `refused` is raised by the 422 middleware, at the moment the bag is written, not in `handleSubmit`'s catch. A store that catches and classifies the 422 itself, so `handleSubmit` sees a resolved action, still gets the signal. `clearErrors` resets all three, and `handleSubmit` calls it before each attempt. "The refusal named a key this form has no field for" is `unmapped.value.length > 0`.
 
-### Take only your own submit's refusal
+### Take a 422 only while submitting
 
-The middleware sees every 422 the shared `HttpService` answers, so a late 422 from a screen the user already left lands in the next mounted form's bag. `ownSubmitsOnly` takes a 422 only while this form's own `handleSubmit` is in flight:
+The middleware sees every 422 the shared `HttpService` answers, so a late 422 from a screen the user already left lands in the next mounted form's bag. `onlyWhileSubmitting` takes a 422 only while this form's `handleSubmit` is in flight:
 
 ```typescript
-useForm<Field>(http, {ownSubmitsOnly: true});
+useForm<Field>(http, {onlyWhileSubmitting: true});
 ```
 
-It works because fs-http runs the middleware synchronously inside the axios interceptor, before the rejection reaches the awaiting action, so `submitting` is still `true` for the sender. **It cannot separate two submits in flight on one `HttpService` at once**: both are `submitting`, and each takes whichever 422 lands. Off by default. When wiring the primitives by hand, pass the predicate yourself: `useValidationErrors(http, {acceptWhen: () => submit.submitting.value})`.
+fs-http runs the middleware synchronously inside the axios interceptor, before the rejection reaches the awaiting action, so a submit's own 422 arrives while `submitting` is still `true`. **The gate is a time window, not request identity.** Any request on the same `HttpService` that answers 422 while this form is submitting lands in this form's bag: another form's submit, a background save, a dialog's request. Telling requests apart needs a marker the consumer threads into its request options (WR-1992; `packages/form/DECISIONS.md` D1). Off by default. When wiring the primitives by hand, pass the predicate yourself: `useValidationErrors(http, {acceptWhen: () => submit.submitting.value})`.
 
 ## Scroll to the First Error
 
@@ -153,7 +153,7 @@ const {handleSubmit, submitting} = useFormSubmit(validation);
 
 ## Scoping & Backend Contract
 
-**One error-scope per form.** `useValidationErrors` (and therefore `useForm`) registers a 422 observer on the `HttpService` you pass and keeps its own error bag. If two forms share **one** `HttpService` instance, a 422 from either fills **both** bags — cross-form bleed, with green types. `ownSubmitsOnly` closes this for a form that is not submitting; two forms submitting at once on one service still share the bleed. Give each form its own error scope where that matters: one form per `HttpService` instance, or don't share a service across concurrently-mounted forms.
+**One error-scope per form.** `useValidationErrors` (and therefore `useForm`) registers a 422 observer on the `HttpService` you pass and keeps its own error bag. If two forms share **one** `HttpService` instance, a 422 from either fills **both** bags — cross-form bleed, with green types. `onlyWhileSubmitting` closes this only while the form is idle; any 422 on the service during its submit still lands in its bag. Give each form its own error scope where that matters: one form per `HttpService` instance, or don't share a service across concurrently-mounted forms.
 
 **Laravel 422 contract.** `fs-form` targets **Laravel**'s validation-error response shape — `{ message?: string, errors: Record<string, string[]> }` — and binds the first message per field. A field whose value is not a list with a string first entry is **not bound**: it is left out of `errors` and listed in `unmapped` (before 0.3.0 a bare string bound its first character). An `errors` container that is not a plain object (an array, say) is read as no field map. If you point `fs-form` at a non-Laravel backend, revisit the parse in `useValidationErrors` first.
 
@@ -171,15 +171,15 @@ const {handleSubmit, submitting} = useFormSubmit(validation);
 
 The one-call entry point. Returns everything from both primitives.
 
-| Parameter                | Type                       | Description                                                                                                                                                           |
-| ------------------------ | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `httpService`            | `HttpService`              | The `fs-http` service whose 422 responses to observe                                                                                                                  |
-| `options.keyMapper`      | `(key: string) => string`  | Remaps raw backend field keys (default: identity)                                                                                                                     |
-| `options.fields`         | `readonly T[]`             | Keep only these fields (by mapped name) in `errors`; others go to `unmapped` (default: every key)                                                                     |
-| `options.ownSubmitsOnly` | `boolean`                  | Take a 422 only while this form's own `handleSubmit` is in flight (default: `false`; see [Take only your own submit's refusal](#take-only-your-own-submit-s-refusal)) |
-| `options.scrollToError`  | `boolean`                  | Scroll the first invalid field into view on a 422 (default: `false`; pass `scrollRoot` with it — see [Scroll to the First Error](#scroll-to-the-first-error))         |
-| `options.scrollRoot`     | `Ref<HTMLElement \| null>` | Scope the `scrollToError` query to a form's subtree; omit for document-wide (see [Scroll to the First Error](#scroll-to-the-first-error))                             |
-| `options.scrollTarget`   | `string`                   | Selector for the invalid-field mark (default `[aria-invalid="true"]`); pass your own when inputs mark errors with a class                                             |
+| Parameter                     | Type                       | Description                                                                                                                                                                                      |
+| ----------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `httpService`                 | `HttpService`              | The `fs-http` service whose 422 responses to observe                                                                                                                                             |
+| `options.keyMapper`           | `(key: string) => string`  | Remaps raw backend field keys (default: identity)                                                                                                                                                |
+| `options.fields`              | `readonly T[]`             | Keep only these fields (by mapped name) in `errors`; others go to `unmapped` (default: every key)                                                                                                |
+| `options.onlyWhileSubmitting` | `boolean`                  | Take a 422 only while this form's `handleSubmit` is in flight; a time window, not request identity (default: `false`; see [Take a 422 only while submitting](#take-a-422-only-while-submitting)) |
+| `options.scrollToError`       | `boolean`                  | Scroll the first invalid field into view on a 422 (default: `false`; pass `scrollRoot` with it — see [Scroll to the First Error](#scroll-to-the-first-error))                                    |
+| `options.scrollRoot`          | `Ref<HTMLElement \| null>` | Scope the `scrollToError` query to a form's subtree; omit for document-wide (see [Scroll to the First Error](#scroll-to-the-first-error))                                                        |
+| `options.scrollTarget`        | `string`                   | Selector for the invalid-field mark (default `[aria-invalid="true"]`); pass your own when inputs mark errors with a class                                                                        |
 
 **Returns:**
 
@@ -195,7 +195,7 @@ The one-call entry point. Returns everything from both primitives.
 
 ### `useValidationErrors(httpService, options?)`
 
-Primitive: registers the 422 middleware and owns the error bag. Takes the same `httpService`, `keyMapper` and `fields`, plus `acceptWhen` (a `() => boolean` consulted on every 422; while it returns `false` the 422 is ignored), but **none of the scroll options** and not `ownSubmitsOnly`. Returns `{errors, clearErrors, refused, unmapped, refusedUnnamed}`.
+Primitive: registers the 422 middleware and owns the error bag. Takes the same `httpService`, `keyMapper` and `fields`, plus `acceptWhen` (a `() => boolean` consulted on every 422; while it returns `false` the 422 is ignored), but **none of the scroll options** and not `onlyWhileSubmitting`. Returns `{errors, clearErrors, refused, unmapped, refusedUnnamed}`.
 
 ### `useFormSubmit(validationErrors)`
 

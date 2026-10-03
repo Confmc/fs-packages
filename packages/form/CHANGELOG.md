@@ -4,11 +4,11 @@
 
 ### Minor Changes
 
-- **Field allow-list, refusal signal and opt-in submit ownership (WR-1643).** All additive; nothing changes unless you pass the new options or read the new refs.
+- **Field allow-list, refusal signal and an opt-in submit window (WR-1643).** All additive; nothing changes unless you pass the new options or read the new refs.
     - `fields` (on `useValidationErrors` and `useForm`) keeps only the listed fields in `errors`, matched by their `keyMapper` name. Omitted, every key binds as before.
     - `refused`, `unmapped` and `refusedUnnamed` are new readonly refs. `refused` is raised by the 422 middleware itself on every accepted 422, so it reaches a consumer whose action catches and classifies the 422 and never lets it reach `handleSubmit`. `unmapped` lists the mapped keys `errors` does not hold, each name once. `refusedUnnamed` is `refused` with an empty bag. `clearErrors` (and so every `handleSubmit`) resets all three.
-    - `ownSubmitsOnly` on `useForm` takes a 422 only while this form's own `handleSubmit` is in flight, so a late refusal from an abandoned screen no longer lands in the next form's bag. Off by default. Two submits in flight on one `HttpService` at once still cannot be told apart.
-    - `acceptWhen` on `useValidationErrors` is the predicate `ownSubmitsOnly` is built on, for forms wired from the two primitives by hand.
+    - `onlyWhileSubmitting` on `useForm` takes a 422 only while this form's `handleSubmit` is in flight, so a late refusal from an abandoned screen no longer lands in an idle form's bag. Off by default. It is a time window, not request identity: any 422 on the same `HttpService` during the submit still lands (WR-1992, DECISIONS D1).
+    - `acceptWhen` on `useValidationErrors` is the predicate `onlyWhileSubmitting` is built on, for forms wired from the two primitives by hand.
 
 ### Patch Changes
 

@@ -20,17 +20,17 @@ import {useValidationErrors} from './validation-errors';
  * when you need one half without the other (e.g. a validation-less confirm action).
  *
  * @param httpService the fs-http service whose 422 responses to observe.
- * @param options     `keyMapper`, `fields`, `ownSubmitsOnly`, `scrollToError`, `scrollRoot`,
+ * @param options     `keyMapper`, `fields`, `onlyWhileSubmitting`, `scrollToError`, `scrollRoot`,
  *                    `scrollTarget` — see `UseFormOptions`.
  */
 export const useForm = <T extends string = string>(
     httpService: HttpService,
     options: UseFormOptions<T> = {},
 ): UseForm<T> => {
-    const {ownSubmitsOnly = false, scrollToError = false, scrollRoot, scrollTarget} = options;
+    const {onlyWhileSubmitting = false, scrollToError = false, scrollRoot, scrollTarget} = options;
     const validation = useValidationErrors<T>(httpService, {
         ...options,
-        acceptWhen: ownSubmitsOnly ? () => submit.submitting.value : undefined,
+        acceptWhen: onlyWhileSubmitting ? () => submit.submitting.value : undefined,
     });
     const submit = useFormSubmit(validation);
 
