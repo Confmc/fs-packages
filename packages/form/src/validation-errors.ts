@@ -67,7 +67,7 @@ export const useValidationErrors = <T extends string = string>(
 
             refused.value = true;
 
-            const bag: Record<string, string> = {};
+            const kept: [string, string][] = [];
             const dropped: string[] = [];
 
             for (const [key, messages] of Object.entries(toFieldErrorMap(response.data))) {
@@ -75,10 +75,11 @@ export const useValidationErrors = <T extends string = string>(
                 const message = firstMessage(messages);
 
                 if (message === undefined || (allowed && !allowed.has(field))) dropped.push(field);
-                else bag[field] = message;
+                else kept.push([field, message]);
             }
 
-            errors.value = bag as ValidationErrors<T>;
+            // fromEntries defines own properties; an assignment would hit the `__proto__` setter.
+            errors.value = Object.fromEntries(kept) as ValidationErrors<T>;
             unmapped.value = dropped;
         }),
     );

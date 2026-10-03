@@ -386,6 +386,19 @@ describe('useValidationErrors', () => {
             expect(result().unmapped.value).toEqual(['email']);
         });
 
+        // Parsed from text: an object literal's `__proto__` sets the prototype instead of creating the key.
+        it('binds a field named __proto__ as an own key', () => {
+            const {httpService, triggerError} = createMockHttpService();
+            const {result} = mountComposable(httpService);
+
+            triggerError(422, JSON.parse('{"errors":{"__proto__":["x"]}}'));
+
+            expect(Object.hasOwn(result().errors.value, '__proto__')).toBe(true);
+            expect(Object.getOwnPropertyDescriptor(result().errors.value, '__proto__')?.value).toBe('x');
+            expect(Object.getPrototypeOf(result().errors.value)).toBe(Object.prototype);
+            expect(result().unmapped.value).toEqual([]);
+        });
+
         it('reports a skipped key under its keyMapper name', () => {
             const {httpService, triggerError} = createMockHttpService();
             const keyMapper = (key: string) => key.toUpperCase();
