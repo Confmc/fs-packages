@@ -1,12 +1,55 @@
 import {BlockList, isIPv4, isIPv6} from 'node:net';
 
-import type {CloudflareGate, CloudflareGateOptions, CloudflareGateRequest, CloudflareGateResponse} from './types';
+import type {
+    CloudflareGate,
+    CloudflareGateHeader,
+    CloudflareGateMissingHeader,
+    CloudflareGateOptions,
+    CloudflareGateRequest,
+    CloudflareGateResponse,
+    CloudflareGateSource,
+} from './types';
 
 import {CLOUDFLARE_IPV4, CLOUDFLARE_IPV6} from './ranges';
 
 const HTTP_FORBIDDEN = 403;
 
-const DEFAULT_HEADER = 'fly-client-ip';
+const HEADERS: readonly CloudflareGateHeader[] = ['fly-client-ip'];
+const SOURCES: readonly CloudflareGateSource[] = ['header', 'socket'];
+const MISSING_HEADER_POLICIES: readonly CloudflareGateMissingHeader[] = ['deny', 'allow'];
+
+// The options reach JavaScript consumers unchecked, and every one of them can turn a closed gate into an
+// open one, so only `undefined` means "not given": any other value, `null` included, must be valid or the
+// factory throws instead of degrading at request time.
+const invalid = (message: string): Error => new Error(`[@script-development/fs-cloudflare] ${message}`);
+
+const oneOf = <T extends string>(option: string, allowed: readonly T[], value: unknown): T => {
+    const match = allowed.find((candidate) => candidate === value);
+    if (match !== undefined) return match;
+
+    const expected = allowed.map((candidate) => JSON.stringify(candidate)).join(', ');
+    throw invalid(`${option} must be one of ${expected}. Received: ${JSON.stringify(value)}`);
+};
+
+const isThenable = (value: unknown): value is PromiseLike<unknown> =>
+    (typeof value === 'object' || typeof value === 'function') &&
+    value !== null &&
+    typeof (value as {then?: unknown}).then === 'function';
+
+const readExemptPaths = (value: unknown): Set<string> => {
+    if (value === undefined) return new Set();
+    if (!Array.isArray(value) || !value.every((path) => typeof path === 'string')) {
+        throw invalid(`exemptPaths must be an array of strings. Received: ${JSON.stringify(value)}`);
+    }
+
+    return new Set(value);
+};
+
+const readReporter = (value: unknown): CloudflareGateOptions['onMissingHeader'] => {
+    if (value === undefined || typeof value === 'function') return value as CloudflareGateOptions['onMissingHeader'];
+
+    throw invalid(`onMissingHeader must be a function. Received: ${JSON.stringify(value)}`);
+};
 
 const addSubnets = (blockList: BlockList, ranges: string[], family: 'ipv4' | 'ipv6'): void => {
     for (const range of ranges) {
@@ -24,9 +67,12 @@ const buildBlockList = (): BlockList => {
 };
 
 export const createCloudflareGate = (options: CloudflareGateOptions = {}): CloudflareGate => {
-    const {header = DEFAULT_HEADER} = options;
-    const exemptPaths = new Set(options.exemptPaths);
-    const readSocket = options.source === 'socket';
+    const {header: rawHeader = 'fly-client-ip', source = 'header', missingHeader = 'deny'} = options;
+    const header = oneOf('header', HEADERS, typeof rawHeader === 'string' ? rawHeader.toLowerCase() : rawHeader);
+    const readSocket = oneOf('source', SOURCES, source) === 'socket';
+    const admitMissingHeader = oneOf('missingHeader', MISSING_HEADER_POLICIES, missingHeader) === 'allow';
+    const onMissingHeader = readReporter(options.onMissingHeader);
+    const exemptPaths = readExemptPaths(options.exemptPaths);
     const blockList = buildBlockList();
 
     const isCloudflareAddress = (value: string): boolean => {
@@ -47,8 +93,23 @@ export const createCloudflareGate = (options: CloudflareGateOptions = {}): Cloud
 
         const address = req.get(header);
 
-        // A missing header means the request never crossed the edge proxy (Fly 6PN/internal, local dev).
-        return address === undefined || isCloudflareAddress(address);
+        // Absence looks the same whether the request came over a private network or the proxy stopped
+        // writing the header, so it is reported before the policy decides, and a throwing reporter admits nothing.
+        // The decision is synchronous, so a reporter returning a promise could only fail after the request was
+        // admitted: that is refused, and its rejection is handled here so it cannot surface as an unhandled one.
+        if (address === undefined) {
+            const reported: unknown = onMissingHeader?.(req);
+            if (isThenable(reported)) {
+                reported.then(undefined, () => undefined);
+                throw invalid(
+                    'onMissingHeader must be synchronous: it returned a promise, whose failure would arrive after the request was admitted',
+                );
+            }
+
+            return admitMissingHeader;
+        }
+
+        return isCloudflareAddress(address);
     };
 
     const middleware = (req: CloudflareGateRequest, res: CloudflareGateResponse, next: () => void): void => {

@@ -22,7 +22,7 @@
  * its tree. The step splitter below is indentation-based, which is sufficient for a
  * file this small and fails loudly (not silently) if the shape ever changes.
  */
-import {existsSync, readFileSync} from 'node:fs';
+import {existsSync, readdirSync, readFileSync} from 'node:fs';
 
 const WORKFLOW = '.github/workflows/publish.yml';
 
@@ -261,8 +261,63 @@ if (!/scripts\/\*\*\/\*\.test\.mjs/.test(vitestConfig)) {
     );
 }
 
+/**
+ * Fifth leg, every workflow: each job declares its own `timeout-minutes`.
+ *
+ * An unbounded job inherits GitHub's 360-minute default, so a hung step holds a runner
+ * for six hours — and on `publish`, holds the job carrying `id-token: write` (WR-0892).
+ * Read per job from its own keys, so a step-level bound never stands in for the job's.
+ */
+const WORKFLOW_DIR = '.github/workflows';
+
+const workflowJobs = (file) => {
+    const fileLines = readFileSync(`${WORKFLOW_DIR}/${file}`, 'utf8').split('\n');
+    const jobsAt = fileLines.findIndex((line) => /^jobs:\s*$/.test(line));
+    if (jobsAt === -1) return [];
+    const jobs = [];
+    let jobIndent = null;
+    let current = null;
+    for (const [offset, line] of fileLines.slice(jobsAt + 1).entries()) {
+        const match = /^(\s*)(\S.*)$/.exec(line);
+        if (!match || match[2].startsWith('#')) continue;
+        const indent = match[1].length;
+        if (indent === 0) break;
+        jobIndent ??= indent;
+        if (indent === jobIndent) {
+            current = {name: match[2].replace(/:\s*$/, ''), line: jobsAt + offset + 2, keyIndent: null, keys: []};
+            jobs.push(current);
+            continue;
+        }
+        current.keyIndent ??= indent;
+        if (indent === current.keyIndent) current.keys.push(match[2]);
+    }
+    return jobs;
+};
+
+const workflowFiles = readdirSync(WORKFLOW_DIR).filter((file) => /\.ya?ml$/.test(file));
+let boundedJobs = 0;
+if (workflowFiles.length === 0) {
+    failures.push(`no workflow files found in ${WORKFLOW_DIR}; the timeout leg scanned nothing.`);
+}
+for (const file of workflowFiles) {
+    const jobs = workflowJobs(file);
+    if (jobs.length === 0) {
+        failures.push(`no jobs found in ${WORKFLOW_DIR}/${file}; the timeout leg cannot read this file's shape.`);
+    }
+    for (const job of jobs) {
+        if (job.keys.some((key) => /^timeout-minutes:\s*[1-9]\d*\s*(#.*)?$/.test(key))) {
+            boundedJobs += 1;
+            continue;
+        }
+        failures.push(
+            `job '${job.name}' in ${WORKFLOW_DIR}/${file} (line ${job.line}) declares no positive integer ` +
+                `'timeout-minutes'. Unbounded, it inherits GitHub's 360-minute default (WR-0892).`,
+        );
+    }
+}
+
 if (failures.length > 0) {
-    console.error(`validate:workflows gate FAIL — ${WORKFLOW}:\n`);
+    console.error(`validate:workflows gate FAIL:\n`);
     for (const failure of failures) console.error(`  - ${failure}\n`);
     process.exit(1);
 }
@@ -270,5 +325,6 @@ if (failures.length > 0) {
 console.log(
     `validate:workflows gate PASS — ${WORKFLOW}: artifact retention >= ${MIN_RETENTION_DAYS}d, ` +
         `download is soft, rebuild fallback present and loud, the OIDC approval is gated on a real release signal ` +
-        `in the fail-closed direction, and that signal's decision logic is exercised at PR time.`,
+        `in the fail-closed direction, and that signal's decision logic is exercised at PR time; ` +
+        `${boundedJobs} job(s) across ${workflowFiles.length} workflow(s) each declare timeout-minutes.`,
 );
