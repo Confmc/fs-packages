@@ -52,6 +52,7 @@ import {onMounted, useTemplateRef} from 'vue';
 import type {LabelKey, SelectItem} from '../types';
 
 import {warnWhenUnnamed} from '../internal/accessible-name';
+import {guardWhileDisabled} from '../internal/disabled-guard';
 import {ensureRefValueExists} from '../internal/reactivity';
 
 const {
@@ -89,6 +90,9 @@ const model = defineModel<T['id'] | null>({required: true});
 const group = useTemplateRef<HTMLElement>('group');
 const legendText = useTemplateRef<HTMLElement>('legendText');
 
+// On the fieldset for the reason CheckboxGroup gives — see there.
+guardWhileDisabled(group, () => disabled);
+
 // The same label-only naming guard as CheckboxGroup — see there.
 onMounted(() =>
     warnWhenUnnamed(ensureRefValueExists(group), 'RadioGroup', 'the `label` prop (the legend)', [
@@ -102,11 +106,8 @@ const labelOf = (option: T): string =>
         ? optionLabel(option)
         : String((option as Record<PropertyKey, unknown>)[optionLabel as PropertyKey]);
 
-// The model follows the native change event (keyboard arrows and clicks both land here). The
-// disabled guard keeps synthetic dispatch honest — a real browser never fires change on a
-// disabled control.
+// The model follows the native change event (keyboard arrows and clicks both land here).
 const onChange = (value: T['id']): void => {
-    if (disabled) return;
     model.value = value;
 };
 </script>

@@ -31,6 +31,7 @@
 import {onMounted, useTemplateRef} from 'vue';
 
 import {warnWhenUnnamed} from '../internal/accessible-name';
+import {guardWhileDisabled} from '../internal/disabled-guard';
 import {ensureRefValueExists} from '../internal/reactivity';
 
 // The root is the <label> (implicit labelling), so attrs are re-aimed at the native input —
@@ -69,10 +70,10 @@ const {
 // has no mixed state).
 const model = defineModel<boolean>({required: true});
 
-// change (not input) is the native checkbox commit event. The disabled guard keeps synthetic
-// dispatch honest — a real browser never fires change on a disabled control.
+guardWhileDisabled(input, () => disabled);
+
+// change (not input) is the native checkbox commit event.
 const onChange = (event: Event): void => {
-    if (disabled) return;
     model.value = (event.target as HTMLInputElement).checked;
 };
 </script>

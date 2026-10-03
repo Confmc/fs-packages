@@ -291,6 +291,18 @@ nothing selected, the SingleSelect shape). The fieldset carries `role="radiogrou
 unlike plain `group` — legitimately carries `aria-required`, so here the attribute is the
 group-level conveyance.
 
+**A disabled control runs none of your `click`, `input` or `change` listeners** — the rule
+`Pressable` and `Disclosure` keep (below). The browser withholds these events only for _user_
+interaction: a dispatched `change` runs every listener on a disabled input, and a dispatched click
+on a disabled checkbox or radio also flips it (measured in Chromium). Each control stops them in
+the capture phase, before your fall-through handler and before any ancestor, and withholds the
+click's flip. On `CheckboxGroup` and `RadioGroup` the stop sits on the fieldset, where your attrs
+land, so the whole group is inert — a pointer on an option's label text included. An **enabled**
+control runs your listeners exactly as before. One shape no component can undo: a click
+dispatched with `cancelable: false` flips the native input regardless, because only a cancelable
+click's default action can be withheld; a real click and `HTMLElement.click()` are both
+cancelable.
+
 **All four warn in development when they render unnamed**, on the same four routes and the same
 `process.env.NODE_ENV` gate as `Pressable`/`Disclosure` (below). Each route is read where it
 actually lands: on `Checkbox`/`Switch` the attributes (`aria-label`, `aria-labelledby`, `title`)

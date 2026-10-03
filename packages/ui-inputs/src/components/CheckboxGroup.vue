@@ -36,6 +36,7 @@ import {onMounted, useTemplateRef} from 'vue';
 import type {LabelKey, SelectItem} from '../types';
 
 import {warnWhenUnnamed} from '../internal/accessible-name';
+import {guardWhileDisabled} from '../internal/disabled-guard';
 import {ensureRefValueExists} from '../internal/reactivity';
 import Checkbox from './Checkbox.vue';
 
@@ -79,6 +80,10 @@ const model = defineModel<T['id'][]>({required: true});
 
 const group = useTemplateRef<HTMLElement>('group');
 const legendText = useTemplateRef<HTMLElement>('legendText');
+
+// On the fieldset, not only the inputs: consumer attrs fall through to the fieldset, so a pointer on an
+// option's label text reaches a consumer `@click` there without ever touching a disabled input.
+guardWhileDisabled(group, () => disabled);
 
 // `label` is typed as a string but `''` passes the type. Only the label names the group: the option
 // text inside the fieldset names the options, and the legend's sr-only `requiredLabel` is a status,
