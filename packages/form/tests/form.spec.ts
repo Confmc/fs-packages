@@ -413,3 +413,110 @@ describe('useForm scroll-to-error', () => {
         wrapper.unmount();
     });
 });
+
+describe('useForm submit window and refusal signal', () => {
+    // A request double that behaves like fs-http: the response-error middleware runs
+    // synchronously inside the interceptor, then the promise rejects.
+    const refusingRequest = (triggerError: (status: number, data: unknown) => void, data: unknown) => () => {
+        triggerError(422, data);
+        return Promise.reject(makeAxiosError(422));
+    };
+
+    it('passes the fields allow-list through to the validation layer', () => {
+        const {httpService, triggerError} = createMockHttpService();
+        const {result} = mountForm(httpService, {fields: ['email']});
+
+        triggerError(422, {errors: {email: ['Taken'], token: ['Expired']}});
+
+        expect(result().errors.value).toEqual({email: 'Taken'});
+        expect(result().unmapped.value).toEqual(['token']);
+    });
+
+    it('binds a 422 that arrives while the form is idle when onlyWhileSubmitting is off', () => {
+        const {httpService, triggerError} = createMockHttpService();
+        const {result} = mountForm(httpService);
+
+        triggerError(422, {errors: {email: ['Taken']}});
+
+        expect(result().errors.value).toEqual({email: 'Taken'});
+        expect(result().refused.value).toBe(true);
+    });
+
+    it('leaves the bag untouched for a 422 that arrives while the form is idle under onlyWhileSubmitting', () => {
+        const {httpService, triggerError} = createMockHttpService();
+        const {result} = mountForm(httpService, {onlyWhileSubmitting: true});
+
+        triggerError(422, {errors: {email: ['Taken']}});
+
+        expect(result().errors.value).toEqual({});
+        expect(result().refused.value).toBe(false);
+    });
+
+    it('binds a 422 raised inside its own handleSubmit under onlyWhileSubmitting', async () => {
+        const {httpService, triggerError} = createMockHttpService();
+        const {result} = mountForm(httpService, {onlyWhileSubmitting: true});
+
+        await result().handleSubmit(refusingRequest(triggerError, {errors: {email: ['Taken']}}));
+
+        expect(result().errors.value).toEqual({email: 'Taken'});
+        expect(result().refused.value).toBe(true);
+    });
+
+    it('ignores a late 422 after its own submit settled under onlyWhileSubmitting', async () => {
+        const {httpService, triggerError} = createMockHttpService();
+        const {result} = mountForm(httpService, {onlyWhileSubmitting: true});
+
+        await result().handleSubmit(async () => {});
+        triggerError(422, {errors: {email: ['Taken']}});
+
+        expect(result().errors.value).toEqual({});
+        expect(result().refused.value).toBe(false);
+    });
+
+    // Regression pin for DECISIONS D1 (WR-1992): the gate is a time window. Real request
+    // identity would turn this red on purpose — read D1 before changing it.
+    it('accepts a foreign 422 that lands while its submit is in flight under onlyWhileSubmitting', async () => {
+        const {httpService, triggerError} = createMockHttpService();
+        const {result} = mountForm(httpService, {onlyWhileSubmitting: true});
+        const gate = deferred();
+
+        const inFlight = result().handleSubmit(() => gate.promise);
+        triggerError(422, {errors: {email: ['Taken in another form']}});
+
+        expect(result().errors.value).toEqual({email: 'Taken in another form'});
+        expect(result().refused.value).toBe(true);
+
+        gate.resolve();
+        await inFlight;
+    });
+
+    it('signals a refusal to a consumer whose action catches and classifies the 422 itself', async () => {
+        const {httpService, triggerError} = createMockHttpService();
+        const {result} = mountForm(httpService, {fields: ['password'], onlyWhileSubmitting: true});
+        const request = refusingRequest(triggerError, {errors: {token: ['Expired']}});
+        let outcome = 'unsent';
+
+        await result().handleSubmit(async () => {
+            outcome = await request().then(
+                () => 'saved',
+                () => 'refused',
+            );
+        });
+
+        expect(outcome).toBe('refused');
+        expect(result().refused.value).toBe(true);
+        expect(result().refusedUnnamed.value).toBe(true);
+        expect(result().unmapped.value).toEqual(['token']);
+    });
+
+    it('drops the previous refusal when a new submit starts', async () => {
+        const {httpService, triggerError} = createMockHttpService();
+        const {result} = mountForm(httpService, {onlyWhileSubmitting: true});
+
+        await result().handleSubmit(refusingRequest(triggerError, {errors: {email: ['Taken']}}));
+        await result().handleSubmit(async () => {});
+
+        expect(result().errors.value).toEqual({});
+        expect(result().refused.value).toBe(false);
+    });
+});
