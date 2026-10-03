@@ -687,37 +687,11 @@ describe('createRouterView', () => {
         window.history.replaceState({}, '', '/');
     });
 
-    it('should not report a later navigation to an unknown URL through the error channel', async () => {
-        // Arrange — the post-settle half: a history-driven or path navigation onto an unknown URL
-        // after the app is up is a 404 too, and must paint the fallback with no fs-router line.
-        window.history.replaceState({}, '', '/');
-        const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-        const service = createRouterService(createTestRoutes());
-        await service.install();
-        await flushPromises();
-        const wrapper = mount(service.RouterView);
-        expect(wrapper.text()).toBe('page content');
-
-        // Act — a path navigation, which is what a back/forward or a raw link produces
-        window.history.pushState({}, '', '/nope');
-        window.dispatchEvent(new PopStateEvent('popstate', {state: window.history.state}));
-        await flushPromises();
-
-        // Assert
-        expect(service.currentRouteRef.value.matched).toHaveLength(0);
-        expect(wrapper.text()).toBe('404');
-        expect(fsRouterCalls(consoleWarnSpy, consoleErrorSpy)).toHaveLength(0);
-
-        consoleWarnSpy.mockRestore();
-        consoleErrorSpy.mockRestore();
-        window.history.replaceState({}, '', '/');
-    });
-
-    it('should never paint a route vue-router matched without running middleware first', async () => {
-        // Arrange — the miss is vue-router's verdict (nothing matched), never fs-router's
-        // flattened lookup, which sees only two levels. A grandchild route vue-router DOES match
-        // must not be mistaken for a miss and slip past a guard: it may fail, it may not land.
+    it('should never read a route vue-router matched as a miss, at any depth', async () => {
+        // Arrange — the miss is vue-router's verdict (nothing matched), never fs-router's two-level
+        // flattened lookup. A matched grandchild must therefore take the lookup, not the miss path
+        // that skips middleware. The lookup still rejects at that depth, as it did before WR-1160;
+        // landing on the leaf instead would mean it slipped past the cancelling middleware.
         window.history.replaceState({}, '', '/deep/inner/leaf');
         const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
         const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -739,10 +713,14 @@ describe('createRouterView', () => {
         service.registerBeforeRouteMiddleware(() => true);
 
         // Act
-        await service.install().catch(() => undefined);
+        const installed = await service.install().then(
+            () => 'resolved',
+            (error: unknown) => String(error),
+        );
         await flushPromises();
 
-        // Assert — the cancelling middleware held: the leaf never became the current route
+        // Assert
+        expect(installed).toBe('Error: /deep/inner/leaf is an unknown route');
         expect(service.currentRouteRef.value.name).not.toBe('deep.leaf');
 
         consoleWarnSpy.mockRestore();

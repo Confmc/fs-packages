@@ -285,8 +285,13 @@ export const createRouterService = <Routes extends RouteRecordRaw[]>(
         // An unmatched URL is a 404, not a failed navigation (WR-1160): let it land on nothing so
         // `RouterView` paints the fallback. The test is vue-router's own verdict, never the
         // flattened lookup below — that sees two levels only, and treating its miss as a 404 would
-        // walk a deeper matched route past every middleware.
-        if (to.matched.length === 0) return undefined;
+        // walk a deeper matched route past every middleware. It is a terminal hop, so it ends any
+        // redirect chain exactly as a clean proceed does.
+        if (to.matched.length === 0) {
+            redirectDepth = 0;
+
+            return undefined;
+        }
 
         const toNormalized = normalizedRouteToSpecificRoute(to);
         const fromNormalized = from.name ? normalizedRouteToSpecificRoute(from) : toNormalized;
