@@ -203,4 +203,222 @@ describe('useValidationErrors', () => {
         expect(result().errors.value).toEqual({});
         expect(consoleError).toHaveBeenCalledOnce();
     });
+
+    // The refusal is raised before the parse, so a 422 the bag cannot hold still reads as one.
+    it('leaves a throwing keyMapper refused with an empty bag and nothing unmapped', () => {
+        const {httpService, triggerError} = createMockHttpService();
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        const keyMapper = () => {
+            throw new Error('mapper blew up');
+        };
+        const {result} = mountComposable(httpService, {keyMapper});
+
+        triggerError(422, VALIDATION_BODY);
+
+        expect(result().refused.value).toBe(true);
+        expect(result().errors.value).toEqual({});
+        expect(result().unmapped.value).toEqual([]);
+        expect(result().refusedUnnamed.value).toBe(true);
+    });
+
+    describe('fields allow-list', () => {
+        it('keeps every key when no allow-list is given', () => {
+            const {httpService, triggerError} = createMockHttpService();
+            const {result} = mountComposable(httpService);
+
+            triggerError(422, {errors: {email: ['Taken'], token: ['Expired']}});
+
+            expect(result().errors.value).toEqual({email: 'Taken', token: 'Expired'});
+            expect(result().unmapped.value).toEqual([]);
+        });
+
+        it('drops a key the allow-list does not name and keeps the ones it does', () => {
+            const {httpService, triggerError} = createMockHttpService();
+            const {result} = mountComposable(httpService, {fields: ['email', 'name']});
+
+            triggerError(422, {errors: {email: ['Taken'], name: ['Required'], token: ['Expired']}});
+
+            expect(result().errors.value).toEqual({email: 'Taken', name: 'Required'});
+            expect(result().unmapped.value).toEqual(['token']);
+        });
+
+        it('matches the allow-list against keyMapper output, not the raw key', () => {
+            const {httpService, triggerError} = createMockHttpService();
+            const keyMapper = (key: string) => (key === 'email_address' ? 'email' : key);
+            const {result} = mountComposable(httpService, {keyMapper, fields: ['email']});
+
+            triggerError(422, {errors: {email_address: ['Taken']}});
+
+            expect(result().errors.value).toEqual({email: 'Taken'});
+            expect(result().unmapped.value).toEqual([]);
+        });
+
+        it('reports a refusal that names no allowed field as refused with an empty bag', () => {
+            const {httpService, triggerError} = createMockHttpService();
+            const {result} = mountComposable(httpService, {fields: ['password']});
+
+            triggerError(422, {errors: {token: ['Expired']}});
+
+            expect(result().refused.value).toBe(true);
+            expect(result().errors.value).toEqual({});
+            expect(result().unmapped.value).toEqual(['token']);
+            expect(result().refusedUnnamed.value).toBe(true);
+        });
+
+        it('keeps the allowed fields of a mixed bag and lists the one it dropped', () => {
+            const {httpService, triggerError} = createMockHttpService();
+            const {result} = mountComposable(httpService, {fields: ['email']});
+
+            triggerError(422, {errors: {email: ['Taken'], token: ['Expired']}});
+
+            expect(result().errors.value).toEqual({email: 'Taken'});
+            expect(result().unmapped.value).toEqual(['token']);
+            expect(result().refusedUnnamed.value).toBe(false);
+        });
+    });
+
+    describe('refusal signal', () => {
+        it('starts neither refused nor unmapped', () => {
+            const {httpService} = createMockHttpService();
+            const {result} = mountComposable(httpService);
+
+            expect(result().refused.value).toBe(false);
+            expect(result().unmapped.value).toEqual([]);
+            expect(result().refusedUnnamed.value).toBe(false);
+        });
+
+        it('is raised by a 422 whose body carries no errors object at all', () => {
+            const {httpService, triggerError} = createMockHttpService();
+            const {result} = mountComposable(httpService);
+
+            triggerError(422, {message: 'nope'});
+
+            expect(result().refused.value).toBe(true);
+            expect(result().refusedUnnamed.value).toBe(true);
+        });
+
+        it('is not raised by a non-422 response', () => {
+            const {httpService, triggerError} = createMockHttpService();
+            const {result} = mountComposable(httpService);
+
+            triggerError(500, VALIDATION_BODY);
+
+            expect(result().refused.value).toBe(false);
+        });
+
+        it('is not raised by an error with no response', () => {
+            const {httpService, triggerBare} = createMockHttpService();
+            const {result} = mountComposable(httpService);
+
+            triggerBare();
+
+            expect(result().refused.value).toBe(false);
+        });
+
+        it('is not unnamed when the bag holds a field', () => {
+            const {httpService, triggerError} = createMockHttpService();
+            const {result} = mountComposable(httpService);
+
+            triggerError(422, VALIDATION_BODY);
+
+            expect(result().refused.value).toBe(true);
+            expect(result().refusedUnnamed.value).toBe(false);
+        });
+
+        it('clearErrors drops the bag, the refusal and the unmapped keys together', () => {
+            const {httpService, triggerError} = createMockHttpService();
+            const {result} = mountComposable(httpService, {fields: ['email']});
+
+            triggerError(422, {errors: {email: ['Taken'], token: ['Expired']}});
+            result().clearErrors();
+
+            expect(result().errors.value).toEqual({});
+            expect(result().refused.value).toBe(false);
+            expect(result().unmapped.value).toEqual([]);
+        });
+
+        it('replaces the unmapped keys of the previous refusal instead of appending', () => {
+            const {httpService, triggerError} = createMockHttpService();
+            const {result} = mountComposable(httpService, {fields: ['email']});
+
+            triggerError(422, {errors: {token: ['Expired']}});
+            triggerError(422, {errors: {code: ['Wrong']}});
+
+            expect(result().unmapped.value).toEqual(['code']);
+        });
+    });
+
+    describe('message list guard', () => {
+        it('skips a bare-string message instead of binding its first character', () => {
+            const {httpService, triggerError} = createMockHttpService();
+            const {result} = mountComposable(httpService);
+
+            triggerError(422, {errors: {email: 'fout', name: ['Required']}});
+
+            expect(result().errors.value).toEqual({name: 'Required'});
+            expect(result().unmapped.value).toEqual(['email']);
+        });
+
+        it('skips an empty message list', () => {
+            const {httpService, triggerError} = createMockHttpService();
+            const {result} = mountComposable(httpService);
+
+            triggerError(422, {errors: {email: []}});
+
+            expect(result().errors.value).toEqual({});
+            expect(result().unmapped.value).toEqual(['email']);
+        });
+
+        it('skips a list whose first entry is not a string', () => {
+            const {httpService, triggerError} = createMockHttpService();
+            const {result} = mountComposable(httpService);
+
+            triggerError(422, {errors: {email: [{text: 'Taken'}]}});
+
+            expect(result().errors.value).toEqual({});
+            expect(result().unmapped.value).toEqual(['email']);
+        });
+
+        it('reports a skipped key under its keyMapper name', () => {
+            const {httpService, triggerError} = createMockHttpService();
+            const keyMapper = (key: string) => key.toUpperCase();
+            const {result} = mountComposable(httpService, {keyMapper});
+
+            triggerError(422, {errors: {email: 'fout'}});
+
+            expect(result().unmapped.value).toEqual(['EMAIL']);
+        });
+    });
+
+    describe('acceptWhen', () => {
+        it('leaves the bag and the refusal untouched while the predicate is false', () => {
+            const {httpService, triggerError} = createMockHttpService();
+            const {result} = mountComposable(httpService, {acceptWhen: () => false});
+
+            triggerError(422, VALIDATION_BODY);
+
+            expect(result().errors.value).toEqual({});
+            expect(result().refused.value).toBe(false);
+        });
+
+        it('binds while the predicate is true', () => {
+            const {httpService, triggerError} = createMockHttpService();
+            const {result} = mountComposable(httpService, {acceptWhen: () => true});
+
+            triggerError(422, VALIDATION_BODY);
+
+            expect(result().errors.value).toEqual({first_name: 'Required'});
+            expect(result().refused.value).toBe(true);
+        });
+
+        it('is not consulted for a non-422', () => {
+            const {httpService, triggerError} = createMockHttpService();
+            const acceptWhen = vi.fn(() => true);
+            mountComposable(httpService, {acceptWhen});
+
+            triggerError(500, VALIDATION_BODY);
+
+            expect(acceptWhen).not.toHaveBeenCalled();
+        });
+    });
 });
