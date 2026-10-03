@@ -50,7 +50,10 @@ describe('createCloudflareGate', () => {
 
     describe('configuration', () => {
         it('should refuse a mistyped header name at construction', () => {
-            expect(() => createCloudflareGate(untyped({header: 'fly-client-up'}))).toThrow(
+            const build = () => createCloudflareGate(untyped({header: 'fly-client-up'}));
+
+            expect(build).toThrow(Error);
+            expect(build).toThrow(
                 '[@script-development/fs-cloudflare] header must be one of "fly-client-ip". Received: "fly-client-up"',
             );
         });
@@ -82,6 +85,46 @@ describe('createCloudflareGate', () => {
                 );
             },
         );
+
+        it.each([
+            ['header', null, 'header must be one of "fly-client-ip". Received: null'],
+            ['header', 42, 'header must be one of "fly-client-ip". Received: 42'],
+            ['source', null, 'source must be one of "header", "socket". Received: null'],
+            ['missingHeader', null, 'missingHeader must be one of "deny", "allow". Received: null'],
+        ])('should refuse %s: %j instead of reading it as the default', (option, value, message) => {
+            expect(() => createCloudflareGate(untyped({[option]: value}))).toThrow(
+                `[@script-development/fs-cloudflare] ${message}`,
+            );
+        });
+
+        it.each([[null], ['/health'], [['/health', 42]]])(
+            'should refuse exemptPaths: %j at construction',
+            (exemptPaths) => {
+                expect(() => createCloudflareGate(untyped({exemptPaths}))).toThrow(
+                    '[@script-development/fs-cloudflare] exemptPaths must be an array of strings',
+                );
+            },
+        );
+
+        it.each([null, 'warn', {}])('should refuse onMissingHeader: %j at construction', (onMissingHeader) => {
+            expect(() => createCloudflareGate(untyped({onMissingHeader}))).toThrow(
+                '[@script-development/fs-cloudflare] onMissingHeader must be a function',
+            );
+        });
+
+        it('should read an option explicitly set to undefined as the default', () => {
+            const gate = createCloudflareGate({
+                exemptPaths: undefined,
+                header: undefined,
+                missingHeader: undefined,
+                onMissingHeader: undefined,
+                source: undefined,
+            });
+
+            expectForbidden(invoke(gate, createRequest('/')));
+            expectForbidden(invoke(gate, createRequest('/', {'fly-client-ip': OTHER_IPV4}, {remoteAddress: CF_IPV4})));
+            expectAllowed(invoke(gate, createRequest('/', {'fly-client-ip': CF_IPV4})));
+        });
 
         it('should construct with every option at its documented value', () => {
             expect(() =>

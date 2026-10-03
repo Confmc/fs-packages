@@ -75,8 +75,11 @@ Returns `{middleware, isCloudflareAddress}`.
 | `onMissingHeader` | none              | Called with the request for every `'header'`-mode request without the header  |
 | `source`          | `'header'`        | Where the client IP comes from: `'header'` or `'socket'`                      |
 
-An unrecognised `header`, `source` or `missingHeader` throws when the gate is built. Each of them
-chooses between a closed and an open gate, so a typo must not reach a request.
+Every option is validated when the gate is built, and only an omitted (`undefined`) option takes its
+default: `null`, a non-string `header`, an `exemptPaths` that is not an array of strings and an
+`onMissingHeader` that is not a function all throw, as does an unrecognised `header`, `source` or
+`missingHeader`. Each of them can turn a closed gate into an open one, so a bad value must not reach a
+request.
 
 - `middleware(req, res, next)` — Express 4/5 compatible handler; calls `next()` or `res.sendStatus(403)`.
 - `isCloudflareAddress(value)` — the range check on its own, for health endpoints or diagnostics.

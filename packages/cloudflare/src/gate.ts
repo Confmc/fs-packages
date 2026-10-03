@@ -18,16 +18,32 @@ const HEADERS: readonly CloudflareGateHeader[] = ['fly-client-ip'];
 const SOURCES: readonly CloudflareGateSource[] = ['header', 'socket'];
 const MISSING_HEADER_POLICIES: readonly CloudflareGateMissingHeader[] = ['deny', 'allow'];
 
-// The options reach JavaScript consumers unchecked, and every one of them selects between a closed and
-// an open gate, so an unrecognised value throws here instead of degrading at request time.
-const oneOf = <T extends string>(option: string, allowed: readonly T[], value: string): T => {
+// The options reach JavaScript consumers unchecked, and every one of them can turn a closed gate into an
+// open one, so only `undefined` means "not given": any other value, `null` included, must be valid or the
+// factory throws instead of degrading at request time.
+const invalid = (message: string): Error => new Error(`[@script-development/fs-cloudflare] ${message}`);
+
+const oneOf = <T extends string>(option: string, allowed: readonly T[], value: unknown): T => {
     const match = allowed.find((candidate) => candidate === value);
     if (match !== undefined) return match;
 
     const expected = allowed.map((candidate) => JSON.stringify(candidate)).join(', ');
-    throw new Error(
-        `[@script-development/fs-cloudflare] ${option} must be one of ${expected}. Received: ${JSON.stringify(value)}`,
-    );
+    throw invalid(`${option} must be one of ${expected}. Received: ${JSON.stringify(value)}`);
+};
+
+const readExemptPaths = (value: unknown): Set<string> => {
+    if (value === undefined) return new Set();
+    if (!Array.isArray(value) || !value.every((path) => typeof path === 'string')) {
+        throw invalid(`exemptPaths must be an array of strings. Received: ${JSON.stringify(value)}`);
+    }
+
+    return new Set(value);
+};
+
+const readReporter = (value: unknown): CloudflareGateOptions['onMissingHeader'] => {
+    if (value === undefined || typeof value === 'function') return value as CloudflareGateOptions['onMissingHeader'];
+
+    throw invalid(`onMissingHeader must be a function. Received: ${JSON.stringify(value)}`);
 };
 
 const addSubnets = (blockList: BlockList, ranges: string[], family: 'ipv4' | 'ipv6'): void => {
@@ -46,12 +62,12 @@ const buildBlockList = (): BlockList => {
 };
 
 export const createCloudflareGate = (options: CloudflareGateOptions = {}): CloudflareGate => {
-    const header = oneOf('header', HEADERS, (options.header ?? 'fly-client-ip').toLowerCase());
-    const readSocket = oneOf('source', SOURCES, options.source ?? 'header') === 'socket';
-    const admitMissingHeader =
-        oneOf('missingHeader', MISSING_HEADER_POLICIES, options.missingHeader ?? 'deny') === 'allow';
-    const {onMissingHeader} = options;
-    const exemptPaths = new Set(options.exemptPaths);
+    const {header: rawHeader = 'fly-client-ip', source = 'header', missingHeader = 'deny'} = options;
+    const header = oneOf('header', HEADERS, typeof rawHeader === 'string' ? rawHeader.toLowerCase() : rawHeader);
+    const readSocket = oneOf('source', SOURCES, source) === 'socket';
+    const admitMissingHeader = oneOf('missingHeader', MISSING_HEADER_POLICIES, missingHeader) === 'allow';
+    const onMissingHeader = readReporter(options.onMissingHeader);
+    const exemptPaths = readExemptPaths(options.exemptPaths);
     const blockList = buildBlockList();
 
     const isCloudflareAddress = (value: string): boolean => {
