@@ -47,7 +47,7 @@
 </template>
 
 <script setup lang="ts" generic="T extends SelectItem">
-import {onMounted, useTemplateRef} from 'vue';
+import {nextTick, onMounted, useTemplateRef} from 'vue';
 
 import type {LabelKey, SelectItem} from '../types';
 
@@ -106,8 +106,15 @@ const labelOf = (option: T): string =>
         ? optionLabel(option)
         : String((option as Record<PropertyKey, unknown>)[optionLabel as PropertyKey]);
 
-// The model follows the native change event (keyboard arrows and clicks both land here).
+// The model follows the native change event (keyboard arrows and clicks both land here). The browser
+// has already moved the checked radio, so once the host has rendered every radio is set back to the
+// model — a declined or deferred change otherwise leaves the clicked one showing (WR-1922).
 const onChange = (value: T['id']): void => {
+    const fieldset = ensureRefValueExists(group);
     model.value = value;
+    void nextTick(() => {
+        const radios = fieldset.querySelectorAll<HTMLInputElement>('.ui-radio__input');
+        for (const [index, radio] of radios.entries()) radio.checked = model.value === options[index].id;
+    });
 };
 </script>

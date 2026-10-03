@@ -34,7 +34,7 @@
 </template>
 
 <script setup lang="ts">
-import {onMounted, useTemplateRef} from 'vue';
+import {nextTick, onMounted, useTemplateRef} from 'vue';
 
 import {warnWhenUnnamed} from '../internal/accessible-name';
 import {guardWhileDisabled} from '../internal/disabled-guard';
@@ -87,8 +87,14 @@ const model = defineModel<boolean>({required: true});
 
 guardWhileDisabled(input, () => disabled);
 
-// change (not input) is the native checkbox commit event.
+// change (not input) is the native checkbox commit event. The browser has already flipped the input,
+// and a host that declines or decides later leaves the model where it was, so Vue never re-patches
+// `checked` (WR-1922): once the host has rendered, the input is set back to the model.
 const onChange = (event: Event): void => {
-    model.value = (event.target as HTMLInputElement).checked;
+    const control = event.target as HTMLInputElement;
+    model.value = control.checked;
+    void nextTick(() => {
+        control.checked = model.value;
+    });
 };
 </script>

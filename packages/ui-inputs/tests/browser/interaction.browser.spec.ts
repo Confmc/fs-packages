@@ -598,6 +598,44 @@ describe('checkbox family — a disabled control runs no consumer listener (WR-0
     }
 });
 
+/** WR-1922 with a real pointer — the happy-dom suite owns the full matrix (declined-change.spec.ts). */
+describe('checkbox family — a real click the host declines leaves the model showing (WR-1922)', () => {
+    const renderDeclining = async (component: unknown, props: Record<string, unknown>) => {
+        await render(
+            defineComponent(
+                () => () =>
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFC in a render-fn host
+                    h(component as any, {...props, 'onUpdate:modelValue': () => {}}),
+            ),
+        );
+        await new Promise((resolve) => setTimeout(resolve, 5));
+    };
+
+    it('Switch goes back to off', async () => {
+        await renderDeclining(Switch, {id: 'decline', label: 'Notify', modelValue: false});
+        const input = document.getElementById('decline') as HTMLInputElement;
+
+        await userEvent.click(input);
+
+        await expect.poll(() => input.checked).toBe(false);
+    });
+
+    it('RadioGroup puts the check back on the committed radio', async () => {
+        await renderDeclining(RadioGroup, {
+            id: 'decline',
+            label: 'Fruit',
+            options: FRUITS,
+            optionLabel: 'name',
+            modelValue: 1,
+        });
+        const radios = [...document.querySelectorAll<HTMLInputElement>('#decline input')];
+
+        await userEvent.click(radios[1]);
+
+        await expect.poll(() => radios.map((radio) => radio.checked)).toEqual([true, false, false]);
+    });
+});
+
 /** Mount a Pressable with a spy click handler; returns the recorded activation count. */
 const renderPressable = async (props: Record<string, unknown>) => {
     const clicks = ref(0);

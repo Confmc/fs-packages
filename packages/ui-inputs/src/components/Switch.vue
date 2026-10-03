@@ -28,7 +28,7 @@
 </template>
 
 <script setup lang="ts">
-import {onMounted, useTemplateRef} from 'vue';
+import {nextTick, onMounted, useTemplateRef} from 'vue';
 
 import {warnWhenUnnamed} from '../internal/accessible-name';
 import {guardWhileDisabled} from '../internal/disabled-guard';
@@ -72,8 +72,13 @@ const model = defineModel<boolean>({required: true});
 
 guardWhileDisabled(input, () => disabled);
 
-// change (not input) is the native checkbox commit event.
+// change (not input) is the native checkbox commit event; the input follows the model once the host
+// has rendered, for the reason Checkbox gives (WR-1922).
 const onChange = (event: Event): void => {
-    model.value = (event.target as HTMLInputElement).checked;
+    const control = event.target as HTMLInputElement;
+    model.value = control.checked;
+    void nextTick(() => {
+        control.checked = model.value;
+    });
 };
 </script>

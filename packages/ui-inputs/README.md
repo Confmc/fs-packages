@@ -291,6 +291,13 @@ nothing selected, the SingleSelect shape). The fieldset carries `role="radiogrou
 unlike plain `group` — legitimately carries `aria-required`, so here the attribute is the
 group-level conveyance.
 
+**A change you decline or defer does not stay on screen.** The browser flips a checkbox or moves a radio before
+you have decided, so a host that declines the change (asks first) or decides later (awaits a save)
+used to leave the control showing the browser's state. Once your `update:modelValue` handler has run
+and the host has rendered, each control sets its input back to the bound value: a declined change
+goes back, a deferred one shows the old value until you commit it, and a change you take at once
+behaves as before.
+
 **A disabled control runs none of your `click`, `input` or `change` listeners** — the rule
 `Pressable` and `Disclosure` keep (below). The browser withholds these events only for _user_
 interaction: a dispatched `change` runs every listener on a disabled input, and a dispatched click
