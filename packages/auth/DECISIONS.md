@@ -321,10 +321,17 @@ this store.
 
 _Fix round 1, 2026-09-14._
 
-`state` and `user` are written **together**. Writing the machine to `signed_out`
+`state` and `user` are one value. Since 0.3.0 they are a single snapshot,
+assigned in one statement (D24), so no reader, including a synchronous
+watcher, can see one without the other. Writing the machine to `signed_out`
 without clearing `user` leaves the previous identity readable behind a dead
 session, and a shell keeps rendering a name for somebody who is gone. Every
-sign-out path now runs through one of two functions, and both write both.
+sign-out path runs through `clearSession`, which assigns both.
+
+_Narrowed 2026-10-03 (D24)._ Until 0.2.0 this entry said the two were "written
+together". That was true per function and false per statement: they were two
+assignments, and a `watch(…, {flush: 'sync'})` ran between them. The WR-1610
+table measured 203 rows in which a synchronous observer saw a torn pair.
 
 And every exit **out of `authenticated` into `signed_out`** goes through
 `endSession` exactly once, so the consumer hears about it. That was already true
@@ -838,6 +845,10 @@ left it — `signed_out`, no user — which is the truthful end state rather tha
 repaired one. On the second, the read answers `undefined` and the newer read's
 answer lands.
 
+_Superseded by D24 (0.3.0): there is no longer a `user` write separate from
+the machine's, so the residual below and the third check that produced it are
+gone. Kept as the record of what 0.2.0 accepted._
+
 **The residual, stated because it is real:** the `user` write has already
 happened when this check fires, so an overtaken read can leave a _newer identity
 behind an unmoved machine_ for as long as the read that overtook it is in
@@ -846,6 +857,10 @@ is exposed as signed in — and the newer read resolves it. Writing `state` firs
 instead would trade this for the round-1 defect (a `state` watcher observing
 `authenticated` with the previous identity still readable), which is worse; the
 order stays as D14 has it.
+
+_Superseded by D24 (0.3.0, WR-1610): the class this paragraph left open is
+closed by construction, and measured closed by the re-entry table. Kept, not
+deleted, because it is the trigger D24 answers._
 
 **This is the fifth concurrency finding on this file, and the class is not
 claimed closed.** Fix round 3 (D17), rounds 4–5 (D19), round 7 (D19's `me`
@@ -934,3 +949,84 @@ The consumer's side of it, stated once so it is not folklore: **a consumer that
 mutates payloads clones in `parseUser`.** That is the one place with both the
 type and the knowledge to do it, and a guard that returns a fresh object breaks
 the alias for every reader at once.
+
+## D24 — One snapshot, written once, last
+
+_2026-10-03, WR-1610 spike, 0.3.0, breaking. Commander ruling on the carve-out
+the same day._
+
+**The model.** `state` and `user` live in one `shallowRef<{state, user}>`, and
+`state`, `user` and `isAuthenticated` are derived from it. Every path **decides
+the whole snapshot first and assigns it once, as its last statement**: a read
+after its epoch checks, `clearSession` after it takes its ticket, the outage
+branch and `setUser`. `onSessionEnd` listeners still run after the write. A
+synchronous consumer effect fires inside that one assignment, so whatever it
+does is news about the machine AFTER the operation. The operation has no
+statement left for the effect to interleave with, and its answer is its own
+decision: `loadSession()` answers what it wrote, and `login()` answers from its
+settled read's decision, never from the machine read back after the await.
+
+**What D23's three checks became.** The check after the `await` stays, on each
+continuation, because it guards an asynchronous boundary. The check after
+`parseUser` stays, because `parseUser` is consumer code that runs BEFORE the
+decision, and a re-entrant read it starts must stop this one before it writes
+anything. The third check, between the `user` write and the `state` write, is
+deleted: there is no second write for it to sit between. No check follows a
+write anywhere. A check after a write would be the hybrid the spike's sealed
+conditions banned, and it is how this file grew a check per round.
+
+**The evidence is a table, not an argument.** `tests/session-store.reentry.spec.ts`
+crosses 13 operations (each `loadSession()` shape from `loading` and from
+`authenticated`, the login confirm, logout 2xx and 401, and expiry from
+`authenticated` and from `outage`), 7 sites where consumer code runs
+synchronously (`parseUser`, sync watchers on `state`, `user`,
+`isAuthenticated` and `[state, user]`, an `onSessionEnd` listener, a
+response-error middleware ahead of the package's), and 6 re-entrant actions.
+Its expectations come from an oracle over what each operation DECIDED, against
+a server model, so no row can be red because of an answer a server could not
+give. **546 generated, 245 pruned as unreachable (each with a reason), 301 run:
+217 red on 0.2.0, 0 red on 0.3.0.** Every row also asserts that its site fired,
+so a mis-pruned row cannot pass silently. Planting the round-2 defect back into
+0.2.0 reproduces D23's worst state in the table.
+
+**The honest split of the 217.**
+
+- **203 rows are torn-pair rows.** A synchronous observer saw `loading` or
+  `signed_out` with a user present. On a read that is the new identity behind a
+  machine that has not moved yet, which is the shape D23 accepted as a
+  safe-direction residual. On a sign-out it is the mirror: the previous identity
+  behind a machine that has already moved. The spike held both stricter than
+  D23 did, because consumers write sync watchers over both halves. lokalekeuze's
+  employer store does, its comment claimed no reader saw the two apart, and it
+  was red on 7 of 13 operations.
+- **16 rows are behavioural defects:**
+    - **8:** `login()` answered `unconfirmed` for a login its confirm had
+      authenticated, because it read the machine back after a consumer effect
+      moved it.
+    - **4:** a consumer's `handleSessionExpired()` from a `user` watcher was
+      silently dropped, because `state` still read `loading` or `signed_out`.
+    - **4:** a consumer's `setUser()` from the same place threw `TypeError`.
+
+**The carve-out ruling.** Two pre-existing specs had to change, one assertion
+each. They were "leaves a session an effect ended during the user write
+exactly as it was ended" (`expect(read).toBeUndefined()`) and "answers nothing
+for a read a watcher on the user overtook…" (`expect(outer).toBeUndefined()`).
+Neither is one of the kinds the spike's carve-out enumerated. The Commander
+ruled them inside it by its stated reason: **their answer was a symptom of the
+two-write intermediate state.** The read had been interrupted mid-write, so
+`undefined` was the only answer it could give. Under one write it completes
+before the effect runs and answers what it wrote, exactly as the `state`-watcher
+spec has pinned since D23. Their machine-state assertions are unchanged and
+still hold: the ended session stays ended with no user and one event, and the
+newer read still lands.
+
+**What it costs.** Observable changes, listed in the 0.3.0 CHANGELOG entry:
+watcher invocation counts, the answers of re-entered reads and logins, and
+`store.user.value` no longer being `reactive` (still readonly). WR-1442 is not
+expressed by this model. Ordering an older logout behind a newer login needs a
+mutation counter beside the read epoch, and it conflicts with D1, so it stays
+deferred (D18 b). Its two table rows are kept as `it.fails`.
+
+**The rule for the next finding on this file.** File it as a row in the
+re-entry table first, as an operation, a site and an action. If the row is red,
+the model is what is wrong, and the answer is never another epoch check.
