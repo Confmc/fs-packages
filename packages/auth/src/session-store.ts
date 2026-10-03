@@ -1,7 +1,7 @@
 import type {Ref} from 'vue';
 
 import {isAxiosError} from '@script-development/fs-http';
-import {computed, readonly, ref} from 'vue';
+import {computed, readonly, shallowRef} from 'vue';
 
 import type {
     CreateSessionStoreConfig,
@@ -45,6 +45,16 @@ interface SupersededOutcome {
 }
 
 type MeOutcome = MeAnswer | SupersededOutcome;
+
+/**
+ * The machine and the identity it names, held as ONE value. A consumer's
+ * synchronous watcher runs inside an assignment, so two assignments leave a gap
+ * in which it sees — and can act on — a pair no path ever decided (D24).
+ */
+interface Session<TUser> {
+    readonly state: SessionState;
+    readonly user: TUser | undefined;
+}
 
 /**
  * Default sink for a failing session-end listener: loud, and it does not
@@ -104,8 +114,7 @@ export const createSessionStore = <TUser, TCredentials = Record<string, unknown>
             : [endpoints.me, endpoints.login, endpoints.logout, config.csrf.primeUrl],
     );
 
-    const state = ref<SessionState>('loading');
-    const user = ref<TUser | undefined>() as Ref<TUser | undefined>;
+    const session = shallowRef<Session<TUser>>({state: 'loading', user: undefined});
     /*
      * One entry per REGISTRATION, not per function. Keyed on the function itself,
      * two components sharing one module-level handler collapsed into a single
@@ -131,11 +140,7 @@ export const createSessionStore = <TUser, TCredentials = Record<string, unknown>
     };
 
     /*
-     * `state` and `user` are written together, always. Writing one without the
-     * other leaves the previous identity readable behind a signed-out machine —
-     * the shell keeps rendering a name for a session that is gone.
-     *
-     * And the epoch advances BEFORE either write. A `me` already in flight when
+     * The epoch advances BEFORE the write. A `me` already in flight when
      * the session ended would otherwise still hold a live ticket, land afterwards
      * and commit `authenticated` over a session the server has closed — handing
      * back guarded access on the strength of an answer that predates the sign-out
@@ -144,8 +149,7 @@ export const createSessionStore = <TUser, TCredentials = Record<string, unknown>
     const clearSession = (): void => {
         nextEpoch();
 
-        state.value = 'signed_out';
-        user.value = undefined;
+        session.value = {state: 'signed_out', user: undefined};
     };
 
     /*
@@ -154,7 +158,7 @@ export const createSessionStore = <TUser, TCredentials = Record<string, unknown>
      * that ends it is a transition a consumer has to hear about. `loading` and
      * `signed_out` hold nothing.
      */
-    const holdsSession = (): boolean => state.value === 'authenticated' || state.value === 'outage';
+    const holdsSession = (): boolean => session.value.state === 'authenticated' || session.value.state === 'outage';
 
     /*
      * The transition out of a live session: clears it, then tells the consumer
@@ -251,7 +255,7 @@ export const createSessionStore = <TUser, TCredentials = Record<string, unknown>
 
                 /*
                  * The branch decided `signed_out` and `endSession` wrote it through
-                 * `clearSession`, unconditionally. Reading `state.value` back here
+                 * `clearSession`, unconditionally. Reading the machine back here
                  * instead would report whatever a SYNCHRONOUS consumer effect left —
                  * a `watch(…, {flush: 'sync'})` fires inside the assignment — which
                  * is the machine's later news and not this read's answer (D23).
@@ -265,7 +269,7 @@ export const createSessionStore = <TUser, TCredentials = Record<string, unknown>
              * good and a shell can keep naming it behind a notice; clearing it
              * would render a broken API as a sign-out by another route.
              */
-            state.value = 'outage';
+            session.value = {state: 'outage', user: session.value.user};
 
             return {status, body, state: 'outage'};
         }
@@ -287,32 +291,18 @@ export const createSessionStore = <TUser, TCredentials = Record<string, unknown>
          */
         if (issued !== ticket) return SUPERSEDED;
 
-        let wrote: SessionState;
-
-        if (parsed === undefined) {
-            wrote = 'outage';
-        } else {
-            // `user` before the machine, so a synchronous effect on `state` cannot
-            // observe `authenticated` with the previous identity still readable.
-            user.value = parsed;
-            wrote = 'authenticated';
-        }
-
         /*
-         * The THIRD re-entry point, and the last one this read owns: the `user`
-         * write above is itself observable, so a `watch(store.user, …,
-         * {flush: 'sync'})` runs between it and the machine. An effect that ends
-         * the session there took a ticket, and writing `wrote` over it would
-         * report `authenticated` with no user, after the consumer was told the
-         * session was over. An effect that starts a newer read took one too, and
-         * this read has no answer to give (D23, crit `6ecd750b40bc` /
-         * `fff70bd50c2d`).
+         * Decided whole, then written once, as the last thing this read does: a
+         * synchronous effect of the write is news about the machine AFTER this
+         * read, and there is no statement left here for it to interleave with
+         * (D24). An outage retains the identity (D14).
          */
-        if (issued !== ticket) return SUPERSEDED;
+        const next: Session<TUser> =
+            parsed === undefined ? {state: 'outage', user: session.value.user} : {state: 'authenticated', user: parsed};
 
-        state.value = wrote;
+        session.value = next;
 
-        return {status: response.status, body: response.data, state: wrote};
+        return {status: response.status, body: response.data, state: next.state};
     };
 
     /** Every read this store makes goes through here, so `latestRead` is never behind one. */
@@ -362,7 +352,7 @@ export const createSessionStore = <TUser, TCredentials = Record<string, unknown>
 
     return {
         guard,
-        state: readonly(state),
+        state: computed(() => session.value.state),
         /*
          * `readonly()` maps a generic through `DeepReadonly`, which does not reduce
          * for an unresolved `TUser` — so the assertion is what keeps the consumer's
@@ -370,15 +360,17 @@ export const createSessionStore = <TUser, TCredentials = Record<string, unknown>
          * value is still Vue's readonly proxy and still refuses a write, and the
          * declared `Readonly<Ref<…>>` still refuses one at compile time (D10).
          */
-        user: readonly(user) as Readonly<Ref<TUser | undefined>>,
-        isAuthenticated: computed(() => state.value === 'authenticated'),
+        user: computed(() => readonly(session).value.user) as Readonly<Ref<TUser | undefined>>,
+        isAuthenticated: computed(() => session.value.state === 'authenticated'),
 
         setUser(next) {
-            if (state.value !== 'authenticated') {
-                throw new TypeError(`fs-auth: setUser called while the session is '${state.value}', not authenticated`);
+            if (session.value.state !== 'authenticated') {
+                throw new TypeError(
+                    `fs-auth: setUser called while the session is '${session.value.state}', not authenticated`,
+                );
             }
 
-            user.value = next;
+            session.value = {state: 'authenticated', user: next};
         },
 
         async loadSession(): Promise<SessionRead | undefined> {
@@ -425,7 +417,7 @@ export const createSessionStore = <TUser, TCredentials = Record<string, unknown>
 
             const me = await readUntilSettled();
 
-            if (state.value === 'authenticated') return {kind: 'authenticated'};
+            if (me.state === 'authenticated') return {kind: 'authenticated'};
 
             /*
              * The POST was accepted and the confirm did not establish a session.

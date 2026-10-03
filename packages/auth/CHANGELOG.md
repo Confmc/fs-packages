@@ -1,5 +1,17 @@
 # @script-development/fs-auth
 
+## 0.3.0 — 2026-10-03
+
+### Minor Changes
+
+- **Breaking (behaviour):** `state` and `user` are one snapshot, written in one assignment. Consumer code that runs synchronously inside the store's own writes (`watch(…, {flush: 'sync'})`, `parseUser`, `onSessionEnd` listeners) can no longer see or act on a half-written session. See `DECISIONS.md` D24 (WR-1610). Observable differences:
+    1. **Sync watchers fire once per transition, not twice.** A `watch([state, user], …, {flush: 'sync'})` drops from 2 invocations to 1 on login, on every sign-out from a session that has a user, and on authentication from `loading` or `signed_out`.
+    2. **No observer ever sees a torn pair.** A `state` watcher on sign-out no longer sees the previous user. A `user` watcher on sign-in no longer sees `loading` or `signed_out`.
+    3. **A consumer acting from a `user` watcher acts on the decided state.** There, `handleSessionExpired()` now ends the session (it was silently ignored), and `setUser()` now succeeds (it threw `TypeError`).
+    4. **`loadSession()` answers what it wrote when a watcher on `user` ends the session or starts a newer read inside the write.** It now answers `{state: 'authenticated', …}`, where it answered `undefined`. The machine and the events are unchanged.
+    5. **`login()` answers `authenticated` when its confirm decided `authenticated`,** even if a consumer's sync effect then signed out or started a logout. It answered `unconfirmed` with the confirm's 200.
+    6. **`store.state` and `store.user` are `computed` refs instead of `readonly(ref)`.** Reads, reactivity and compile-time write refusal are unchanged, and a runtime write still does nothing beyond a dev warning. `user.value` is still a readonly proxy, but it is no longer also `reactive`: `isReactive(store.user.value)` goes from `true` to `false`.
+
 ## 0.2.0
 
 ### Minor Changes
