@@ -2,10 +2,12 @@
     <!-- role="radiogroup" (overriding fieldset's implicit `group`) because radiogroup — unlike
          group — legitimately carries aria-required, giving the group-level required conveyance
          as a real attribute; the legend still names the fieldset. ONE described-by story: the
-         error IDREF lives on the fieldset only. -->
+         error IDREF lives on the fieldset only. The disabled guard sits on the fieldset for the
+         reason CheckboxGroup gives. -->
     <fieldset
         :id="id"
         ref="group"
+        v-guard-while-disabled="disabled"
         class="ui-radio-group"
         role="radiogroup"
         :aria-required="required || undefined"
@@ -47,11 +49,12 @@
 </template>
 
 <script setup lang="ts" generic="T extends SelectItem">
-import {onMounted, useTemplateRef} from 'vue';
+import {nextTick, onMounted, useTemplateRef} from 'vue';
 
 import type {LabelKey, SelectItem} from '../types';
 
 import {warnWhenUnnamed} from '../internal/accessible-name';
+import {vGuardWhileDisabled} from '../internal/disabled-guard';
 import {ensureRefValueExists} from '../internal/reactivity';
 
 const {
@@ -102,11 +105,15 @@ const labelOf = (option: T): string =>
         ? optionLabel(option)
         : String((option as Record<PropertyKey, unknown>)[optionLabel as PropertyKey]);
 
-// The model follows the native change event (keyboard arrows and clicks both land here). The
-// disabled guard keeps synthetic dispatch honest — a real browser never fires change on a
-// disabled control.
+// The model follows the native change event (keyboard arrows and clicks both land here). The browser
+// has already moved the checked radio, so once the host has rendered every radio is set back to the
+// model — a declined or deferred change otherwise leaves the clicked one showing (WR-1922).
 const onChange = (value: T['id']): void => {
-    if (disabled) return;
+    const fieldset = ensureRefValueExists(group);
     model.value = value;
+    void nextTick(() => {
+        const radios = fieldset.querySelectorAll<HTMLInputElement>('.ui-radio__input');
+        for (const [index, radio] of radios.entries()) radio.checked = model.value === options[index].id;
+    });
 };
 </script>

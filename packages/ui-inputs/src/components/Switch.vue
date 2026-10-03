@@ -7,6 +7,7 @@
             <input
                 :id="id"
                 ref="input"
+                v-guard-while-disabled="disabled"
                 v-bind="$attrs"
                 type="checkbox"
                 role="switch"
@@ -28,9 +29,10 @@
 </template>
 
 <script setup lang="ts">
-import {onMounted, useTemplateRef} from 'vue';
+import {nextTick, onMounted, useTemplateRef} from 'vue';
 
 import {warnWhenUnnamed} from '../internal/accessible-name';
+import {vGuardWhileDisabled} from '../internal/disabled-guard';
 import {ensureRefValueExists} from '../internal/reactivity';
 
 // The root is the <label> (implicit labelling), so attrs are re-aimed at the native input —
@@ -69,10 +71,13 @@ const {
 // has no mixed state).
 const model = defineModel<boolean>({required: true});
 
-// change (not input) is the native checkbox commit event. The disabled guard keeps synthetic
-// dispatch honest — a real browser never fires change on a disabled control.
+// change (not input) is the native checkbox commit event; the input follows the model once the host
+// has rendered, for the reason Checkbox gives (WR-1922).
 const onChange = (event: Event): void => {
-    if (disabled) return;
-    model.value = (event.target as HTMLInputElement).checked;
+    const control = event.target as HTMLInputElement;
+    model.value = control.checked;
+    void nextTick(() => {
+        control.checked = model.value;
+    });
 };
 </script>
