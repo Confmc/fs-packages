@@ -26,7 +26,10 @@ export interface CloudflareGateOptions {
     header?: CloudflareGateHeader;
     /** Default `'deny'`. */
     missingHeader?: CloudflareGateMissingHeader;
-    /** Called for every `'header'`-mode request without the header, before `missingHeader` applies. Not called for exempt paths. */
+    /**
+     * Called for every `'header'`-mode request without the header, before `missingHeader` applies. Not called for exempt paths.
+     * Must be synchronous: a returned promise is refused with an error, because its failure would arrive after the decision.
+     */
     onMissingHeader?: (req: CloudflareGateRequest) => void;
     /** Default `'header'`. */
     source?: CloudflareGateSource;

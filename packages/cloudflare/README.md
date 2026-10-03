@@ -130,6 +130,11 @@ is never reported. Local development does not need the opt-in either, because th
 mounted where you switch it on. If private-network callers must reach gated paths, opt in with
 `missingHeader: 'allow'`: the request then passes, and `onMissingHeader` is still called for it. A
 reporter that throws admits nothing — the error reaches your error handler instead of `next()`.
+The reporter must be synchronous. The gate decides before it calls `next()`, so a promise's
+rejection would arrive after the request was already admitted: a reporter that returns a promise is
+refused with an error on every request it reports, under either policy, and the promise's own
+rejection is absorbed so it cannot crash the process as an unhandled rejection. Log synchronously,
+or hand the event to a queue your logger drains.
 Accepted caveat: over 6PN/WireGuard the header is caller-chosen, so the gate is not a defence against
 an attacker who is already inside the private network.
 

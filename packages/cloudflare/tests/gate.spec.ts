@@ -239,6 +239,58 @@ describe('createCloudflareGate', () => {
             expect(next).not.toHaveBeenCalled();
         });
 
+        it.each(['allow', 'deny'] as const)(
+            'should refuse an asynchronous reporter whose rejection would arrive after the decision (%s)',
+            async (missingHeader) => {
+                const gate = createCloudflareGate({
+                    missingHeader,
+                    onMissingHeader: async () => {
+                        throw new Error('logger down');
+                    },
+                });
+                const next = vi.fn();
+                const sendStatus = vi.fn();
+
+                expect(() => gate.middleware(createRequest('/'), {sendStatus}, next)).toThrow(
+                    '[@script-development/fs-cloudflare] onMissingHeader must be synchronous: it returned a promise',
+                );
+                expect(next).not.toHaveBeenCalled();
+                expect(sendStatus).not.toHaveBeenCalled();
+
+                // The rejection must be handled by the gate: vitest fails the run on an unhandled one.
+                await new Promise((resolve) => setTimeout(resolve, 0));
+            },
+        );
+
+        it('should refuse a reporter returning a callable thenable', () => {
+            // eslint-disable-next-line unicorn/no-thenable -- a function carrying `then` is the thenable shape under test
+            const thenable = Object.assign(() => undefined, {then: (_: unknown, reject: () => void) => reject()});
+            const gate = createCloudflareGate({missingHeader: 'allow', onMissingHeader: () => thenable as never});
+            const next = vi.fn();
+
+            expect(() => gate.middleware(createRequest('/'), {sendStatus: vi.fn()}, next)).toThrow(
+                'onMissingHeader must be synchronous',
+            );
+            expect(next).not.toHaveBeenCalled();
+        });
+
+        it('should refuse an asynchronous reporter even when its promise resolves', () => {
+            const gate = createCloudflareGate({missingHeader: 'allow', onMissingHeader: async () => undefined});
+            const next = vi.fn();
+
+            expect(() => gate.middleware(createRequest('/'), {sendStatus: vi.fn()}, next)).toThrow(Error);
+            expect(next).not.toHaveBeenCalled();
+        });
+
+        it.each([null, 42, {}, () => undefined])(
+            'should read a reporter return value of %j as synchronous',
+            (returned) => {
+                const gate = createCloudflareGate({missingHeader: 'allow', onMissingHeader: () => returned as never});
+
+                expectAllowed(invoke(gate, createRequest('/')));
+            },
+        );
+
         it('should not report a request that carries the header, whatever its address', () => {
             const onMissingHeader = vi.fn();
             const gate = createCloudflareGate({onMissingHeader});

@@ -31,6 +31,11 @@ const oneOf = <T extends string>(option: string, allowed: readonly T[], value: u
     throw invalid(`${option} must be one of ${expected}. Received: ${JSON.stringify(value)}`);
 };
 
+const isThenable = (value: unknown): value is PromiseLike<unknown> =>
+    (typeof value === 'object' || typeof value === 'function') &&
+    value !== null &&
+    typeof (value as {then?: unknown}).then === 'function';
+
 const readExemptPaths = (value: unknown): Set<string> => {
     if (value === undefined) return new Set();
     if (!Array.isArray(value) || !value.every((path) => typeof path === 'string')) {
@@ -90,8 +95,16 @@ export const createCloudflareGate = (options: CloudflareGateOptions = {}): Cloud
 
         // Absence looks the same whether the request came over a private network or the proxy stopped
         // writing the header, so it is reported before the policy decides, and a throwing reporter admits nothing.
+        // The decision is synchronous, so a reporter returning a promise could only fail after the request was
+        // admitted: that is refused, and its rejection is handled here so it cannot surface as an unhandled one.
         if (address === undefined) {
-            onMissingHeader?.(req);
+            const reported: unknown = onMissingHeader?.(req);
+            if (isThenable(reported)) {
+                reported.then(undefined, () => undefined);
+                throw invalid(
+                    'onMissingHeader must be synchronous: it returned a promise, whose failure would arrive after the request was admitted',
+                );
+            }
 
             return admitMissingHeader;
         }
