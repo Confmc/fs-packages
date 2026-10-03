@@ -35,7 +35,7 @@ const FRUITS: Fruit[] = [
     {id: 2, name: 'Apricot'},
     {id: 3, name: 'Mango'},
 ];
-// Sorted render order: Apricot(2), Mango(3), Watermelon(1).
+// Sorted render order (`alphabeticalSort: true`): Apricot(2), Mango(3), Watermelon(1).
 
 // Grouped controls are CALLER-ordered (no alphabetical sort), so the flat option index runs
 // through the groups in declaration order: Watermelon(0), Mango(1), Apricot(2).
@@ -138,7 +138,7 @@ describe('SingleSelect — real typeahead (WR-1991)', () => {
 
 describe('SingleSelect — real keyboard walk', () => {
     it('Tab focuses, Enter opens, ArrowDown navigates, Enter commits, menu closes', async () => {
-        const model = await renderControlled<number | null>(SingleSelect, null, {});
+        const model = await renderControlled<number | null>(SingleSelect, null, {alphabeticalSort: true});
         const trigger = document.getElementById('fruit') as HTMLButtonElement;
 
         await userEvent.tab();
@@ -296,7 +296,7 @@ describe('Combobox — real typing filters and commits', () => {
 
 describe('MultiSelect — chips, toggle-stays-open, Backspace', () => {
     it('a real click commit toggles membership while the menu STAYS open, and chips render', async () => {
-        const model = await renderControlled<number[]>(MultiSelect, [], {});
+        const model = await renderControlled<number[]>(MultiSelect, [], {alphabeticalSort: true});
         const trigger = document.getElementById('fruit') as HTMLButtonElement;
 
         await userEvent.click(trigger);

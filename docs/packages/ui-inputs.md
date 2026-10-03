@@ -305,7 +305,7 @@ See [Nullable values](#nullable-values) for why the models are nullable and what
 | `id`               | `string`      | —              | Required. Pairs the trigger with a label/error                     |
 | `placeholder`      | `string`      | `'Select…'`    |                                                                    |
 | `disabled`         | `boolean`     | `false`        |                                                                    |
-| `alphabeticalSort` | `boolean`     | `true`         | Sorts rendered options by display string                           |
+| `alphabeticalSort` | `boolean`     | `false`        | Sorts rendered options by display string; off keeps caller order   |
 | `required`         | `boolean`     | `false`        | Conveyed via `aria-required`                                       |
 | `invalid`          | `boolean`     | `false`        | Invalid styling + `aria-invalid`                                   |
 | `describedby`      | `string`      | —              | Id of the paired error element                                     |

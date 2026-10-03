@@ -95,7 +95,7 @@ const {
     id,
     placeholder = 'Select…',
     disabled = false,
-    alphabeticalSort = true,
+    alphabeticalSort = false,
     required = false,
     invalid = false,
     describedby,
@@ -112,6 +112,7 @@ const {
     id: string;
     placeholder?: string;
     disabled?: boolean;
+    /** sort the rendered options by display string — off by default, so the caller's order is kept. */
     alphabeticalSort?: boolean;
     /** conveys the required state to assistive tech via `aria-required`. */
     required?: boolean;
