@@ -106,11 +106,13 @@ describe('useValidationErrors', () => {
 
     it('yields an empty bag when errors is null', () => {
         const {httpService, triggerError} = createMockHttpService();
+        const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
         const {result} = mountComposable(httpService);
 
         triggerError(422, {errors: null});
 
         expect(result().errors.value).toEqual({});
+        expect(consoleError).not.toHaveBeenCalled();
     });
 
     it('yields an empty bag when errors is not an object', () => {
@@ -120,6 +122,7 @@ describe('useValidationErrors', () => {
         triggerError(422, {errors: 'not-an-object'});
 
         expect(result().errors.value).toEqual({});
+        expect(result().unmapped.value).toEqual([]);
     });
 
     it('yields an empty bag when the 422 body is a non-object', () => {
@@ -133,20 +136,24 @@ describe('useValidationErrors', () => {
 
     it('yields an empty bag when the 422 body is null', () => {
         const {httpService, triggerError} = createMockHttpService();
+        const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
         const {result} = mountComposable(httpService);
 
         triggerError(422, null);
 
         expect(result().errors.value).toEqual({});
+        expect(consoleError).not.toHaveBeenCalled();
     });
 
     it('handles an error with no response at all', () => {
         const {httpService, triggerBare} = createMockHttpService();
+        const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
         const {result} = mountComposable(httpService);
 
         triggerBare();
 
         expect(result().errors.value).toEqual({});
+        expect(consoleError).not.toHaveBeenCalled();
     });
 
     it('applies a custom keyMapper to field keys', () => {
