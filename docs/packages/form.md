@@ -88,11 +88,11 @@ Omit `fields` and every key binds, as before.
 
 A 422 whose keys are all dropped leaves `errors` empty, and a screen that draws only `errors` then refuses in silence. Three readonly refs report the refusal itself:
 
-| Ref              | Meaning                                                                                         |
-| ---------------- | ----------------------------------------------------------------------------------------------- |
-| `refused`        | A 422 was accepted since the last `clearErrors`                                                 |
-| `unmapped`       | The mapped keys of that 422 that `errors` does not hold (not in `fields`, or not a string list) |
-| `refusedUnnamed` | `refused` and `errors` is empty: show a form-level message                                      |
+| Ref              | Meaning                                                                                                    |
+| ---------------- | ---------------------------------------------------------------------------------------------------------- |
+| `refused`        | A 422 was accepted since the last `clearErrors`                                                            |
+| `unmapped`       | The mapped keys of that 422 that `errors` does not hold (not in `fields`, or not a string list), each once |
+| `refusedUnnamed` | `refused` and `errors` is empty: show a form-level message                                                 |
 
 `refused` is raised by the 422 middleware, at the moment the bag is written, not in `handleSubmit`'s catch. A store that catches and classifies the 422 itself, so `handleSubmit` sees a resolved action, still gets the signal. `clearErrors` resets all three, and `handleSubmit` calls it before each attempt. "The refusal named a key this form has no field for" is `unmapped.value.length > 0`.
 
@@ -155,7 +155,7 @@ const {handleSubmit, submitting} = useFormSubmit(validation);
 
 **One error-scope per form.** `useValidationErrors` (and therefore `useForm`) registers a 422 observer on the `HttpService` you pass and keeps its own error bag. If two forms share **one** `HttpService` instance, a 422 from either fills **both** bags — cross-form bleed, with green types. `ownSubmitsOnly` closes this for a form that is not submitting; two forms submitting at once on one service still share the bleed. Give each form its own error scope where that matters: one form per `HttpService` instance, or don't share a service across concurrently-mounted forms.
 
-**Laravel 422 contract.** `fs-form` targets **Laravel**'s validation-error response shape — `{ message?: string, errors: Record<string, string[]> }` — and binds the first message per field. A field whose value is not a list with a string first entry is **not bound**: it is left out of `errors` and listed in `unmapped` (before 0.3.0 a bare string bound its first character). If you point `fs-form` at a non-Laravel backend, revisit the parse in `useValidationErrors` first.
+**Laravel 422 contract.** `fs-form` targets **Laravel**'s validation-error response shape — `{ message?: string, errors: Record<string, string[]> }` — and binds the first message per field. A field whose value is not a list with a string first entry is **not bound**: it is left out of `errors` and listed in `unmapped` (before 0.3.0 a bare string bound its first character). An `errors` container that is not a plain object (an array, say) is read as no field map. If you point `fs-form` at a non-Laravel backend, revisit the parse in `useValidationErrors` first.
 
 ## Middleware Safety (Principle #8)
 

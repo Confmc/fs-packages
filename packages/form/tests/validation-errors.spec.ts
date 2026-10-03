@@ -125,6 +125,27 @@ describe('useValidationErrors', () => {
         expect(result().unmapped.value).toEqual([]);
     });
 
+    it('treats an array errors container as no field map', () => {
+        const {httpService, triggerError} = createMockHttpService();
+        const {result} = mountComposable(httpService);
+
+        triggerError(422, {errors: [['Required'], ['Taken']]});
+
+        expect(result().errors.value).toEqual({});
+        expect(result().unmapped.value).toEqual([]);
+        expect(result().refusedUnnamed.value).toBe(true);
+    });
+
+    it('binds from a null-prototype errors container', () => {
+        const {httpService, triggerError} = createMockHttpService();
+        const {result} = mountComposable(httpService);
+        const errors = Object.assign(Object.create(null) as object, {email: ['Taken']});
+
+        triggerError(422, {errors});
+
+        expect(result().errors.value).toEqual({email: 'Taken'});
+    });
+
     it('yields an empty bag when the 422 body is a non-object', () => {
         const {httpService, triggerError} = createMockHttpService();
         const {result} = mountComposable(httpService);
@@ -226,6 +247,23 @@ describe('useValidationErrors', () => {
         expect(result().errors.value).toEqual({});
         expect(result().unmapped.value).toEqual([]);
         expect(result().refusedUnnamed.value).toBe(true);
+    });
+
+    it('keeps the previous bag and unmapped keys when the keyMapper throws on a later 422', () => {
+        const {httpService, triggerError} = createMockHttpService();
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        const keyMapper = (key: string) => {
+            if (key === 'boom') throw new Error('mapper blew up');
+            return key;
+        };
+        const {result} = mountComposable(httpService, {keyMapper, fields: ['name']});
+
+        triggerError(422, {errors: {name: ['Required'], token: ['Expired']}});
+        triggerError(422, {errors: {boom: ['x']}});
+
+        expect(result().refused.value).toBe(true);
+        expect(result().errors.value).toEqual({name: 'Required'});
+        expect(result().unmapped.value).toEqual(['token']);
     });
 
     describe('fields allow-list', () => {
@@ -407,6 +445,30 @@ describe('useValidationErrors', () => {
             triggerError(422, {errors: {email: 'fout'}});
 
             expect(result().unmapped.value).toEqual(['EMAIL']);
+        });
+
+        it('does not report a name as unmapped when another key bound it', () => {
+            const {httpService, triggerError} = createMockHttpService();
+            const keyMapper = (key: string) => (key === 'email_address' ? 'email' : key);
+            const {result} = mountComposable(httpService, {keyMapper});
+
+            triggerError(422, JSON.parse('{"errors":{"email":["Taken"],"email_address":"bad"}}'));
+            expect(result().errors.value).toEqual({email: 'Taken'});
+            expect(result().unmapped.value).toEqual([]);
+
+            triggerError(422, JSON.parse('{"errors":{"email_address":"bad","email":["Taken"]}}'));
+            expect(result().errors.value).toEqual({email: 'Taken'});
+            expect(result().unmapped.value).toEqual([]);
+        });
+
+        it('lists a name once when several dropped keys map to it', () => {
+            const {httpService, triggerError} = createMockHttpService();
+            const keyMapper = (key: string) => (key.endsWith('_token') ? 'token' : key);
+            const {result} = mountComposable(httpService, {keyMapper, fields: ['name']});
+
+            triggerError(422, {errors: {reset_token: ['Expired'], invite_token: ['Expired'], code: ['Wrong']}});
+
+            expect(result().unmapped.value).toEqual(['token', 'code']);
         });
     });
 

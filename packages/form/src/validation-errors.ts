@@ -12,6 +12,9 @@ const toFieldErrorMap = (data: unknown): Record<string, unknown> => {
     const errors = (data as {errors?: unknown} | null | undefined)?.errors;
     if (typeof errors !== 'object' || errors === null) return {};
 
+    const prototype: unknown = Object.getPrototypeOf(errors);
+    if (prototype !== Object.prototype && prototype !== null) return {};
+
     return errors as Record<string, unknown>;
 };
 
@@ -79,8 +82,10 @@ export const useValidationErrors = <T extends string = string>(
             }
 
             // fromEntries defines own properties; an assignment would hit the `__proto__` setter.
-            errors.value = Object.fromEntries(kept) as ValidationErrors<T>;
-            unmapped.value = dropped;
+            const bag = Object.fromEntries(kept);
+
+            errors.value = bag as ValidationErrors<T>;
+            unmapped.value = [...new Set(dropped)].filter((field) => !Object.hasOwn(bag, field));
         }),
     );
 

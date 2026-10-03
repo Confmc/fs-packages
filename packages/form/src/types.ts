@@ -13,7 +13,8 @@ export interface UseValidationErrors<T extends string = string> {
     refused: Readonly<Ref<boolean>>;
     /**
      * The mapped keys of the last accepted 422 that `errors` does not hold: not named by
-     * `fields`, or whose value was not a list with a string first entry.
+     * `fields`, or whose value was not a list with a string first entry. Each name appears
+     * once, however many dropped keys map to it, and never while another key bound it.
      */
     unmapped: Readonly<Ref<readonly string[]>>;
     /** The last accepted 422 named nothing this form can mark — ADR-0048 rule 4's empty-bag check, kept in one place. */
