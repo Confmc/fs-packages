@@ -1,6 +1,6 @@
 import {describe, expect, it, vi} from 'vitest';
 
-import type {CloudflareGate, CloudflareGateRequest} from '../src';
+import type {CloudflareGate, CloudflareGateOptions, CloudflareGateRequest} from '../src';
 
 import {createCloudflareGate} from '../src';
 
@@ -14,6 +14,9 @@ const createRequest = (
     headers: Record<string, string> = {},
     socket?: {remoteAddress?: string},
 ): CloudflareGateRequest => ({path, get: (name) => headers[name.toLowerCase()], socket});
+
+// Simulates a JavaScript consumer, which the type system does not reach.
+const untyped = (options: Record<string, unknown>): CloudflareGateOptions => options as CloudflareGateOptions;
 
 const invoke = (gate: CloudflareGate, req: CloudflareGateRequest) => {
     const next = vi.fn();
@@ -42,6 +45,55 @@ describe('createCloudflareGate', () => {
 
             expect(gate).toHaveProperty('middleware');
             expect(gate).toHaveProperty('isCloudflareAddress');
+        });
+    });
+
+    describe('configuration', () => {
+        it('should refuse a mistyped header name at construction', () => {
+            expect(() => createCloudflareGate(untyped({header: 'fly-client-up'}))).toThrow(
+                '[@script-development/fs-cloudflare] header must be one of "fly-client-ip". Received: "fly-client-up"',
+            );
+        });
+
+        it.each(['cf-connecting-ip', 'x-forwarded-for', 'x-real-ip', 'x-edge-ip', ''])(
+            'should refuse the header %j, which no supported edge proxy is documented to overwrite',
+            (header) => {
+                expect(() => createCloudflareGate(untyped({header}))).toThrow('header must be one of');
+            },
+        );
+
+        it('should accept the header name in any letter case', () => {
+            const gate = createCloudflareGate(untyped({header: 'Fly-Client-IP'}));
+
+            expectForbidden(invoke(gate, createRequest('/', {'fly-client-ip': OTHER_IPV4})));
+        });
+
+        it.each(['Socket', 'tcp', 'headers'])('should refuse the unknown source %j at construction', (source) => {
+            expect(() => createCloudflareGate(untyped({source}))).toThrow(
+                `[@script-development/fs-cloudflare] source must be one of "header", "socket". Received: "${source}"`,
+            );
+        });
+
+        it.each(['Allow', 'pass', 'open'])(
+            'should refuse the unknown missingHeader policy %j at construction',
+            (missingHeader) => {
+                expect(() => createCloudflareGate(untyped({missingHeader}))).toThrow(
+                    `[@script-development/fs-cloudflare] missingHeader must be one of "deny", "allow". Received: "${missingHeader}"`,
+                );
+            },
+        );
+
+        it('should construct with every option at its documented value', () => {
+            expect(() =>
+                createCloudflareGate({
+                    exemptPaths: ['/health'],
+                    header: 'fly-client-ip',
+                    missingHeader: 'allow',
+                    onMissingHeader: () => undefined,
+                    source: 'header',
+                }),
+            ).not.toThrow();
+            expect(() => createCloudflareGate({source: 'socket', missingHeader: 'deny'})).not.toThrow();
         });
     });
 
@@ -82,12 +134,6 @@ describe('createCloudflareGate', () => {
             expectForbidden(invoke(gate, createRequest('/', {'fly-client-ip': `::ffff:${OTHER_IPV4}`})));
         });
 
-        it('should pass a request without the client-IP header', () => {
-            const gate = createCloudflareGate();
-
-            expectAllowed(invoke(gate, createRequest('/')));
-        });
-
         it('should forbid a request whose client-IP header is not an address', () => {
             const gate = createCloudflareGate();
 
@@ -101,17 +147,79 @@ describe('createCloudflareGate', () => {
                 invoke(gate, createRequest('/', {'cf-connecting-ip': CF_IPV4, 'fly-client-ip': OTHER_IPV4})),
             );
         });
+    });
 
-        it('should read the configured header instead of the default', () => {
-            const gate = createCloudflareGate({header: 'x-edge-ip'});
+    describe('header mode, header absent', () => {
+        it('should forbid a request without the client-IP header by default', () => {
+            const gate = createCloudflareGate();
 
-            expectAllowed(invoke(gate, createRequest('/', {'fly-client-ip': OTHER_IPV4, 'x-edge-ip': CF_IPV4})));
+            expectForbidden(invoke(gate, createRequest('/')));
         });
 
-        it('should pass when the configured header is absent, ignoring the default header', () => {
-            const gate = createCloudflareGate({header: 'x-edge-ip'});
+        it('should report a request without the client-IP header and forbid it by default', () => {
+            const onMissingHeader = vi.fn();
+            const gate = createCloudflareGate({onMissingHeader});
+            const req = createRequest('/jobs');
 
-            expectAllowed(invoke(gate, createRequest('/', {'fly-client-ip': OTHER_IPV4})));
+            expectForbidden(invoke(gate, req));
+            expect(onMissingHeader).toHaveBeenCalledTimes(1);
+            expect(onMissingHeader).toHaveBeenCalledWith(req);
+        });
+
+        it('should pass a request without the client-IP header only under the explicit allow opt-in', () => {
+            const gate = createCloudflareGate({missingHeader: 'allow'});
+
+            expectAllowed(invoke(gate, createRequest('/')));
+        });
+
+        it('should still report a request it passes under the allow opt-in', () => {
+            const onMissingHeader = vi.fn();
+            const gate = createCloudflareGate({missingHeader: 'allow', onMissingHeader});
+            const req = createRequest('/');
+
+            expectAllowed(invoke(gate, req));
+            expect(onMissingHeader).toHaveBeenCalledTimes(1);
+            expect(onMissingHeader).toHaveBeenCalledWith(req);
+        });
+
+        it('should not pass a request when the report callback throws, even under the allow opt-in', () => {
+            const gate = createCloudflareGate({
+                missingHeader: 'allow',
+                onMissingHeader: () => {
+                    throw new Error('logger down');
+                },
+            });
+            const next = vi.fn();
+            const sendStatus = vi.fn();
+
+            expect(() => gate.middleware(createRequest('/'), {sendStatus}, next)).toThrow('logger down');
+            expect(next).not.toHaveBeenCalled();
+        });
+
+        it('should not report a request that carries the header, whatever its address', () => {
+            const onMissingHeader = vi.fn();
+            const gate = createCloudflareGate({onMissingHeader});
+
+            invoke(gate, createRequest('/', {'fly-client-ip': CF_IPV4}));
+            invoke(gate, createRequest('/', {'fly-client-ip': OTHER_IPV4}));
+
+            expect(onMissingHeader).not.toHaveBeenCalled();
+        });
+
+        it('should not report or forbid an exempt path without the header', () => {
+            const onMissingHeader = vi.fn();
+            const gate = createCloudflareGate({exemptPaths: ['/health'], onMissingHeader});
+
+            expectAllowed(invoke(gate, createRequest('/health')));
+            expect(onMissingHeader).not.toHaveBeenCalled();
+        });
+
+        it('should not report in socket mode, which never reads the header', () => {
+            const onMissingHeader = vi.fn();
+            const gate = createCloudflareGate({source: 'socket', missingHeader: 'allow', onMissingHeader});
+
+            expectForbidden(invoke(gate, createRequest('/', {}, {remoteAddress: OTHER_IPV4})));
+            expect(onMissingHeader).not.toHaveBeenCalled();
         });
     });
 

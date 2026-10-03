@@ -7,11 +7,27 @@
  */
 export type CloudflareGateSource = 'header' | 'socket';
 
+/**
+ * Client-IP headers an edge proxy is documented to write from the TCP peer and overwrite on every
+ * request. A header joins this set only with that guarantee: a client-suppliable header is a bypass.
+ */
+export type CloudflareGateHeader = 'fly-client-ip';
+
+/**
+ * What a `'header'`-mode request without the header gets. `'allow'` admits it — correct only where
+ * traffic that never crossed the edge proxy (a private network) must reach gated paths.
+ */
+export type CloudflareGateMissingHeader = 'deny' | 'allow';
+
 export interface CloudflareGateOptions {
     /** Paths that bypass the gate entirely, matched exactly against `req.path`. No default — health-probe paths differ per app. */
     exemptPaths?: readonly string[];
-    /** Client-IP header read in `'header'` mode. Must be proxy-written; a client-suppliable header is a bypass. */
-    header?: string;
+    /** Client-IP header read in `'header'` mode, matched case-insensitively. Default `'fly-client-ip'`. */
+    header?: CloudflareGateHeader;
+    /** Default `'deny'`. */
+    missingHeader?: CloudflareGateMissingHeader;
+    /** Called for every `'header'`-mode request without the header, before `missingHeader` applies. Not called for exempt paths. */
+    onMissingHeader?: (req: CloudflareGateRequest) => void;
     /** Default `'header'`. */
     source?: CloudflareGateSource;
 }

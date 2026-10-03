@@ -1,12 +1,34 @@
 import {BlockList, isIPv4, isIPv6} from 'node:net';
 
-import type {CloudflareGate, CloudflareGateOptions, CloudflareGateRequest, CloudflareGateResponse} from './types';
+import type {
+    CloudflareGate,
+    CloudflareGateHeader,
+    CloudflareGateMissingHeader,
+    CloudflareGateOptions,
+    CloudflareGateRequest,
+    CloudflareGateResponse,
+    CloudflareGateSource,
+} from './types';
 
 import {CLOUDFLARE_IPV4, CLOUDFLARE_IPV6} from './ranges';
 
 const HTTP_FORBIDDEN = 403;
 
-const DEFAULT_HEADER = 'fly-client-ip';
+const HEADERS: readonly CloudflareGateHeader[] = ['fly-client-ip'];
+const SOURCES: readonly CloudflareGateSource[] = ['header', 'socket'];
+const MISSING_HEADER_POLICIES: readonly CloudflareGateMissingHeader[] = ['deny', 'allow'];
+
+// The options reach JavaScript consumers unchecked, and every one of them selects between a closed and
+// an open gate, so an unrecognised value throws here instead of degrading at request time.
+const oneOf = <T extends string>(option: string, allowed: readonly T[], value: string): T => {
+    const match = allowed.find((candidate) => candidate === value);
+    if (match !== undefined) return match;
+
+    const expected = allowed.map((candidate) => JSON.stringify(candidate)).join(', ');
+    throw new Error(
+        `[@script-development/fs-cloudflare] ${option} must be one of ${expected}. Received: ${JSON.stringify(value)}`,
+    );
+};
 
 const addSubnets = (blockList: BlockList, ranges: string[], family: 'ipv4' | 'ipv6'): void => {
     for (const range of ranges) {
@@ -24,9 +46,12 @@ const buildBlockList = (): BlockList => {
 };
 
 export const createCloudflareGate = (options: CloudflareGateOptions = {}): CloudflareGate => {
-    const {header = DEFAULT_HEADER} = options;
+    const header = oneOf('header', HEADERS, (options.header ?? 'fly-client-ip').toLowerCase());
+    const readSocket = oneOf('source', SOURCES, options.source ?? 'header') === 'socket';
+    const admitMissingHeader =
+        oneOf('missingHeader', MISSING_HEADER_POLICIES, options.missingHeader ?? 'deny') === 'allow';
+    const {onMissingHeader} = options;
     const exemptPaths = new Set(options.exemptPaths);
-    const readSocket = options.source === 'socket';
     const blockList = buildBlockList();
 
     const isCloudflareAddress = (value: string): boolean => {
@@ -47,8 +72,15 @@ export const createCloudflareGate = (options: CloudflareGateOptions = {}): Cloud
 
         const address = req.get(header);
 
-        // A missing header means the request never crossed the edge proxy (Fly 6PN/internal, local dev).
-        return address === undefined || isCloudflareAddress(address);
+        // Absence looks the same whether the request came over a private network or the proxy stopped
+        // writing the header, so it is reported before the policy decides, and a throwing reporter admits nothing.
+        if (address === undefined) {
+            onMissingHeader?.(req);
+
+            return admitMissingHeader;
+        }
+
+        return isCloudflareAddress(address);
     };
 
     const middleware = (req: CloudflareGateRequest, res: CloudflareGateResponse, next: () => void): void => {
