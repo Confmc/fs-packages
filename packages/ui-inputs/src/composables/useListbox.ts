@@ -138,6 +138,9 @@ export const useListbox = (options: UseListboxOptions) => {
     // composable still never calls this on commit: closing after a commit stays the caller's
     // decision (`onCommit` — the MultiSelect toggle-and-stay-open contract).
     let typed = '';
+    // Whether every key in `typed` is its first character — kept as a flag, so a held key costs the
+    // same on every repeat instead of re-scanning a run that key repeat grows without limit.
+    let repeated = true;
     let typedTimer: ReturnType<typeof setTimeout> | undefined;
     const dropTyped = () => {
         clearTimeout(typedTimer);
@@ -170,10 +173,12 @@ export const useListbox = (options: UseListboxOptions) => {
      */
     const typeahead = (key: string, labels: string[]): boolean => {
         clearTimeout(typedTimer);
-        typed += key.toLocaleLowerCase();
         typedTimer = setTimeout(dropTyped, TYPEAHEAD_RESET_MS);
 
-        const repeated = [...typed].every((character) => character === typed[0]);
+        const character = key.toLocaleLowerCase();
+        repeated = typed === '' || (repeated && character === typed[0]);
+        typed += character;
+
         const needle = repeated ? typed[0] : typed;
         const from = pointer.value >= 0 ? pointer.value : (committedIndex?.() ?? -1);
         const start = repeated ? from + 1 : Math.max(from, 0);

@@ -143,6 +143,17 @@ describe.each(SELECT_ONLY)('$name — typeahead', ({mountIt, keyTarget}) => {
         expect(active()).toBe('f-opt-0');
     });
 
+    it('after a typed string resets, a repeated character cycles again', async () => {
+        const {press, active} = await setup();
+
+        for (const key of 'ap') await press(key);
+        vi.advanceTimersByTime(600);
+        await press('b');
+        await press('b');
+
+        expect(active()).toBe('f-opt-3');
+    });
+
     it('wraps around past the last option', async () => {
         const {press, active} = await setup();
 
@@ -272,5 +283,49 @@ describe('typeahead — a search starts after the committed value (native <selec
         await wrapper.find('.ui-multiselect__trigger').trigger('keydown', {key: 'b'});
 
         expect(wrapper.find('[role="combobox"]').attributes('aria-activedescendant')).toBe('f-opt-2');
+    });
+});
+
+describe('typeahead — a held key costs the same on its thousandth repeat as on its first', () => {
+    // Key repeat (~30 Hz) never lets the idle reset fire, so a held key grows the typed string without
+    // limit; per-key work must not grow with it. Timed, not counted: the string lives inside the
+    // composable. Both blocks are timed in one run, so station load mostly cancels out of the ratio.
+    // The assertion is a within-run ratio (last block vs first) at 4x, between the fix's ~1x and the
+    // defect's measured 9-14x. If it flakes in CI, the fix is a deterministic work counter, never a
+    // looser threshold.
+    const holdAfter = (prefix: string): {first: number; last: number} => {
+        // Real clock: the suite's fake timers freeze performance.now(). The loop is synchronous, so
+        // the 500 ms idle reset cannot fire inside it either way.
+        vi.useRealTimers();
+        const wrapper = mount(SingleSelect, {
+            props: {options: FRUITS, label: 'name', id: 'f', modelValue: null, alphabeticalSort: false},
+            attachTo: document.body,
+        });
+        const root = wrapper.find('.ui-select').element;
+        const press = (key: string): void => {
+            root.dispatchEvent(new KeyboardEvent('keydown', {key, bubbles: true, cancelable: true}));
+        };
+        const hold = (repeats: number): number => {
+            const started = performance.now();
+            for (let repeat = 0; repeat < repeats; repeat++) press('a');
+            return performance.now() - started;
+        };
+
+        for (const key of prefix) press(key);
+        const first = hold(1000);
+        hold(15_000);
+        return {first, last: hold(1000)};
+    };
+
+    it('a held key on its own (the repeated-character run)', () => {
+        const {first, last} = holdAfter('');
+
+        expect(last).toBeLessThan(first * 4);
+    });
+
+    it('a held key after another character (a string no option can match any more)', () => {
+        const {first, last} = holdAfter('b');
+
+        expect(last).toBeLessThan(first * 4);
     });
 });
