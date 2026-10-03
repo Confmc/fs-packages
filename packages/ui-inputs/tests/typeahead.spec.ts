@@ -216,3 +216,61 @@ describe('Combobox — typeahead belongs to the text input', () => {
         expect(input.attributes('aria-activedescendant')).toBeUndefined();
     });
 });
+
+describe('typeahead — a search starts after the committed value (native <select> parity)', () => {
+    const banana = 3;
+
+    it('SingleSelect with Banana chosen: closed, b moves to Blue moon, not Banana again', async () => {
+        const wrapper = mount(SingleSelect, {
+            props: {options: FRUITS, label: 'name', id: 'f', modelValue: banana, alphabeticalSort: false},
+            attachTo: document.body,
+        });
+
+        await wrapper.find('.ui-select').trigger('keydown', {key: 'b'});
+
+        expect(wrapper.find('[role="combobox"]').attributes('aria-activedescendant')).toBe('f-opt-3');
+    });
+
+    it('GroupSelect with Banana chosen: closed, b moves to Blue moon', async () => {
+        const wrapper = mount(GroupSelect, {
+            props: {
+                groups: [
+                    {text: 'A', options: FRUITS.slice(0, 2)},
+                    {text: 'B', options: FRUITS.slice(2)},
+                ],
+                label: 'name',
+                id: 'f',
+                modelValue: banana,
+            },
+            attachTo: document.body,
+        });
+
+        await wrapper.find('.ui-groupselect').trigger('keydown', {key: 'b'});
+
+        expect(wrapper.find('[role="combobox"]').attributes('aria-activedescendant')).toBe('f-opt-3');
+    });
+
+    it('REGRESSION PIN — SingleSelect with Banana chosen: a string still matching it stays on it', async () => {
+        const wrapper = mount(SingleSelect, {
+            props: {options: FRUITS, label: 'name', id: 'f', modelValue: banana, alphabeticalSort: false},
+            attachTo: document.body,
+        });
+        const root = wrapper.find('.ui-select');
+
+        await root.trigger('keydown', {key: 'b'});
+        await root.trigger('keydown', {key: 'a'});
+
+        expect(wrapper.find('[role="combobox"]').attributes('aria-activedescendant')).toBe('f-opt-2');
+    });
+
+    it('PIN — MultiSelect has no single committed value, so a search starts at the top', async () => {
+        const wrapper = mount(MultiSelect, {
+            props: {options: FRUITS, label: 'name', id: 'f', modelValue: [banana], alphabeticalSort: false},
+            attachTo: document.body,
+        });
+
+        await wrapper.find('.ui-multiselect__trigger').trigger('keydown', {key: 'b'});
+
+        expect(wrapper.find('[role="combobox"]').attributes('aria-activedescendant')).toBe('f-opt-2');
+    });
+});

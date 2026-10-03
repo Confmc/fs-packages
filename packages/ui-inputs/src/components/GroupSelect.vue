@@ -222,6 +222,7 @@ const {
     onDismiss: () => close(),
     onOutside: () => close(),
     typeaheadLabels: () => flatOptions.value.map(labelOf),
+    committedIndex: () => flatOptions.value.findIndex((option) => option.id === model.value),
     clearEntry: () => clearLabel !== undefined,
     onClearCommit: commitClear,
 });

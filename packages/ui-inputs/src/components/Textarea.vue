@@ -3,16 +3,16 @@
         :id="id"
         class="ui-control ui-textarea"
         :class="{'is-invalid': invalid}"
-        :value="model"
+        :value="shown"
         :placeholder="placeholder"
         :disabled="disabled"
         :rows="rows"
         :aria-required="required || undefined"
         :aria-invalid="invalid || undefined"
         :aria-describedby="describedby"
-        @input="text.onInput"
-        @compositionstart="text.onCompositionstart"
-        @compositionend="text.onCompositionend"
+        @input="onInput"
+        @compositionstart="onCompositionstart"
+        @compositionend="onCompositionend"
     />
 </template>
 
@@ -37,7 +37,10 @@ defineProps<{
 // ConvertEmptyStringsToNull middleware converts back to null on submit.
 const model = defineModel<string | null>({required: true});
 
-const text = commitOutsideComposition((value) => {
-    model.value = value;
-});
+const {shown, onInput, onCompositionstart, onCompositionend} = commitOutsideComposition(
+    () => model.value,
+    (value) => {
+        model.value = value;
+    },
+);
 </script>

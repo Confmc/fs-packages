@@ -4,7 +4,7 @@
 
 ### Added
 
-- **Typeahead on `SingleSelect`, `MultiSelect` and `GroupSelect` (WR-1991).** A typed character moves the highlight to the next option starting with it, a quickly typed string matches by prefix, and the string resets after 500 ms. On a closed control a match opens the list on that option; nothing commits until Enter. The comboboxes are unchanged: their typed characters are the query.
+- **Typeahead on `SingleSelect`, `MultiSelect` and `GroupSelect` (WR-1991).** A typed character moves the highlight to the next option starting with it, a quickly typed string matches by prefix, and the string resets after 500 ms. With nothing highlighted, SingleSelect and GroupSelect search from the chosen option, as a native `<select>` does; MultiSelect searches from the top. On a closed control a match opens the list on that option; nothing commits until Enter. The comboboxes are unchanged: their typed characters are the query.
 
 ### Changed
 

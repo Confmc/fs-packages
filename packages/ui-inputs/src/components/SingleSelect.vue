@@ -223,6 +223,7 @@ const {
     onDismiss: () => close(),
     onOutside: () => close(),
     typeaheadLabels: () => optionLabels.value,
+    committedIndex: () => sorted.value.findIndex((option) => option.id === model.value),
     clearEntry: () => clearLabel !== undefined,
     onClearCommit: commitClear,
 });

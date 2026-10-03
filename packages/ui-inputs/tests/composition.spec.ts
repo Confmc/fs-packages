@@ -59,3 +59,24 @@ describe.each([
         expect(wrapper.emitted('update:modelValue')).toEqual([['か'], ['か!']]);
     });
 });
+
+describe.each([
+    ['TextInput', TextInput, 'input'],
+    ['Textarea', Textarea, 'textarea'],
+] as const)('%s — a re-render during composition', (_name, component, selector) => {
+    it('keeps the candidate text in the field, then commits it on compositionend', async () => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- two SFCs through one mount
+        const wrapper = mount(component as any, {props: {id: 't', modelValue: 'a', placeholder: 'one'}});
+        const field = wrapper.find(selector).element as HTMLInputElement;
+
+        field.dispatchEvent(new CompositionEvent('compositionstart', {bubbles: true}));
+        field.value = 'aか';
+        field.dispatchEvent(new Event('input', {bubbles: true}));
+        await wrapper.setProps({placeholder: 'two'});
+
+        expect(field.value).toBe('aか');
+
+        field.dispatchEvent(new CompositionEvent('compositionend', {bubbles: true}));
+        expect(wrapper.emitted('update:modelValue')).toEqual([['aか']]);
+    });
+});

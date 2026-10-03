@@ -71,6 +71,11 @@ export interface UseListboxOptions {
      * characters belong to its text input.
      */
     typeaheadLabels?: () => string[];
+    /**
+     * Index of the single committed option in the rendered list, or -1. A typeahead search with
+     * nothing highlighted starts from it, as a native <select> searches from its value.
+     */
+    committedIndex?: () => number;
 }
 
 /** How long the typed string survives without a keystroke (the APG listbox examples' 500 ms). */
@@ -99,6 +104,7 @@ export const useListbox = (options: UseListboxOptions) => {
         clearEntry,
         onClearCommit,
         typeaheadLabels,
+        committedIndex,
     } = options;
 
     const open = ref(false);
@@ -157,7 +163,8 @@ export const useListbox = (options: UseListboxOptions) => {
      * The WAI-ARIA listbox typeahead, with native <select> parity: the typed string grows while keys
      * arrive within TYPEAHEAD_RESET_MS; a single character (or the same character repeated) moves
      * to the NEXT option starting with it, so repeating it cycles; a longer string matches by
-     * prefix from the current option, so a highlight that still matches stays put. The search
+     * prefix from the current option, so a highlight that still matches stays put. With nothing
+     * highlighted, "current" is the committed option (`committedIndex`). The search
      * wraps, compares case-insensitively, and moves nothing when no option matches. Returns
      * whether it found one.
      */
@@ -168,7 +175,8 @@ export const useListbox = (options: UseListboxOptions) => {
 
         const repeated = [...typed].every((character) => character === typed[0]);
         const needle = repeated ? typed[0] : typed;
-        const start = repeated ? pointer.value + 1 : Math.max(pointer.value, 0);
+        const from = pointer.value >= 0 ? pointer.value : (committedIndex?.() ?? -1);
+        const start = repeated ? from + 1 : Math.max(from, 0);
         for (let step = 0; step < labels.length; step++) {
             const index = (start + step) % labels.length;
             if (labels[index].toLocaleLowerCase().startsWith(needle)) {

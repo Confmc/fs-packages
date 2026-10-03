@@ -126,9 +126,11 @@ moves the keyboard highlight the way a native `<select>` does: a character moves
 option starting with it (so repeating it cycles through those options), a string typed quickly —
 spaces included — matches by prefix, and the string resets after 500 ms without a keystroke.
 Matching ignores case and wraps past the last option, and a character no option starts with
-moves nothing. On a closed control a match **opens** the list on that option and commits
-nothing; Enter commits, as always. The comboboxes have no typeahead: what you type there is the
-query.
+moves nothing. With nothing highlighted, a search starts from the chosen option on
+`SingleSelect` and `GroupSelect` (so with Banana chosen, `b` moves on to the next b-option);
+`MultiSelect` has no single chosen option and searches from the top. On a closed control a match
+**opens** the list on that option and commits nothing; Enter commits, as always. The comboboxes
+have no typeahead: what you type there is the query.
 
 **The committing clear entry (`SingleSelect` / `Combobox`).** `clearLabel` renders a
 committing entry **above** the options — choosing it commits `null` and closes, exactly like
