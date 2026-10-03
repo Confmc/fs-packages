@@ -329,3 +329,21 @@ describe('typeahead — a held key costs the same on its thousandth repeat as on
         expect(last).toBeLessThan(first * 4);
     });
 });
+
+describe.each(SELECT_ONLY)('$name — closing through the trigger drops a half-typed string', ({name, mountIt}) => {
+    it(`${name === 'GroupSelect' ? 'REGRESSION PIN — ' : ''}a reopen within the idle window starts a new search`, async () => {
+        const wrapper = mountIt();
+        const trigger = wrapper.find('[role="combobox"]');
+
+        await trigger.trigger('click');
+        await trigger.trigger('keydown', {key: 'b'});
+        expect(trigger.attributes('aria-activedescendant')).toBe('f-opt-2');
+        await trigger.trigger('click');
+        await trigger.trigger('click');
+        await trigger.trigger('keydown', {key: 'a'});
+
+        // Extending the old prefix reads "ba" and stays on Banana.
+        expect(trigger.attributes('aria-expanded')).toBe('true');
+        expect(trigger.attributes('aria-activedescendant')).toBe('f-opt-0');
+    });
+});
