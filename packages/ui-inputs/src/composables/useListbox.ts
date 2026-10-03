@@ -80,6 +80,11 @@ export interface UseListboxOptions {
 
 /** How long the typed string survives without a keystroke (the APG listbox examples' 500 ms). */
 const TYPEAHEAD_RESET_MS = 500;
+/**
+ * Key repeat never lets the idle reset fire, so the typed string is capped. It keeps its FIRST
+ * characters: the prefix is what matches, and a sliding tail would match from the middle of a word.
+ */
+const TYPEAHEAD_MAX_LENGTH = 64;
 
 /**
  * The behavioural core shared by every ui-inputs listbox control (SingleSelect, Combobox, and —
@@ -187,7 +192,7 @@ export const useListbox = (options: UseListboxOptions) => {
 
         const character = key.toLocaleLowerCase();
         repeated = typed === '' || (repeated && character === typed[0]);
-        typed += character;
+        if (typed.length < TYPEAHEAD_MAX_LENGTH) typed += character;
 
         const needle = repeated ? typed[0] : typed;
         const from = pointer.value >= 0 ? pointer.value : (committedIndex?.() ?? -1);

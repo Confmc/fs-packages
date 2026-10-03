@@ -347,3 +347,25 @@ describe.each(SELECT_ONLY)('$name — closing through the trigger drops a half-t
         expect(trigger.attributes('aria-activedescendant')).toBe('f-opt-0');
     });
 });
+
+describe('typeahead — the typed string stops growing at 64 characters', () => {
+    // Two labels identical for their first 64 characters: past the cap, a 65th key cannot tell them
+    // apart, so the highlight stays on the first. An uncapped string reads the 65th key and moves.
+    const shared = 'xy'.repeat(32);
+    const LONG = [
+        {id: 1, name: `${shared}a`},
+        {id: 2, name: `${shared}b`},
+    ];
+
+    it('a 65th key leaves the 64-character match in place', async () => {
+        const wrapper = mount(SingleSelect, {
+            props: {options: LONG, label: 'name', id: 'f', modelValue: null, alphabeticalSort: false},
+            attachTo: document.body,
+        });
+        const root = wrapper.find('.ui-select');
+
+        for (const key of `${shared}b`) await root.trigger('keydown', {key});
+
+        expect(wrapper.find('[role="combobox"]').attributes('aria-activedescendant')).toBe('f-opt-0');
+    });
+});
