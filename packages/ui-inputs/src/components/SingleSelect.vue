@@ -207,6 +207,7 @@ const {
     floatingStyles,
     onKey,
     close,
+    toggle,
     clearHighlighted,
     clearId,
     highlightClear,
@@ -228,9 +229,6 @@ const {
     onClearCommit: commitClear,
 });
 
-const toggle = () => {
-    open.value = !open.value;
-};
 const choose = (option: T): void => {
     model.value = option.id;
     close();

@@ -265,8 +265,8 @@ const commit = (index: number): boolean => {
     return true;
 };
 
-const {open, pointer, listboxId, optionId, activeDescendant, floatingStyles, onKey, close, resetHighlight} = useListbox(
-    {
+const {open, pointer, listboxId, optionId, activeDescendant, floatingStyles, onKey, openList, close, resetHighlight} =
+    useListbox({
         root,
         reference: box,
         floating,
@@ -279,8 +279,7 @@ const {open, pointer, listboxId, optionId, activeDescendant, floatingStyles, onK
         onCommit: commit,
         onDismiss: () => dismiss(),
         onOutside: () => dismiss(),
-    },
-);
+    });
 
 // Close-without-commit (Escape, Tab, click outside): the query clears back to the resting
 // empty state — a half-typed filter never lingers, and there is no committed label to revert to.
@@ -299,7 +298,7 @@ const remove = (value: T['id']): void => {
     model.value = model.value.filter((member) => member !== value);
     const wasOpen = open.value;
     ensureRefValueExists(input).focus();
-    open.value = wasOpen;
+    if (!wasOpen) close();
 };
 /** Backspace with an EMPTY query pops the LAST committed value (no-op when empty). */
 const popLast = (): void => {
@@ -323,15 +322,13 @@ const onInputKey = (event: KeyboardEvent): void => {
 // resets the highlight (nothing is pre-selected — Enter with no highlight is a no-op).
 const onInput = (event: Event) => {
     query.value = (event.target as HTMLInputElement).value;
-    open.value = true;
+    openList();
     resetHighlight();
 };
 // Focusing or clicking the (enabled) input opens the list (kendo's searchable choreography —
 // focus is managed into the input, and the list is its context). A disabled input never
 // dispatches either event.
-const onOpen = () => {
-    open.value = true;
-};
+const onOpen = openList;
 
 // The one sanctioned defineExpose: a PUBLIC imperative handle (Combobox parity).
 // The input is non-null by lifetime; the loud accessor names the assumption if it ever breaks.

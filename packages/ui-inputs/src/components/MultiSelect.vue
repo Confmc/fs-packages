@@ -231,7 +231,7 @@ const commit = (index: number): boolean => {
     return true;
 };
 
-const {open, pointer, listboxId, optionId, activeDescendant, floatingStyles, onKey, close} = useListbox({
+const {open, pointer, listboxId, optionId, activeDescendant, floatingStyles, onKey, close, toggle} = useListbox({
     root,
     reference,
     floating,
@@ -246,9 +246,6 @@ const {open, pointer, listboxId, optionId, activeDescendant, floatingStyles, onK
     typeaheadLabels: () => optionLabels.value,
 });
 
-const toggle = () => {
-    open.value = !open.value;
-};
 /** Per-chip remove — drops one committed id; never touches `open`. */
 const remove = (value: T['id']): void => {
     model.value = model.value.filter((member) => member !== value);

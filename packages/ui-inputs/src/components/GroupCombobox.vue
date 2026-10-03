@@ -229,6 +229,7 @@ const {
     activeDescendant,
     floatingStyles,
     onKey,
+    openList,
     close,
     clearHighlighted,
     clearId,
@@ -282,13 +283,11 @@ const dismiss = (): void => {
 // `resetHighlight` (not a bare pointer write) so a hovered clear entry drops too.
 const onInput = (event: Event) => {
     query.value = (event.target as HTMLInputElement).value;
-    open.value = true;
+    openList();
     resetHighlight();
 };
 // Clicking the (enabled) input opens the list. A disabled input never dispatches click.
-const onClick = () => {
-    open.value = true;
-};
+const onClick = openList;
 
 // The one sanctioned defineExpose: a PUBLIC imperative handle (isms WR-0448 focus trap).
 defineExpose({focus: () => ensureRefValueExists(input).focus()});

@@ -2,7 +2,7 @@ import type {Placement} from '@floating-ui/vue';
 import type {CSSProperties, Ref} from 'vue';
 
 import {autoUpdate, flip, hide, offset, shift, size, useFloating} from '@floating-ui/vue';
-import {computed, onBeforeUnmount, onMounted, ref, watch} from 'vue';
+import {computed, onBeforeUnmount, onMounted, readonly, ref, watch} from 'vue';
 
 import {ensureRefValueExists} from '../internal/reactivity';
 
@@ -145,12 +145,22 @@ export const useListbox = (options: UseListboxOptions) => {
     const dropTyped = () => {
         clearTimeout(typedTimer);
         typed = '';
+        repeated = true;
     };
 
+    // `open` is written here and nowhere else: it leaves the composable read-only, so every close
+    // passes through the one place that drops the highlight and the typed string (WR-1991).
+    const openList = () => {
+        open.value = true;
+    };
     const close = () => {
         open.value = false;
         resetHighlight();
         dropTyped();
+    };
+    const toggle = () => {
+        if (open.value) close();
+        else openList();
     };
 
     // A key is typeahead when it prints one character with no command modifier. Space counts only
@@ -245,13 +255,13 @@ export const useListbox = (options: UseListboxOptions) => {
         if (typeaheadLabels !== undefined && isTypeahead(event)) {
             event.preventDefault();
             // Closed, a match OPENS the list on it (the APG select-only combobox), never commits.
-            if (typeahead(event.key, typeaheadLabels()) && !open.value) open.value = true;
+            if (typeahead(event.key, typeaheadLabels()) && !open.value) openList();
             return;
         }
         if (!open.value) {
             if (openKeys(event.key)) {
                 event.preventDefault();
-                open.value = true;
+                openList();
             }
             return;
         }
@@ -399,14 +409,16 @@ export const useListbox = (options: UseListboxOptions) => {
     );
 
     return {
-        open,
+        open: readonly(open),
         pointer,
         listboxId,
         optionId,
         activeDescendant,
         floatingStyles: gatedFloatingStyles,
         onKey,
+        openList,
         close,
+        toggle,
         clearHighlighted,
         clearId,
         highlightClear,

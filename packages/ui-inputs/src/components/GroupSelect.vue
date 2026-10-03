@@ -206,6 +206,7 @@ const {
     floatingStyles,
     onKey,
     close,
+    toggle,
     clearHighlighted,
     clearId,
     highlightClear,
@@ -226,12 +227,4 @@ const {
     clearEntry: () => clearLabel !== undefined,
     onClearCommit: commitClear,
 });
-
-const toggle = () => {
-    if (open.value) {
-        close();
-    } else {
-        open.value = true;
-    }
-};
 </script>
