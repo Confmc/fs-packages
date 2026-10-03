@@ -10,11 +10,15 @@
         :aria-required="required || undefined"
         :aria-invalid="invalid || undefined"
         :aria-describedby="describedby"
-        @input="model = ($event.target as HTMLTextAreaElement).value"
+        @input="text.onInput"
+        @compositionstart="text.onCompositionstart"
+        @compositionend="text.onCompositionend"
     />
 </template>
 
 <script setup lang="ts">
+import {commitOutsideComposition} from '../internal/composition';
+
 defineProps<{
     id: string;
     placeholder?: string;
@@ -32,4 +36,8 @@ defineProps<{
 // empty control); a cleared textarea emits '', which the fleet's
 // ConvertEmptyStringsToNull middleware converts back to null on submit.
 const model = defineModel<string | null>({required: true});
+
+const text = commitOutsideComposition((value) => {
+    model.value = value;
+});
 </script>

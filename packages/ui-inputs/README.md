@@ -519,6 +519,8 @@ option — the anchor grows with it, so the popup stays on-screen.
 
 Every text-like input (`TextInput`, `DateInput`, `Textarea`) models `string | null`, and `NumberInput` models `number | null`. A `null` from a nullable backend column binds directly — the control renders empty, no `?? ''` at the call site. When the user clears the field, the string inputs emit `''` (the raw native value); a Laravel backend's `ConvertEmptyStringsToNull` middleware maps that back to `null` on submit. `NumberInput` is the one exception: an empty number input emits `null` (not `NaN`, not `''`), since a `number` model can never hold `''` honestly — so it round-trips to `null` without relying on the middleware.
 
+**IME input.** `TextInput` and `Textarea` follow Vue's own `v-model` on a text field: while an input method (Japanese, Chinese, Korean, …) is composing, the candidate `input` events emit nothing, and the composed value is emitted once on `compositionend`. Swapping a native `v-model` for one of these controls does not hand you every candidate.
+
 ## SingleSelect and assistive tech
 
 The listbox keeps DOM focus on the trigger and conveys the keyboard-focused option with

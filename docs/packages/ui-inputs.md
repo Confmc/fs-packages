@@ -292,6 +292,8 @@ The default slot receives `{controlId, errorId, required, invalid, describedby}`
 | `DateInput`   | `min`, `max` (ISO `YYYY-MM-DD`)     | `string \| null` | `''`           |
 | `Textarea`    | `rows`, `placeholder`               | `string \| null` | `''`           |
 
+**IME input.** `TextInput` and `Textarea` follow Vue's own `v-model` on a text field: while an input method (Japanese, Chinese, Korean, …) is composing, the candidate `input` events emit nothing, and the composed value is emitted once on `compositionend`. Swapping a native `v-model` for one of these controls does not hand you every candidate.
+
 See [Nullable values](#nullable-values) for why the models are nullable and what each input emits when cleared.
 
 ### The select family
