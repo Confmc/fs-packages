@@ -433,7 +433,7 @@ The **`as` escape hatch is discouraged**. Where a button genuinely cannot be use
 
 ### Attribute fall-through
 
-Props the components do not declare — `name`, `autocomplete`, `inputmode`, `data-*`, … — fall through to the underlying native control via Vue's attribute inheritance. You do not need a declared prop to make a field participate in autofill or a native form post. (`Checkbox` and `Switch` re-aim attrs at the native **input** — their root is the wrapping `<label>`.)
+Props the components do not declare — `name`, `autocomplete`, `inputmode`, `data-*`, … — fall through to the underlying native control via Vue's attribute inheritance. You do not need a declared prop to make a field participate in autofill or a native form post. (`Checkbox` and `Switch` re-aim attrs at the native **input** — their root is the wrapping `<label>`.) The six selects and comboboxes split them: `class` and `style` stay on the root `<div>`, where you style the whole control, and every other attr — `aria-label`, `aria-labelledby`, `data-*`, listeners — lands on the element carrying `role="combobox"` (the trigger button, or the combobox's text input), the only place an accessible name can name the control.
 
 ## Theming — the `--ui-*` contract
 

@@ -1,6 +1,7 @@
 <template>
-    <div ref="root" class="ui-select" @keydown="onKey">
+    <div ref="root" v-bind="rootAttrs($attrs)" class="ui-select" @keydown="onKey">
         <button
+            v-bind="controlAttrs($attrs)"
             :id="id"
             ref="reference"
             type="button"
@@ -89,7 +90,11 @@ import type {GroupRow} from '../internal/group-rows';
 import type {LabelKey, SelectItem} from '../types';
 
 import {useListbox} from '../composables/useListbox';
+import {controlAttrs, rootAttrs} from '../internal/split-attrs';
 import OptionList from './OptionList.vue';
+
+// `class`/`style` → root, every other attr → the combobox element (see split-attrs).
+defineOptions({inheritAttrs: false});
 
 const {
     options,

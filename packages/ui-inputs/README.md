@@ -71,6 +71,12 @@ shape at that fixed breakpoint (a custom property cannot drive a media query, so
 
 ### The select family's shared extras
 
+**Attributes.** On all six selects and comboboxes, `class` and `style` stay on the root `<div>`,
+where you style the whole control; every other attr — `aria-label`, `aria-labelledby`, `data-*`,
+listeners — lands on the element carrying `role="combobox"` (the trigger button, or the text
+input), the only place an accessible name can name the control. A consumer attr never overrides
+the component's own `id`, `role` or ARIA wiring.
+
 **Per-option content — the `#option` scoped slot.** All four selects render each option's
 plain display string by default; the `option` slot replaces that content with your own
 (colour swatches, icons, rich labels). The payload is `{option, index, selected, active}` —

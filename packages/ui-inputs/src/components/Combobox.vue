@@ -1,6 +1,7 @@
 <template>
-    <div ref="root" class="ui-combobox" @keydown="onKey">
+    <div ref="root" v-bind="rootAttrs($attrs)" class="ui-combobox" @keydown="onKey">
         <input
+            v-bind="controlAttrs($attrs)"
             :id="id"
             ref="input"
             type="text"
@@ -82,7 +83,11 @@ import type {LabelKey, SelectItem} from '../types';
 
 import {useListbox} from '../composables/useListbox';
 import {ensureRefValueExists} from '../internal/reactivity';
+import {controlAttrs, rootAttrs} from '../internal/split-attrs';
 import OptionList from './OptionList.vue';
+
+// `class`/`style` → root, every other attr → the combobox element (see split-attrs).
+defineOptions({inheritAttrs: false});
 
 const {
     options,
