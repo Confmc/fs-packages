@@ -1501,3 +1501,44 @@ describe('createRouterLink', () => {
         expect(getUrl).toHaveBeenCalledWith('nested', 10, {tab: 'info'}, 5);
     });
 });
+
+describe('RouterLink from createRouterService', () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    // WR-1928: the anchor is followed by the BROWSER on middle-click, open-in-new-tab, copy-link and
+    // crawlers — none of which go through `onClick` — so its href must be a document URL, base included.
+    it('should render an href that carries the history base', () => {
+        // Arrange
+        const service = createRouterService(createTestRoutes(), {base: '/colleague'});
+
+        // Act
+        const wrapper = mount(service.RouterLink, {props: {to: {name: 'items.show', id: 5}}});
+
+        // Assert
+        expect(wrapper.find('a').attributes('href')).toBe('/colleague/items/5');
+    });
+
+    it('should render the same href as before when no base is set (regression pin)', () => {
+        // Arrange
+        const service = createRouterService(createTestRoutes());
+
+        // Act
+        const wrapper = mount(service.RouterLink, {props: {to: {name: 'items.show', id: 5, query: {tab: '1'}}}});
+
+        // Assert
+        expect(wrapper.find('a').attributes('href')).toBe('/items/5?tab=1');
+    });
+
+    it('should leave getUrlForRouteName base-relative under a base (contract pin)', () => {
+        // Arrange
+        const service = createRouterService(createTestRoutes(), {base: '/colleague'});
+
+        // Act
+        const url = service.getUrlForRouteName('items.show', 5);
+
+        // Assert
+        expect(url).toBe('/items/5');
+    });
+});

@@ -4,6 +4,7 @@
 
 ### Patch Changes
 
+- **`RouterLink` renders an `href` that carries the history base (WR-1928).** It used `getUrlForRouteName`, which returns vue-router's `fullPath` — a path relative to the base. Under `createRouterService(routes, {base: '/colleague'})` every link rendered `href="/…"`: a plain click still worked because `RouterLink` intercepts it, but middle-click, open-in-new-tab, copy-link and crawlers followed the bare path out of the app. The anchor now uses vue-router's `href`. Without a `base` the rendered `href` is unchanged. `getUrlForRouteName` keeps its contract and still returns the base-relative path.
 - **Published object-shape type aliases are now declared as `interface` (WR-1633).** Runtime is unchanged. An `interface` has no implicit index signature, so a converted type is no longer assignable to `Record<string, unknown>` without one (0 consumers measured across 64,338 fleet files). Declaration merging becomes possible, which is additive.
 
 ## 0.3.0 — 2026-08-29

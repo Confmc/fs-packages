@@ -142,6 +142,11 @@ export interface RouterService<Routes extends RouteRecordRaw[]> {
         id: number | string,
         query?: LocationQueryRaw,
     ) => Promise<void>;
+    /**
+     * The route's path RELATIVE to the history `base` (vue-router's `fullPath`), not a document URL:
+     * under `base: '/colleague'` it returns `/items/5`, not `/colleague/items/5`. `RouterLink`'s
+     * `href` carries the base.
+     */
     getUrlForRouteName: (
         name: RouteName<Routes>,
         id?: number | string,

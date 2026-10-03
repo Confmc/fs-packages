@@ -122,8 +122,20 @@ export const createRouterService = <Routes extends RouteRecordRaw[]>(
         return specificRoute;
     };
 
+    const resolveNamedRoute = (
+        name: RouteName<Routes>,
+        id?: number | string,
+        query?: LocationQueryRaw,
+        parentId?: number,
+    ) => router.resolve({name, params: resolveRouteParams(name as string, id, parentId), query});
+
     const getUrlForRouteName: RouterService<Routes>['getUrlForRouteName'] = (name, id, query, parentId) =>
-        router.resolve({name, params: resolveRouteParams(name as string, id, parentId), query}).fullPath;
+        resolveNamedRoute(name, id, query, parentId).fullPath;
+
+    // `fullPath` is relative to the history base; `href` carries it. An anchor is followed by the
+    // browser itself on middle-click, open-in-new-tab and copy-link, so it needs the latter (WR-1928).
+    const getHrefForRouteName: RouterService<Routes>['getUrlForRouteName'] = (name, id, query, parentId) =>
+        resolveNamedRoute(name, id, query, parentId).href;
 
     // Readiness is a fact this service knows, not one it asks vue-router for. fs-router redirects
     // by ABORTING — the wrapper below dispatches its own navigation and returns `false`, which
@@ -470,6 +482,6 @@ export const createRouterService = <Routes extends RouteRecordRaw[]>(
         },
 
         RouterView: createRouterView(currentRouteRef, options?.notFoundComponent, navigating),
-        RouterLink: createRouterLink(getUrlForRouteName, goToRoute),
+        RouterLink: createRouterLink(getHrefForRouteName, goToRoute),
     };
 };

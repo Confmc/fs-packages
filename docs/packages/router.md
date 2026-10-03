@@ -235,6 +235,8 @@ const url = router.getUrlForRouteName('project-issues.show', 7, undefined, 3);
 // "/projects/3/issues/7"
 ```
 
+The result is relative to the history `base`: with `createRouterService(routes, {base: '/admin'})` it is still `"/users/42/edit"`, not `"/admin/users/42/edit"`. `RouterLink` renders the base-carrying URL in its `href`, so a link opened in a new tab or copied stays inside the app.
+
 ## Query Parameters
 
 ```typescript
