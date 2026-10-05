@@ -82,7 +82,8 @@ export interface UseListboxOptions {
 const TYPEAHEAD_RESET_MS = 500;
 /**
  * Key repeat never lets the idle reset fire, so the typed string is capped. It keeps its FIRST
- * characters: the prefix is what matches, and a sliding tail would match from the middle of a word.
+ * keys: the prefix is what matches, and a sliding tail would match from the middle of a word. Keys,
+ * not UTF-16 units: an emoji key is two units and one key.
  */
 const TYPEAHEAD_MAX_LENGTH = 64;
 
@@ -152,6 +153,7 @@ export const useListbox = (options: UseListboxOptions) => {
     let typed = '';
     // The first key, folded. Not `typed[0]`: a fold can be two code units (İ → i̇).
     let first = '';
+    let keys = 0;
     // Whether every key in `typed` is its first character — kept as a flag, so a held key costs the
     // same on every repeat instead of re-scanning a run that key repeat grows without limit.
     let repeated = true;
@@ -159,6 +161,7 @@ export const useListbox = (options: UseListboxOptions) => {
     const dropTyped = () => {
         clearTimeout(typedTimer);
         typed = '';
+        keys = 0;
         repeated = true;
     };
 
@@ -206,7 +209,10 @@ export const useListbox = (options: UseListboxOptions) => {
         const character = fold(key);
         if (typed === '') first = character;
         repeated = typed === '' || (repeated && character === first);
-        if (typed.length < TYPEAHEAD_MAX_LENGTH) typed += character;
+        if (keys < TYPEAHEAD_MAX_LENGTH) {
+            typed += character;
+            keys++;
+        }
 
         const needle = repeated ? first : typed;
         const from = pointer.value >= 0 ? pointer.value : (committedIndex?.() ?? -1);

@@ -14,15 +14,21 @@ type TextField = HTMLInputElement | HTMLTextAreaElement;
  */
 export const commitOutsideComposition = (model: () => string | null, commit: (value: string) => void) => {
     const draft = ref<string | null>(null);
+    const onCompositionend = (event: Event): void => {
+        draft.value = null;
+        commit((event.target as TextField).value);
+    };
 
     return {
         shown: computed(() => draft.value ?? model()),
         onCompositionstart: (event: Event): void => {
             draft.value = (event.target as TextField).value;
         },
-        onCompositionend: (event: Event): void => {
-            draft.value = null;
-            commit((event.target as TextField).value);
+        onCompositionend,
+        // `vModelText` also ends a composition on `change`, for a browser that commits one without a
+        // `compositionend`; outside a composition it does nothing.
+        onChange: (event: Event): void => {
+            if (draft.value !== null) onCompositionend(event);
         },
         onInput: (event: Event): void => {
             const {value} = event.target as TextField;

@@ -3,7 +3,7 @@
 // `aria-label` or `aria-labelledby` can name the control — while `class` and `style` stay on the
 // root, where the fleet's consumers already style the whole control.
 import {mount} from '@vue/test-utils';
-import {afterEach, describe, expect, it} from 'vitest';
+import {afterEach, describe, expect, it, vi} from 'vitest';
 
 import Combobox from '../src/components/Combobox.vue';
 import GroupCombobox from '../src/components/GroupCombobox.vue';
@@ -72,5 +72,20 @@ describe.each(FAMILY)('$name — attribute fall-through', ({component, props}) =
         const control = wrapper.find('#f');
 
         expect(control.attributes('role')).toBe('combobox');
+    });
+
+    it('a consumer listener passed as an attr fires on the combobox element', () => {
+        // `focus` does not bubble: a listener left on the root would never hear it.
+        const onFocus = vi.fn();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- six generic SFCs through one mount
+        const wrapper = mount(component as any, {
+            props: {label: 'name', id: 'f', ...props},
+            attrs: {onFocus},
+            attachTo: document.body,
+        });
+
+        wrapper.find('[role="combobox"]').element.dispatchEvent(new FocusEvent('focus'));
+
+        expect(onFocus).toHaveBeenCalledOnce();
     });
 });

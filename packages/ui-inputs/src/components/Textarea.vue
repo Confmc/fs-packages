@@ -13,6 +13,7 @@
         @input="onInput"
         @compositionstart="onCompositionstart"
         @compositionend="onCompositionend"
+        @change="onChange"
     />
 </template>
 
@@ -37,7 +38,7 @@ defineProps<{
 // ConvertEmptyStringsToNull middleware converts back to null on submit.
 const model = defineModel<string | null>({required: true});
 
-const {shown, onInput, onCompositionstart, onCompositionend} = commitOutsideComposition(
+const {shown, onInput, onCompositionstart, onCompositionend, onChange} = commitOutsideComposition(
     () => model.value,
     (value) => {
         model.value = value;

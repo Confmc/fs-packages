@@ -58,6 +58,29 @@ describe.each([
 
         expect(wrapper.emitted('update:modelValue')).toEqual([['か'], ['か!']]);
     });
+
+    it('a change that ends a composition with no compositionend commits it, and typing reaches the model again', () => {
+        const wrapper = mountField();
+        const field = wrapper.find(selector).element as HTMLInputElement;
+
+        field.dispatchEvent(new CompositionEvent('compositionstart', {bubbles: true}));
+        type(field, 'か');
+        field.dispatchEvent(new Event('change', {bubbles: true}));
+        type(field, 'か!');
+
+        expect(wrapper.emitted('update:modelValue')).toEqual([['か'], ['か!']]);
+    });
+
+    it('REGRESSION PIN — a change outside a composition commits nothing, as `vModelText` ignores it', () => {
+        const wrapper = mountField();
+        const field = wrapper.find(selector).element as HTMLInputElement;
+
+        type(field, 'a');
+        field.value = 'ab';
+        field.dispatchEvent(new Event('change', {bubbles: true}));
+
+        expect(wrapper.emitted('update:modelValue')).toEqual([['a']]);
+    });
 });
 
 describe.each([

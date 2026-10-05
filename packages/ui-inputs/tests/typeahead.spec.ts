@@ -368,6 +368,34 @@ describe('typeahead — the typed string stops growing at 64 characters', () => 
 
         expect(wrapper.find('[role="combobox"]').attributes('aria-activedescendant')).toBe('f-opt-0');
     });
+
+    // The cap counts keys, not UTF-16 units: an emoji key is two units and still one of the 64.
+    const typeEmoji = async (shared: string): Promise<string | undefined> => {
+        const wrapper = mount(SingleSelect, {
+            props: {
+                options: [
+                    {id: 1, name: `${shared}🍌`},
+                    {id: 2, name: `${shared}🍒`},
+                ],
+                label: 'name',
+                id: 'f',
+                modelValue: null,
+                alphabeticalSort: false,
+            },
+            attachTo: document.body,
+        });
+        const root = wrapper.find('.ui-select');
+        for (const key of `${shared}🍒`) await root.trigger('keydown', {key});
+        return wrapper.find('[role="combobox"]').attributes('aria-activedescendant');
+    };
+
+    it('a 64th emoji key is read', async () => {
+        expect(await typeEmoji(`${'🍎🍌'.repeat(31)}🍎`)).toBe('f-opt-1');
+    });
+
+    it('a 65th emoji key leaves the 64-key match in place', async () => {
+        expect(await typeEmoji('🍎🍌'.repeat(32))).toBe('f-opt-0');
+    });
 });
 
 describe('typeahead — a typed key and a label fold the same, whatever follows in the label', () => {
