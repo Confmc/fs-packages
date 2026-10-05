@@ -369,3 +369,36 @@ describe('typeahead — the typed string stops growing at 64 characters', () => 
         expect(wrapper.find('[role="combobox"]').attributes('aria-activedescendant')).toBe('f-opt-0');
     });
 });
+
+describe('typeahead — a typed key and a label fold the same, whatever follows in the label', () => {
+    // A whole-string lowercase is contextual: Σ ending a word becomes ς, elsewhere σ. Typed one key
+    // at a time, Σ never ends a word, so the label must not be folded with a context the keys lack.
+    const typeInto = async (names: string[], keys: string): Promise<string | undefined> => {
+        const wrapper = mount(SingleSelect, {
+            props: {
+                options: names.map((name, index) => ({id: index + 1, name})),
+                label: 'name',
+                id: 'f',
+                modelValue: null,
+                alphabeticalSort: false,
+            },
+            attachTo: document.body,
+        });
+        const root = wrapper.find('.ui-select');
+        for (const key of keys) await root.trigger('keydown', {key});
+        return wrapper.find('[role="combobox"]').attributes('aria-activedescendant');
+    };
+
+    it('Ο then Σ moves from ΟΧ to ΟΣ, a label whose Σ ends the word', async () => {
+        expect(await typeInto(['ΟΧ', 'ΟΣ'], 'ΟΣ')).toBe('f-opt-1');
+    });
+
+    it('Ο then Σ moves from ΟΧ to ΟΣΑ, a label whose Σ does not end the word', async () => {
+        expect(await typeInto(['ΟΧ', 'ΟΣΑ'], 'ΟΣ')).toBe('f-opt-1');
+    });
+
+    it('İ, whose lowercase is two code units, matches İ labels and cycles through them on repeat', async () => {
+        expect(await typeInto(['Ice', 'İzmir', 'İstanbul'], 'İ')).toBe('f-opt-1');
+        expect(await typeInto(['Ice', 'İzmir', 'İstanbul'], 'İİ')).toBe('f-opt-2');
+    });
+});

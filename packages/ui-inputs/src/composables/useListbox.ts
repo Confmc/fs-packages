@@ -87,6 +87,13 @@ const TYPEAHEAD_RESET_MS = 500;
 const TYPEAHEAD_MAX_LENGTH = 64;
 
 /**
+ * Lowercases one code point at a time, so a character folds the same wherever it stands. A whole-string
+ * lowercase is contextual (Σ ending a word becomes ς, elsewhere σ), and the keys are folded one by one,
+ * so a label folded as a whole could disagree with the same text typed (crit b8d6a958f182).
+ */
+const fold = (text: string): string => Array.from(text, (character) => character.toLocaleLowerCase()).join('');
+
+/**
  * The behavioural core shared by every ui-inputs listbox control (SingleSelect, Combobox, and —
  * forthcoming — MultiSelect). Entirely position/index-based, so the option type `T` never crosses
  * this boundary: the caller owns the derived list and hands back only its length and index-keyed
@@ -143,6 +150,8 @@ export const useListbox = (options: UseListboxOptions) => {
     // composable still never calls this on commit: closing after a commit stays the caller's
     // decision (`onCommit` — the MultiSelect toggle-and-stay-open contract).
     let typed = '';
+    // The first key, folded. Not `typed[0]`: a fold can be two code units (İ → i̇).
+    let first = '';
     // Whether every key in `typed` is its first character — kept as a flag, so a held key costs the
     // same on every repeat instead of re-scanning a run that key repeat grows without limit.
     let repeated = true;
@@ -190,16 +199,17 @@ export const useListbox = (options: UseListboxOptions) => {
         clearTimeout(typedTimer);
         typedTimer = setTimeout(dropTyped, TYPEAHEAD_RESET_MS);
 
-        const character = key.toLocaleLowerCase();
-        repeated = typed === '' || (repeated && character === typed[0]);
+        const character = fold(key);
+        if (typed === '') first = character;
+        repeated = typed === '' || (repeated && character === first);
         if (typed.length < TYPEAHEAD_MAX_LENGTH) typed += character;
 
-        const needle = repeated ? typed[0] : typed;
+        const needle = repeated ? first : typed;
         const from = pointer.value >= 0 ? pointer.value : (committedIndex?.() ?? -1);
         const start = repeated ? from + 1 : Math.max(from, 0);
         for (let step = 0; step < labels.length; step++) {
             const index = (start + step) % labels.length;
-            if (labels[index].toLocaleLowerCase().startsWith(needle)) {
+            if (fold(labels[index]).startsWith(needle)) {
                 clearActive.value = false;
                 pointer.value = index;
                 return true;
