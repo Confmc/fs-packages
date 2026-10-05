@@ -187,6 +187,9 @@ export const useListbox = (options: UseListboxOptions) => {
         !event.altKey &&
         (event.key !== ' ' || typed !== '');
 
+    // Folded once per change of the labels, not on every key a held, matching-nothing key repeats.
+    const foldedLabels = typeaheadLabels && computed(() => typeaheadLabels().map(fold));
+
     /**
      * The WAI-ARIA listbox typeahead, with native <select> parity: the typed string grows while keys
      * arrive within TYPEAHEAD_RESET_MS; a single character (or the same character repeated) moves
@@ -196,8 +199,6 @@ export const useListbox = (options: UseListboxOptions) => {
      * wraps, compares case-insensitively, and moves nothing when no option matches. Returns
      * whether it found one.
      */
-    // Folded once per change of the labels, not on every key a held, matching-nothing key repeats.
-    const foldedLabels = typeaheadLabels && computed(() => typeaheadLabels().map(fold));
     const typeahead = (key: string, labels: string[]): boolean => {
         clearTimeout(typedTimer);
         typedTimer = setTimeout(dropTyped, TYPEAHEAD_RESET_MS);
