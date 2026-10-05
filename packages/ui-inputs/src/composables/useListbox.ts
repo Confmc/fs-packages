@@ -177,10 +177,11 @@ export const useListbox = (options: UseListboxOptions) => {
         else openList();
     };
 
-    // A key is typeahead when it prints one character with no command modifier. Space counts only
-    // inside a string already being typed — on its own it keeps its open/toggle meaning.
+    // A key is typeahead when it prints one character with no command modifier. Characters are
+    // counted as `fold` counts them, by code point, so 🍎 is one and a named key such as Enter is not.
+    // Space counts only inside a string already being typed — on its own it keeps its open/toggle meaning.
     const isTypeahead = (event: KeyboardEvent): boolean =>
-        event.key.length === 1 &&
+        Array.from(event.key).length === 1 &&
         !event.ctrlKey &&
         !event.metaKey &&
         !event.altKey &&
@@ -195,6 +196,8 @@ export const useListbox = (options: UseListboxOptions) => {
      * wraps, compares case-insensitively, and moves nothing when no option matches. Returns
      * whether it found one.
      */
+    // Folded once per change of the labels, not on every key a held, matching-nothing key repeats.
+    const foldedLabels = typeaheadLabels && computed(() => typeaheadLabels().map(fold));
     const typeahead = (key: string, labels: string[]): boolean => {
         clearTimeout(typedTimer);
         typedTimer = setTimeout(dropTyped, TYPEAHEAD_RESET_MS);
@@ -209,7 +212,7 @@ export const useListbox = (options: UseListboxOptions) => {
         const start = repeated ? from + 1 : Math.max(from, 0);
         for (let step = 0; step < labels.length; step++) {
             const index = (start + step) % labels.length;
-            if (fold(labels[index]).startsWith(needle)) {
+            if (labels[index].startsWith(needle)) {
                 clearActive.value = false;
                 pointer.value = index;
                 return true;
@@ -267,10 +270,10 @@ export const useListbox = (options: UseListboxOptions) => {
             onDismiss();
             return;
         }
-        if (typeaheadLabels !== undefined && isTypeahead(event)) {
+        if (foldedLabels !== undefined && isTypeahead(event)) {
             event.preventDefault();
             // Closed, a match OPENS the list on it (the APG select-only combobox), never commits.
-            if (typeahead(event.key, typeaheadLabels()) && !open.value) openList();
+            if (typeahead(event.key, foldedLabels.value) && !open.value) openList();
             return;
         }
         if (!open.value) {

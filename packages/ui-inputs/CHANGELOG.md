@@ -4,7 +4,7 @@
 
 ### Added
 
-- **Typeahead on `SingleSelect`, `MultiSelect` and `GroupSelect` (WR-1991).** A typed character moves the highlight to the next option starting with it, a quickly typed string matches by prefix, and the string resets after 500 ms or when the list closes, however it closes. The string keeps its first 64 characters. With nothing highlighted, SingleSelect and GroupSelect search from the chosen option, as a native `<select>` does; MultiSelect searches from the top. On a closed control a match opens the list on that option; nothing commits until Enter. Case is ignored one character at a time, so typed `ΟΣ` finds both `ΟΣ` and `ΟΣΑ` (a whole-word lowercase would read the first as `ος`), and `İ` finds and cycles the labels starting with `İ`. The comboboxes are unchanged: their typed characters are the query.
+- **Typeahead on `SingleSelect`, `MultiSelect` and `GroupSelect` (WR-1991).** A typed character moves the highlight to the next option starting with it, a quickly typed string matches by prefix, and the string resets after 500 ms or when the list closes, however it closes. The string keeps its first 64 characters. With nothing highlighted, SingleSelect and GroupSelect search from the chosen option, as a native `<select>` does; MultiSelect searches from the top. On a closed control a match opens the list on that option; nothing commits until Enter. Case is ignored one character at a time, so typed `ΟΣ` finds both `ΟΣ` and `ΟΣΑ` (a whole-word lowercase would read the first as `ος`), and `İ` finds and cycles the labels starting with `İ`. An emoji key such as `🍎` counts as one character. The comboboxes are unchanged: their typed characters are the query.
 
 ### Changed
 

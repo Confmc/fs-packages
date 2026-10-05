@@ -2,7 +2,7 @@
 // WR-1991: typeahead on the select-only listboxes. Key handling is the component's own logic over
 // the keydown it receives — no platform default is involved — so happy-dom runs the real path.
 import {mount} from '@vue/test-utils';
-import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
+import {afterEach, beforeEach, describe, expect, it, onTestFinished, vi} from 'vitest';
 
 import Combobox from '../src/components/Combobox.vue';
 import GroupSelect from '../src/components/GroupSelect.vue';
@@ -400,5 +400,64 @@ describe('typeahead — a typed key and a label fold the same, whatever follows 
     it('İ, whose lowercase is two code units, matches İ labels and cycles through them on repeat', async () => {
         expect(await typeInto(['Ice', 'İzmir', 'İstanbul'], 'İ')).toBe('f-opt-1');
         expect(await typeInto(['Ice', 'İzmir', 'İstanbul'], 'İİ')).toBe('f-opt-2');
+    });
+
+    it('a key outside the BMP, two code units, is one character and matches', async () => {
+        expect(await typeInto(['Banana', '🍎 Apple'], '🍎')).toBe('f-opt-1');
+    });
+});
+
+describe('typeahead — a named key is not a character', () => {
+    // Enter and Tab are longer than one character; neither may search for a label spelling the key.
+    it.each(['Enter', 'Tab'])('%s never moves the highlight to a label starting with its name', async (key) => {
+        const wrapper = mount(SingleSelect, {
+            props: {
+                options: [
+                    {id: 1, name: 'Apple'},
+                    {id: 2, name: `${key} here`},
+                ],
+                label: 'name',
+                id: 'f',
+                modelValue: null,
+                alphabeticalSort: false,
+            },
+            attachTo: document.body,
+        });
+
+        await wrapper.find('.ui-select').trigger('keydown', {key});
+
+        expect(wrapper.find('[role="combobox"]').attributes('aria-activedescendant')).not.toBe('f-opt-1');
+    });
+});
+
+describe.each(SELECT_ONLY)('$name — a held key that matches nothing folds no label again', ({mountIt, keyTarget}) => {
+    // The labels change only with the options, so they are folded once; a key folds only itself.
+    it('100 repeats of a key no label starts with cost one fold each', () => {
+        const wrapper = mountIt();
+        const target = wrapper.find(keyTarget).element;
+        const press = (): void => {
+            target.dispatchEvent(new KeyboardEvent('keydown', {key: 'z', bubbles: true, cancelable: true}));
+        };
+        press();
+        const folds = vi.spyOn(String.prototype, 'toLocaleLowerCase');
+        onTestFinished(() => folds.mockRestore());
+
+        for (let repeat = 0; repeat < 100; repeat++) press();
+
+        expect(folds).toHaveBeenCalledTimes(100);
+    });
+});
+
+describe('typeahead — the labels fold again when the options change', () => {
+    it('a label added after mount is found', async () => {
+        const wrapper = mount(SingleSelect, {
+            props: {options: FRUITS, label: 'name', id: 'f', modelValue: null, alphabeticalSort: false},
+            attachTo: document.body,
+        });
+        await wrapper.setProps({options: [...FRUITS, {id: 7, name: 'Damson'}]});
+
+        await wrapper.find('.ui-select').trigger('keydown', {key: 'd'});
+
+        expect(wrapper.find('[role="combobox"]').attributes('aria-activedescendant')).toBe('f-opt-6');
     });
 });
