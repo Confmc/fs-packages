@@ -22,4 +22,22 @@ export {default as GroupCombobox} from './components/GroupCombobox.vue';
 export {default as Pressable} from './components/Pressable.vue';
 export {default as Disclosure} from './components/Disclosure.vue';
 
+// Field wiring: a control reads its FormField, a FormField reads its form's errors by name.
+export {useFieldControl, useFieldError} from './composables/field-context';
+export type {FieldControl, OwnControlProps} from './composables/field-context';
+
+// Form state (formerly @script-development/fs-form): useForm provides its errors to the named fields below it.
+export {useForm} from './form/form';
+export {useFormSubmit} from './form/form-submit';
+export {useValidationErrors} from './form/validation-errors';
+export type {
+    UseForm,
+    UseFormClient,
+    UseFormOptions,
+    UseFormSubmit,
+    UseValidationErrors,
+    UseValidationErrorsOptions,
+    ValidationErrors,
+} from './form/types';
+
 export type {SelectItem, LabelKey} from './types';

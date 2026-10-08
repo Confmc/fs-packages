@@ -1,4 +1,4 @@
-# ui-inputs — decisions
+# ui-form — decisions (from ui-inputs)
 
 Why this package is shaped the way it is. Every entry names a cost it accepts or
 a limitation it lives with, so the argument sits here rather than in a comment

@@ -4,7 +4,7 @@ import {watch} from 'vue';
 
 import type {ValidationErrors} from './types';
 
-/** The mark `@script-development/ui-inputs` renders from `:invalid`. */
+/** The mark ui-form's controls render from `:invalid`. */
 const DEFAULT_TARGET = '[aria-invalid="true"]';
 
 /**

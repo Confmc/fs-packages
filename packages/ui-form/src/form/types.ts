@@ -1,4 +1,4 @@
-import type {Ref} from 'vue';
+import type {ComputedRef, Ref} from 'vue';
 
 /** Field-error bag: the first backend validation message per field key. */
 export type ValidationErrors<T extends string = string> = Partial<Record<T, string>>;
@@ -75,7 +75,7 @@ export type UseFormOptions<T extends string = string> = Omit<UseValidationErrors
      * whose refusal it was — turning it on without a `scrollRoot` lets one form's refusal
      * scroll the page to another form's field. Requires the presentation layer to mark the
      * errored control (the default target is `[aria-invalid="true"]`, which
-     * `@script-development/ui-inputs` renders from `:invalid`).
+     * this package's controls render from `:invalid`).
      * @default false
      */
     scrollToError?: boolean;
@@ -88,7 +88,7 @@ export type UseFormOptions<T extends string = string> = Omit<UseValidationErrors
     scrollRoot?: Ref<HTMLElement | null>;
     /**
      * CSS selector for the invalid-field mark, used by `scrollToError`. Defaults to
-     * `'[aria-invalid="true"]'` (what `@script-development/ui-inputs` renders). Pass your
+     * `'[aria-invalid="true"]'` (what this package's controls render). Pass your
      * own when your inputs mark errors differently (e.g. a class) — the package derives
      * no ids and marks nothing itself.
      * @default '[aria-invalid="true"]'
@@ -101,4 +101,18 @@ export type UseFormOptions<T extends string = string> = Omit<UseValidationErrors
  * `useValidationErrors`, plus `handleSubmit` and the `submitting` loading flag
  * from `useFormSubmit` — wired together so a page composes one call, not two.
  */
-export type UseForm<T extends string = string> = UseValidationErrors<T> & UseFormSubmit;
+export type UseForm<T extends string = string> = UseValidationErrors<T> & UseFormSubmit & UseFormClient<T>;
+
+/** The refusals a form makes itself, next to the server's. */
+export interface UseFormClient<T extends string = string> {
+    /** Refusals the form made itself (a check before sending). `handleSubmit` leaves them alone. */
+    clientErrors: Readonly<Ref<ValidationErrors<T>>>;
+    /** What the fields show: the server's errors with the client refusals on top (client wins per key). */
+    fieldErrors: ComputedRef<ValidationErrors<T>>;
+    /** Refuse a field from the client, e.g. a check that runs before the request is sent. */
+    refuse: (field: T, message: string) => void;
+    /** Withdraw the client refusal on these fields; the server's errors are untouched. */
+    withdraw: (...fields: T[]) => void;
+    /** Withdraw every client refusal, e.g. when an editor opens or closes. */
+    clearClient: () => void;
+}

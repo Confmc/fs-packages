@@ -8,25 +8,25 @@
          land here, and a pointer on an option's label text reaches them without touching a
          disabled input. -->
     <fieldset
-        :id="id"
+        :id="control.id"
         ref="group"
         v-guard-while-disabled="disabled"
         class="ui-check-group"
-        :aria-invalid="invalid || undefined"
-        :aria-describedby="describedby"
+        :aria-invalid="control.invalid || undefined"
+        :aria-describedby="control.describedby"
     >
         <legend class="ui-label ui-check-group__legend">
             <span ref="legendText">{{ label }}</span
-            ><span v-if="required" class="ui-label__req" aria-hidden="true">*</span
-            ><span v-if="required" class="ui-check-group__sr">{{ requiredLabel }}</span>
+            ><span v-if="control.required" class="ui-label__req" aria-hidden="true">*</span
+            ><span v-if="control.required" class="ui-check-group__sr">{{ requiredLabel }}</span>
         </legend>
         <Checkbox
             v-for="(option, index) in options"
-            :id="`${id}-opt-${index}`"
+            :id="`${control.id}-opt-${index}`"
             :key="String(option.id)"
             :label="labelOf(option)"
             :disabled="disabled"
-            :invalid="invalid"
+            :invalid="control.invalid"
             :model-value="model.includes(option.id)"
             @update:model-value="toggle(option.id)"
         />
@@ -38,6 +38,7 @@ import {onMounted, useTemplateRef} from 'vue';
 
 import type {LabelKey, SelectItem} from '../types';
 
+import {useFieldControl} from '../composables/field-context';
 import {warnWhenUnnamed} from '../internal/accessible-name';
 import {vGuardWhileDisabled} from '../internal/disabled-guard';
 import {ensureRefValueExists} from '../internal/reactivity';
@@ -49,8 +50,8 @@ const {
     label,
     id,
     disabled = false,
-    required = false,
-    invalid = false,
+    required = undefined,
+    invalid = undefined,
     describedby,
     requiredLabel = '(required)',
 } = defineProps<{
@@ -63,7 +64,7 @@ const {
     /** the group legend. */
     label: string;
     /** stable id — on the fieldset, and the base for position-keyed member ids. */
-    id: string;
+    id?: string;
     disabled?: boolean;
     /** conveys the required state at group level (legend marker + sr-only text). */
     required?: boolean;
@@ -79,6 +80,10 @@ const {
 }>();
 
 /** The committed membership: an array of option ids, kept in OPTIONS order. */
+// The group takes the field's wiring for its fieldset and isolates it: a member must not repeat
+// the group's aria-describedby (one described-by story), so the members only get what is passed below.
+const control = useFieldControl(() => ({id, invalid, describedby, required}), {isolate: true});
+
 const model = defineModel<T['id'][]>({required: true});
 
 const group = useTemplateRef<HTMLElement>('group');

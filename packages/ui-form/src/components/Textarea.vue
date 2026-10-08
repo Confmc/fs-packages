@@ -1,15 +1,15 @@
 <template>
-    <input
-        :id="id"
-        :type="type"
-        class="ui-control ui-input"
-        :class="{'is-invalid': invalid}"
+    <textarea
+        :id="control.id"
+        class="ui-control ui-textarea"
+        :class="{'is-invalid': control.invalid}"
         :value="shown"
         :placeholder="placeholder"
         :disabled="disabled"
-        :aria-required="required || undefined"
-        :aria-invalid="invalid || undefined"
-        :aria-describedby="describedby"
+        :rows="rows"
+        :aria-required="control.required || undefined"
+        :aria-invalid="control.invalid || undefined"
+        :aria-describedby="control.describedby"
         @input="onInput"
         @compositionstart="onCompositionstart"
         @compositionend="onCompositionend"
@@ -18,13 +18,20 @@
 </template>
 
 <script setup lang="ts">
+import {useFieldControl} from '../composables/field-context';
 import {commitOutsideComposition} from '../internal/composition';
 
-const {type = 'text'} = defineProps<{
-    id: string;
-    type?: 'text' | 'email' | 'password' | 'search' | 'tel' | 'url';
+const {
+    id,
+    invalid = undefined,
+    describedby,
+    required = undefined,
+} = defineProps<{
+    /** control id; inside a `FormField` it defaults to the field's. */
+    id?: string;
     placeholder?: string;
     disabled?: boolean;
+    rows?: number;
     /** conveys the required state to assistive tech via `aria-required`. */
     required?: boolean;
     /** invalid styling + aria; drive it from the field's error. */
@@ -33,8 +40,12 @@ const {type = 'text'} = defineProps<{
     describedby?: string;
 }>();
 
-// Accepts null so it binds a nullable backend field directly (Vue renders null as
-// an empty control); a cleared input emits '', which the fleet's
+// Absent `invalid`/`required` must stay `undefined` (not Vue's boolean-cast `false`), so the
+// enclosing FormField can decide them.
+const control = useFieldControl(() => ({id, invalid, describedby, required}));
+
+// Accepts null so it binds a nullable text column directly (Vue renders null as an
+// empty control); a cleared textarea emits '', which the fleet's
 // ConvertEmptyStringsToNull middleware converts back to null on submit.
 const model = defineModel<string | null>({required: true});
 

@@ -147,7 +147,7 @@ const warnWhenModelUninitialised = (): void => {
     if (vnodeProps?.['onUpdate:pressed'] === undefined) return;
 
     console.warn(
-        '[ui-inputs] <Pressable> has `v-model:pressed` bound to `undefined`, so it renders no ' +
+        '[ui-form] <Pressable> has `v-model:pressed` bound to `undefined`, so it renders no ' +
             '`aria-pressed` and never toggles or emits. Initialise the bound ref to a boolean.',
     );
 };
@@ -171,7 +171,7 @@ const warnWhenSelfActivating = (element: HTMLElement): void => {
     if (rendered === 'a' && !element.hasAttribute('href')) return;
 
     console.warn(
-        `[ui-inputs] <Pressable as="${as}"> aims the escape hatch at an element the browser ` +
+        `[ui-form] <Pressable as="${as}"> aims the escape hatch at an element the browser ` +
             'already activates, so it now carries a hand-rolled `role="button"` and a second ' +
             'key-to-click translation on top of its own. Render a `<button>`, or an element that ' +
             'activates nothing.',

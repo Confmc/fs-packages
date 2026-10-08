@@ -17,7 +17,7 @@ export default defineConfig({
     root: import.meta.dirname,
     plugins: [Vue()],
     test: {
-        name: 'ui-inputs-browser',
+        name: 'ui-form-browser',
         include: ['tests/browser/**/*.browser.spec.ts'],
         // Spec files must run SERIALLY: the suite asserts real `:focus-visible` state, and a
         // parallel sibling page holding OS focus makes the focused document inactive — the

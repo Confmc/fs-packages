@@ -1,7 +1,11 @@
 import type {HttpService} from '@script-development/fs-http';
+import type {Ref} from 'vue';
 
-import type {UseForm, UseFormOptions} from './types';
+import {computed, readonly, ref} from 'vue';
 
+import type {UseForm, UseFormOptions, ValidationErrors} from './types';
+
+import {provideFieldErrors} from '../composables/field-context';
 import {useFormSubmit} from './form-submit';
 import {useScrollToFirstError} from './scroll-to-first-error';
 import {useValidationErrors} from './validation-errors';
@@ -19,6 +23,10 @@ import {useValidationErrors} from './validation-errors';
  * for the underlying `useValidationErrors` / `useFormSubmit` primitives directly
  * when you need one half without the other (e.g. a validation-less confirm action).
  *
+ * The form's fields find their own messages: every `FormField` with a `name` below the calling
+ * component reads `fieldErrors` (the server's errors with the form's own `refuse`s on top). Two
+ * forms in one component would provide over each other; give each its own component.
+ *
  * @param httpService the fs-http service whose 422 responses to observe.
  * @param options     `keyMapper`, `fields`, `onlyWhileSubmitting`, `scrollToError`, `scrollRoot`,
  *                    `scrollTarget` — see `UseFormOptions`.
@@ -34,7 +42,33 @@ export const useForm = <T extends string = string>(
     });
     const submit = useFormSubmit(validation);
 
-    if (scrollToError) useScrollToFirstError(validation.errors, scrollRoot, scrollTarget);
+    const client = ref({}) as Ref<ValidationErrors<T>>;
+    const fieldErrors = computed(() => ({...validation.errors.value, ...client.value}));
+    provideFieldErrors(fieldErrors);
 
-    return {...validation, ...submit};
+    if (scrollToError) useScrollToFirstError(fieldErrors, scrollRoot, scrollTarget);
+
+    const refuse = (field: T, message: string): void => {
+        client.value = {...client.value, [field]: message};
+    };
+
+    const withdraw = (...fields: T[]): void => {
+        const next = {...client.value};
+        for (const field of fields) delete next[field];
+        client.value = next;
+    };
+
+    const clearClient = (): void => {
+        client.value = {};
+    };
+
+    return {
+        ...validation,
+        ...submit,
+        clientErrors: readonly(client) as Readonly<Ref<ValidationErrors<T>>>,
+        fieldErrors,
+        refuse,
+        withdraw,
+        clearClient,
+    };
 };

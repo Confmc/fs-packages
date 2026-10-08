@@ -10,7 +10,7 @@ export default defineProject({
     // unplugin-vue/rolldown for the build.
     plugins: [Vue()],
     test: {
-        name: 'ui-inputs',
+        name: 'ui-form',
         // The browser-mode layer (vitest.browser.config.ts — real Chromium, run via the root
         // `test:browser` script) names its specs `*.browser.spec.ts`, which the default include
         // glob would otherwise sweep into this happy-dom project on the root `vitest run`.

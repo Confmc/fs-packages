@@ -1,7 +1,7 @@
 /*
- * @script-development/ui-inputs — shipped stylesheet.
+ * @script-development/ui-form — shipped stylesheet.
  *
- *   import '@script-development/ui-inputs/style.css';
+ *   import '@script-development/ui-form/style.css';
  *
  * Every rule is keyed on a --ui-* custom property. The component ships NO token
  * vocabulary and NO hard-coded colour: a consuming territory maps its own tokens

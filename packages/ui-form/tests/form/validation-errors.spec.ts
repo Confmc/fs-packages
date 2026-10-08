@@ -6,9 +6,9 @@ import {mount} from '@vue/test-utils';
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {defineComponent} from 'vue';
 
-import type {UseValidationErrors, UseValidationErrorsOptions} from '../src';
+import type {UseValidationErrors, UseValidationErrorsOptions} from '../../src';
 
-import {useValidationErrors} from '../src';
+import {useValidationErrors} from '../../src';
 
 type ErrorMiddleware = ResponseErrorMiddlewareFunc;
 

@@ -3,7 +3,7 @@ import type {AxiosError} from 'axios';
 
 import {describe, expect, it, vi} from 'vitest';
 
-import {useFormSubmit} from '../src';
+import {useFormSubmit} from '../../src';
 
 const makeAxiosError = (status: number): AxiosError => ({isAxiosError: true, response: {status}}) as AxiosError;
 
