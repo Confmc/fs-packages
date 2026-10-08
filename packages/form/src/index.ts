@@ -5,7 +5,6 @@
 export {useForm, useFormSubmit, useValidationErrors} from '@script-development/ui-form';
 export type {
     UseForm,
-    UseFormClient,
     UseFormOptions,
     UseFormSubmit,
     UseValidationErrors,

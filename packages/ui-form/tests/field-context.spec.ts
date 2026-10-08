@@ -3,7 +3,8 @@ import {mount} from '@vue/test-utils';
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {defineComponent, h, nextTick, ref} from 'vue';
 
-import type {FieldErrors, OwnControlProps} from '../src/composables/field-context';
+import type {OwnControlProps} from '../src/composables/field-context';
+import type {ValidationErrors} from '../src/form/types';
 
 import CheckboxGroup from '../src/components/CheckboxGroup.vue';
 import FormField from '../src/components/FormField.vue';
@@ -34,7 +35,7 @@ const OutsideControl = defineComponent({
 });
 
 // A form that provides its bag and renders whatever fields it is given.
-const formWith = (errors: ReturnType<typeof ref<FieldErrors>>, render: () => ReturnType<typeof h>) =>
+const formWith = (errors: ReturnType<typeof ref<ValidationErrors>>, render: () => ReturnType<typeof h>) =>
     defineComponent({
         setup: () => {
             provideFieldErrors(errors as never);
@@ -157,7 +158,7 @@ describe('useFieldControl isolate', () => {
 
 describe('FormField name', () => {
     it('reads its message from the provided bag by name, verbatim', async () => {
-        const errors = ref<FieldErrors>({});
+        const errors = ref<ValidationErrors>({});
         const wrapper = mount(
             formWith(errors, () =>
                 h('div', [
@@ -185,7 +186,7 @@ describe('FormField name', () => {
     });
 
     it('generates distinct ids for two fields with the same name in two forms', () => {
-        const errors = ref<FieldErrors>({});
+        const errors = ref<ValidationErrors>({});
         const field = () =>
             h(FormField, {name: 'email', label: 'Email'}, {default: () => h(TextInput, {modelValue: ''})});
         const wrapper = mount(
@@ -197,7 +198,7 @@ describe('FormField name', () => {
     });
 
     it('lets an explicit error win over the bag', () => {
-        const errors = ref<FieldErrors>({email: 'From the bag'});
+        const errors = ref<ValidationErrors>({email: 'From the bag'});
         const wrapper = mount(
             formWith(errors, () =>
                 h(FormField, {name: 'email', error: 'Explicit'}, {default: () => h(TextInput, {modelValue: ''})}),
@@ -208,7 +209,7 @@ describe('FormField name', () => {
     });
 
     it('treats an empty message as no error, so describedby never points at a missing element', () => {
-        const errors = ref<FieldErrors>({email: ''});
+        const errors = ref<ValidationErrors>({email: ''});
         const wrapper = mount(
             formWith(errors, () => h(FormField, {name: 'email'}, {default: () => h(TextInput, {modelValue: ''})})),
         );
@@ -220,8 +221,8 @@ describe('FormField name', () => {
     });
 
     it('reads the nearest provided bag', () => {
-        const outer = ref<FieldErrors>({email: 'Outer form'});
-        const inner = ref<FieldErrors>({});
+        const outer = ref<ValidationErrors>({email: 'Outer form'});
+        const inner = ref<ValidationErrors>({});
         const field = () => h(FormField, {name: 'email'}, {default: () => h(TextInput, {modelValue: ''})});
         const wrapper = mount(formWith(outer, () => h(formWith(inner, field))));
 
@@ -241,7 +242,7 @@ describe('FormField name', () => {
         const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 
         mount(
-            formWith(ref<FieldErrors>({}), () =>
+            formWith(ref<ValidationErrors>({}), () =>
                 h(FormField, {name: 'email'}, {default: () => h(TextInput, {modelValue: ''})}),
             ),
         );
@@ -302,7 +303,7 @@ describe('useFieldError', () => {
     });
 
     it('reads the message by name from the nearest bag, and follows the bag and the name', async () => {
-        const errors = ref<FieldErrors>({remarks: 'Te lang'});
+        const errors = ref<ValidationErrors>({remarks: 'Te lang'});
         const name = ref('remarks');
         const wrapper = mount(formWith(errors, () => h(Probe, {name: name.value})));
 
@@ -316,7 +317,7 @@ describe('useFieldError', () => {
 
     it('gives undefined for an empty message, a missing key, no name and no bag', () => {
         const bagged = mount(
-            formWith(ref<FieldErrors>({empty: ''}), () =>
+            formWith(ref<ValidationErrors>({empty: ''}), () =>
                 h('div', [h(Probe, {name: 'empty'}), h(Probe, {name: 'missing'}), h(Probe)]),
             ),
         );

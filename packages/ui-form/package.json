@@ -1,6 +1,6 @@
 {
     "name": "@script-development/ui-form",
-    "version": "0.1.0-merge.4",
+    "version": "0.1.0-merge.5",
     "private": true,
     "description": "Headless, themeable Vue form components and form state (fs-form + ui-inputs merged): fields, controls, 422 binding, client refusals",
     "homepage": "https://packages.script.nl/packages/ui-form",

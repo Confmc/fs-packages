@@ -26,16 +26,14 @@ export {default as Disclosure} from './components/Disclosure.vue';
 // provideFieldErrors is public for what useForm cannot cover: a component spec that provides a bag
 // to assert a field's message and mark, a territory with its own error source, two forms in one component.
 export {provideFieldErrors, useFieldControl, useFieldError} from './composables/field-context';
-export type {FieldControl, FieldErrorSource, FieldErrors, OwnControlProps} from './composables/field-context';
 
 // Form state (formerly @script-development/fs-form): useForm provides its errors to the named fields below it.
 export {useForm} from './form/form';
 export {useFormSubmit} from './form/form-submit';
 export {useValidationErrors} from './form/validation-errors';
-export type {FailedRequest, FormHttpService} from './form/http-contract';
+export type {FormHttpService} from './form/http-contract';
 export type {
     UseForm,
-    UseFormClient,
     UseFormOptions,
     UseFormSubmit,
     UseValidationErrors,

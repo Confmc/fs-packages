@@ -2,11 +2,10 @@ import type {ComputedRef, MaybeRefOrGetter, Ref} from 'vue';
 
 import {computed, inject, provide, toValue, useId} from 'vue';
 
-/** A field-error bag by name: the first message per field. fs-form's `ValidationErrors` fits it. */
-export type FieldErrors = Readonly<Partial<Record<string, string>>>;
+import type {ValidationErrors} from '../form/types';
 
-/** Where a form's fields read their errors: a ref to the bag (fs-form's `errors`) or a getter. */
-export type FieldErrorSource = Readonly<Ref<FieldErrors>> | (() => FieldErrors);
+/** Where a form's fields read their errors: a ref to the bag (useForm's `errors`) or a getter. */
+type FieldErrorSource = Readonly<Ref<ValidationErrors>> | (() => ValidationErrors);
 
 /** The wiring a `FormField` hands the control inside it. */
 export interface FieldControl {
@@ -42,8 +41,8 @@ export const provideFieldErrors = (source: FieldErrorSource): void => {
 };
 
 /** The nearest provided error bag, or `null` outside any form. */
-export const injectFieldErrors = (): ComputedRef<FieldErrors> | null =>
-    inject<ComputedRef<FieldErrors> | null>(FIELD_ERRORS, null);
+export const injectFieldErrors = (): ComputedRef<ValidationErrors> | null =>
+    inject<ComputedRef<ValidationErrors> | null>(FIELD_ERRORS, null);
 
 /**
  * A field's message, read by name from the nearest provided error bag (`provideFieldErrors`).
