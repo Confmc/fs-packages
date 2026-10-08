@@ -1,16 +1,17 @@
 {
-    "name": "@script-development/fs-form",
-    "version": "0.4.0-merge.2",
-    "description": "DEPRECATED: merged into @script-development/ui-form; re-exports its form API",
-    "homepage": "https://packages.script.nl/packages/form",
+    "name": "@script-development/ui-inputs",
+    "version": "0.18.0-merge.2",
+    "description": "DEPRECATED: renamed to @script-development/ui-form; re-exports it",
+    "homepage": "https://packages.script.nl/packages/ui-inputs",
     "license": "MIT",
     "repository": {
         "type": "git",
         "url": "git+https://github.com/script-development/fs-packages.git",
-        "directory": "packages/form"
+        "directory": "packages/ui-inputs"
     },
     "files": [
-        "dist"
+        "dist",
+        "styles.css"
     ],
     "type": "module",
     "sideEffects": false,
@@ -27,7 +28,8 @@
                 "types": "./dist/index.d.cts",
                 "default": "./dist/index.cjs"
             }
-        }
+        },
+        "./style.css": "./styles.css"
     },
     "publishConfig": {
         "access": "public",
@@ -38,16 +40,14 @@
         "lint:pkg": "publint && attw --pack",
         "test": "vitest run --passWithNoTests",
         "test:coverage": "vitest run --coverage",
-        "test:mutation": "echo fs-form: re-export shim, nothing to mutate.",
+        "test:mutation": "echo ui-inputs: re-export shim, nothing to mutate.",
         "typecheck": "tsc --noEmit"
     },
     "devDependencies": {
-        "@script-development/fs-http": "^0.5.0 || ^0.6.0",
         "@script-development/ui-form": "0.1.0-merge.1",
         "vue": "^3.5.43"
     },
     "peerDependencies": {
-        "@script-development/fs-http": "^0.5.0 || ^0.6.0",
         "@script-development/ui-form": "0.1.0-merge.1",
         "vue": "^3.5.43"
     },

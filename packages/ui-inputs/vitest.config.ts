@@ -6,7 +6,7 @@ export default defineProject({
         // copy whose specs the default include glob would sweep in twice. Carried from
         // the pre-`test.projects` root config — root test.exclude is not inherited here.
         exclude: [...configDefaults.exclude, '**/.stryker-tmp/**'],
-        name: 'form',
+        name: 'ui-inputs',
         passWithNoTests: true,
         coverage: {
             provider: 'v8',
