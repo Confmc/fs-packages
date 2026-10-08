@@ -1,9 +1,8 @@
-import {isAxiosError} from '@script-development/fs-http';
 import {ref} from 'vue';
 
 import type {UseFormSubmit} from './types';
 
-const HTTP_UNPROCESSABLE_ENTITY = 422;
+import {isValidationRefusal} from './http-contract';
 
 /**
  * Wrap a form-submit action with double-submit prevention and validation-aware
@@ -30,7 +29,7 @@ export const useFormSubmit = (validationErrors: {clearErrors: () => void}): UseF
         try {
             await action();
         } catch (error) {
-            if (isAxiosError(error) && error.response?.status === HTTP_UNPROCESSABLE_ENTITY) return;
+            if (isValidationRefusal(error)) return;
 
             throw error;
         } finally {

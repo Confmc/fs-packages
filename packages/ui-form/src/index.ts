@@ -30,6 +30,7 @@ export type {FieldControl, OwnControlProps} from './composables/field-context';
 export {useForm} from './form/form';
 export {useFormSubmit} from './form/form-submit';
 export {useValidationErrors} from './form/validation-errors';
+export type {FailedRequest, FormHttpService} from './form/http-contract';
 export type {
     UseForm,
     UseFormClient,

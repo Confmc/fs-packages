@@ -1,8 +1,8 @@
-import type {HttpService} from '@script-development/fs-http';
 import type {Ref} from 'vue';
 
 import {computed, readonly, ref} from 'vue';
 
+import type {FormHttpService} from './http-contract';
 import type {UseForm, UseFormOptions, ValidationErrors} from './types';
 
 import {provideFieldErrors} from '../composables/field-context';
@@ -32,7 +32,7 @@ import {useValidationErrors} from './validation-errors';
  *                    `scrollTarget` — see `UseFormOptions`.
  */
 export const useForm = <T extends string = string>(
-    httpService: HttpService,
+    httpService: FormHttpService,
     options: UseFormOptions<T> = {},
 ): UseForm<T> => {
     const {onlyWhileSubmitting = false, scrollToError = false, scrollRoot, scrollTarget} = options;

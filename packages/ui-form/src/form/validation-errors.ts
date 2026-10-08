@@ -1,10 +1,11 @@
-import type {HttpService} from '@script-development/fs-http';
 import type {Ref} from 'vue';
 
-import {guarded} from '@script-development/fs-http';
 import {computed, onUnmounted, readonly, ref} from 'vue';
 
+import type {FailedRequest, FormHttpService} from './http-contract';
 import type {UseValidationErrors, UseValidationErrorsOptions, ValidationErrors} from './types';
+
+import {loudlySwallowed} from './http-contract';
 
 const HTTP_UNPROCESSABLE_ENTITY = 422;
 
@@ -35,19 +36,19 @@ const identity = (key: string): string => key;
  * of `errors` and listed in `unmapped` when `fields` does not name it or when
  * its value is not a list whose first entry is a string.
  *
- * The middleware body is wrapped with fs-http's `guarded()` so a throwing
- * `keyMapper` (or any parse hiccup) cannot reject a resolved request nor mask
- * the real API error — fs-form is a well-behaved fs-http consumer per the
- * Middleware Sync Contract (Architectural Principle #8). A throw leaves
+ * The middleware body is loudly swallowed (the same contract as fs-http's
+ * `guarded()`) so a throwing `keyMapper` (or any parse hiccup) cannot reject a
+ * resolved request nor mask the real API error — a well-behaved fs-http consumer
+ * per the Middleware Sync Contract (Architectural Principle #8). A throw leaves
  * `refused` true and `errors` / `unmapped` as they were.
  *
- * @param httpService the fs-http service whose error responses to observe.
+ * @param httpService the service whose error responses to observe (fs-http's `HttpService` fits).
  * @param options     `keyMapper` remaps raw backend field keys (default identity);
  *                    `fields` allow-lists the bag by mapped name (default every key);
  *                    `acceptWhen` gates which 422s are taken at all (default every one).
  */
 export const useValidationErrors = <T extends string = string>(
-    httpService: HttpService,
+    httpService: FormHttpService,
     options: UseValidationErrorsOptions<T> = {},
 ): UseValidationErrors<T> => {
     const {keyMapper = identity, fields, acceptWhen} = options;
@@ -63,7 +64,7 @@ export const useValidationErrors = <T extends string = string>(
     };
 
     const unregister = httpService.registerResponseErrorMiddleware(
-        guarded((error) => {
+        loudlySwallowed((error: FailedRequest) => {
             const response = error.response;
             if (response?.status !== HTTP_UNPROCESSABLE_ENTITY) return;
             if (acceptWhen && !acceptWhen()) return;
