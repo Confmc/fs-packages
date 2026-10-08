@@ -23,8 +23,10 @@ export {default as Pressable} from './components/Pressable.vue';
 export {default as Disclosure} from './components/Disclosure.vue';
 
 // Field wiring: a control reads its FormField, a FormField reads its form's errors by name.
-export {useFieldControl, useFieldError} from './composables/field-context';
-export type {FieldControl, OwnControlProps} from './composables/field-context';
+// provideFieldErrors is public for what useForm cannot cover: a component spec that provides a bag
+// to assert a field's message and mark, a territory with its own error source, two forms in one component.
+export {provideFieldErrors, useFieldControl, useFieldError} from './composables/field-context';
+export type {FieldControl, FieldErrorSource, FieldErrors, OwnControlProps} from './composables/field-context';
 
 // Form state (formerly @script-development/fs-form): useForm provides its errors to the named fields below it.
 export {useForm} from './form/form';
