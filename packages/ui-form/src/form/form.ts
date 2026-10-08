@@ -52,6 +52,13 @@ export const useForm = <T extends string = string>(
         client.value = {...client.value, [field]: message};
     };
 
+    const setRefusals = (bag: ValidationErrors<T>): boolean => {
+        const kept = Object.entries(bag).filter((entry): entry is [string, string] => Boolean(entry[1]));
+        client.value = Object.fromEntries(kept) as ValidationErrors<T>;
+
+        return kept.length > 0;
+    };
+
     const withdraw = (...fields: T[]): void => {
         const next = {...client.value};
         for (const field of fields) delete next[field];
@@ -68,6 +75,7 @@ export const useForm = <T extends string = string>(
         clientErrors: readonly(client) as Readonly<Ref<ValidationErrors<T>>>,
         fieldErrors,
         refuse,
+        setRefusals,
         withdraw,
         clearClient,
     };

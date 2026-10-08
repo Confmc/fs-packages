@@ -248,6 +248,39 @@ describe('client refusals share the bag', () => {
         expect(wrapper.findAll('.ui-error')).toHaveLength(0);
     });
 
+    it('sets the whole client verdict from a bag, and says whether it refused anything', async () => {
+        const {form, wrapper} = mountForm(() => [field('name'), field('url'), field('kvkNumber')]);
+
+        expect(form.setRefusals({name: 'Vul een naam in', url: 'Ongeldige url', kvkNumber: ''})).toBe(true);
+        await nextTick();
+
+        expectMarked(wrapper, 'name', 'Vul een naam in');
+        expectMarked(wrapper, 'url', 'Ongeldige url');
+        expect(form.clientErrors.value).toEqual({name: 'Vul een naam in', url: 'Ongeldige url'});
+
+        // the next check replaces the verdict: the fixed field is no longer refused
+        expect(form.setRefusals({url: 'Ongeldige url'})).toBe(true);
+        await nextTick();
+        expect(form.clientErrors.value).toEqual({url: 'Ongeldige url'});
+        expect(wrapper.findAll('.ui-error')).toHaveLength(1);
+
+        // a clean draft refuses nothing and clears the client layer
+        expect(form.setRefusals({})).toBe(false);
+        expect(form.setRefusals({name: undefined, url: ''})).toBe(false);
+        await nextTick();
+        expect(wrapper.findAll('.ui-error')).toHaveLength(0);
+    });
+
+    it('leaves the server errors alone when it sets the client verdict', async () => {
+        const {form, wrapper} = mountForm(() => [field('name'), field('url')]);
+
+        await form.handleSubmit(() => send({errors: {url: ['Server zegt nee']}}));
+        form.setRefusals({});
+        await nextTick();
+
+        expect(wrapper.find('.ui-error').text()).toBe('Server zegt nee');
+    });
+
     it('still re-throws what is not a refusal', async () => {
         const {form} = mountForm(() => [field('name')]);
 

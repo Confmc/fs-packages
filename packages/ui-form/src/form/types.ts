@@ -111,6 +111,13 @@ export interface UseFormClient<T extends string = string> {
     fieldErrors: ComputedRef<ValidationErrors<T>>;
     /** Refuse a field from the client, e.g. a check that runs before the request is sent. */
     refuse: (field: T, message: string) => void;
+    /**
+     * Set the client's whole verdict at once, e.g. the result of a pure `validate(draft)`: the bag
+     * REPLACES every earlier client refusal, so a field fixed since the last check is no longer
+     * refused. Empty messages are no refusal. Returns `true` when it refused anything, so a save can
+     * stop with `if (setRefusals(validate(draft))) return;`. The server's errors are untouched.
+     */
+    setRefusals: (bag: ValidationErrors<T>) => boolean;
     /** Withdraw the client refusal on these fields; the server's errors are untouched. */
     withdraw: (...fields: T[]) => void;
     /** Withdraw every client refusal, e.g. when an editor opens or closes. */
