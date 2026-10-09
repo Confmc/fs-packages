@@ -6,13 +6,13 @@
             ref="input"
             type="text"
             class="ui-control ui-combobox__input"
-            :class="{'is-open': open, 'is-invalid': invalid}"
+            :class="{'is-open': open, 'is-invalid': marked}"
             role="combobox"
             aria-autocomplete="list"
             aria-haspopup="listbox"
             :aria-expanded="open"
             :aria-required="required || undefined"
-            :aria-invalid="invalid || undefined"
+            :aria-invalid="marked || undefined"
             :aria-describedby="describedby"
             :aria-controls="open ? listboxId : undefined"
             :aria-activedescendant="activeDescendant"
@@ -97,7 +97,8 @@ const {
     disabled = false,
     alphabeticalSort = false,
     required = false,
-    invalid = false,
+    invalid = undefined,
+    error,
     describedby,
     emptyText = 'No options',
     optionsLabel = 'Options',
@@ -116,6 +117,12 @@ const {
     alphabeticalSort?: boolean;
     /** conveys the required state to assistive tech via `aria-required`. */
     required?: boolean;
+    /**
+     * the field's message (`field(name)` passes it). It marks the control invalid unless `invalid`
+     * says otherwise: `invalid: false` shows a message without the mark.
+     */
+    error?: string;
+    /** overrides the mark `error` sets; omitted, the mark follows `error`. */
     invalid?: boolean;
     describedby?: string;
     emptyText?: string;
@@ -132,6 +139,9 @@ const {
     /** what the input renders when the model is null — a NAMED empty state instead of `''`. */
     emptyDisplayValue?: string;
 }>();
+
+// The mark: `invalid` when given, otherwise whether there is a message.
+const marked = computed(() => invalid ?? Boolean(error));
 
 const ownId = useId();
 const controlId = computed(() => id ?? ownId);

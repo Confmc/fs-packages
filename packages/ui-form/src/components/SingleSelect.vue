@@ -6,13 +6,13 @@
             ref="reference"
             type="button"
             class="ui-control ui-select__trigger"
-            :class="{'is-open': open, 'has-value': selected !== undefined, 'is-invalid': invalid}"
+            :class="{'is-open': open, 'has-value': selected !== undefined, 'is-invalid': marked}"
             :disabled="disabled"
             role="combobox"
             aria-haspopup="listbox"
             :aria-expanded="open"
             :aria-required="required || undefined"
-            :aria-invalid="invalid || undefined"
+            :aria-invalid="marked || undefined"
             :aria-describedby="describedby"
             :aria-controls="open ? listboxId : undefined"
             :aria-activedescendant="activeDescendant"
@@ -104,7 +104,8 @@ const {
     disabled = false,
     alphabeticalSort = false,
     required = false,
-    invalid = false,
+    invalid = undefined,
+    error,
     describedby,
     emptyText = 'No options',
     optionsLabel = 'Options',
@@ -123,6 +124,12 @@ const {
     alphabeticalSort?: boolean;
     /** conveys the required state to assistive tech via `aria-required`. */
     required?: boolean;
+    /**
+     * the field's message (`field(name)` passes it). It marks the control invalid unless `invalid`
+     * says otherwise: `invalid: false` shows a message without the mark.
+     */
+    error?: string;
+    /** overrides the mark `error` sets; omitted, the mark follows `error`. */
     invalid?: boolean;
     describedby?: string;
     emptyText?: string;
@@ -139,6 +146,9 @@ const {
     /** what the trigger renders when the model is null — as a VALUE, not muted placeholder text. */
     emptyDisplayValue?: string;
 }>();
+
+// The mark: `invalid` when given, otherwise whether there is a message.
+const marked = computed(() => invalid ?? Boolean(error));
 
 const ownId = useId();
 const controlId = computed(() => id ?? ownId);

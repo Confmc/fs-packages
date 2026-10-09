@@ -12,7 +12,7 @@
         ref="group"
         v-guard-while-disabled="disabled"
         class="ui-check-group"
-        :aria-invalid="invalid || undefined"
+        :aria-invalid="marked || undefined"
         :aria-describedby="describedby"
     >
         <legend class="ui-label ui-check-group__legend">
@@ -26,7 +26,7 @@
             :key="String(option.id)"
             :label="labelOf(option)"
             :disabled="disabled"
-            :invalid="invalid"
+            :invalid="marked"
             :model-value="model.includes(option.id)"
             @update:model-value="toggle(option.id)"
         />
@@ -50,7 +50,8 @@ const {
     id,
     disabled = false,
     required = false,
-    invalid = false,
+    invalid = undefined,
+    error,
     describedby,
     requiredLabel = '(required)',
 } = defineProps<{
@@ -68,7 +69,12 @@ const {
     disabled?: boolean;
     /** conveys the required state at group level (legend marker + sr-only text). */
     required?: boolean;
-    /** invalid styling + aria — mirrored onto the members so the boxes show it. */
+    /**
+     * the field's message (`field(name)` passes it). It marks the control invalid unless `invalid`
+     * says otherwise: `invalid: false` shows a message without the mark.
+     */
+    error?: string;
+    /** overrides the mark `error` sets; omitted, the mark follows `error`. */
     invalid?: boolean;
     /** id of the paired error element for `aria-describedby` (fieldset only). */
     describedby?: string;
@@ -78,6 +84,9 @@ const {
      */
     requiredLabel?: string;
 }>();
+
+// The mark: `invalid` when given, otherwise whether there is a message.
+const marked = computed(() => invalid ?? Boolean(error));
 
 /** The committed membership: an array of option ids, kept in OPTIONS order. */
 const ownId = useId();

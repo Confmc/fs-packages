@@ -2,7 +2,7 @@
     <div ref="root" v-bind="rootAttrs($attrs)" class="ui-multiselect">
         <div
             class="ui-control ui-multiselect__box"
-            :class="{'is-open': open, 'has-value': model.length > 0, 'is-invalid': invalid, 'is-disabled': disabled}"
+            :class="{'is-open': open, 'has-value': model.length > 0, 'is-invalid': marked, 'is-disabled': disabled}"
         >
             <!-- Chips are OUTSIDE the trigger button (a button may not nest a button), inside
                  the flex box that carries the control chrome. Removing must not open the menu:
@@ -39,7 +39,7 @@
                 aria-haspopup="listbox"
                 :aria-expanded="open"
                 :aria-required="required || undefined"
-                :aria-invalid="invalid || undefined"
+                :aria-invalid="marked || undefined"
                 :aria-describedby="describedby"
                 :aria-controls="open ? listboxId : undefined"
                 :aria-activedescendant="activeDescendant"
@@ -127,7 +127,8 @@ const {
     disabled = false,
     alphabeticalSort = false,
     required = false,
-    invalid = false,
+    invalid = undefined,
+    error,
     describedby,
     emptyText = 'No options',
     optionsLabel = 'Options',
@@ -145,6 +146,12 @@ const {
     alphabeticalSort?: boolean;
     /** conveys the required state to assistive tech via `aria-required`. */
     required?: boolean;
+    /**
+     * the field's message (`field(name)` passes it). It marks the control invalid unless `invalid`
+     * says otherwise: `invalid: false` shows a message without the mark.
+     */
+    error?: string;
+    /** overrides the mark `error` sets; omitted, the mark follows `error`. */
     invalid?: boolean;
     describedby?: string;
     emptyText?: string;
@@ -158,6 +165,9 @@ const {
     /** ids rendered visually muted (`.is-muted`) — still committable, still in the keyboard path. */
     mutedOptions?: T['id'][];
 }>();
+
+// The mark: `invalid` when given, otherwise whether there is a message.
+const marked = computed(() => invalid ?? Boolean(error));
 
 const ownId = useId();
 const controlId = computed(() => id ?? ownId);

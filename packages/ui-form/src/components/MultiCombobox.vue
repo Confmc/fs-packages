@@ -3,7 +3,7 @@
         <div
             ref="box"
             class="ui-control ui-multicombobox__box"
-            :class="{'is-open': open, 'has-value': model.length > 0, 'is-invalid': invalid, 'is-disabled': disabled}"
+            :class="{'is-open': open, 'has-value': model.length > 0, 'is-invalid': marked, 'is-disabled': disabled}"
         >
             <!-- Chips render the committed values around the input (the APG editor-combobox
                  layout, stolen from our own MultiSelect). Removing must not open the menu:
@@ -44,7 +44,7 @@
                 aria-haspopup="listbox"
                 :aria-expanded="open"
                 :aria-required="required || undefined"
-                :aria-invalid="invalid || undefined"
+                :aria-invalid="marked || undefined"
                 :aria-describedby="describedbyWithSelection"
                 :aria-controls="open ? listboxId : undefined"
                 :aria-activedescendant="activeDescendant"
@@ -132,7 +132,8 @@ const {
     disabled = false,
     alphabeticalSort = false,
     required = false,
-    invalid = false,
+    invalid = undefined,
+    error,
     describedby,
     emptyText = 'No options',
     optionsLabel = 'Options',
@@ -151,6 +152,12 @@ const {
     alphabeticalSort?: boolean;
     /** conveys the required state to assistive tech via `aria-required`. */
     required?: boolean;
+    /**
+     * the field's message (`field(name)` passes it). It marks the control invalid unless `invalid`
+     * says otherwise: `invalid: false` shows a message without the mark.
+     */
+    error?: string;
+    /** overrides the mark `error` sets; omitted, the mark follows `error`. */
     invalid?: boolean;
     describedby?: string;
     emptyText?: string;
@@ -164,6 +171,9 @@ const {
     /** ids rendered visually muted (`.is-muted`) — still committable, still in the keyboard path. */
     mutedOptions?: T['id'][];
 }>();
+
+// The mark: `invalid` when given, otherwise whether there is a message.
+const marked = computed(() => invalid ?? Boolean(error));
 
 const ownId = useId();
 const controlId = computed(() => id ?? ownId);

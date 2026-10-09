@@ -3,7 +3,7 @@
         :id="controlId"
         type="number"
         class="ui-control ui-input"
-        :class="{'is-invalid': invalid}"
+        :class="{'is-invalid': marked}"
         :value="model"
         :placeholder="placeholder"
         :disabled="disabled"
@@ -11,7 +11,7 @@
         :max="max"
         :step="step"
         :aria-required="required || undefined"
-        :aria-invalid="invalid || undefined"
+        :aria-invalid="marked || undefined"
         :aria-describedby="describedby"
         @input="onInput"
     />
@@ -20,7 +20,11 @@
 <script setup lang="ts">
 import {computed, useId} from 'vue';
 
-const {id} = defineProps<{
+const {
+    id,
+    invalid = undefined,
+    error,
+} = defineProps<{
     /** stable id, pairing the control with its label and error; omit it and the control generates one with `useId()`. */
     id?: string;
     placeholder?: string;
@@ -30,11 +34,19 @@ const {id} = defineProps<{
     step?: number;
     /** conveys the required state to assistive tech via `aria-required`. */
     required?: boolean;
-    /** invalid styling + aria; drive it from the field's error. */
+    /**
+     * the field's message (`field(name)` passes it). It marks the control invalid unless `invalid`
+     * says otherwise: `invalid: false` shows a message without the mark.
+     */
+    error?: string;
+    /** overrides the mark `error` sets; omitted, the mark follows `error`. */
     invalid?: boolean;
     /** id of the paired error element for `aria-describedby`. */
     describedby?: string;
 }>();
+
+// The mark: `invalid` when given, otherwise whether there is a message.
+const marked = computed(() => invalid ?? Boolean(error));
 
 const ownId = useId();
 const controlId = computed(() => id ?? ownId);

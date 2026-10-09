@@ -8,12 +8,12 @@
                 v-bind="$attrs"
                 type="checkbox"
                 class="ui-check__input"
-                :class="{'is-invalid': invalid}"
+                :class="{'is-invalid': marked}"
                 :checked="model"
                 :indeterminate="indeterminate"
                 :disabled="disabled"
                 :aria-required="required || undefined"
-                :aria-invalid="invalid || undefined"
+                :aria-invalid="marked || undefined"
                 :aria-describedby="describedby"
                 @change="onChange"
             />
@@ -61,7 +61,8 @@ const {
     label,
     disabled = false,
     required = false,
-    invalid = false,
+    invalid = undefined,
+    error,
     indeterminate = false,
     describedby,
 } = defineProps<{
@@ -72,7 +73,12 @@ const {
     disabled?: boolean;
     /** conveys the required state to assistive tech via `aria-required`. */
     required?: boolean;
-    /** invalid styling + aria; drive it from the field's error. */
+    /**
+     * the field's message (`field(name)` passes it). It marks the control invalid unless `invalid`
+     * says otherwise: `invalid: false` shows a message without the mark.
+     */
+    error?: string;
+    /** overrides the mark `error` sets; omitted, the mark follows `error`. */
     invalid?: boolean;
     /** id of the paired error element for `aria-describedby`. */
     describedby?: string;
@@ -82,6 +88,9 @@ const {
      */
     indeterminate?: boolean;
 }>();
+
+// The mark: `invalid` when given, otherwise whether there is a message.
+const marked = computed(() => invalid ?? Boolean(error));
 
 const ownId = useId();
 const controlId = computed(() => id ?? ownId);
