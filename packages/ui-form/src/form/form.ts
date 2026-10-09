@@ -64,22 +64,23 @@ export const useForm = (<T extends string = string>(
         return kept.length > 0;
     };
 
+    // The user acted on these fields, so what was said about them no longer holds: drop their server
+    // messages and client refusals. Reassigned only when something goes, so a keystroke is free.
     const withdraw = (...fields: T[]): void => {
-        const next = {...client.value};
-        for (const field of fields) delete next[field];
-        client.value = next;
-    };
-
-    // The user changed this field, so what was said about its old value no longer holds: drop its
-    // server message and its client refusal. Only the write `field()` owns does this, never a watch.
-    const settle = (name: T): void => {
         const {errors} = validation;
-        if (Object.hasOwn(errors.value, name)) {
+        const said = fields.filter((field) => Object.hasOwn(errors.value, field));
+        const refused = fields.filter((field) => Object.hasOwn(client.value, field));
+
+        if (said.length) {
             const next = {...errors.value};
-            delete next[name];
+            for (const field of said) delete next[field];
             errors.value = next;
         }
-        if (Object.hasOwn(client.value, name)) withdraw(name);
+        if (refused.length) {
+            const next = {...client.value};
+            for (const field of refused) delete next[field];
+            client.value = next;
+        }
     };
 
     // Unique per form instance by default, so two forms with the same names never share an id.
@@ -102,7 +103,7 @@ export const useForm = (<T extends string = string>(
             modelValue: readPath(draft.value, name),
             'onUpdate:modelValue': (value: unknown) => {
                 writePath(draft.value, name, value);
-                settle(name);
+                withdraw(name);
             },
         };
     };

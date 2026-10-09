@@ -131,7 +131,10 @@ export interface UseFormClient<T extends string = string> {
      * stop with `if (setRefusals(validate(draft))) return;`. The server's errors are untouched.
      */
     setRefusals: (bag: ValidationErrors<T>) => boolean;
-    /** Withdraw the client refusal on these fields; the server's errors are untouched. */
+    /**
+     * The user acted on these fields: drop their server messages and client refusals. A write through
+     * a draft form's `field(name)` does this for that field itself.
+     */
     withdraw: (...fields: T[]) => void;
     /** Withdraw every client refusal, e.g. when an editor opens or closes. */
     clearClient: () => void;
@@ -153,8 +156,8 @@ export type UseDraftFormOptions<D extends object> = UseFormOptions<Path<D>> & {
     /**
      * The component's own draft (a ref; stores and adapters stay untouched). With it, `field(name)`
      * also carries the value at that path and writes changes back into `draft.value`, so
-     * `<TextInput v-bind="field('firstName')" />` needs no `v-model`. Such a write also drops that
-     * field's server message and client refusal: they were about the value it replaced.
+     * `<TextInput v-bind="field('firstName')" />` needs no `v-model`. Such a write also withdraws that
+     * field (its server message and client refusal): they were about the value it replaced.
      */
     draft: Ref<D>;
 };

@@ -272,6 +272,19 @@ describe('client refusals share the bag', () => {
         expect(wrapper.findAll('.ui-error')).toHaveLength(0);
     });
 
+    it("withdraws a field's server message too: the user acted on it", async () => {
+        const {form, wrapper} = mountForm(() => [field('clientId'), field('date')]);
+
+        await form.handleSubmit(() =>
+            send({errors: {client_id: ['Niet in deze caseload'], date: ['Vul een datum in']}}),
+        );
+        form.withdraw('clientId');
+        await nextTick();
+
+        expect(form.fieldErrors.value).toEqual({date: 'Vul een datum in'});
+        expect(wrapper.findAll('.ui-error')).toHaveLength(1);
+    });
+
     it('sets the whole client verdict from a bag, and says whether it refused anything', async () => {
         const {form, wrapper} = mountForm(() => [field('name'), field('url'), field('kvkNumber')]);
 
