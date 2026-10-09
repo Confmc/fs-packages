@@ -4,7 +4,7 @@ import type {AxiosError} from 'axios';
 
 import {mount} from '@vue/test-utils';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
-import {defineComponent, h, nextTick, ref} from 'vue';
+import {defineComponent, h, nextTick} from 'vue';
 
 import type {UseForm, UseFormOptions} from '../../src';
 
