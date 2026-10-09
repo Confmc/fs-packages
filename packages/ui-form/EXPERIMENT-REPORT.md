@@ -23,12 +23,13 @@ removed `Field` API, Stryker was not run, and no CHANGELOG entry or version plan
   component is still open.
 - **No shims** (Marcel). The `fs-form` and `ui-inputs` re-export shims go; emmie renames its imports in one
   pass.
-- **One kind of message element** (Marcel). `FieldMessage` is dropped, and every message element (including
-  `FormField`'s) behaves like `Message`: always present, empty without a message. Consequence to check when
-  building: `FormField`'s horizontal grid then always has its message row.
-- **Default `keyMapper` = camelCase per dotted segment** (Marcel): `learning_goals.0.title` →
-  `learningGoals.0.title`. This is emmie's casing, and it was identity before. The package implements the
-  segment mapping itself rather than depending on fs-helpers.
+- **Two message behaviours, each set by who owns the layout** (Marcel). `FieldMessage` is dropped.
+  `Message`, which the consumer places, is always present (empty without a message) so it can hold a column.
+  `FormField`'s built-in message renders only when there is one, as on `main`. An always-present empty
+  element would add a flex `gap` / grid `row-gap` under every clean field that the consumer can't remove.
+- **The package's default `keyMapper` stays identity** (Marcel). "Server snake, app camel" lives in one place,
+  emmie's http middleware, which camelCases every response body (54 emmie files read error bodies beyond the
+  field keys) and already keeps the dots (`helpers/error-keys.ts`). The package maps nothing by default.
 - **`refusedUnnamed` means "no field the form holds"** (Marcel), not "nothing rendered".
 - **Keep `'ignored'`** (Marcel): a submit while one is in flight is dropped, not queued.
 - **Keep the one overload cast** (Marcel), no separate `useDraftForm()`.
