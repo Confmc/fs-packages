@@ -5,7 +5,7 @@ import {computed, readonly, ref} from 'vue';
 import type {FormHttpService} from './http-contract';
 import type {FieldProps, UseForm, UseFormOptions, ValidationErrors} from './types';
 
-import {fieldId, messageId} from './field';
+import {createLabel, createMessage, fieldId, messageId} from './field';
 import {useFormSubmit} from './form-submit';
 import {useScrollToFirstError} from './scroll-to-first-error';
 import {useValidationErrors} from './validation-errors';
@@ -74,11 +74,13 @@ export const useForm = <T extends string = string>(
         client.value = next;
     };
 
-    const field = (name: T): FieldProps => {
-        const id = fieldId(name, idPrefix);
-        const error = fieldErrors.value[name] || undefined;
+    const id = (name: T): string => fieldId(name, idPrefix);
+    const message = (name: T): string | undefined => fieldErrors.value[name] || undefined;
 
-        return {id, invalid: Boolean(error), describedby: error ? messageId(id) : undefined, error};
+    const field = (name: T): FieldProps => {
+        const error = message(name);
+
+        return {id: id(name), invalid: Boolean(error), describedby: error ? messageId(id(name)) : undefined, error};
     };
 
     const clearClient = (): void => {
@@ -91,6 +93,8 @@ export const useForm = <T extends string = string>(
         clientErrors: readonly(client) as Readonly<Ref<ValidationErrors<T>>>,
         fieldErrors,
         field,
+        Label: createLabel(id),
+        Message: createMessage(message, id),
         refuse,
         setRefusals,
         withdraw,

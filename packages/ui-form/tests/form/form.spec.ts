@@ -8,7 +8,7 @@ import {defineComponent, h, nextTick, ref} from 'vue';
 
 import type {UseForm, UseFormOptions} from '../../src';
 
-import {useForm} from '../../src';
+import {TextInput, useForm} from '../../src';
 
 const createMockHttpService = () => {
     const errorMiddlewares: ResponseErrorMiddlewareFunc[] = [];
@@ -551,5 +551,52 @@ describe('useForm field()', () => {
         const {result} = mountForm<'email'>(httpService, {idPrefix: 'invoice'});
 
         expect(result().field('email').id).toBe('invoice-email');
+    });
+});
+
+describe('useForm Label and Message', () => {
+    const mountRow = (options?: UseFormOptions) => {
+        const {httpService, triggerError} = createMockHttpService();
+        let form!: UseForm<'firstName'>;
+        const wrapper = mount(
+            defineComponent({
+                setup() {
+                    form = useForm<'firstName'>(httpService, options);
+                    return () =>
+                        h('div', [
+                            h(form.Label, {name: 'firstName', label: 'Voornaam', required: true, class: 'w-40'}),
+                            h(TextInput, {...form.field('firstName'), modelValue: ''}),
+                            h(form.Message, {name: 'firstName'}),
+                        ]);
+                },
+            }),
+        );
+        return {wrapper, triggerError, form: () => form};
+    };
+
+    it("labels the control field() wires, and fills the message the control's describedby names", async () => {
+        const {wrapper, triggerError} = mountRow({idPrefix: 'client'});
+        const label = wrapper.find('label');
+
+        expect(label.attributes('for')).toBe('client-firstName');
+        expect(label.text()).toContain('Voornaam');
+        expect(label.find('.ui-label__req').exists()).toBe(true);
+        expect(label.classes()).toContain('w-40');
+
+        triggerError(422, {errors: {firstName: ['Vul een voornaam in']}});
+        await nextTick();
+
+        const message = wrapper.find(`#${wrapper.find('input').attributes('aria-describedby')}`);
+        expect(message.text()).toBe('Vul een voornaam in');
+        expect(message.attributes('role')).toBe('alert');
+    });
+
+    it("keeps the message's element in place, empty, while the field is clean", () => {
+        const {wrapper} = mountRow();
+        const message = wrapper.find('p.ui-error');
+
+        expect(message.exists()).toBe(true);
+        expect(message.attributes('id')).toBe('firstName-error');
+        expect(message.text()).toBe('');
     });
 });
