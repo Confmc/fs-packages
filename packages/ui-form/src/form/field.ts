@@ -18,12 +18,18 @@ export interface FieldLabelProps<T extends string = string> {
 
 /**
  * A `FormLabel` bound to one form: `<FieldLabel name="firstName" label="Voornaam" required />` points its
- * `for` at the id `field('firstName')` gives the control. Attributes fall through to the `<label>`.
+ * `for` at the id `field('firstName')` gives the control. Attributes fall through to the `<label>`; its
+ * default slot renders after the label text and the required mark (a note like "optioneel").
  */
 export const createFieldLabel = <T extends string>(id: (name: T) => string) =>
     defineComponent(
-        (props: FieldLabelProps<T>) => () =>
-            h(FormLabel, {htmlFor: id(props.name), required: props.required}, () => props.label),
+        (props: FieldLabelProps<T>, {slots}) =>
+            () =>
+                h(
+                    FormLabel,
+                    {htmlFor: id(props.name), required: props.required},
+                    {default: () => props.label, after: slots.default},
+                ),
         {name: 'FieldLabel', props: ['name', 'label', 'required']},
     );
 

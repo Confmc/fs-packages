@@ -2,6 +2,8 @@
     <label class="ui-label" :for="htmlFor">
         <slot />
         <span v-if="required" class="ui-label__req" aria-hidden="true">*</span>
+        <!-- content after the label text and its required mark, e.g. a note like "optional" -->
+        <slot name="after" />
     </label>
 </template>
 

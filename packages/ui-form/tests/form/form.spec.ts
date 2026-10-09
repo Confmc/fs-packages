@@ -608,6 +608,25 @@ describe('useForm FieldLabel and Message', () => {
         expect(message.attributes('role')).toBe('alert');
     });
 
+    it('renders its slot after the label text and the required mark, inside the label', () => {
+        const {httpService} = createMockHttpService();
+        const wrapper = mount(
+            defineComponent({
+                setup() {
+                    const {FieldLabel} = useForm<'actions'>(httpService);
+                    return () =>
+                        h(FieldLabel, {name: 'actions', label: 'Acties', required: true}, () =>
+                            h('span', {class: 'note'}, 'optioneel'),
+                        );
+                },
+            }),
+        );
+        const label = wrapper.find('label');
+
+        expect(label.text()).toBe('Acties*optioneel');
+        expect(label.find('.ui-label__req + .note').exists()).toBe(true);
+    });
+
     it("keeps the message's element in place, empty, while the field is clean", () => {
         const {wrapper} = mountRow({idPrefix: 'client'});
         const message = wrapper.find('p.ui-error');
