@@ -27,7 +27,10 @@ export interface UseValidationErrors<T extends string = string> {
      * once, however many dropped keys map to it, and never while another key bound it.
      */
     unmapped: Readonly<Ref<readonly string[]>>;
-    /** The last accepted 422 named nothing this form can mark — ADR-0048 rule 4's empty-bag check, kept in one place. */
+    /**
+     * The last taken 422 named no field this form holds (nothing to point at), so a caller can say so
+     * after `outcome === 'refused'`. Decided when it is taken: dropping messages later never flips it.
+     */
     refusedUnnamed: Readonly<Ref<boolean>>;
 }
 
@@ -150,7 +153,8 @@ export type UseDraftFormOptions<D extends object> = UseFormOptions<Path<D>> & {
     /**
      * The component's own draft (a ref; stores and adapters stay untouched). With it, `field(name)`
      * also carries the value at that path and writes changes back into `draft.value`, so
-     * `<TextInput v-bind="field('firstName')" />` needs no `v-model`.
+     * `<TextInput v-bind="field('firstName')" />` needs no `v-model`. Such a write also drops that
+     * field's server message and client refusal: they were about the value it replaced.
      */
     draft: Ref<D>;
 };

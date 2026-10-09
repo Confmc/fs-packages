@@ -294,6 +294,16 @@ describe("useForm takes its own request's 422", () => {
         expect(result().refused.value).toBe(false);
     });
 
+    it('says whether the refusal named nothing it can show, for a one-line toast after the outcome', async () => {
+        const {result} = mountForm({fields: ['email']});
+
+        await result().handleSubmit(() => Promise.reject(refusal(422, {errors: {token: ['Expired']}})));
+        expect(result().refusedUnnamed.value).toBe(true);
+
+        await result().handleSubmit(() => Promise.reject(refusal(422, {errors: {email: ['Taken']}})));
+        expect(result().refusedUnnamed.value).toBe(false);
+    });
+
     it('drops the previous refusal when a new submit starts', async () => {
         const {result} = mountForm();
 

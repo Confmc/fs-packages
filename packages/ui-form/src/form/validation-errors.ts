@@ -1,6 +1,6 @@
 import type {Ref} from 'vue';
 
-import {computed, readonly, ref} from 'vue';
+import {readonly, ref} from 'vue';
 
 import type {UseValidationErrors, UseValidationErrorsOptions, ValidationErrors} from './types';
 
@@ -42,17 +42,22 @@ export const useValidationErrors = <T extends string = string>(
     const errors = ref<ValidationErrors<T>>({}) as Ref<ValidationErrors<T>>;
     const refused = ref(false);
     const unmapped = ref<readonly string[]>([]);
+    // Decided when the 422 is taken, not read off the bag: a message the form later drops (the user
+    // fixing that field) must not turn a refusal that named fields into one that named none.
+    const unnamed = ref(false);
 
     const clearErrors = (): void => {
         errors.value = {};
         refused.value = false;
         unmapped.value = [];
+        unnamed.value = false;
     };
 
     const take = (error: unknown): boolean => {
         if (!isValidationRefusal(error)) return false;
 
         refused.value = true;
+        unnamed.value = true;
 
         const kept: [string, string][] = [];
         const dropped: string[] = [];
@@ -70,6 +75,7 @@ export const useValidationErrors = <T extends string = string>(
 
         errors.value = bag as ValidationErrors<T>;
         unmapped.value = [...new Set(dropped)].filter((field) => !Object.hasOwn(bag, field));
+        unnamed.value = kept.length === 0;
 
         return true;
     };
@@ -80,6 +86,6 @@ export const useValidationErrors = <T extends string = string>(
         take,
         refused: readonly(refused),
         unmapped: readonly(unmapped),
-        refusedUnnamed: computed(() => refused.value && Object.keys(errors.value).length === 0),
+        refusedUnnamed: readonly(unnamed),
     };
 };

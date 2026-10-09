@@ -70,6 +70,18 @@ export const useForm = (<T extends string = string>(
         client.value = next;
     };
 
+    // The user changed this field, so what was said about its old value no longer holds: drop its
+    // server message and its client refusal. Only the write `field()` owns does this, never a watch.
+    const settle = (name: T): void => {
+        const {errors} = validation;
+        if (Object.hasOwn(errors.value, name)) {
+            const next = {...errors.value};
+            delete next[name];
+            errors.value = next;
+        }
+        if (Object.hasOwn(client.value, name)) withdraw(name);
+    };
+
     // Unique per form instance by default, so two forms with the same names never share an id.
     const prefix = idPrefix ?? useId();
     const id = (name: T): string => fieldId(name, prefix);
@@ -88,7 +100,10 @@ export const useForm = (<T extends string = string>(
         return {
             ...wiring,
             modelValue: readPath(draft.value, name),
-            'onUpdate:modelValue': (value: unknown) => writePath(draft.value, name, value),
+            'onUpdate:modelValue': (value: unknown) => {
+                writePath(draft.value, name, value);
+                settle(name);
+            },
         };
     };
 
