@@ -11,15 +11,13 @@ interface Draft {
     learningGoals: {title: string | null}[];
 }
 
-const http = {registerResponseErrorMiddleware: () => () => undefined};
-
 describe('useForm with a draft', () => {
     it('binds a control to the value at a path, nested and indexed, with no v-model', async () => {
         const draft = ref<Draft>({firstName: 'Ann', learningGoals: [{title: 'Lezen'}]});
         const wrapper = mount(
             defineComponent({
                 setup: () => {
-                    const {field} = useForm(http, {draft});
+                    const {field} = useForm({draft});
                     return () =>
                         h('div', [h(TextInput, field('firstName')), h(TextInput, field('learningGoals.0.title'))]);
                 },
@@ -43,7 +41,7 @@ describe('useForm with a draft', () => {
         mount(
             defineComponent({
                 setup: () => {
-                    props = useForm(http).field('firstName');
+                    props = useForm().field('firstName');
                     return () => null;
                 },
             }),
@@ -59,7 +57,7 @@ describe('useForm with a draft', () => {
         const wrapper = mount(
             defineComponent({
                 setup: () => {
-                    const {field} = useForm(http, {draft});
+                    const {field} = useForm({draft});
                     return () =>
                         h(
                             TextInput,

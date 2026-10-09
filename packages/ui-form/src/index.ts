@@ -27,7 +27,6 @@ export {default as Disclosure} from './components/Disclosure.vue';
 export {useForm} from './form/form';
 export {useFormSubmit} from './form/form-submit';
 export {useValidationErrors} from './form/validation-errors';
-export type {FormHttpService} from './form/http-contract';
 export type {
     UseForm,
     FieldProps,

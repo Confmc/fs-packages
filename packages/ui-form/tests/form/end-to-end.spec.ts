@@ -69,8 +69,7 @@ const mountForm = (fields: () => FieldNode[], options = {}): Mounted => {
     const wrapper = mount(
         defineComponent({
             setup: () => {
-                // these cases send the 422 directly, outside a submit; the window case opts back in
-                form = useForm(care, {keyMapper, onlyWhileSubmitting: false, ...options});
+                form = useForm({keyMapper, ...options});
 
                 return () =>
                     h(
@@ -119,7 +118,7 @@ afterEach(() => {
 
 describe('a 422 reaches the field that names it', () => {
     it('marks every named field of the care plan, nested and indexed keys included', async () => {
-        const {wrapper} = mountForm(() => [
+        const {wrapper, form} = mountForm(() => [
             field('clientFirstName'),
             field('remarks', Textarea),
             field('traject.trajectTypeId'),
@@ -130,7 +129,7 @@ describe('a 422 reaches the field that names it', () => {
             field('learningGoals.0.description', Textarea),
         ]);
 
-        await expect(send(CARE_PLAN_422)).rejects.toThrow();
+        await expect(form.handleSubmit(() => send(CARE_PLAN_422))).resolves.toBe('refused');
         await nextTick();
 
         expectMarked(wrapper, 'clientFirstName', 'Vul een voornaam in');
@@ -151,28 +150,25 @@ describe('a 422 reaches the field that names it', () => {
     it('maps no two backend keys onto one name', async () => {
         const {form} = mountForm(() => []);
 
-        await expect(send(CARE_PLAN_422)).rejects.toThrow();
+        await form.handleSubmit(() => send(CARE_PLAN_422));
 
         expect(Object.keys(form.errors.value)).toHaveLength(Object.keys(CARE_PLAN_422.errors).length);
         expect(form.unmapped.value).toEqual([]);
     });
 
-    it('scrolls the first marked control into view when the form asks for it', async () => {
+    it('scrolls the first marked control into view when the submit is refused', async () => {
         const scroll = vi.fn();
         vi.spyOn(HTMLElement.prototype, 'scrollIntoView').mockImplementation(scroll);
-        const {wrapper} = mountForm(() => [field('clientFirstName'), field('remarks', Textarea)], {
-            scrollToError: true,
-        });
+        const {wrapper, form} = mountForm(() => [field('clientFirstName'), field('remarks', Textarea)]);
 
-        await expect(send({errors: {remarks: ['Te lang']}})).rejects.toThrow();
-        await nextTick();
+        await form.handleSubmit(() => send({errors: {remarks: ['Te lang']}}));
 
         expect(scroll).toHaveBeenCalledOnce();
         expect(scroll.mock.contexts[0]).toBe(wrapper.find('textarea').element);
     });
 
     it('carries a group error on the fieldset and never on its boxes', async () => {
-        const {wrapper} = mountForm(() => [
+        const {wrapper, form: goalsForm} = mountForm(() => [
             (form) =>
                 h(
                     FormField,
@@ -190,7 +186,7 @@ describe('a 422 reaches the field that names it', () => {
                 ),
         ]);
 
-        await expect(send({errors: {goals: ['Kies een doel']}})).rejects.toThrow();
+        await goalsForm.handleSubmit(() => send({errors: {goals: ['Kies een doel']}}));
         await nextTick();
 
         const fieldset = wrapper.find('fieldset');
@@ -199,20 +195,22 @@ describe('a 422 reaches the field that names it', () => {
         expect(wrapper.find('input[type="checkbox"]').attributes('aria-describedby')).toBeUndefined();
     });
 
-    it('takes a 422 from a request that is not a submit, as the address lookup relies on', async () => {
-        const {wrapper} = mountForm(() => [field('zipcode')]);
+    it('takes a 422 from a request that is not a submit through take, as the address lookup does', async () => {
+        const {wrapper, form} = mountForm(() => [field('zipcode')]);
 
-        await expect(
-            care.getRequest('/address-lookup', {adapter: answering(422, {errors: {zipcode: ['Onbekende postcode']}})}),
-        ).rejects.toThrow();
+        await care
+            .getRequest('/address-lookup', {adapter: answering(422, {errors: {zipcode: ['Onbekende postcode']}})})
+            .catch((error: unknown) => {
+                if (!form.take(error)) throw error;
+            });
         await nextTick();
 
         expectMarked(wrapper, 'zipcode', 'Onbekende postcode');
     });
 
-    it('shows only its own 422 when two forms share the service but not a submit window', async () => {
-        const first = mountForm(() => [field('name')], {onlyWhileSubmitting: true});
-        const second = mountForm(() => [field('name')], {onlyWhileSubmitting: true});
+    it('shows only its own 422 when two forms share the service', async () => {
+        const first = mountForm(() => [field('name')]);
+        const second = mountForm(() => [field('name')]);
 
         await second.form.handleSubmit(() => send({errors: {name: ['Vul een naam in']}}));
         await nextTick();

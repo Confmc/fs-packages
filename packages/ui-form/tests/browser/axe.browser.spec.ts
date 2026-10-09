@@ -521,7 +521,7 @@ describe('axe-core audits — fields linked by field(name), zero violations', ()
         const screen = await render(
             defineComponent({
                 setup: () => {
-                    form = useForm({registerResponseErrorMiddleware: () => () => undefined});
+                    form = useForm();
 
                     return () => {
                         const title = form.field('learningGoals.0.title');

@@ -1,6 +1,6 @@
 {
     "name": "@script-development/ui-inputs",
-    "version": "0.18.0-control.8",
+    "version": "0.18.0-control.9",
     "description": "DEPRECATED: renamed to @script-development/ui-form; re-exports it",
     "homepage": "https://packages.script.nl/packages/ui-inputs",
     "license": "MIT",
@@ -44,11 +44,11 @@
         "typecheck": "tsc --noEmit"
     },
     "devDependencies": {
-        "@script-development/ui-form": "0.1.0-control.8",
+        "@script-development/ui-form": "0.1.0-control.9",
         "vue": "^3.5.43"
     },
     "peerDependencies": {
-        "@script-development/ui-form": "0.1.0-control.8",
+        "@script-development/ui-form": "0.1.0-control.9",
         "vue": "^3.5.43"
     },
     "engines": {
