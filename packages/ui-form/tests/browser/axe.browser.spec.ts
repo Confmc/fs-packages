@@ -18,9 +18,7 @@ import Checkbox from '../../src/components/Checkbox.vue';
 import CheckboxGroup from '../../src/components/CheckboxGroup.vue';
 import Combobox from '../../src/components/Combobox.vue';
 import Disclosure from '../../src/components/Disclosure.vue';
-import FieldMessage from '../../src/components/FieldMessage.vue';
 import FormField from '../../src/components/FormField.vue';
-import FormLabel from '../../src/components/FormLabel.vue';
 import GroupCombobox from '../../src/components/GroupCombobox.vue';
 import GroupSelect from '../../src/components/GroupSelect.vue';
 import MultiCombobox from '../../src/components/MultiCombobox.vue';
@@ -530,9 +528,9 @@ describe('axe-core audits — fields linked by field(name), zero violations', ()
                         return h('main', [
                             h('h1', 'Test form'),
                             // bare layer: the template places label and message itself
-                            h(FormLabel, {htmlFor: title.id, required: true}, () => 'Title'),
+                            h(form.FormLabel, {name: 'learningGoals.0.title', label: 'Title', required: true}),
                             h(TextInput, {...title, required: true, modelValue: ''}),
-                            h(FieldMessage, title),
+                            h(form.FormError, {name: 'learningGoals.0.title'}),
                             // field-control layer: FormField draws label and message
                             h(
                                 FormField,
@@ -546,7 +544,7 @@ describe('axe-core audits — fields linked by field(name), zero violations', ()
                                 label: 'Goals',
                                 modelValue: [],
                             }),
-                            h(FieldMessage, form.field('goals')),
+                            h(form.FormError, {name: 'goals'}),
                         ]);
                     };
                 },

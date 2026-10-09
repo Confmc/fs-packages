@@ -114,7 +114,7 @@ export interface UseFormClient<T extends string = string> {
     fieldErrors: ComputedRef<ValidationErrors<T>>;
     /**
      * Everything that links one field to the form: `<TextInput v-bind="field('email')" v-model="email" />`
-     * plus `<FieldMessage v-bind="field('email')" />`, or a control that draws its own label and message.
+     * plus `<FormError name="email" />`, or a control that draws its own label and message.
      * The id is the name plus the form's unique part, so it is the same on every render and unique per form.
      */
     field: (name: T) => FieldProps;
