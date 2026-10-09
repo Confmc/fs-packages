@@ -524,10 +524,10 @@ describe('useForm submit window and refusal signal', () => {
 describe('useForm field()', () => {
     it('links a control to the form: an id from the name, and the message with its mark and describedby', () => {
         const {httpService, triggerError} = createMockHttpService();
-        const {result} = mountForm<'email' | 'name' | 'learningGoals.0.title'>(httpService);
+        const {result} = mountForm<'email' | 'name' | 'learningGoals.0.title'>(httpService, {idPrefix: 'f'});
 
         expect(result().field('email')).toEqual({
-            id: 'email',
+            id: 'f-email',
             invalid: false,
             describedby: undefined,
             error: undefined,
@@ -537,16 +537,33 @@ describe('useForm field()', () => {
         result().refuse('name', 'Too short');
 
         expect(result().field('email')).toEqual({
-            id: 'email',
+            id: 'f-email',
             invalid: true,
-            describedby: 'email-error',
+            describedby: 'f-email-error',
             error: 'Taken',
         });
         expect(result().field('name').error).toBe('Too short');
-        expect(result().field('learningGoals.0.title').id).toBe('learningGoals-0-title');
+        expect(result().field('learningGoals.0.title').id).toBe('f-learningGoals-0-title');
     });
 
-    it('puts idPrefix before every derived id, so two forms with the same names can share a page', () => {
+    it("gives every form its own prefix from useId, so two forms' same-named fields never share an id", () => {
+        const {httpService} = createMockHttpService();
+        const ids: string[] = [];
+        const Block = defineComponent({
+            setup() {
+                ids.push(useForm<'email'>(httpService).field('email').id);
+                return () => null;
+            },
+        });
+        // one page (one app), two blocks that both have an `email`
+        mount(defineComponent({setup: () => () => h('div', [h(Block), h(Block)])}));
+
+        expect(ids[0]).toMatch(/^v-\S+-email$/);
+        expect(ids[1]).toMatch(/^v-\S+-email$/);
+        expect(ids[0]).not.toBe(ids[1]);
+    });
+
+    it('lets idPrefix replace the generated prefix, for an id something outside the form must know', () => {
         const {httpService} = createMockHttpService();
         const {result} = mountForm<'email'>(httpService, {idPrefix: 'invoice'});
 
@@ -592,11 +609,11 @@ describe('useForm FieldLabel and Message', () => {
     });
 
     it("keeps the message's element in place, empty, while the field is clean", () => {
-        const {wrapper} = mountRow();
+        const {wrapper} = mountRow({idPrefix: 'client'});
         const message = wrapper.find('p.ui-error');
 
         expect(message.exists()).toBe(true);
-        expect(message.attributes('id')).toBe('firstName-error');
+        expect(message.attributes('id')).toBe('client-firstName-error');
         expect(message.text()).toBe('');
     });
 });

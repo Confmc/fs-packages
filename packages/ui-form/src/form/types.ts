@@ -104,8 +104,9 @@ export type UseFormOptions<T extends string = string> = Omit<UseValidationErrors
      */
     scrollTarget?: string;
     /**
-     * Put before every id `field()` derives, for two forms with the same field names on one page:
-     * `idPrefix: 'invoice'` gives `invoice-email`. Without it the id is the name alone.
+     * Replaces the prefix of every id `field()` derives. By default each form takes its own from Vue's
+     * `useId()` (`v-3-email`), so ids are unique without anyone thinking; set this only when something
+     * outside the form needs a fixed id: `idPrefix: 'invoice'` gives `invoice-email`.
      */
     idPrefix?: string;
 };
@@ -126,7 +127,7 @@ export interface UseFormClient<T extends string = string> {
     /**
      * Everything that links one field to the form: `<TextInput v-bind="field('email')" v-model="email" />`
      * plus `<FieldMessage v-bind="field('email')" />`, or a control that draws its own label and message.
-     * The id comes from the name (and `idPrefix`), so it is the same on every render.
+     * The id is the form's prefix plus the name, so it is the same on every render and unique per form.
      */
     field: (name: T) => FieldProps;
     /** A `FormLabel` for one of this form's fields: `<FieldLabel name="email" label="E-mail" required />`. */

@@ -1,6 +1,6 @@
 import type {Ref} from 'vue';
 
-import {computed, readonly, ref} from 'vue';
+import {computed, readonly, ref, useId} from 'vue';
 
 import type {FormHttpService} from './http-contract';
 import type {FieldProps, UseForm, UseFormOptions, ValidationErrors} from './types';
@@ -74,7 +74,9 @@ export const useForm = <T extends string = string>(
         client.value = next;
     };
 
-    const id = (name: T): string => fieldId(name, idPrefix);
+    // Unique per form instance by default, so two forms with the same names never share an id.
+    const prefix = idPrefix ?? useId();
+    const id = (name: T): string => fieldId(name, prefix);
     const message = (name: T): string | undefined => fieldErrors.value[name] || undefined;
 
     const field = (name: T): FieldProps => {
