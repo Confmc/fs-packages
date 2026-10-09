@@ -31,7 +31,7 @@ import {useValidationErrors} from './validation-errors';
  * `fieldErrors` (the server's errors with the form's own refusals on top):
  * `<TextInput v-bind="field('email')" v-model="email" />` + `<FormError name="email" />`, or one control
  * that draws its own label and message through `FormField`. Call it in a component `setup()`: the id
- * prefix comes from `useId()` unless `idPrefix` is given.
+ * ids end in a part from `useId()` unless a fixed `idPrefix` is given.
  *
  * @param options `keyMapper`, `fields`, `scrollToError`, `idPrefix`, `draft` — see `UseFormOptions`.
  */
@@ -84,8 +84,8 @@ export const useForm = (<T extends string = string>(
     };
 
     // Unique per form instance by default, so two forms with the same names never share an id.
-    const prefix = idPrefix ?? useId();
-    const id = (name: T): string => fieldId(name, prefix);
+    const unique = idPrefix === undefined ? {suffix: useId()} : {prefix: idPrefix};
+    const id = (name: T): string => fieldId(name, unique);
     const message = (name: T): string | undefined => fieldErrors.value[name] || undefined;
 
     const field = (name: T): FieldProps | (FieldProps & FieldModel<unknown>) => {

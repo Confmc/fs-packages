@@ -2,8 +2,16 @@ import {defineComponent, h} from 'vue';
 
 import FormLabel from '../components/FormLabel.vue';
 
-/** The id a form gives a field: its prefix, then its name with anything outside `[A-Za-z0-9_-]` turned into `-`. */
-export const fieldId = (name: string, prefix: string): string => `${prefix}-${name.replace(/[^\w-]/g, '-')}`;
+/**
+ * The id a form gives a field, its name first with anything outside `[A-Za-z0-9_-]` turned into `-`:
+ * followed by the form's unique part as Vue gives it (`firstName-v-3`), or after a fixed prefix
+ * (`invoice-firstName`) when the form was given one.
+ */
+export const fieldId = (name: string, unique: {prefix: string} | {suffix: string}): string => {
+    const slug = name.replace(/[^\w-]/g, '-');
+
+    return 'prefix' in unique ? `${unique.prefix}-${slug}` : `${slug}-${unique.suffix}`;
+};
 
 /** The id of a field's message, which the control names in `aria-describedby`. One rule for `field()` and `FormField`. */
 export const messageId = (id: string): string => `${id}-error`;

@@ -167,7 +167,7 @@ describe('useForm scroll-to-error', () => {
     });
 
     it('never scrolls to another form on the page that refused the same name', async () => {
-        // one page is one app, so useId keeps the two forms' prefixes apart
+        // one page is one app, so useId keeps the two forms' ids apart
         const forms: UseForm[] = [];
         const Block = defineComponent({
             setup() {
@@ -381,7 +381,7 @@ describe('useForm field()', () => {
         expect(result().field('learningGoals.0.title').id).toBe('f-learningGoals-0-title');
     });
 
-    it("gives every form its own prefix from useId, so two forms' same-named fields never share an id", () => {
+    it("puts the name first and appends each form's own part from useId, so same-named fields never share an id", () => {
         const ids: string[] = [];
         const Block = defineComponent({
             setup() {
@@ -392,8 +392,8 @@ describe('useForm field()', () => {
         // one page (one app), two blocks that both have an `email`
         mount(defineComponent({setup: () => () => h('div', [h(Block), h(Block)])}));
 
-        expect(ids[0]).toMatch(/^v-\S+-email$/);
-        expect(ids[1]).toMatch(/^v-\S+-email$/);
+        expect(ids[0]).toMatch(/^email-v-\S+$/);
+        expect(ids[1]).toMatch(/^email-v-\S+$/);
         expect(ids[0]).not.toBe(ids[1]);
     });
 
