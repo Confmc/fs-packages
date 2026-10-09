@@ -40,7 +40,12 @@ const createMockHttpService = () => {
     return {httpService, triggerError, errorMiddlewares};
 };
 
-const mountForm = <T extends string = string>(httpService: HttpService, options?: UseFormOptions) => {
+// Most cases here raise a 422 by hand, outside any submit, so the helper takes idle ones; the cases
+// about the submit window say so explicitly.
+const mountForm = <T extends string = string>(
+    httpService: HttpService,
+    options: UseFormOptions = {onlyWhileSubmitting: false},
+) => {
     let result!: UseForm<T>;
     const wrapper = mount(
         defineComponent({
@@ -49,48 +54,6 @@ const mountForm = <T extends string = string>(httpService: HttpService, options?
                 return () => null;
             },
         }),
-    );
-    return {wrapper, result: () => result};
-};
-
-// Mounts (attached to the document) a form that renders one field marked `aria-invalid`
-// while the error bag is non-empty — the shape the scroll watcher queries for.
-const mountFieldForm = (httpService: HttpService, options?: UseFormOptions, markInvalid = true) => {
-    let result!: UseForm;
-    const wrapper = mount(
-        defineComponent({
-            setup() {
-                // The scroll is opt-in; these cases are about what it does once asked for.
-                result = useForm(httpService, {scrollToError: true, ...options});
-                return () =>
-                    h('input', {
-                        'aria-invalid': markInvalid && Object.keys(result.errors.value).length > 0 ? 'true' : 'false',
-                    });
-            },
-        }),
-        {attachTo: document.body},
-    );
-    return {wrapper, result: () => result};
-};
-
-// Mounts (attached) a form whose invalid field sits inside (or outside) a `scrollRoot` element,
-// to prove the query is scoped to that root's subtree.
-const mountScopedForm = (httpService: HttpService, fieldInsideRoot: boolean) => {
-    const scrollRoot = ref<HTMLElement | null>(null);
-    let result!: UseForm;
-    const wrapper = mount(
-        defineComponent({
-            setup() {
-                result = useForm(httpService, {scrollToError: true, scrollRoot});
-                const marked = () => (Object.keys(result.errors.value).length > 0 ? 'true' : 'false');
-                return () =>
-                    h('div', [
-                        h('div', {ref: scrollRoot}, [fieldInsideRoot ? h('input', {'aria-invalid': marked()}) : null]),
-                        fieldInsideRoot ? null : h('input', {'aria-invalid': marked()}),
-                    ]);
-            },
-        }),
-        {attachTo: document.body},
     );
     return {wrapper, result: () => result};
 };
@@ -133,7 +96,7 @@ describe('useForm', () => {
     it('passes keyMapper through to the internal validation layer', () => {
         const {httpService, triggerError} = createMockHttpService();
         const camel = (key: string) => key.replace(/_(\w)/g, (_, c: string) => c.toUpperCase());
-        const {result} = mountForm(httpService, {keyMapper: camel});
+        const {result} = mountForm(httpService, {keyMapper: camel, onlyWhileSubmitting: false});
 
         triggerError(422, {errors: {street_name: ['Required']}});
 
@@ -201,48 +164,87 @@ describe('useForm scroll-to-error', () => {
         scrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {});
     });
 
-    it('scrolls the first invalid field into view after a 422', async () => {
-        const {httpService, triggerError} = createMockHttpService();
-        const {wrapper} = mountFieldForm(httpService);
-
-        triggerError(422, {errors: {email: ['Taken']}});
-        await nextTick();
-
-        expect(scrollIntoView).toHaveBeenCalledWith({behavior: 'smooth', block: 'center'});
-        wrapper.unmount();
-    });
-
-    it('scrolls to the first invalid field in document order when several are marked', async () => {
-        const {httpService, triggerError} = createMockHttpService();
-        let result!: UseForm;
+    // A form rendering `names` as controls wired by field(), in that order, attached to the document.
+    const mountFields = (names: string[], options: UseFormOptions = {}, control = true) => {
+        let form!: UseForm;
         const wrapper = mount(
             defineComponent({
                 setup() {
-                    result = useForm(httpService, {scrollToError: true});
-                    const marked = () => (Object.keys(result.errors.value).length > 0 ? 'true' : 'false');
+                    form = useForm(createMockHttpService().httpService, options);
                     return () =>
-                        h('div', [h('input', {'aria-invalid': marked()}), h('input', {'aria-invalid': marked()})]);
+                        h(
+                            'div',
+                            names.map((name) =>
+                                control ? h(TextInput, {...form.field(name), modelValue: ''}) : h(form.Message, {name}),
+                            ),
+                        );
                 },
             }),
             {attachTo: document.body},
         );
+        return {wrapper, form: () => form};
+    };
 
-        triggerError(422, {errors: {email: ['Taken']}});
+    it("scrolls to the control of the first refused field, by the form's own id, by default", async () => {
+        const {wrapper, form} = mountFields(['email']);
+
+        form().refuse('email', 'Taken');
         await nextTick();
 
-        const invalid = document.querySelectorAll('[aria-invalid="true"]');
-        expect(invalid).toHaveLength(2);
-        expect(scrollIntoView).toHaveBeenCalledTimes(1);
-        expect(scrollIntoView.mock.contexts[0]).toBe(invalid[0]);
+        expect(scrollIntoView).toHaveBeenCalledWith({behavior: 'smooth', block: 'center'});
+        expect(scrollIntoView.mock.contexts[0]).toBe(wrapper.find('input').element);
         wrapper.unmount();
     });
 
-    it('does not scroll unless the caller asks for it', async () => {
-        const {httpService, triggerError} = createMockHttpService();
-        // No `scrollToError`, so the default decides.
-        const {wrapper} = mountFieldForm(httpService, {scrollToError: undefined});
+    it('takes the first in document order, not the order the bag lists the fields in', async () => {
+        const {wrapper, form} = mountFields(['first', 'second']);
 
-        triggerError(422, {errors: {email: ['Taken']}});
+        form().setRefusals({second: 'Required', first: 'Required'});
+        await nextTick();
+
+        expect(scrollIntoView).toHaveBeenCalledOnce();
+        expect(scrollIntoView.mock.contexts[0]).toBe(wrapper.findAll('input')[0]!.element);
+        wrapper.unmount();
+    });
+
+    it("falls back to the field's message element when no control carries the id", async () => {
+        const {wrapper, form} = mountFields(['email'], {}, false);
+
+        form().refuse('email', 'Taken');
+        await nextTick();
+
+        expect(scrollIntoView.mock.contexts[0]).toBe(wrapper.find('p.ui-error').element);
+        wrapper.unmount();
+    });
+
+    it('never scrolls to another form on the page that refused the same name', async () => {
+        // one page is one app, so useId keeps the two forms' prefixes apart
+        const forms: UseForm[] = [];
+        const Block = defineComponent({
+            setup() {
+                const form = useForm(createMockHttpService().httpService);
+                forms.push(form);
+                return () => h(TextInput, {...form.field('email'), modelValue: ''});
+            },
+        });
+        const wrapper = mount(defineComponent({setup: () => () => h('div', [h(Block), h(Block)])}), {
+            attachTo: document.body,
+        });
+
+        forms[1]!.refuse('email', 'Taken');
+        await nextTick();
+
+        expect(scrollIntoView).toHaveBeenCalledOnce();
+        expect(scrollIntoView.mock.contexts[0]).toBe(wrapper.findAll('input')[1]!.element);
+        wrapper.unmount();
+    });
+
+    it('does nothing for a refusal it renders no element for, an empty message, or when cleared', async () => {
+        const {wrapper, form} = mountFields(['email']);
+
+        form().setRefusals({elsewhere: 'Not rendered', email: ''});
+        await nextTick();
+        form().clearClient();
         await nextTick();
 
         expect(scrollIntoView).not.toHaveBeenCalled();
@@ -250,108 +252,20 @@ describe('useForm scroll-to-error', () => {
     });
 
     it('does not scroll when scrollToError is false', async () => {
-        const {httpService, triggerError} = createMockHttpService();
-        const {wrapper} = mountFieldForm(httpService, {scrollToError: false});
+        const {wrapper, form} = mountFields(['email'], {scrollToError: false});
 
-        triggerError(422, {errors: {email: ['Taken']}});
+        form().refuse('email', 'Taken');
         await nextTick();
 
         expect(scrollIntoView).not.toHaveBeenCalled();
         wrapper.unmount();
     });
 
-    it('does not scroll again once the error bag is cleared', async () => {
-        const {httpService, triggerError} = createMockHttpService();
-        const {wrapper, result} = mountFieldForm(httpService);
+    it('scrolls without animation under prefers-reduced-motion', async () => {
+        vi.stubGlobal('matchMedia', (query: string) => ({matches: query === '(prefers-reduced-motion: reduce)'}));
+        const {wrapper, form} = mountFields(['email']);
 
-        triggerError(422, {errors: {email: ['Taken']}});
-        await nextTick();
-        expect(scrollIntoView).toHaveBeenCalledTimes(1);
-
-        result().clearErrors();
-        await nextTick();
-        expect(scrollIntoView).toHaveBeenCalledTimes(1);
-        wrapper.unmount();
-    });
-
-    it('does not scroll to an independently invalid field when the bag is cleared', async () => {
-        const {httpService, triggerError} = createMockHttpService();
-        let result!: UseForm;
-        const wrapper = mount(
-            defineComponent({
-                setup() {
-                    result = useForm(httpService, {scrollToError: true});
-                    // This form's own field is marked only while its bag holds errors; the sibling
-                    // stays invalid on its own, unrelated to this form's bag.
-                    const marked = () => (Object.keys(result.errors.value).length > 0 ? 'true' : 'false');
-                    return () =>
-                        h('div', [h('input', {'aria-invalid': marked()}), h('input', {'aria-invalid': 'true'})]);
-                },
-            }),
-            {attachTo: document.body},
-        );
-
-        triggerError(422, {errors: {email: ['Taken']}});
-        await nextTick();
-        expect(scrollIntoView).toHaveBeenCalledTimes(1);
-
-        result.clearErrors();
-        await nextTick();
-        expect(scrollIntoView).toHaveBeenCalledTimes(1);
-        wrapper.unmount();
-    });
-
-    it('no-ops when a 422 marks no field invalid', async () => {
-        const {httpService, triggerError} = createMockHttpService();
-        const {wrapper} = mountFieldForm(httpService, undefined, false);
-
-        triggerError(422, {errors: {email: ['Taken']}});
-        await nextTick();
-
-        expect(scrollIntoView).not.toHaveBeenCalled();
-        wrapper.unmount();
-    });
-
-    it('scopes the scroll to scrollRoot when provided', async () => {
-        const {httpService, triggerError} = createMockHttpService();
-        const {wrapper} = mountScopedForm(httpService, true);
-
-        triggerError(422, {errors: {email: ['Taken']}});
-        await nextTick();
-
-        expect(scrollIntoView).toHaveBeenCalledWith({behavior: 'smooth', block: 'center'});
-        wrapper.unmount();
-    });
-
-    it('does not scroll to an invalid field outside scrollRoot', async () => {
-        const {httpService, triggerError} = createMockHttpService();
-        const {wrapper} = mountScopedForm(httpService, false);
-
-        triggerError(422, {errors: {email: ['Taken']}});
-        await nextTick();
-
-        expect(scrollIntoView).not.toHaveBeenCalled();
-        wrapper.unmount();
-    });
-
-    it('does not fall back to the document when scrollRoot is null', async () => {
-        const {httpService, triggerError} = createMockHttpService();
-        const scrollRoot = ref<HTMLElement | null>(null); // passed but never bound -> stays null
-        const {wrapper} = mountFieldForm(httpService, {scrollRoot});
-
-        triggerError(422, {errors: {email: ['Taken']}});
-        await nextTick();
-
-        expect(scrollIntoView).not.toHaveBeenCalled();
-        wrapper.unmount();
-    });
-
-    it('scrolls with auto behavior under prefers-reduced-motion', async () => {
-        const {httpService, triggerError} = createMockHttpService();
-        vi.spyOn(window, 'matchMedia').mockReturnValue({matches: true} as MediaQueryList);
-        const {wrapper} = mountFieldForm(httpService);
-
-        triggerError(422, {errors: {email: ['Taken']}});
+        form().refuse('email', 'Taken');
         await nextTick();
 
         expect(scrollIntoView).toHaveBeenCalledWith({behavior: 'auto', block: 'center'});
@@ -359,57 +273,13 @@ describe('useForm scroll-to-error', () => {
     });
 
     it('scrolls with smooth behavior when the runtime has no matchMedia', async () => {
-        const {httpService, triggerError} = createMockHttpService();
         vi.stubGlobal('matchMedia', undefined);
-        const {wrapper} = mountFieldForm(httpService);
+        const {wrapper, form} = mountFields(['email']);
 
-        triggerError(422, {errors: {email: ['Taken']}});
+        form().refuse('email', 'Taken');
         await nextTick();
 
         expect(scrollIntoView).toHaveBeenCalledWith({behavior: 'smooth', block: 'center'});
-        wrapper.unmount();
-    });
-
-    it('scrolls after a child paints the mark from a prop (flush: post across the boundary)', async () => {
-        const {httpService, triggerError} = createMockHttpService();
-        const Field = defineComponent({
-            props: {invalid: {type: Boolean, required: true}},
-            setup: (props) => () => h('input', {'aria-invalid': props.invalid ? 'true' : 'false'}),
-        });
-        const wrapper = mount(
-            defineComponent({
-                setup() {
-                    const {errors} = useForm(httpService, {scrollToError: true});
-                    return () => h(Field, {invalid: Object.keys(errors.value).length > 0});
-                },
-            }),
-            {attachTo: document.body},
-        );
-
-        triggerError(422, {errors: {email: ['Taken']}});
-        await nextTick();
-
-        expect(scrollIntoView).toHaveBeenCalledTimes(1);
-        wrapper.unmount();
-    });
-
-    it('targets a custom scrollTarget selector instead of aria-invalid', async () => {
-        const {httpService, triggerError} = createMockHttpService();
-        let result!: UseForm;
-        const wrapper = mount(
-            defineComponent({
-                setup() {
-                    result = useForm(httpService, {scrollToError: true, scrollTarget: '.field-error'});
-                    return () => h('input', {class: Object.keys(result.errors.value).length > 0 ? 'field-error' : ''});
-                },
-            }),
-            {attachTo: document.body},
-        );
-
-        triggerError(422, {errors: {email: ['Taken']}});
-        await nextTick();
-
-        expect(scrollIntoView).toHaveBeenCalledTimes(1);
         wrapper.unmount();
     });
 });
@@ -424,7 +294,7 @@ describe('useForm submit window and refusal signal', () => {
 
     it('passes the fields allow-list through to the validation layer', () => {
         const {httpService, triggerError} = createMockHttpService();
-        const {result} = mountForm(httpService, {fields: ['email']});
+        const {result} = mountForm(httpService, {fields: ['email'], onlyWhileSubmitting: false});
 
         triggerError(422, {errors: {email: ['Taken'], token: ['Expired']}});
 
@@ -432,9 +302,19 @@ describe('useForm submit window and refusal signal', () => {
         expect(result().unmapped.value).toEqual(['token']);
     });
 
+    it('by default leaves the bag untouched for a 422 that arrives while the form is idle', () => {
+        const {httpService, triggerError} = createMockHttpService();
+        const {result} = mountForm(httpService, {});
+
+        triggerError(422, {errors: {email: ['Taken']}});
+
+        expect(result().errors.value).toEqual({});
+        expect(result().refused.value).toBe(false);
+    });
+
     it('binds a 422 that arrives while the form is idle when onlyWhileSubmitting is off', () => {
         const {httpService, triggerError} = createMockHttpService();
-        const {result} = mountForm(httpService);
+        const {result} = mountForm(httpService, {onlyWhileSubmitting: false});
 
         triggerError(422, {errors: {email: ['Taken']}});
 
@@ -524,7 +404,10 @@ describe('useForm submit window and refusal signal', () => {
 describe('useForm field()', () => {
     it('links a control to the form: an id from the name, and the message with its mark and describedby', () => {
         const {httpService, triggerError} = createMockHttpService();
-        const {result} = mountForm<'email' | 'name' | 'learningGoals.0.title'>(httpService, {idPrefix: 'f'});
+        const {result} = mountForm<'email' | 'name' | 'learningGoals.0.title'>(httpService, {
+            idPrefix: 'f',
+            onlyWhileSubmitting: false,
+        });
 
         expect(result().field('email')).toEqual({
             id: 'f-email',
@@ -578,7 +461,7 @@ describe('useForm FieldLabel and Message', () => {
         const wrapper = mount(
             defineComponent({
                 setup() {
-                    form = useForm<'firstName'>(httpService, options);
+                    form = useForm<'firstName'>(httpService, {onlyWhileSubmitting: false, ...options});
                     return () =>
                         h('div', [
                             h(form.FieldLabel, {name: 'firstName', label: 'Voornaam', required: true, class: 'w-40'}),

@@ -38,8 +38,7 @@ import {useValidationErrors} from './validation-errors';
  * or one control that draws its own label and message through `FormField`.
  *
  * @param httpService the fs-http service whose 422 responses to observe.
- * @param options     `keyMapper`, `fields`, `onlyWhileSubmitting`, `scrollToError`, `scrollRoot`,
- *                    `scrollTarget`, `idPrefix` — see `UseFormOptions`.
+ * @param options     `keyMapper`, `fields`, `onlyWhileSubmitting`, `scrollToError`, `idPrefix` — see `UseFormOptions`.
  */
 // Two call shapes: names are free strings, or, with a `draft`, the draft's paths with typed values.
 // The overloads are a type; the one implementation below is cast to it, since an arrow function cannot
@@ -56,10 +55,8 @@ export const useForm = (<T extends string = string>(
     const {
         keyMapper,
         fields,
-        onlyWhileSubmitting = false,
-        scrollToError = false,
-        scrollRoot,
-        scrollTarget,
+        onlyWhileSubmitting = true,
+        scrollToError = true,
         idPrefix,
         draft,
     } = options;
@@ -73,7 +70,6 @@ export const useForm = (<T extends string = string>(
     const client = ref({}) as Ref<ValidationErrors<T>>;
     const fieldErrors = computed(() => ({...validation.errors.value, ...client.value}));
 
-    if (scrollToError) useScrollToFirstError(fieldErrors, scrollRoot, scrollTarget);
 
     const refuse = (field: T, message: string): void => {
         client.value = {...client.value, [field]: message};
@@ -95,6 +91,7 @@ export const useForm = (<T extends string = string>(
     // Unique per form instance by default, so two forms with the same names never share an id.
     const prefix = idPrefix ?? useId();
     const id = (name: T): string => fieldId(name, prefix);
+    if (scrollToError) useScrollToFirstError(fieldErrors, id as (name: string) => string);
     const message = (name: T): string | undefined => fieldErrors.value[name] || undefined;
 
     const field = (name: T): FieldProps | (FieldProps & FieldModel<unknown>) => {

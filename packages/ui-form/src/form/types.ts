@@ -70,40 +70,19 @@ export interface UseFormSubmit {
 /** Options for `useForm`: the validation options plus `useForm`-only behaviour. */
 export type UseFormOptions<T extends string = string> = Omit<UseValidationErrorsOptions<T>, 'acceptWhen'> & {
     /**
-     * Take a 422 only while this form's `handleSubmit` is in flight, so a refusal that lands
-     * while the form is idle (a late answer from a screen the user left) does not enter its bag.
-     * This is a time window, not request identity: ANY request on the same `HttpService` that
-     * answers 422 during the window lands here too — another form's submit, a background save,
-     * a dialog's request. Telling the requests apart needs a marker the consumer threads into
-     * its request options (WR-1992; DECISIONS D1).
-     * @default false
+     * Take a 422 only while this form's own `handleSubmit` is in flight, so a refusal lands in the form
+     * that sent it: a dialog's refusal no longer fills the page form behind it, and a late answer from a
+     * screen the user left is dropped. Turn it off for a form that must take a 422 from a request it
+     * does not submit through `handleSubmit` (a lookup that refuses a field, say).
+     * @default true
      */
     onlyWhileSubmitting?: boolean;
     /**
-     * On a 422, scroll the first invalid field into view. Off unless you ask for it: an
-     * `HttpService` is shared, so a 422 fills every mounted form's bag and this cannot tell
-     * whose refusal it was — turning it on without a `scrollRoot` lets one form's refusal
-     * scroll the page to another form's field. Requires the presentation layer to mark the
-     * errored control (the default target is `[aria-invalid="true"]`, which
-     * this package's controls render from `:invalid`).
-     * @default false
+     * Scroll the first refused field into view, found by the ids this form hands out (`field(name)`'s
+     * control, else its `Message`). Scoped by those ids, so another form's refusal never scrolls here.
+     * @default true
      */
     scrollToError?: boolean;
-    /**
-     * Scopes the `scrollToError` query to one form's subtree — pass it when forms
-     * share a page (a dialog over a page form on the same `HttpService` **must** pass
-     * it). Omitted: document-wide. Provided but `null`: no scroll (never falls back to
-     * document).
-     */
-    scrollRoot?: Ref<HTMLElement | null>;
-    /**
-     * CSS selector for the invalid-field mark, used by `scrollToError`. Defaults to
-     * `'[aria-invalid="true"]'` (what this package's controls render). Pass your
-     * own when your inputs mark errors differently (e.g. a class) — the package derives
-     * no ids and marks nothing itself.
-     * @default '[aria-invalid="true"]'
-     */
-    scrollTarget?: string;
     /**
      * Replaces the prefix of every id `field()` derives. By default each form takes its own from Vue's
      * `useId()` (`v-3-email`), so ids are unique without anyone thinking; set this only when something

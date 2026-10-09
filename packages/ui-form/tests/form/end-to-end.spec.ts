@@ -61,12 +61,16 @@ interface Mounted {
 // A field is written against the form it belongs to: the test passes each one that form.
 type FieldNode = (form: UseForm) => VNode;
 
+// Every form mounted on the shared service; unmounted after each case so none outlives it.
+const mounted: ReturnType<typeof mount>[] = [];
+
 const mountForm = (fields: () => FieldNode[], options = {}): Mounted => {
     let form!: UseForm;
     const wrapper = mount(
         defineComponent({
             setup: () => {
-                form = useForm(care, {keyMapper, ...options});
+                // these cases send the 422 directly, outside a submit; the window case opts back in
+                form = useForm(care, {keyMapper, onlyWhileSubmitting: false, ...options});
 
                 return () =>
                     h(
@@ -77,6 +81,8 @@ const mountForm = (fields: () => FieldNode[], options = {}): Mounted => {
         }),
         {attachTo: document.body},
     );
+
+    mounted.push(wrapper);
 
     return {form, wrapper};
 };
@@ -106,6 +112,7 @@ const expectMarked = (wrapper: ReturnType<typeof mount>, name: string, message: 
 };
 
 afterEach(() => {
+    for (const wrapper of mounted.splice(0)) wrapper.unmount();
     vi.restoreAllMocks();
     document.body.innerHTML = '';
 });
