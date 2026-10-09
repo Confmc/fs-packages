@@ -13,13 +13,21 @@ removed `Field` API, Stryker was not run, and no CHANGELOG entry or version plan
 
 - **No provide/inject** (Gerard). The shape stays as described here: `v-bind="field(name)"` on controls,
   `FieldLabel` / `Message` by name, and the form passed as a prop to child components that render fields.
+- **emmie first** (Gerard). Make it better for emmie and don't worry much about other projects; staying
+  framework-agnostic is nice to have, no longer required. emmie's features go straight into the controls,
+  and emmie's look can be the default theme. (This moves away from ADR-0043's "headless, themeable for
+  every territory" premise, one more reason that ADR needs amending.)
+- **`error` with an `invalid` override** (Marcel). Controls take `error`; `invalid` defaults to
+  `Boolean(error)`, and `invalid: false` shows the message without the red mark. Red stays the default.
+- **One set of names goes, and the old names are preferred** (Marcel). Which old name maps to which
+  component is still open.
 
 ## Next steps, in this order
 
 Each step lands as its own commits, so the work can stop or be reverted cheaply after any of them.
 
-1. **emmie adopts ui-form's controls**, control by control: emmie's theme on the `--ui-*` tokens, and the
-   features the package lacks added to the package (§5b).
+1. **emmie adopts ui-form's controls**, control by control: emmie's look becomes the package default, and
+   emmie's features go into the controls as they are (§5b).
 2. **The field-controls move into the package**: the self-wrapping versions of the controls (§5a), so emmie's
    `shared/components/form/fields/` folder goes.
 3. **Only then decide on the kit.** `useForm` would hand out form-bound versions of the package's own
@@ -170,8 +178,9 @@ emmie's templates want one element per field that draws its own label and messag
 Proposal: every control accepts the whole `field()` object plus `label` / `required` / `orientation`.
 When `label` is set, the control wraps itself in `FormField`. Concretely:
 
-1. **Add `error?: string`** to all 14 controls, deriving `invalid` from it. Today `v-bind="field(x)"` on a
-   package control leaks `error="…"` as an HTML attribute on the `<input>`.
+1. **Add `error?: string`** to all 14 controls; `invalid` defaults to `Boolean(error)` and stays as an
+   override (`invalid: false` = message without red, decided). Today `v-bind="field(x)"` on a package
+   control leaks `error="…"` as an HTML attribute on the `<input>`.
 2. **`label`/`required`/`orientation` props** plus a self-wrap in `FormField`, shared through one internal piece
    so the 14 controls don't each repeat it.
     - The props: `label?`, `orientation?` (`required` exists). With `label`, the control renders
@@ -212,27 +221,32 @@ control, and **uses** (each `<Control` tag).
 | `SwitchButtons` (segmented)                                                   | 2       | 2       | none                            | missing                                                                                              |
 | `GroupMultiSelect` / `RangeInput`                                             | 1 / 1   | 1 / 1   | none                            | missing; low priority                                                                                |
 
-**Tokens:** the package styles through 96 `--ui-*` custom properties. Per emmie-2's report, an earlier
-experiment matched the package `TextInput` to emmie's look with about ten tokens; two raw CSS rules (a hover
-border, a danger ring only on focus) were needed and could become tokens. New controls (time, segmented,
-password toggle, search clear, an error icon inside the input, which emmie shows and the package lacks) need
-their own tokens in the same scheme.
+**Theme:** with emmie first, emmie's look becomes the default values of the 96 `--ui-*` custom
+properties, rather than a theme emmie maps onto them. Per emmie-2's report, an earlier experiment matched
+`TextInput` to emmie with about ten tokens; its two raw CSS rules (a hover border, a danger ring only on
+focus) simply become the default styles. Tokens stay as the override seam; they no longer have to anticipate
+other territories.
 
 **Order within the next steps**, by uses × effort:
 
-- Step 1 (bare controls):
-    1. `label` → `optionLabel` on the select family, and `error` on every control (§5a.1);
-    2. auto-grow `Textarea`, password toggle, search clear, the in-input error icon;
-    3. `TimeInput`;
-    4. a date picker last. That's a project of its own; until then emmie keeps its pickers, wired through
-       `field()`.
+- Step 1 (bare controls). emmie-first means porting emmie's behaviour, not designing a generic one:
+    1. `error` (with the `invalid` override) on every control, and `label` → `optionLabel` on the select family;
+    2. emmie's look as the default theme;
+    3. emmie's features into the existing controls: auto-grow `Textarea` (`maxRows`), the searchable select's
+       search box, password show/hide, search clear, the in-input error icon;
+    4. emmie-only controls that become package controls as they are: `TimeInput` (with `notNullable`),
+       `BooleanRadioGroup`, `SwitchButtons`, `AdditiveInput`, `GroupMultiSelect`;
+    5. the date pickers last: emmie's own calendars move in as they are instead of a generic picker.
+       They're the biggest piece (45 + 11 uses).
+- Still a judgement call, even emmie-first: `RichTextEditor` (tiptap) and the file upload. They'd bring heavy
+  or app-specific dependencies into the package; moving them is now allowed, not required.
 - Step 2 (field-controls): §5a.2–4 together (self-wrap in `FormField`, the `class`/`style` split, no empty
   wrapper), shared once across the controls.
 
 ## 6. Deliberately left open
 
-- **Naming.** Once the shape is approved, the components go back to the old names (Marcel). `FieldMessage`
-  folds into `Message`, and `idPrefix` stays as the fixed-id fallback.
+- **Naming mapping.** One set goes and the old names are preferred (decided); which old name maps to which
+  component is open. `FieldMessage` folds into `Message`, and `idPrefix` stays as the fixed-id fallback.
 - **`useDraftForm()` vs the overload cast** (§3).
 - **Partial 422s.**
     - Without `fields`, a 422 naming only a key no control renders counts as "named"; `refusedUnnamed`
