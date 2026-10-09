@@ -16,6 +16,7 @@ import {computed, useId} from 'vue';
 
 import type {FieldBinding} from '../types';
 
+import {messageId} from '../form/field';
 import FormError from './FormError.vue';
 import FormLabel from './FormLabel.vue';
 
@@ -45,7 +46,7 @@ const {
 defineSlots<{default?: (scope: {field: FieldBinding}) => unknown}>();
 
 const generatedId = useId();
-const errorId = computed(() => `${id ?? generatedId}-error`);
+const errorId = computed(() => messageId(id ?? generatedId));
 const message = computed(() => error || undefined);
 
 const field = computed<FieldBinding>(() => ({

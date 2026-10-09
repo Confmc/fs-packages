@@ -1,15 +1,12 @@
 // @vitest-environment happy-dom
 import {mount, shallowMount} from '@vue/test-utils';
 import {describe, expect, it} from 'vitest';
-import {defineComponent, h, nextTick, ref} from 'vue';
-
-import type {ValidationErrors} from '../src';
+import {defineComponent, h} from 'vue';
 
 import {
     Checkbox,
     CheckboxGroup,
     Combobox,
-    createField,
     DateInput,
     FormField,
     GroupCombobox,
@@ -76,6 +73,12 @@ describe('FormField hands its control one object to bind', () => {
 
         expect(input.attributes('id')).toMatch(/\S/);
         expect(input.attributes('id')).not.toBe('undefined');
+    });
+
+    it('describes a control by its generated id when none is given', () => {
+        const input = inField({label: 'Name', error: 'Required'}, spread()).find('input');
+
+        expect(input.attributes('aria-describedby')).toBe(`${input.attributes('id')}-error`);
     });
 
     it('wires a control wrapped in an element the same way', () => {
@@ -170,95 +173,5 @@ describe('FormField hands its control one object to bind', () => {
                 .find(selector)
                 .attributes('id'),
         ).toBe('given');
-    });
-});
-
-describe('createField', () => {
-    const textField = (Field: unknown, props: Record<string, unknown>) =>
-        h(Field as never, props, {default: spread(TextInput, {modelValue: ''})});
-
-    it('reads its message by name from the bag it was created with, verbatim', async () => {
-        const errors = ref<ValidationErrors>({});
-        const Field = createField(errors);
-        const wrapper = mount(
-            defineComponent({
-                setup: () => () =>
-                    h('div', [
-                        textField(Field, {name: 'learningGoals.0.title', label: 'Title'}),
-                        textField(Field, {name: 'remarks', label: 'Remarks'}),
-                    ]),
-            }),
-        );
-
-        errors.value = {'learningGoals.0.title': 'Vul een titel in'};
-        await nextTick();
-
-        const [title, remarks] = wrapper.findAll('.ui-field');
-        const input = title!.find('input');
-        expect(title!.find('.ui-error').text()).toBe('Vul een titel in');
-        expect(input.attributes('aria-invalid')).toBe('true');
-        expect(title!.find(`#${input.attributes('aria-describedby')}`).text()).toBe('Vul een titel in');
-        expect(title!.find('label').attributes('for')).toBe(input.attributes('id'));
-        expect(remarks!.find('.ui-error').exists()).toBe(false);
-    });
-
-    it('passes label, required, id and orientation through to the field', () => {
-        const Field = createField({});
-        const wrapper = mount(Field, {
-            props: {name: 'email', label: 'Email', required: true, id: 'email', orientation: 'horizontal'},
-            slots: {default: spread(TextInput, {modelValue: ''})},
-        });
-
-        expect(wrapper.find('label').attributes('for')).toBe('email');
-        expect(wrapper.find('.ui-label__req').exists()).toBe(true);
-        expect(wrapper.find('.ui-field').classes()).toContain('is-horizontal');
-    });
-
-    it('is findable by name, the way a consumer spec looks a Field up', () => {
-        const Field = createField({});
-        const wrapper = mount(defineComponent({setup: () => () => h('div', [textField(Field, {name: 'email'})])}));
-
-        expect(wrapper.findComponent({name: 'Field'}).exists()).toBe(true);
-    });
-
-    it('lets an explicit error win over the bag', () => {
-        const Field = createField({email: 'From the bag'});
-        const wrapper = mount(Field, {
-            props: {name: 'email', error: 'Explicit'},
-            slots: {default: spread(TextInput, {modelValue: ''})},
-        });
-
-        expect(wrapper.find('.ui-error').text()).toBe('Explicit');
-    });
-
-    it('accepts a getter as the bag', () => {
-        const Field = createField(() => ({email: 'From a getter'}));
-        const wrapper = mount(Field, {props: {name: 'email'}, slots: {default: spread(TextInput, {modelValue: ''})}});
-
-        expect(wrapper.find('.ui-error').text()).toBe('From a getter');
-    });
-
-    it('generates distinct ids for two fields with the same name', () => {
-        const Field = createField({});
-        const wrapper = mount(
-            defineComponent({
-                setup: () => () => h('div', [textField(Field, {name: 'email'}), textField(Field, {name: 'email'})]),
-            }),
-        );
-        const [first, second] = wrapper.findAll('input');
-
-        expect(first!.attributes('id')).not.toBe(second!.attributes('id'));
-    });
-
-    it('reads only its own bag: two forms side by side never mix', () => {
-        const page = createField({email: 'Page form'});
-        const dialog = createField({});
-        const wrapper = mount(
-            defineComponent({
-                setup: () => () => h('div', [textField(page, {name: 'email'}), textField(dialog, {name: 'email'})]),
-            }),
-        );
-
-        expect(wrapper.findAll('.ui-error')).toHaveLength(1);
     });
 });

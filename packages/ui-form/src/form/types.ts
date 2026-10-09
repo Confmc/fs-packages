@@ -1,6 +1,6 @@
 import type {ComputedRef, Ref} from 'vue';
 
-import type {FieldComponent} from './field';
+import type {FieldBinding} from '../types';
 
 /** Field-error bag: the first backend validation message per field key. */
 export type ValidationErrors<T extends string = string> = Partial<Record<T, string>>;
@@ -46,6 +46,12 @@ export interface UseValidationErrorsOptions<T extends string = string> {
     acceptWhen?: () => boolean;
 }
 
+/**
+ * How a `handleSubmit` call ended: the action ran to the end (`'sent'`), the server refused it with a
+ * 422 (`'refused'`), or it never ran because a submit was already in flight (`'ignored'`).
+ */
+export type SubmitOutcome = 'sent' | 'refused' | 'ignored';
+
 /** Form-submit helper returned by `useFormSubmit`. */
 export interface UseFormSubmit {
     /**
@@ -54,7 +60,7 @@ export interface UseFormSubmit {
      * `useValidationErrors`' response middleware, so the form is preserved. Any
      * other rejection is re-thrown to the caller / error boundary.
      */
-    handleSubmit: (action: () => Promise<void>) => Promise<void>;
+    handleSubmit: (action: () => Promise<void>) => Promise<SubmitOutcome>;
     /** `true` while a submit action is in flight — the form's loading state. */
     submitting: Ref<boolean>;
 }
@@ -96,6 +102,11 @@ export type UseFormOptions<T extends string = string> = Omit<UseValidationErrors
      * @default '[aria-invalid="true"]'
      */
     scrollTarget?: string;
+    /**
+     * Put before every id `field()` derives, for two forms with the same field names on one page:
+     * `idPrefix: 'invoice'` gives `invoice-email`. Without it the id is the name alone.
+     */
+    idPrefix?: string;
 };
 
 /**
@@ -111,11 +122,10 @@ export interface UseFormClient<T extends string = string> {
     clientErrors: Readonly<Ref<ValidationErrors<T>>>;
     /** What the fields show: the server's errors with the client refusals on top (client wins per key). */
     fieldErrors: ComputedRef<ValidationErrors<T>>;
-    /** A `FormField` bound to this form's `fieldErrors`: `<form.Field name="email">`. */
-    Field: FieldComponent<T>;
     /**
-     * One field's props for a control that renders its own label and message:
-     * `<Textarea v-bind="form.field('description')" label="…" v-model="…" />`.
+     * Everything that links one field to the form: `<TextInput v-bind="field('email')" v-model="email" />`
+     * plus `<FieldMessage v-bind="field('email')" />`, or a control that draws its own label and message.
+     * The id comes from the name (and `idPrefix`), so it is the same on every render.
      */
     field: (name: T) => FieldProps;
     /** Refuse a field from the client, e.g. a check that runs before the request is sent. */
@@ -133,7 +143,7 @@ export interface UseFormClient<T extends string = string> {
     clearClient: () => void;
 }
 
-/** What `useForm().field(name)` hands a control: the field's current message, read from `fieldErrors`. */
-export interface FieldProps {
+/** What `useForm().field(name)` hands a control: the wiring plus the field's message from `fieldErrors`. */
+export interface FieldProps extends FieldBinding {
     error: string | undefined;
 }

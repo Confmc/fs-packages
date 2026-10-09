@@ -3,9 +3,9 @@ import type {Ref} from 'vue';
 import {computed, readonly, ref} from 'vue';
 
 import type {FormHttpService} from './http-contract';
-import type {UseForm, UseFormOptions, ValidationErrors} from './types';
+import type {FieldProps, UseForm, UseFormOptions, ValidationErrors} from './types';
 
-import {createField} from './field';
+import {fieldId, messageId} from './field';
 import {useFormSubmit} from './form-submit';
 import {useScrollToFirstError} from './scroll-to-first-error';
 import {useValidationErrors} from './validation-errors';
@@ -23,20 +23,28 @@ import {useValidationErrors} from './validation-errors';
  * for the underlying `useValidationErrors` / `useFormSubmit` primitives directly
  * when you need one half without the other (e.g. a validation-less confirm action).
  *
- * `Field` is a `FormField` bound to this form's `fieldErrors` (the server's errors with the form's own
- * refusals on top): `const {Field} = useForm(http)`, then
- * `<Field name="email" v-slot="{field}"><TextInput v-bind="field" v-model="email" /></Field>`. Pass the
- * form (not its errors) to a child component that renders fields.
+ * `field(name)` is a field's whole link to the form — id, invalid, describedby and its message from
+ * `fieldErrors` (the server's errors with the form's own refusals on top):
+ * `<TextInput v-bind="field('email')" v-model="email" />` + `<FieldMessage v-bind="field('email')" />`,
+ * or one control that draws its own label and message through `FormField`.
  *
  * @param httpService the fs-http service whose 422 responses to observe.
  * @param options     `keyMapper`, `fields`, `onlyWhileSubmitting`, `scrollToError`, `scrollRoot`,
- *                    `scrollTarget` — see `UseFormOptions`.
+ *                    `scrollTarget`, `idPrefix` — see `UseFormOptions`.
  */
 export const useForm = <T extends string = string>(
     httpService: FormHttpService,
     options: UseFormOptions<T> = {},
 ): UseForm<T> => {
-    const {keyMapper, fields, onlyWhileSubmitting = false, scrollToError = false, scrollRoot, scrollTarget} = options;
+    const {
+        keyMapper,
+        fields,
+        onlyWhileSubmitting = false,
+        scrollToError = false,
+        scrollRoot,
+        scrollTarget,
+        idPrefix,
+    } = options;
     const validation = useValidationErrors<T>(httpService, {
         keyMapper,
         fields,
@@ -66,6 +74,13 @@ export const useForm = <T extends string = string>(
         client.value = next;
     };
 
+    const field = (name: T): FieldProps => {
+        const id = fieldId(name, idPrefix);
+        const error = fieldErrors.value[name] || undefined;
+
+        return {id, invalid: Boolean(error), describedby: error ? messageId(id) : undefined, error};
+    };
+
     const clearClient = (): void => {
         client.value = {};
     };
@@ -75,8 +90,7 @@ export const useForm = <T extends string = string>(
         ...submit,
         clientErrors: readonly(client) as Readonly<Ref<ValidationErrors<T>>>,
         fieldErrors,
-        Field: createField(fieldErrors),
-        field: (name: T) => ({error: fieldErrors.value[name]}),
+        field,
         refuse,
         setRefusals,
         withdraw,

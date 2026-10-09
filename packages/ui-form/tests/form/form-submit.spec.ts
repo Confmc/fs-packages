@@ -50,11 +50,11 @@ describe('useFormSubmit', () => {
         expect(submitting.value).toBe(true);
 
         // second call must early-return without invoking the action again
-        await handleSubmit(action);
+        await expect(handleSubmit(action)).resolves.toBe('ignored');
         expect(action).toHaveBeenCalledOnce();
 
         gate.resolve();
-        await first;
+        await expect(first).resolves.toBe('sent');
     });
 
     it('swallows a 422 rejection so the form is preserved', async () => {
@@ -64,7 +64,7 @@ describe('useFormSubmit', () => {
             handleSubmit(async () => {
                 throw makeAxiosError(422);
             }),
-        ).resolves.toBeUndefined();
+        ).resolves.toBe('refused');
         expect(submitting.value).toBe(false);
     });
 

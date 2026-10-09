@@ -10,11 +10,11 @@ import {defineComponent, h, nextTick} from 'vue';
 
 import type {UseForm} from '../../src';
 
-import {CheckboxGroup, Textarea, TextInput, useForm} from '../../src';
+import {CheckboxGroup, FormField, Textarea, TextInput, useForm} from '../../src';
 
 // The end-to-end chain a consumer runs, now inside one package and read from SOURCE:
 // a real HttpService answers 422 → fs-form's middleware fills the bag through keyMapper →
-// form.Field reads its message by name from that form's bag → v-bind of its `field` marks and describes the control.
+// form.field(name) reads the message from that form's bag → FormField draws it, v-bind marks and describes the control.
 
 // A real 422 from emmie's care plan (UpdateCarePlanRequest, Dutch messages), raw snake keys.
 const CARE_PLAN_422 = {
@@ -58,8 +58,8 @@ interface Mounted {
     wrapper: ReturnType<typeof mount>;
 }
 
-// A field is written against the form it belongs to: the test passes each one that form's Field.
-type FieldNode = (Field: Component) => VNode;
+// A field is written against the form it belongs to: the test passes each one that form.
+type FieldNode = (form: UseForm) => VNode;
 
 const mountForm = (fields: () => FieldNode[], options = {}): Mounted => {
     let form!: UseForm;
@@ -71,7 +71,7 @@ const mountForm = (fields: () => FieldNode[], options = {}): Mounted => {
                 return () =>
                     h(
                         'form',
-                        fields().map((node) => node(form.Field)),
+                        fields().map((node) => node(form)),
                     );
             },
         }),
@@ -83,8 +83,15 @@ const mountForm = (fields: () => FieldNode[], options = {}): Mounted => {
 
 const field =
     (name: string, control: Component = TextInput): FieldNode =>
-    (Field) =>
-        h(Field, {name, label: name}, {default: ({field}: {field: object}) => h(control, {...field, modelValue: ''})});
+    (form) => {
+        const {id, error} = form.field(name);
+
+        return h(
+            FormField,
+            {id, error, label: name},
+            {default: ({field}: {field: object}) => h(control, {...field, modelValue: ''})},
+        );
+    };
 
 // Every assertion a sighted and a screen-reader user both depend on, for one named field.
 const expectMarked = (wrapper: ReturnType<typeof mount>, name: string, message: string) => {
@@ -159,10 +166,10 @@ describe('a 422 reaches the field that names it', () => {
 
     it('carries a group error on the fieldset and never on its boxes', async () => {
         const {wrapper} = mountForm(() => [
-            (Field) =>
+            (form) =>
                 h(
-                    Field,
-                    {name: 'goals'},
+                    FormField,
+                    {id: form.field('goals').id, error: form.field('goals').error},
                     {
                         default: ({field}: {field: object}) =>
                             h(CheckboxGroup, {

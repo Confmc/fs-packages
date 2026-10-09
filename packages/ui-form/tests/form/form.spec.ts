@@ -156,7 +156,7 @@ describe('useForm', () => {
             result().handleSubmit(async () => {
                 throw makeAxiosError(422);
             }),
-        ).resolves.toBeUndefined();
+        ).resolves.toBe('refused');
     });
 
     it('re-throws a non-422 rejection through handleSubmit', async () => {
@@ -522,17 +522,34 @@ describe('useForm submit window and refusal signal', () => {
 });
 
 describe('useForm field()', () => {
-    it("hands a control the field's message, server and client alike, and undefined when clean", () => {
+    it('links a control to the form: an id from the name, and the message with its mark and describedby', () => {
         const {httpService, triggerError} = createMockHttpService();
-        const {result} = mountForm<'email' | 'name' | 'age'>(httpService);
+        const {result} = mountForm<'email' | 'name' | 'learningGoals.0.title'>(httpService);
 
-        expect(result().field('email')).toEqual({error: undefined});
+        expect(result().field('email')).toEqual({
+            id: 'email',
+            invalid: false,
+            describedby: undefined,
+            error: undefined,
+        });
 
         triggerError(422, {errors: {email: ['Taken'], name: ['Required']}});
         result().refuse('name', 'Too short');
 
-        expect(result().field('email')).toEqual({error: 'Taken'});
-        expect(result().field('name')).toEqual({error: 'Too short'});
-        expect(result().field('age')).toEqual({error: undefined});
+        expect(result().field('email')).toEqual({
+            id: 'email',
+            invalid: true,
+            describedby: 'email-error',
+            error: 'Taken',
+        });
+        expect(result().field('name').error).toBe('Too short');
+        expect(result().field('learningGoals.0.title').id).toBe('learningGoals-0-title');
+    });
+
+    it('puts idPrefix before every derived id, so two forms with the same names can share a page', () => {
+        const {httpService} = createMockHttpService();
+        const {result} = mountForm<'email'>(httpService, {idPrefix: 'invoice'});
+
+        expect(result().field('email').id).toBe('invoice-email');
     });
 });

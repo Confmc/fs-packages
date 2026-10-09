@@ -1,6 +1,6 @@
 import {ref} from 'vue';
 
-import type {UseFormSubmit} from './types';
+import type {SubmitOutcome, UseFormSubmit} from './types';
 
 import {isValidationRefusal} from './http-contract';
 
@@ -20,16 +20,18 @@ import {isValidationRefusal} from './http-contract';
 export const useFormSubmit = (validationErrors: {clearErrors: () => void}): UseFormSubmit => {
     const submitting = ref(false);
 
-    const handleSubmit = async (action: () => Promise<void>): Promise<void> => {
-        if (submitting.value) return;
+    const handleSubmit = async (action: () => Promise<void>): Promise<SubmitOutcome> => {
+        if (submitting.value) return 'ignored';
 
         submitting.value = true;
         validationErrors.clearErrors();
 
         try {
             await action();
+
+            return 'sent';
         } catch (error) {
-            if (isValidationRefusal(error)) return;
+            if (isValidationRefusal(error)) return 'refused';
 
             throw error;
         } finally {

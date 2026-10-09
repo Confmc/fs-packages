@@ -1,4 +1,5 @@
 export {default as FormField} from './components/FormField.vue';
+export {default as FieldMessage} from './components/FieldMessage.vue';
 export {default as FormLabel} from './components/FormLabel.vue';
 export {default as FormError} from './components/FormError.vue';
 export {default as TextInput} from './components/TextInput.vue';
@@ -22,11 +23,7 @@ export {default as GroupCombobox} from './components/GroupCombobox.vue';
 export {default as Pressable} from './components/Pressable.vue';
 export {default as Disclosure} from './components/Disclosure.vue';
 
-// A FormField bound to one error bag. useForm returns one as `Field`; createField is for a bag from
-// another source and for component specs.
-export {createField} from './form/field';
-
-// Form state (formerly @script-development/fs-form): useForm returns a Field that closes over its errors.
+// Form state (formerly @script-development/fs-form): useForm's field(name) links a control to the form.
 export {useForm} from './form/form';
 export {useFormSubmit} from './form/form-submit';
 export {useValidationErrors} from './form/validation-errors';
@@ -34,6 +31,7 @@ export type {FormHttpService} from './form/http-contract';
 export type {
     UseForm,
     FieldProps,
+    SubmitOutcome,
     UseFormOptions,
     UseFormSubmit,
     UseValidationErrors,

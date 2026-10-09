@@ -18,7 +18,9 @@ import Checkbox from '../../src/components/Checkbox.vue';
 import CheckboxGroup from '../../src/components/CheckboxGroup.vue';
 import Combobox from '../../src/components/Combobox.vue';
 import Disclosure from '../../src/components/Disclosure.vue';
+import FieldMessage from '../../src/components/FieldMessage.vue';
 import FormField from '../../src/components/FormField.vue';
+import FormLabel from '../../src/components/FormLabel.vue';
 import GroupCombobox from '../../src/components/GroupCombobox.vue';
 import GroupSelect from '../../src/components/GroupSelect.vue';
 import MultiCombobox from '../../src/components/MultiCombobox.vue';
@@ -29,7 +31,7 @@ import SingleSelect from '../../src/components/SingleSelect.vue';
 import Switch from '../../src/components/Switch.vue';
 import Textarea from '../../src/components/Textarea.vue';
 import TextInput from '../../src/components/TextInput.vue';
-import {createField} from '../../src/form/field';
+import {useForm} from '../../src/form/form';
 import '../../styles.css';
 
 interface Fruit {
@@ -513,45 +515,46 @@ describe('axe-core audits — interactive non-form controls, zero violations', (
     });
 });
 
-describe('axe-core audits — form-bound fields by name, control wired by one v-bind, zero violations', () => {
-    it('a form whose fields read its error bag by name: label, mark and message all resolve', async () => {
-        const errors = ref<Record<string, string>>({});
-        const Field = createField(errors);
+describe('axe-core audits — fields linked by field(name), zero violations', () => {
+    it("bare controls and a FormField both resolve label, mark and message from the form's field()", async () => {
+        let form!: ReturnType<typeof useForm>;
         const screen = await render(
             defineComponent({
-                setup: () => () =>
-                    h('main', [
-                        h('h1', 'Test form'),
-                        h(
-                            Field,
-                            {label: 'Title', name: 'learningGoals.0.title', required: true},
-                            {default: ({field}: {field: object}) => h(TextInput, {...field, modelValue: ''})},
-                        ),
-                        h(
-                            Field,
-                            {label: 'Remarks', name: 'remarks'},
-                            {default: ({field}: {field: object}) => h(Textarea, {...field, modelValue: ''})},
-                        ),
-                        h(
-                            Field,
-                            {name: 'goals'},
-                            {
-                                default: ({field}: {field: object}) =>
-                                    h(CheckboxGroup, {
-                                        ...field,
-                                        options: FRUITS,
-                                        optionLabel: 'name',
-                                        label: 'Goals',
-                                        modelValue: [],
-                                    }),
-                            },
-                        ),
-                    ]),
+                setup: () => {
+                    form = useForm({registerResponseErrorMiddleware: () => () => undefined});
+
+                    return () => {
+                        const title = form.field('learningGoals.0.title');
+                        const remarks = form.field('remarks');
+
+                        return h('main', [
+                            h('h1', 'Test form'),
+                            // bare layer: the template places label and message itself
+                            h(FormLabel, {htmlFor: title.id, required: true}, () => 'Title'),
+                            h(TextInput, {...title, required: true, modelValue: ''}),
+                            h(FieldMessage, title),
+                            // field-control layer: FormField draws label and message
+                            h(
+                                FormField,
+                                {id: remarks.id, error: remarks.error, label: 'Remarks'},
+                                {default: ({field}: {field: object}) => h(Textarea, {...field, modelValue: ''})},
+                            ),
+                            h(CheckboxGroup, {
+                                ...form.field('goals'),
+                                options: FRUITS,
+                                optionLabel: 'name',
+                                label: 'Goals',
+                                modelValue: [],
+                            }),
+                            h(FieldMessage, form.field('goals')),
+                        ]);
+                    };
+                },
             }),
         );
         await expectNoViolations(screen.container);
 
-        errors.value = {'learningGoals.0.title': 'Vul een titel in', remarks: 'Te lang', goals: 'Kies een doel'};
+        form.setRefusals({'learningGoals.0.title': 'Vul een titel in', remarks: 'Te lang', goals: 'Kies een doel'});
         await new Promise((resolve) => requestAnimationFrame(resolve));
 
         for (const control of screen.container.querySelectorAll('input[type="text"], textarea, fieldset')) {
