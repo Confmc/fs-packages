@@ -132,8 +132,8 @@ export interface UseFormClient<T extends string = string> {
      */
     setRefusals: (bag: ValidationErrors<T>) => boolean;
     /**
-     * The user acted on these fields: drop their server messages and client refusals. A write through
-     * a draft form's `field(name)` does this for that field itself.
+     * Drop these fields' server messages and client refusals now, instead of at the next submit — e.g.
+     * when picking a value answers what the message said. Nothing calls it for you.
      */
     withdraw: (...fields: T[]) => void;
     /** Withdraw every client refusal, e.g. when an editor opens or closes. */
@@ -156,8 +156,8 @@ export type UseDraftFormOptions<D extends object> = UseFormOptions<Path<D>> & {
     /**
      * The component's own draft (a ref; stores and adapters stay untouched). With it, `field(name)`
      * also carries the value at that path and writes changes back into `draft.value`, so
-     * `<TextInput v-bind="field('firstName')" />` needs no `v-model`. Such a write also withdraws that
-     * field (its server message and client refusal): they were about the value it replaced.
+     * `<TextInput v-bind="field('firstName')" />` needs no `v-model`. Messages stay until the next
+     * submit, as everywhere else; `withdraw(name)` drops one sooner where a form wants that.
      */
     draft: Ref<D>;
 };

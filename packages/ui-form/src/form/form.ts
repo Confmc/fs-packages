@@ -101,10 +101,7 @@ export const useForm = (<T extends string = string>(
         return {
             ...wiring,
             modelValue: readPath(draft.value, name),
-            'onUpdate:modelValue': (value: unknown) => {
-                writePath(draft.value, name, value);
-                withdraw(name);
-            },
+            'onUpdate:modelValue': (value: unknown) => writePath(draft.value, name, value),
         };
     };
 

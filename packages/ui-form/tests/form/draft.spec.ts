@@ -80,66 +80,27 @@ describe('useForm with a draft', () => {
     });
 });
 
-describe('a write through field() settles that field', () => {
+describe('a write through field() keeps the messages', () => {
     const refusal = (data: unknown) => ({isAxiosError: true, response: {status: 422, data}});
 
-    const mountDraft = () => {
-        const draft = ref<Draft>({firstName: 'Ann', learningGoals: [{title: null}]});
+    it('leaves server messages and client refusals until the next submit, as without a draft', async () => {
+        const draft = ref<Draft>({firstName: 'Ann', learningGoals: []});
         let form!: UseDraftForm<Draft>;
         const wrapper = mount(
             defineComponent({
                 setup: () => {
                     form = useForm({draft});
-                    return () =>
-                        h('div', [
-                            h(TextInput, form.field('firstName')),
-                            h(TextInput, form.field('learningGoals.0.title')),
-                        ]);
+                    return () => h(TextInput, form.field('firstName'));
                 },
             }),
         );
-        return {wrapper, form: () => form, draft};
-    };
+        form.take(refusal({errors: {firstName: ['Minimaal 8 tekens']}}));
+        form.refuse('learningGoals', 'Kies een doel');
 
-    it("drops that field's server message and client refusal, and leaves every other field's alone", async () => {
-        const {wrapper, form} = mountDraft();
-        form().take(refusal({errors: {firstName: ['Taken'], 'learningGoals.0.title': ['Required']}}));
-        form().refuse('firstName', 'Too short');
+        await wrapper.find('input').setValue('B');
 
-        await wrapper.findAll('input')[0]!.setValue('Bo');
-
-        expect(form().fieldErrors.value).toEqual({'learningGoals.0.title': 'Required'});
-        expect(form().clientErrors.value).toEqual({});
-    });
-
-    it('keeps the refusal named: fixing every field never makes it read as one that named nothing', async () => {
-        const {wrapper, form} = mountDraft();
-        form().take(refusal({errors: {firstName: ['Taken']}}));
-
-        await wrapper.findAll('input')[0]!.setValue('Bo');
-
-        expect(form().errors.value).toEqual({});
-        expect(form().refused.value).toBe(true);
-        expect(form().refusedUnnamed.value).toBe(false);
-    });
-
-    it('drops nothing on a write to a field with nothing said about it', async () => {
-        const {wrapper, form} = mountDraft();
-        form().take(refusal({errors: {'learningGoals.0.title': ['Required']}}));
-        const before = form().errors.value;
-
-        await wrapper.findAll('input')[0]!.setValue('Bo');
-
-        expect(form().errors.value).toBe(before);
-    });
-
-    it('does not settle on a write that bypasses field(): it owns no deep watch on the draft', () => {
-        const {form, draft} = mountDraft();
-        form().take(refusal({errors: {firstName: ['Taken']}}));
-
-        draft.value.firstName = 'Bo';
-
-        expect(form().errors.value).toEqual({firstName: 'Taken'});
+        expect(draft.value.firstName).toBe('B');
+        expect(form.fieldErrors.value).toEqual({firstName: 'Minimaal 8 tekens', learningGoals: 'Kies een doel'});
     });
 });
 
