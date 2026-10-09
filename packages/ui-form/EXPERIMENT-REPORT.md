@@ -1,7 +1,7 @@
 # ui-form experiment: package-side report
 
 For: Gerard (lead). From: the fs-packages side of the fs-form + ui-inputs experiment.
-Branch: `experiment/ui-form-control` on the fork (`Confmc/fs-packages`), last pack `0.1.0-control.12`.
+Branch: `experiment/ui-form-control` on the fork (`Confmc/fs-packages`), last pack `0.1.0-control.14`.
 The emmie side (how the 119 files that call `useForm` move, what broke, the migration list) is in emmie-2's report:
 `docs/plans/fs-packages-experiment/REPORT.md` on emmie `experiment/fs-packages-control`. This one covers the package: its shape, how it is built, and what is
 still missing.
@@ -12,19 +12,28 @@ removed `Field` API, Stryker was not run, and no CHANGELOG entry or version plan
 ## Decided (2026-10-09)
 
 - **No provide/inject** (Gerard). The shape stays as described here: `v-bind="field(name)"` on controls,
-  `FieldLabel` / `Message` by name, and the form passed as a prop to child components that render fields.
+  `FormLabel` / `FormError` by name, and the form passed as a prop to child components that render fields.
 - **emmie first** (Gerard). Make it better for emmie and don't worry much about other projects; staying
   framework-agnostic is nice to have, no longer required. emmie's features go straight into the controls,
   and emmie's look can be the default theme. (This moves away from ADR-0043's "headless, themeable for
   every territory" premise, one more reason that ADR needs amending.)
 - **`error` with an `invalid` override** (Marcel). Controls take `error`; `invalid` defaults to
   `Boolean(error)`, and `invalid: false` shows the message without the red mark. Red stays the default.
-- **One set of names goes, and the old names are preferred** (Marcel). Which old name maps to which
-  component is still open.
+- **Names: the form-bound pieces take the old names** (Gerard). `useForm` hands out `FormLabel` and
+  `FormError` (by name); the unbound `FormLabel.vue` / `FormError.vue` are internal to `FormField`, which
+  keeps its name. Done in control.13.
+- **Generated ids** (Gerard: "geweldig"): name first, Vue's unique part after (`firstName-v-3`); a fixed
+  `idPrefix` only when something outside needs it (`invoice-firstName`). Done in control.13.
+- **Package styles are defaults consumer CSS always overrides without hacks** (Marcel). Every component
+  rule sits in `@layer ui-form`; unlayered consumer CSS wins whatever its specificity or load order. The
+  consumer declares `@layer base, ui-form;` first and puts its element base in `base` (emmie does, in
+  `sass/app.scss`). `:where()`-flattening was rejected: emmie's element base (`input`, `p`, `label`, 0,0,1)
+  would then beat the package. Done in control.14.
+- **ADR-0043 amendment:** Gerard writes it himself.
 - **No shims** (Marcel). The `fs-form` and `ui-inputs` re-export shims go; emmie renames its imports in one
   pass.
 - **Two message behaviours, each set by who owns the layout** (Marcel). `FieldMessage` is dropped.
-  `Message`, which the consumer places, is always present (empty without a message) so it can hold a column.
+  The form-bound `FormError`, which the consumer places, is always present (empty without a message) so it can hold a column.
   `FormField`'s built-in message renders only when there is one, as on `main`. An always-present empty
   element would add a flex `gap` / grid `row-gap` under every clean field that the consumer can't remove.
 - **The package's default `keyMapper` stays identity** (Marcel). "Server snake, app camel" lives in one place,
@@ -45,7 +54,7 @@ Each step lands as its own commits, so the work can stop or be reverted cheaply 
 2. **The field-controls move into the package**: the self-wrapping versions of the controls (§5a), so emmie's
    `shared/components/form/fields/` folder goes.
 3. **Only then decide on the kit.** `useForm` would hand out form-bound versions of the package's own
-   controls, like `FieldLabel` / `Message` today: `<TextField name="title" label="Titel" />`, typed per
+   controls, like `FormLabel` / `FormError` today: `<TextField name="title" label="Titel" />`, typed per
    control because the package owns them.
 
 No package code changes until step 1 starts.
@@ -57,7 +66,7 @@ No package code changes until step 1 starts.
 ```vue
 <script setup lang="ts">
 const draft = ref<CarePlanDraft>(initial);
-const {field, FieldLabel, Message, handleSubmit, refusedUnnamed} = useForm({draft, keyMapper});
+const {field, FormLabel, FormError, handleSubmit, refusedUnnamed} = useForm({draft, keyMapper});
 
 const save = async () => {
     const outcome = await handleSubmit(() => carePlanService.update(draft.value), {validate: () => check(draft.value)});
@@ -67,9 +76,9 @@ const save = async () => {
 </script>
 
 <template>
-    <FieldLabel name="learningGoals.0.title" label="Titel" required />
+    <FormLabel name="learningGoals.0.title" label="Titel" required />
     <TextInput v-bind="field('learningGoals.0.title')" />
-    <Message name="learningGoals.0.title" />
+    <FormError name="learningGoals.0.title" />
 </template>
 ```
 
@@ -97,7 +106,7 @@ error, and so is binding a `number` path to `TextInput`. vue-tsc checks the valu
 | `handleSubmit(action): Promise<void>`                                                                                         | `handleSubmit(action, {validate?}): Promise<'sent' \| 'refused' \| 'ignored'>`. `validate` returns a bag; a refusal skips the action. `'ignored'` = a call while one is already in flight.                            |
 | `scrollToError` + `scrollRoot` + `scrollTarget` (watcher, CSS selector)                                                       | `scrollToError` (default **on**) is a step of a `'refused'` submit: it finds the first refused field by the form's **own ids**, in document order. `scrollRoot`/`scrollTarget` are removed, and typing never scrolls. |
 | server errors only                                                                                                            | plus **client refusals**: `refuse`, `setRefusals` (replaces), `withdraw` (drops server message _and_ client refusal for those names), `clearClient`, `clientErrors`, `fieldErrors` (server + client, client wins)     |
-| —                                                                                                                             | `field(name)`, `FieldLabel`, `Message` (below)                                                                                                                                                                        |
+| —                                                                                                                             | `field(name)`, `FormLabel`, `FormError` (below)                                                                                                                                                                       |
 | —                                                                                                                             | `idPrefix` option (optional; default prefix comes from `useId()`)                                                                                                                                                     |
 | —                                                                                                                             | `draft: Ref<D>` option: names become `Path<D>`, `field()` carries the typed value                                                                                                                                     |
 | `refusedUnnamed` computed from the current bag                                                                                | decided **when the 422 is taken**, so dropping messages later never flips it                                                                                                                                          |
@@ -110,21 +119,22 @@ sooner.
 
 - `field(name)` → `{id, invalid, describedby, error}`, plus `modelValue` / `onUpdate:modelValue` on a
   draft form.
-    - **id** = `${prefix}-${name with non [A-Za-z0-9_-] → '-'}`: `v-3-learningGoals-0-title`, deterministic per render.
+    - **id** = `${name with non [A-Za-z0-9_-] → '-'}-${useId()}`: `learningGoals-0-title-v-3`; with a fixed
+      `idPrefix` it is `${idPrefix}-${slug}`. Deterministic per render.
     - **describedby** = `${id}-error`, set only while there's a message.
-- `FieldLabel` (`name`, `label`, `required`, default slot after the required mark) renders `FormLabel`
-  pointing at that id.
-    - It's called `FieldLabel`, not `Label`, because emmie's a11y lint treats any `<Label>` tag as a native label.
-- `Message` (`name`): an always-rendered `<p class="ui-error" role="alert">`, filled when there's a
-  message. It holds a column in a row layout without a wrapper.
-- `FieldMessage`: the same as `Message`, but takes the `field()` object. It's unused and should be folded into `Message`
-  (agreed, not yet done).
+- `FormLabel` (form-bound: `name`, `label`, `required`, default slot after the required mark) renders the
+  internal label pointing at that id. (It was `FieldLabel` for a while; emmie's a11y lint only matches a
+  tag literally named `label`, so `<FormLabel>` is fine.)
+- `FormError` (form-bound: `name`): an always-rendered `<p class="ui-error" role="alert">`, filled when
+  there's a message, so it holds a column in a row layout without a wrapper.
 - `FormField` stays: label + control slot + message, and its slot still passes `{field}` for compound
-  fields.
+  fields. Its own message renders only when there is one (it owns the layout).
+- Every control takes `error`: the mark is `invalid ?? Boolean(error)`, `invalid` defaults to `undefined`
+  (no Vue boolean cast), so `:invalid="false"` shows a message without red.
 
 ### Removed
 
-`Field` / `createField` / `FieldComponent` (the slot-bound wrapper), `FormHttpService`, `loudlySwallowed`,
+`Field` / `createField` / `FieldComponent` (the slot-bound wrapper), `FieldMessage`, `FormHttpService`, `loudlySwallowed`,
 `acceptWhen`, `onlyWhileSubmitting`, `scrollRoot`, `scrollTarget`.
 
 ### Controls
@@ -135,9 +145,9 @@ sooner.
 ## 3. How it is built (conventions held)
 
 - **No Vue internals.**
-    - No `provide`/`inject`. The first experiment used it and dropped it, because it fell back silently to
+    - No `provide`/`inject` (Gerard confirmed: no). The first experiment used it and dropped it, because it fell back silently to
       the nearest form and broke shallow-mount specs.
-    - No vnode cloning. `FieldLabel` and `Message` are plain `defineComponent` closures over their form.
+    - No vnode cloning. The form-bound `FormLabel` and `FormError` are plain `defineComponent` closures over their form.
 - **One cast in the whole form layer.**
     - `useForm` has two call shapes, plain names and draft paths with typed values. The repo's arrow-only lint
       rules out function overloads, so the overloads are an interface (`UseFormCall`) and the single
@@ -162,7 +172,7 @@ sooner.
 
 - **The ui-form unit suite:** 702 tests, 100% line/branch/function coverage.
     - `form.spec`: `take`, the submit outcome, `validate`, scroll order, scroll isolation between two forms,
-      `refusedUnnamed`, ids, `FieldLabel`/`Message`.
+      `refusedUnnamed`, ids, the form-bound `FormLabel`/`FormError`; `control-error.spec` pins the mark rule on all 14 controls.
     - `draft.spec`: path read/write, writes keep messages, `v-model` next to `field()`.
     - `validation-errors.spec`: parsing, `keyMapper`, `fields`, `__proto__`, malformed bodies.
 - **End-to-end:**
@@ -171,8 +181,10 @@ sooner.
     - two forms on one service, where only the sender sees its 422;
     - the address-lookup case through `take`.
 - **Browser (real Chromium + axe):** 166 tests. The form-wired case covers both the bare layer (`FormLabel` +
-  control + `FieldMessage`) and the `FormField` layer with zero violations.
-- **Typing:** checked once with vue-tsc on a throwaway SFC (wrong path, wrong value type, `Message` with an
+  control + form-bound `FormError`) and the `FormField` layer with zero violations. `styles.browser.spec`
+  pins the layer contract (a utility beats the package in any order; an unlayered element base does too, until
+  it is declared in an earlier layer).
+- **Typing:** checked once with vue-tsc on a throwaway SFC (wrong path, wrong value type, `FormError` with an
   unknown name, no `modelValue` without a draft). **Not committed.** A permanent type-test file is open work.
 - **Not run:** Stryker (the package's mutation gate is a stub on `main`, WR-0897).
 - **Flaky:** select-family specs failed three times under coverage this session, in code this experiment
@@ -192,15 +204,13 @@ emmie's templates want one element per field that draws its own label and messag
 Proposal: every control accepts the whole `field()` object plus `label` / `required` / `orientation`.
 When `label` is set, the control wraps itself in `FormField`. Concretely:
 
-1. **Add `error?: string`** to all 14 controls; `invalid` defaults to `Boolean(error)` and stays as an
-   override (`invalid: false` = message without red, decided). Today `v-bind="field(x)"` on a package
-   control leaks `error="…"` as an HTML attribute on the `<input>`.
+1. **`error` on all 14 controls** with the `invalid` override. **Done in control.13.**
 2. **`label`/`required`/`orientation` props** plus a self-wrap in `FormField`, shared through one internal piece
    so the 14 controls don't each repeat it.
     - The props: `label?`, `orientation?` (`required` exists). With `label`, the control renders
       `FormField` around itself, and without it nothing changes.
-    - The select family already uses `select`'s `label` prop for the option-text key. It must become
-      `optionLabel` (emmie made the same rename) so `label` always means the field label.
+    - The select family's option-text prop is already `optionLabel` (done in control.13), so `label` is free
+      for the field label.
 3. **Attribute split:** `class`/`style` go to the field wrapper, everything else to the native element. The
    select family already does this (`internal/split-attrs.ts`). Without it, layout classes land on the
    input instead of the field.
@@ -244,10 +254,13 @@ other territories.
 **Order within the next steps**, by uses × effort:
 
 - Step 1 (bare controls). emmie-first means porting emmie's behaviour, not designing a generic one:
-    1. `error` (with the `invalid` override) on every control, and `label` → `optionLabel` on the select family;
-    2. emmie's look as the default theme;
-    3. emmie's features into the existing controls: auto-grow `Textarea` (`maxRows`), the searchable select's
-       search box, password show/hide, search clear, the in-input error icon;
+    1. ~~`error` + `invalid` override on every control, `label` → `optionLabel` on selects~~ (control.13);
+    2. emmie's look as the default theme: **pilot done** (control.13). The shared `--ui-control-*` defaults
+       take emmie's values, so every `.ui-control` follows, not only `TextInput`; the danger colours are not
+       yet emmie's (`#D45F52`);
+    3. emmie's features into the existing controls: in-input error icon **done on `TextInput`** (control.13;
+       its root is now `span.ui-input-wrap`, class/style there, the rest on the input); still open:
+       auto-grow `Textarea` (`maxRows`), the searchable select's search box, password show/hide, search clear;
     4. emmie-only controls that become package controls as they are: `TimeInput` (with `notNullable`),
        `BooleanRadioGroup`, `SwitchButtons`, `AdditiveInput`, `GroupMultiSelect`;
     5. the date pickers last: emmie's own calendars move in as they are instead of a generic picker.
@@ -259,8 +272,8 @@ other territories.
 
 ## 6. Deliberately left open
 
-- **Naming mapping.** One set goes and the old names are preferred (decided); which old name maps to which
-  component is open. `idPrefix` stays as the fixed-id fallback.
+- **Pending with Gerard:** the 422-per-form model (he asked for an example), and the text controls' model
+  `string | null` vs `string` (they emit `''` when cleared).
 - **Partial 422s.** Server keys that aren't draft paths can't be named on a draft form without a cast.
 - **An action that catches its own 422 hides it from the form.**
     - It must rethrow or call `take(e)`. In emmie, the 2 such actions already rethrow.
