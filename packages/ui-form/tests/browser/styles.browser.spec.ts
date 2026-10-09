@@ -222,17 +222,38 @@ describe('styles.css — WR-0512 font-size source-order regression pins', () => 
         expect(getComputedStyle(control).fontSize).toBe('18px');
     });
 
-    it('pins the trap: a declaration utility EARLIER in source order silently loses to the package sheet', () => {
-        // Utility first, package sheet last — the arrangement WR-0512 documented: both
-        // selectors are one class (0,1,0), so the later sheet wins the tie and the
-        // utility's font-size silently vanishes under the package's font reset.
+    it('a utility wins even EARLIER in source order: the package rules sit in the ui-form layer', () => {
+        // WR-0512's trap, closed: utility first, package sheet last used to tie at (0,1,0) and lose
+        // on order. Unlayered consumer CSS now beats every layered package rule.
         addStyle('.text-sm { font-size: 13px; }');
         addStyle(uiCss);
         const control = addControl('font-size: 18px');
         control.classList.add('text-sm');
 
-        // the utility's 13px loses to the package default (14px)
-        expect(getComputedStyle(control).fontSize).toBe('14px');
+        expect(getComputedStyle(control).fontSize).toBe('13px');
+    });
+
+    it("an attributify utility beats the package's width:100%, the <TextInput w-40> case", () => {
+        addStyle(uiCss);
+        addStyle('[w-40] { width: 10rem; }');
+        const control = addControl();
+        control.setAttribute('w-40', '');
+
+        expect(getComputedStyle(control).width).toBe('160px');
+    });
+
+    it('an unlayered element base also beats the package; declaring its layer first restores the package', () => {
+        addStyle(uiCss);
+        addStyle('input { font-size: 20px; }');
+        const control = addControl();
+        expect(getComputedStyle(control).fontSize).toBe('20px');
+
+        // the documented consumer setup: order declared first, the element base in the earlier layer
+        for (const el of cleanupTargets.splice(0)) el.remove();
+        addStyle('@layer base, ui-form;');
+        addStyle('@layer base { input { font-size: 20px; } }');
+        addStyle(uiCss);
+        expect(getComputedStyle(addControl()).fontSize).toBe('14px');
     });
 
     it('the --ui-control-font-size var wins by contract, regardless of source order', () => {
