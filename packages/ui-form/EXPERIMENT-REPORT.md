@@ -21,6 +21,19 @@ removed `Field` API, Stryker was not run, and no CHANGELOG entry or version plan
   `Boolean(error)`, and `invalid: false` shows the message without the red mark. Red stays the default.
 - **One set of names goes, and the old names are preferred** (Marcel). Which old name maps to which
   component is still open.
+- **No shims** (Marcel). The `fs-form` and `ui-inputs` re-export shims go; emmie renames its imports in one
+  pass.
+- **One kind of message element** (Marcel). `FieldMessage` is dropped, and every message element (including
+  `FormField`'s) behaves like `Message`: always present, empty without a message. Consequence to check when
+  building: `FormField`'s horizontal grid then always has its message row.
+- **Default `keyMapper` = camelCase per dotted segment** (Marcel): `learning_goals.0.title` →
+  `learningGoals.0.title`. This is emmie's casing, and it was identity before. The package implements the
+  segment mapping itself rather than depending on fs-helpers.
+- **`refusedUnnamed` means "no field the form holds"** (Marcel), not "nothing rendered".
+- **Keep `'ignored'`** (Marcel): a submit while one is in flight is dropped, not queued.
+- **Keep the one overload cast** (Marcel), no separate `useDraftForm()`.
+- **Hyper-specific controls stay in emmie** (Marcel): `RichTextEditor` (tiptap) and file upload are not
+  moved in. They should still be able to use the package's `FormField` / `field()` wiring.
 
 ## Next steps, in this order
 
@@ -238,20 +251,16 @@ other territories.
        `BooleanRadioGroup`, `SwitchButtons`, `AdditiveInput`, `GroupMultiSelect`;
     5. the date pickers last: emmie's own calendars move in as they are instead of a generic picker.
        They're the biggest piece (45 + 11 uses).
-- Still a judgement call, even emmie-first: `RichTextEditor` (tiptap) and the file upload. They'd bring heavy
-  or app-specific dependencies into the package; moving them is now allowed, not required.
+- `RichTextEditor` (tiptap) and the file upload stay in emmie (decided), wired through `field()` /
+  `FormField`.
 - Step 2 (field-controls): §5a.2–4 together (self-wrap in `FormField`, the `class`/`style` split, no empty
   wrapper), shared once across the controls.
 
 ## 6. Deliberately left open
 
 - **Naming mapping.** One set goes and the old names are preferred (decided); which old name maps to which
-  component is open. `FieldMessage` folds into `Message`, and `idPrefix` stays as the fixed-id fallback.
-- **`useDraftForm()` vs the overload cast** (§3).
-- **Partial 422s.**
-    - Without `fields`, a 422 naming only a key no control renders counts as "named"; `refusedUnnamed`
-      means "no field the form holds", not "nothing rendered".
-    - Server keys that aren't draft paths can't be named on a draft form without a cast.
+  component is open. `idPrefix` stays as the fixed-id fallback.
+- **Partial 422s.** Server keys that aren't draft paths can't be named on a draft form without a cast.
 - **An action that catches its own 422 hides it from the form.**
     - It must rethrow or call `take(e)`. In emmie, the 2 such actions already rethrow.
     - The real migration cost is the **16 forms that never call `handleSubmit`**: they relied on the old
@@ -261,5 +270,5 @@ other territories.
   It's harmless if unintended, but worth a sentence in the docs.
 - **`useId()` is unique per app**, not per page. A second Vue app on the same page, or specs that mount two forms
   separately, can produce the same ids. Pass `idPrefix` there.
-- **Release work not done:** README rewrite, CHANGELOG, Stryker, a committed type-test file, the
-  version / deprecation plan for the `fs-form` and `ui-inputs` shims.
+- **Release work not done:** README rewrite, CHANGELOG, Stryker, a committed type-test file, and the
+  first publish of `ui-form` (a new npm package: hand bootstrap + Trusted Publisher before any CI publish).
