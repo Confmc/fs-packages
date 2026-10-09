@@ -97,12 +97,17 @@ const expectNoViolations = async (node: Element) => {
 const noop = () => undefined;
 
 // Shared select-control prop bag (id/aria wiring threaded from the field slot).
-const selectProps = (slot: FieldSlot) => ({options: FRUITS, label: 'name', ...slot.field, required: slot.required});
+const selectProps = (slot: FieldSlot) => ({
+    options: FRUITS,
+    optionLabel: 'name',
+    ...slot.field,
+    required: slot.required,
+});
 
 // Shared grouped-select prop bag.
 const groupSelectProps = (slot: FieldSlot) => ({
     groups: FRUIT_GROUPS,
-    label: 'name',
+    optionLabel: 'name',
     ...slot.field,
     required: slot.required,
 });

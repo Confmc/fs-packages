@@ -99,7 +99,7 @@ defineOptions({inheritAttrs: false});
 
 const {
     groups,
-    label,
+    optionLabel,
     id,
     placeholder = 'Select…',
     disabled = false,
@@ -116,7 +116,7 @@ const {
     /** caller-ordered groups, each with options and a display header. */
     groups: {options: T[]; text: string; header?: boolean}[];
     /** property name or getter for an option's display string. */
-    label: LabelKey<T>;
+    optionLabel: LabelKey<T>;
     /** stable id, pairing the control with its label and error; omit it and the control generates one with `useId()`. */
     id?: string;
     placeholder?: string;
@@ -161,11 +161,11 @@ defineSlots<{
 
 const model = defineModel<T['id'] | null>({required: true});
 
-/** Resolve an option's display string from the `label` prop (property name or getter). */
+/** Resolve an option's display string from the `optionLabel` prop (property name or getter). */
 const labelOf = (option: T): string =>
-    typeof label === 'function'
-        ? label(option)
-        : String((option as Record<PropertyKey, unknown>)[label as PropertyKey]);
+    typeof optionLabel === 'function'
+        ? optionLabel(option)
+        : String((option as Record<PropertyKey, unknown>)[optionLabel as PropertyKey]);
 
 // All options across all groups in declaration order — the flat index space useListbox and
 // commit/isSelected/isMuted operate on. Groups are caller-ordered; no alphabeticalSort.

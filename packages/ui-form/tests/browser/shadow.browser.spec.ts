@@ -61,7 +61,7 @@ const mountInShadow = (model: {value: number[]}): ShadowRoot => {
             () => () =>
                 h(MultiSelect, {
                     options: FRUITS,
-                    label: 'name',
+                    optionLabel: 'name',
                     id: 'fruit',
                     alphabeticalSort: true,
                     modelValue: model.value,

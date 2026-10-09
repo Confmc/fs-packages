@@ -21,7 +21,7 @@ const FRUITS: Fruit[] = [
 const mountSelect = (props: Record<string, unknown>, slots?: Record<string, unknown>) =>
     mount(SingleSelect as any, {
         // Sorted on purpose: the cases below index the sorted order (the default is caller order).
-        props: {options: FRUITS, label: 'name', id: 'fruit', modelValue: null, alphabeticalSort: true, ...props},
+        props: {options: FRUITS, optionLabel: 'name', id: 'fruit', modelValue: null, alphabeticalSort: true, ...props},
         slots,
         attachTo: document.body,
     });
@@ -93,7 +93,7 @@ describe('SingleSelect', () => {
     });
 
     it('resolves the display value via a getter label', () => {
-        const wrapper = mountSelect({label: (o: Fruit) => `${o.name}!`, modelValue: 2});
+        const wrapper = mountSelect({optionLabel: (o: Fruit) => `${o.name}!`, modelValue: 2});
         expect(wrapper.find('.ui-select__value').text()).toBe('Apricot!');
     });
 

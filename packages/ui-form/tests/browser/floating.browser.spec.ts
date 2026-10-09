@@ -43,7 +43,7 @@ const renderSelect = async (component: any) => {
             () => () =>
                 h(component, {
                     options: FRUITS,
-                    label: 'name',
+                    optionLabel: 'name',
                     id: 'fruit',
                     modelValue: model.value,
                     'onUpdate:modelValue': (value: number | null) => {
@@ -107,7 +107,7 @@ describe('floating-ui hide() — the open menu follows its clipped-away trigger'
                     h('div', {id: 'clip', style: 'height: 120px; overflow: auto; position: relative;'}, [
                         h(SingleSelect, {
                             options: FRUITS,
-                            label: 'name',
+                            optionLabel: 'name',
                             id: 'fruit',
                             modelValue: model.value,
                             'onUpdate:modelValue': (value: number | null) => {
@@ -150,7 +150,7 @@ describe('listbox teleport — the open menu escapes a clipping ancestor (KD-113
                     h('div', {style: 'width: 200px;'}, [
                         h(SingleSelect, {
                             options: FRUITS,
-                            label: 'name',
+                            optionLabel: 'name',
                             id: 'fruit',
                             modelValue: model.value,
                             'onUpdate:modelValue': (value: number | null) => {
@@ -183,7 +183,7 @@ describe('listbox teleport — the open menu escapes a clipping ancestor (KD-113
                         h('div', {id: 'clip', style: 'height: 48px; overflow: hidden; position: relative;'}, [
                             h(SingleSelect, {
                                 options: FRUITS,
-                                label: 'name',
+                                optionLabel: 'name',
                                 id: 'fruit',
                                 modelValue: model.value,
                                 'onUpdate:modelValue': (value: number | null) => {
@@ -231,7 +231,7 @@ describe('listbox teleport — the open menu escapes a clipping ancestor (KD-113
                     h('dialog', {id: 'dlg', open: true, style: 'height: 60px; overflow: hidden; padding: 0;'}, [
                         h(SingleSelect, {
                             options: FRUITS,
-                            label: 'name',
+                            optionLabel: 'name',
                             id: 'fruit',
                             modelValue: model.value,
                             'onUpdate:modelValue': (value: number | null) => {
@@ -268,7 +268,7 @@ describe('listbox teleport — the open menu escapes a clipping ancestor (KD-113
                     h('dialog', {id: 'dlg', open: true}, [
                         h(SingleSelect, {
                             options: FRUITS,
-                            label: 'name',
+                            optionLabel: 'name',
                             id: 'fruit',
                             modelValue: model.value,
                             'onUpdate:modelValue': (value: number | null) => {

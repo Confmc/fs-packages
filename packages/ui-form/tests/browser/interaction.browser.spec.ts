@@ -68,7 +68,7 @@ const renderControlled = async <V>(component: any, initial: V, props: Record<str
             () => () =>
                 h(component, {
                     options: FRUITS,
-                    label: 'name',
+                    optionLabel: 'name',
                     id: 'fruit',
                     ...props,
                     modelValue: model.value,
@@ -94,7 +94,7 @@ const renderControlledGroups = <V>(component: any, initial: V, props: Record<str
             () => () =>
                 h(component, {
                     groups: FRUIT_GROUPS,
-                    label: 'name',
+                    optionLabel: 'name',
                     id: 'fruit',
                     ...props,
                     modelValue: model.value,
@@ -213,7 +213,7 @@ describe('disabled controls genuinely receive no events', () => {
     it('a disabled TextInput receives no typed input', async () => {
         const model = await renderControlled<string | null>(TextInput, 'untouched', {
             options: undefined,
-            label: undefined,
+            optionLabel: undefined,
             disabled: true,
         });
         const input = document.getElementById('fruit') as HTMLInputElement;

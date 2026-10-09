@@ -29,12 +29,12 @@ const CONTROLS: [string, unknown, Record<string, unknown>, string][] = [
     ['Switch', Switch, {modelValue: false, label: 'On'}, 'input'],
     ['RadioGroup', RadioGroup, {options: [], optionLabel: 'name', label: 'Fruit', modelValue: null}, 'fieldset'],
     ['CheckboxGroup', CheckboxGroup, {options: [], optionLabel: 'name', label: 'Fruit', modelValue: []}, 'fieldset'],
-    ['SingleSelect', SingleSelect, {options: [], label: 'name', modelValue: null}, '[role="combobox"]'],
-    ['Combobox', Combobox, {options: [], label: 'name', modelValue: null}, '[role="combobox"]'],
-    ['MultiSelect', MultiSelect, {options: [], label: 'name', modelValue: []}, '[role="combobox"]'],
-    ['MultiCombobox', MultiCombobox, {options: [], label: 'name', modelValue: []}, '[role="combobox"]'],
-    ['GroupSelect', GroupSelect, {groups: [], label: 'name', modelValue: null}, '[role="combobox"]'],
-    ['GroupCombobox', GroupCombobox, {groups: [], label: 'name', modelValue: null}, '[role="combobox"]'],
+    ['SingleSelect', SingleSelect, {options: [], optionLabel: 'name', modelValue: null}, '[role="combobox"]'],
+    ['Combobox', Combobox, {options: [], optionLabel: 'name', modelValue: null}, '[role="combobox"]'],
+    ['MultiSelect', MultiSelect, {options: [], optionLabel: 'name', modelValue: []}, '[role="combobox"]'],
+    ['MultiCombobox', MultiCombobox, {options: [], optionLabel: 'name', modelValue: []}, '[role="combobox"]'],
+    ['GroupSelect', GroupSelect, {groups: [], optionLabel: 'name', modelValue: null}, '[role="combobox"]'],
+    ['GroupCombobox', GroupCombobox, {groups: [], optionLabel: 'name', modelValue: null}, '[role="combobox"]'],
 ];
 
 const mark = (control: unknown, props: Record<string, unknown>, selector: string) =>
