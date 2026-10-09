@@ -2,8 +2,8 @@
 
 For: Gerard (lead). From: the fs-packages side of the fs-form + ui-inputs experiment.
 Branch: `experiment/ui-form-control` on the fork (`Confmc/fs-packages`), last pack `0.1.0-control.12`.
-The emmie side (how its 119 `useForm` call sites move, what broke, the migration list) is in emmie-2's report on
-`experiment/fs-packages-control`. This one covers the package: its shape, how it is built, and what is
+The emmie side (how the 119 files that call `useForm` move, what broke, the migration list) is in emmie-2's report:
+`docs/plans/fs-packages-experiment/REPORT.md` on emmie `experiment/fs-packages-control`. This one covers the package: its shape, how it is built, and what is
 still missing.
 
 Status: **prototype.** It is working and tested, but not release-polished. The README still shows the
@@ -165,36 +165,41 @@ When `label` is set, the control wraps itself in `FormField`. Concretely:
 4. **No empty wrapper:** a control without `label` and without a message renders no `.ui-field`, so a bare
    search box costs nothing.
 
-### 5b. Missing controls and features (usage counts across emmie's frontend apps)
+### 5b. Missing controls and features
 
-| emmie control                                                                 | uses    | package today                   | gap                                                                                                  |
-| ----------------------------------------------------------------------------- | ------- | ------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `TextInput`                                                                   | 86      | `TextInput`                     | none (native attrs fall through to the `<input>`)                                                    |
-| `CheckBoxInput`                                                               | 40      | `Checkbox`                      | none                                                                                                 |
-| `SingleSelect`                                                                | 40      | `SingleSelect`                  | `label` → `optionLabel` rename                                                                       |
-| `SwitchBoxInput`                                                              | 39      | `Switch`                        | none                                                                                                 |
-| `DatePickerField` (+ Period 3, Range 4, Week 1, Registration 2, Attendance 1) | 33 + 11 | `DateInput` (native)            | **largest gap**: emmie's pickers are custom calendars; the package has none                          |
-| `NumberInput`                                                                 | 24      | `NumberInput`                   | none                                                                                                 |
-| `VerticallyGrowingTextarea`                                                   | 16      | `Textarea`                      | **auto-grow** (`maxRows`), `maxlength` passes through                                                |
-| `MultiSelect`                                                                 | 15      | `MultiSelect` / `MultiCombobox` | rename only                                                                                          |
-| `SearchInput`                                                                 | 15      | `TextInput type="search"`       | search icon + clear button                                                                           |
-| `RichTextEditor` (tiptap)                                                     | 15      | none                            | keep in emmie; tiptap is too heavy for the package. It wires through `field()` or `FormField`'s slot |
-| `TimeInput`                                                                   | 14      | none                            | **missing**: needs `notNullable` and a step                                                          |
-| `AdditiveInput`                                                               | 12      | none                            | needs a look at what it does before deciding                                                         |
-| `RadioButtonGroup`                                                            | 10      | `RadioGroup`                    | none                                                                                                 |
-| `SearchableSelect`                                                            | 9       | `Combobox`                      | rename only                                                                                          |
-| `FileDropArea` / `FileInput`                                                  | 7 + 1   | none                            | missing; probably stays in emmie (upload flow)                                                       |
-| `PasswordInput`                                                               | 6       | `TextInput type="password"`     | show/hide toggle, `autocomplete`                                                                     |
-| `BooleanRadioGroup`                                                           | 5       | `RadioGroup`                    | check that boolean option ids work, or add a thin wrapper                                            |
-| `GroupSelect`                                                                 | 2       | `GroupSelect`                   | none                                                                                                 |
-| `SwitchButtons` (segmented)                                                   | 2       | none                            | missing                                                                                              |
-| `GroupMultiSelect` / `RangeInput`                                             | 1 / 1   | none                            | missing; low priority                                                                                |
+Counts are from `frontend/apps` on emmie's `experiment/fs-packages-control`: **files** that use the
+control, and **uses** (each `<Control` tag).
 
-**Tokens:** the package styles through 96 `--ui-*` custom properties. emmie would map its theme onto them once
-(not yet done on emmie's branch, as far as this side knows). New controls (time, segmented, password toggle,
-search clear) need their own tokens in the same scheme.
+| emmie control                                                                 | files   | uses    | package today                   | gap                                                                                                  |
+| ----------------------------------------------------------------------------- | ------- | ------- | ------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `TextInput`                                                                   | 86      | 163     | `TextInput`                     | none (native attrs fall through to the `<input>`)                                                    |
+| `CheckBoxInput`                                                               | 40      | 52      | `Checkbox`                      | none                                                                                                 |
+| `SingleSelect`                                                                | 40      | 54      | `SingleSelect`                  | `label` → `optionLabel` rename                                                                       |
+| `SwitchBoxInput`                                                              | 39      | 54      | `Switch`                        | none                                                                                                 |
+| `DatePickerField` (+ Period 3, Range 4, Week 1, Registration 2, Attendance 1) | 33 + 11 | 45 + 11 | `DateInput` (native)            | **largest gap**: emmie's pickers are custom calendars; the package has none                          |
+| `NumberInput`                                                                 | 24      | 36      | `NumberInput`                   | none                                                                                                 |
+| `VerticallyGrowingTextarea`                                                   | 16      | 22      | `Textarea`                      | **auto-grow** (`maxRows`), `maxlength` passes through                                                |
+| `MultiSelect`                                                                 | 15      | 23      | `MultiSelect` / `MultiCombobox` | rename only                                                                                          |
+| `SearchInput`                                                                 | 15      | 16      | `TextInput type="search"`       | search icon + clear button                                                                           |
+| `RichTextEditor` (tiptap)                                                     | 15      | 21      | none                            | keep in emmie; tiptap is too heavy for the package. It wires through `field()` or `FormField`'s slot |
+| `TimeInput`                                                                   | 14      | 24      | none                            | **missing**: needs `notNullable` and a step                                                          |
+| `AdditiveInput`                                                               | 12      | 17      | none                            | needs a look at what it does before deciding                                                         |
+| `RadioButtonGroup`                                                            | 10      | 10      | `RadioGroup`                    | none                                                                                                 |
+| `SearchableSelect`                                                            | 9       | 10      | `Combobox`                      | rename only                                                                                          |
+| `FileDropArea` / `FileInput`                                                  | 7 + 1   | 7 + 1   | none                            | missing; probably stays in emmie (upload flow)                                                       |
+| `PasswordInput`                                                               | 6       | 13      | `TextInput type="password"`     | show/hide toggle, `autocomplete`                                                                     |
+| `BooleanRadioGroup`                                                           | 5       | 7       | `RadioGroup`                    | check that boolean option ids work, or add a thin wrapper                                            |
+| `GroupSelect`                                                                 | 2       | 2       | `GroupSelect`                   | none                                                                                                 |
+| `SwitchButtons` (segmented)                                                   | 2       | 2       | none                            | missing                                                                                              |
+| `GroupMultiSelect` / `RangeInput`                                             | 1 / 1   | 1 / 1   | none                            | missing; low priority                                                                                |
 
-**Suggested order**, by usage × effort:
+**Tokens:** the package styles through 96 `--ui-*` custom properties. Per emmie-2's report, an earlier
+experiment matched the package `TextInput` to emmie's look with about ten tokens; two raw CSS rules (a hover
+border, a danger ring only on focus) were needed and could become tokens. New controls (time, segmented,
+password toggle, search clear, an error icon inside the input, which emmie shows and the package lacks) need
+their own tokens in the same scheme.
+
+**Suggested order**, by uses × effort:
 
 1. the field-version plumbing (5a, all controls at once);
 2. `optionLabel`, auto-grow `Textarea`, password toggle, search clear;
