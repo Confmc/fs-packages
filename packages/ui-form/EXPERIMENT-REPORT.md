@@ -9,6 +9,25 @@ still missing.
 Status: **prototype.** It is working and tested, but not release-polished. The README still shows the
 removed `Field` API, Stryker was not run, and no CHANGELOG entry or version plan exists.
 
+## Decided (2026-10-09)
+
+- **No provide/inject** (Gerard). The shape stays as described here: `v-bind="field(name)"` on controls,
+  `FieldLabel` / `Message` by name, and the form passed as a prop to child components that render fields.
+
+## Next steps, in this order
+
+Each step lands as its own commits, so the work can stop or be reverted cheaply after any of them.
+
+1. **emmie adopts ui-form's controls**, control by control: emmie's theme on the `--ui-*` tokens, and the
+   features the package lacks added to the package (§5b).
+2. **The field-controls move into the package**: the self-wrapping versions of the controls (§5a), so emmie's
+   `shared/components/form/fields/` folder goes.
+3. **Only then decide on the kit.** `useForm` would hand out form-bound versions of the package's own
+   controls, like `FieldLabel` / `Message` today: `<TextField name="title" label="Titel" />`, typed per
+   control because the package owns them.
+
+No package code changes until step 1 starts.
+
 ---
 
 ## 1. The shape in one example
@@ -199,13 +218,16 @@ border, a danger ring only on focus) were needed and could become tokens. New co
 password toggle, search clear, an error icon inside the input, which emmie shows and the package lacks) need
 their own tokens in the same scheme.
 
-**Suggested order**, by uses × effort:
+**Order within the next steps**, by uses × effort:
 
-1. the field-version plumbing (5a, all controls at once);
-2. `optionLabel`, auto-grow `Textarea`, password toggle, search clear;
-3. `TimeInput`;
-4. a date picker. That's a project of its own; until then emmie keeps its pickers, wired through
-   `field()`.
+- Step 1 (bare controls):
+    1. `label` → `optionLabel` on the select family, and `error` on every control (§5a.1);
+    2. auto-grow `Textarea`, password toggle, search clear, the in-input error icon;
+    3. `TimeInput`;
+    4. a date picker last. That's a project of its own; until then emmie keeps its pickers, wired through
+       `field()`.
+- Step 2 (field-controls): §5a.2–4 together (self-wrap in `FormField`, the `class`/`style` split, no empty
+  wrapper), shared once across the controls.
 
 ## 6. Deliberately left open
 
