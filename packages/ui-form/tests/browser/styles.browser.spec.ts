@@ -47,10 +47,10 @@ describe('styles.css — resting defaults', () => {
         const computed = getComputedStyle(control);
 
         expect(computed.backgroundColor).toBe('rgb(255, 255, 255)'); // --ui-control-bg
-        expect(computed.color).toBe('rgb(17, 24, 39)'); // --ui-control-text
+        expect(computed.color).toBe('rgb(0, 0, 0)'); // --ui-control-text (emmie's look)
         expect(computed.borderTopWidth).toBe('1px'); // --ui-control-border-width
-        expect(computed.borderTopColor).toBe('rgb(209, 213, 219)'); // --ui-control-border-color
-        expect(computed.borderTopLeftRadius).toBe('8px'); // --ui-control-radius
+        expect(computed.borderTopColor).toBe('rgb(225, 218, 206)'); // --ui-control-border-color (emmie border)
+        expect(computed.borderTopLeftRadius).toBe('12px'); // --ui-control-radius (emmie radius)
         expect(computed.boxShadow).toBe('none'); // --ui-control-shadow
     });
 
@@ -213,9 +213,12 @@ describe('styles.css — group header (--ui-group-header-*)', () => {
 });
 
 describe('styles.css — WR-0512 font-size source-order regression pins', () => {
-    it('the default reproduces the historical `font: inherit` (control text follows the parent)', () => {
+    it("the default is emmie's 14px; `--ui-control-font-size: inherit` restores following the parent", () => {
         addStyle(uiCss);
         const control = addControl('font-size: 18px');
+        expect(getComputedStyle(control).fontSize).toBe('14px');
+
+        document.documentElement.style.setProperty('--ui-control-font-size', 'inherit');
         expect(getComputedStyle(control).fontSize).toBe('18px');
     });
 
@@ -228,7 +231,8 @@ describe('styles.css — WR-0512 font-size source-order regression pins', () => 
         const control = addControl('font-size: 18px');
         control.classList.add('text-sm');
 
-        expect(getComputedStyle(control).fontSize).toBe('18px');
+        // the utility's 13px loses to the package default (14px)
+        expect(getComputedStyle(control).fontSize).toBe('14px');
     });
 
     it('the --ui-control-font-size var wins by contract, regardless of source order', () => {
@@ -310,7 +314,7 @@ describe('styles.css — state-variant hooks on real states', () => {
 
         const focused = getComputedStyle(control);
         expect(focused.backgroundColor).toBe('rgb(255, 255, 255)'); // --ui-control-bg-focus → --ui-control-bg
-        expect(focused.color).toBe('rgb(17, 24, 39)'); // --ui-control-text-focus → --ui-control-text
+        expect(focused.color).toBe('rgb(0, 0, 0)'); // --ui-control-text-focus → --ui-control-text
         expect(focused.borderTopWidth).toBe('1px'); // --ui-control-border-width-focus → resting width
     });
 
@@ -333,7 +337,7 @@ describe('styles.css — state-variant hooks on real states', () => {
         const control = addControl();
         control.disabled = true;
 
-        expect(getComputedStyle(control).backgroundColor).toBe('rgb(243, 244, 246)'); // --ui-control-bg-disabled
+        expect(getComputedStyle(control).backgroundColor).toBe('rgb(251, 248, 242)'); // --ui-control-bg-disabled (emmie)
         expect(getComputedStyle(control).color).toBe('rgb(107, 114, 128)'); // --ui-control-text-muted
         expect(getComputedStyle(control).cursor).toBe('not-allowed');
     });
@@ -365,7 +369,7 @@ describe('styles.css — checkbox family (--ui-check-* / --ui-switch-*)', () => 
         expect(computed.width).toBe('18px'); // --ui-check-size 1.125rem
         expect(computed.height).toBe('18px');
         expect(computed.borderTopWidth).toBe('1px'); // --ui-check-border-width → --ui-control-border-width
-        expect(computed.borderTopColor).toBe('rgb(209, 213, 219)'); // → --ui-control-border-color
+        expect(computed.borderTopColor).toBe('rgb(225, 218, 206)'); // → --ui-control-border-color
         expect(computed.borderTopLeftRadius).toBe('4px'); // --ui-check-radius
         expect(computed.backgroundColor).toBe('rgb(255, 255, 255)'); // --ui-check-bg → --ui-control-bg
 
@@ -413,7 +417,7 @@ describe('styles.css — checkbox family (--ui-check-* / --ui-switch-*)', () => 
         const track = getComputedStyle(input);
         expect(track.width).toBe('36px'); // --ui-switch-track-width 2.25rem
         expect(track.height).toBe('20px'); // --ui-switch-track-height 1.25rem
-        expect(track.backgroundColor).toBe('rgb(209, 213, 219)'); // --ui-switch-track-bg → border-color token
+        expect(track.backgroundColor).toBe('rgb(225, 218, 206)'); // --ui-switch-track-bg → border-color token
 
         // Resting thumb: 14px (--ui-switch-thumb-size 0.875rem), vertically centred.
         expect(getComputedStyle(thumb).width).toBe('14px');

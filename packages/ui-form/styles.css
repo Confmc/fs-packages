@@ -31,8 +31,8 @@
        no-op until a territory opts in (brick fills the control on focus/invalid). */
     --ui-control-bg-focus: var(--ui-control-bg);
     --ui-control-bg-invalid: var(--ui-control-bg);
-    --ui-control-bg-disabled: #f3f4f6;
-    --ui-control-text: #111827;
+    --ui-control-bg-disabled: #fbf8f2;
+    --ui-control-text: #000000;
     /* text-on-state hooks — default to the resting text colour so they are a no-op
        until a territory opts in (a strong bg-focus/bg-invalid fill needs a text
        partner for contrast). */
@@ -42,27 +42,31 @@
     /* typography escape hatch — `inherit` reproduces the historical `font: inherit`
        size; a territory sizes control text through this var (which the package
        reads) instead of a utility that loses the source-order tie. */
-    --ui-control-font-size: inherit;
+    --ui-control-font-size: 0.875rem;
     /* completes the `font: inherit` decomposition (WR-0537): line-height reads from the
        var instead of a hardcoded `inherit` longhand — same rendered default. */
-    --ui-control-line-height: inherit;
+    --ui-control-line-height: 1.5;
     /* touch-target hook — `auto` is the measured status quo. WCAG 2.5.5's 44px is the
        CONSUMER's call: assign 2.75rem under your own coarse-pointer media query. */
     --ui-control-min-height: auto;
     --ui-control-border-width: 1px;
-    --ui-control-border-color: #d1d5db;
+    --ui-control-border-color: #e1dace;
     --ui-control-border-open: #2563eb;
     /* border-on-focus hooks — default to the resting border so they are a no-op
        until a territory opts in. .is-open / .is-invalid follow in source order and
        keep winning their border where they did before. */
-    --ui-control-border-color-focus: var(--ui-control-border-color);
+    --ui-control-border-color-focus: #de7356;
     --ui-control-border-width-focus: var(--ui-control-border-width);
-    --ui-control-radius: 8px;
-    --ui-control-pad-x: 0.75rem;
-    --ui-control-pad-y: 0.55rem;
+    --ui-control-radius: 12px;
+    --ui-control-pad-x: 0.875rem;
+    --ui-control-pad-y: 0.5rem;
     --ui-control-shadow: none;
     --ui-control-shadow-hover: none;
-    --ui-focus-ring: 0 0 0 3px rgba(37, 99, 235, 0.35);
+    /* hover border on a resting control (not disabled, focused or invalid). */
+    --ui-control-border-color-hover: #9aa39c;
+    /* the ring an invalid control shows only while it has focus. */
+    --ui-danger-ring-focus: 0 0 0 4px rgba(212, 95, 82, 0.25);
+    --ui-focus-ring: 0 0 0 4px rgba(222, 115, 86, 0.25);
 
     /* listbox menu */
     --ui-menu-bg: #ffffff;
@@ -172,7 +176,7 @@
     /* error / danger */
     --ui-danger-text: #dc2626;
     --ui-danger-border: #dc2626;
-    --ui-danger-shadow: 0 0 0 3px rgba(220, 38, 38, 0.2);
+    --ui-danger-shadow: none;
     --ui-error-size: 0.8125rem;
     --ui-error-weight: 400;
 }
@@ -291,6 +295,33 @@
     color: var(--ui-control-text-invalid);
     border-color: var(--ui-danger-border);
     box-shadow: var(--ui-danger-shadow);
+}
+.ui-control:hover:where(:not(:disabled, :focus-visible, .is-invalid)) {
+    border-color: var(--ui-control-border-color-hover);
+}
+.ui-control.is-invalid:focus-visible {
+    box-shadow: var(--ui-danger-ring-focus);
+}
+
+/* TextInput's in-input error icon: shown while the control is marked, at the right edge,
+   with the text kept clear of it. */
+.ui-input-wrap {
+    position: relative;
+    display: block;
+}
+.ui-input.is-invalid {
+    padding-right: calc(var(--ui-control-pad-x) * 2 + 1em);
+}
+.ui-input__icon {
+    position: absolute;
+    top: 50%;
+    right: var(--ui-control-pad-x);
+    width: 1em;
+    height: 1em;
+    transform: translateY(-50%);
+    color: var(--ui-danger-text);
+    font-size: var(--ui-control-font-size);
+    pointer-events: none;
 }
 
 .ui-textarea {

@@ -52,3 +52,30 @@ describe('TextInput', () => {
         expect((wrapper.find('input').element as HTMLInputElement).value).toBe('');
     });
 });
+
+describe('TextInput error icon and attributes', () => {
+    it('shows the in-input error icon only while marked, hidden from assistive tech', async () => {
+        const wrapper = mount(TextInput, {props: {modelValue: ''}});
+        expect(wrapper.find('.ui-input__icon').exists()).toBe(false);
+
+        await wrapper.setProps({error: 'Required'});
+        expect(wrapper.find('.ui-input__icon').attributes('aria-hidden')).toBe('true');
+
+        await wrapper.setProps({invalid: false});
+        expect(wrapper.find('.ui-input__icon').exists()).toBe(false);
+    });
+
+    it('puts class and style on the wrapper and every other attribute on the input', () => {
+        const wrapper = mount(TextInput, {
+            props: {modelValue: ''},
+            attrs: {class: 'w-40', style: 'margin: 1px', 'data-test': 'name', autocomplete: 'off'},
+        });
+        const input = wrapper.find('input');
+
+        expect(wrapper.classes()).toEqual(expect.arrayContaining(['ui-input-wrap', 'w-40']));
+        expect(wrapper.attributes('style')).toBe('margin: 1px;');
+        expect(input.attributes('data-test')).toBe('name');
+        expect(input.attributes('autocomplete')).toBe('off');
+        expect(input.classes()).not.toContain('w-40');
+    });
+});
