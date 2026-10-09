@@ -125,7 +125,9 @@ describe('useForm scroll-to-error', () => {
                         h(
                             'div',
                             names.map((name) =>
-                                control ? h(TextInput, {...form.field(name), modelValue: ''}) : h(form.Message, {name}),
+                                control
+                                    ? h(TextInput, {...form.field(name), modelValue: ''})
+                                    : h(form.FormError, {name}),
                             ),
                         );
                 },
@@ -402,7 +404,7 @@ describe('useForm field()', () => {
     });
 });
 
-describe('useForm FieldLabel and Message', () => {
+describe('useForm FormLabel and FormError (form-bound)', () => {
     const mountRow = (options?: UseFormOptions) => {
         let form!: UseForm<'firstName'>;
         const wrapper = mount(
@@ -411,9 +413,9 @@ describe('useForm FieldLabel and Message', () => {
                     form = useForm<'firstName'>(options);
                     return () =>
                         h('div', [
-                            h(form.FieldLabel, {name: 'firstName', label: 'Voornaam', required: true, class: 'w-40'}),
+                            h(form.FormLabel, {name: 'firstName', label: 'Voornaam', required: true, class: 'w-40'}),
                             h(TextInput, {...form.field('firstName'), modelValue: ''}),
-                            h(form.Message, {name: 'firstName'}),
+                            h(form.FormError, {name: 'firstName'}),
                         ]);
                 },
             }),
@@ -442,9 +444,9 @@ describe('useForm FieldLabel and Message', () => {
         const wrapper = mount(
             defineComponent({
                 setup() {
-                    const {FieldLabel} = useForm<'actions'>();
+                    const {FormLabel} = useForm<'actions'>();
                     return () =>
-                        h(FieldLabel, {name: 'actions', label: 'Acties', required: true}, () =>
+                        h(FormLabel, {name: 'actions', label: 'Acties', required: true}, () =>
                             h('span', {class: 'note'}, 'optioneel'),
                         );
                 },

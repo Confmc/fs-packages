@@ -1,7 +1,7 @@
 import type {ComputedRef, Ref} from 'vue';
 
 import type {FieldBinding} from '../types';
-import type {FieldLabelComponent, MessageComponent} from './field';
+import type {FormErrorComponent, FormLabelComponent} from './field';
 import type {Path, PathValue} from './path';
 
 /** Field-error bag: the first backend validation message per field key. */
@@ -74,7 +74,7 @@ export type UseFormOptions<T extends string = string> = UseValidationErrorsOptio
     /**
      * When `handleSubmit` ends `'refused'` (the server's 422, or `validate`'s refusals), scroll the
      * first refused field into view, found by the ids this form hands out (`field(name)`'s control,
-     * else its `Message`). Never on `refuse`/`setRefusals` alone, so typing never scrolls.
+     * else its `FormError`). Never on `refuse`/`setRefusals` alone, so typing never scrolls.
      * @default true
      */
     scrollToError?: boolean;
@@ -118,10 +118,10 @@ export interface UseFormClient<T extends string = string> {
      * The id is the form's prefix plus the name, so it is the same on every render and unique per form.
      */
     field: (name: T) => FieldProps;
-    /** A `FormLabel` for one of this form's fields: `<FieldLabel name="email" label="E-mail" required />`. */
-    FieldLabel: FieldLabelComponent<T>;
-    /** One field's message, its element always rendered: `<Message name="email" />`. */
-    Message: MessageComponent<T>;
+    /** A label for one of this form's fields: `<FormLabel name="email" label="E-mail" required />`. */
+    FormLabel: FormLabelComponent<T>;
+    /** One field's message, its element always rendered: `<FormError name="email" />`. */
+    FormError: FormErrorComponent<T>;
     /** Refuse a field from the client, e.g. a check that runs before the request is sent. */
     refuse: (field: T, message: string) => void;
     /**

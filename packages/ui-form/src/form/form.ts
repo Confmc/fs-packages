@@ -13,7 +13,7 @@ import type {
     ValidationErrors,
 } from './types';
 
-import {createFieldLabel, createMessage, fieldId, messageId} from './field';
+import {createFormError, createFormLabel, fieldId, messageId} from './field';
 import {useFormSubmit} from './form-submit';
 import {readPath, writePath} from './path';
 import {scrollToFirstError} from './scroll-to-first-error';
@@ -29,7 +29,7 @@ import {useValidationErrors} from './validation-errors';
  *
  * `field(name)` is a field's whole link to the form — id, invalid, describedby and its message from
  * `fieldErrors` (the server's errors with the form's own refusals on top):
- * `<TextInput v-bind="field('email')" v-model="email" />` + `<Message name="email" />`, or one control
+ * `<TextInput v-bind="field('email')" v-model="email" />` + `<FormError name="email" />`, or one control
  * that draws its own label and message through `FormField`. Call it in a component `setup()`: the id
  * prefix comes from `useId()` unless `idPrefix` is given.
  *
@@ -137,8 +137,8 @@ export const useForm = (<T extends string = string>(
         clientErrors: readonly(client) as Readonly<Ref<ValidationErrors<T>>>,
         fieldErrors,
         field,
-        FieldLabel: createFieldLabel(id),
-        Message: createMessage(message, id),
+        FormLabel: createFormLabel(id),
+        FormError: createFormError(message, id),
         refuse,
         setRefusals,
         withdraw,
