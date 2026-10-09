@@ -5,7 +5,7 @@ import {computed, readonly, ref} from 'vue';
 import type {FormHttpService} from './http-contract';
 import type {FieldProps, UseForm, UseFormOptions, ValidationErrors} from './types';
 
-import {createLabel, createMessage, fieldId, messageId} from './field';
+import {createFieldLabel, createMessage, fieldId, messageId} from './field';
 import {useFormSubmit} from './form-submit';
 import {useScrollToFirstError} from './scroll-to-first-error';
 import {useValidationErrors} from './validation-errors';
@@ -93,7 +93,7 @@ export const useForm = <T extends string = string>(
         clientErrors: readonly(client) as Readonly<Ref<ValidationErrors<T>>>,
         fieldErrors,
         field,
-        Label: createLabel(id),
+        FieldLabel: createFieldLabel(id),
         Message: createMessage(message, id),
         refuse,
         setRefusals,

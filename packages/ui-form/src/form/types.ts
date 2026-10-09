@@ -1,7 +1,7 @@
 import type {ComputedRef, Ref} from 'vue';
 
 import type {FieldBinding} from '../types';
-import type {LabelComponent, MessageComponent} from './field';
+import type {FieldLabelComponent, MessageComponent} from './field';
 
 /** Field-error bag: the first backend validation message per field key. */
 export type ValidationErrors<T extends string = string> = Partial<Record<T, string>>;
@@ -129,8 +129,8 @@ export interface UseFormClient<T extends string = string> {
      * The id comes from the name (and `idPrefix`), so it is the same on every render.
      */
     field: (name: T) => FieldProps;
-    /** A `FormLabel` for one of this form's fields: `<Label name="email" label="E-mail" required />`. */
-    Label: LabelComponent<T>;
+    /** A `FormLabel` for one of this form's fields: `<FieldLabel name="email" label="E-mail" required />`. */
+    FieldLabel: FieldLabelComponent<T>;
     /** One field's message, its element always rendered: `<Message name="email" />`. */
     Message: MessageComponent<T>;
     /** Refuse a field from the client, e.g. a check that runs before the request is sent. */

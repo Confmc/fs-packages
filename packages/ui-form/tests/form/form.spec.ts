@@ -554,7 +554,7 @@ describe('useForm field()', () => {
     });
 });
 
-describe('useForm Label and Message', () => {
+describe('useForm FieldLabel and Message', () => {
     const mountRow = (options?: UseFormOptions) => {
         const {httpService, triggerError} = createMockHttpService();
         let form!: UseForm<'firstName'>;
@@ -564,7 +564,7 @@ describe('useForm Label and Message', () => {
                     form = useForm<'firstName'>(httpService, options);
                     return () =>
                         h('div', [
-                            h(form.Label, {name: 'firstName', label: 'Voornaam', required: true, class: 'w-40'}),
+                            h(form.FieldLabel, {name: 'firstName', label: 'Voornaam', required: true, class: 'w-40'}),
                             h(TextInput, {...form.field('firstName'), modelValue: ''}),
                             h(form.Message, {name: 'firstName'}),
                         ]);

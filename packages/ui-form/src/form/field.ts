@@ -10,7 +10,7 @@ export const fieldId = (name: string, prefix?: string): string =>
 export const messageId = (id: string): string => `${id}-error`;
 
 /** The props of a form-bound `Label`. */
-export interface LabelProps<T extends string = string> {
+export interface FieldLabelProps<T extends string = string> {
     /** the field the label names; its `for` is that field's id. */
     name: T;
     label: string;
@@ -18,14 +18,14 @@ export interface LabelProps<T extends string = string> {
 }
 
 /**
- * A `FormLabel` bound to one form: `<Label name="firstName" label="Voornaam" required />` points its
+ * A `FormLabel` bound to one form: `<FieldLabel name="firstName" label="Voornaam" required />` points its
  * `for` at the id `field('firstName')` gives the control. Attributes fall through to the `<label>`.
  */
-export const createLabel = <T extends string>(id: (name: T) => string) =>
+export const createFieldLabel = <T extends string>(id: (name: T) => string) =>
     defineComponent(
-        (props: LabelProps<T>) => () =>
+        (props: FieldLabelProps<T>) => () =>
             h(FormLabel, {htmlFor: id(props.name), required: props.required}, () => props.label),
-        {name: 'Label', props: ['name', 'label', 'required']},
+        {name: 'FieldLabel', props: ['name', 'label', 'required']},
     );
 
 /**
@@ -40,6 +40,6 @@ export const createMessage = <T extends string>(message: (name: T) => string | u
         {name: 'Message', props: ['name']},
     );
 
-/** The components `createLabel` and `createMessage` return. */
-export type LabelComponent<T extends string = string> = ReturnType<typeof createLabel<T>>;
+/** The components `createFieldLabel` and `createMessage` return. */
+export type FieldLabelComponent<T extends string = string> = ReturnType<typeof createFieldLabel<T>>;
 export type MessageComponent<T extends string = string> = ReturnType<typeof createMessage<T>>;
