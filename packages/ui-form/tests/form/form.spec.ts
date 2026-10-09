@@ -520,3 +520,19 @@ describe('useForm submit window and refusal signal', () => {
         expect(result().refused.value).toBe(false);
     });
 });
+
+describe('useForm field()', () => {
+    it("hands a control the field's message, server and client alike, and undefined when clean", () => {
+        const {httpService, triggerError} = createMockHttpService();
+        const {result} = mountForm<'email' | 'name' | 'age'>(httpService);
+
+        expect(result().field('email')).toEqual({error: undefined});
+
+        triggerError(422, {errors: {email: ['Taken'], name: ['Required']}});
+        result().refuse('name', 'Too short');
+
+        expect(result().field('email')).toEqual({error: 'Taken'});
+        expect(result().field('name')).toEqual({error: 'Too short'});
+        expect(result().field('age')).toEqual({error: undefined});
+    });
+});

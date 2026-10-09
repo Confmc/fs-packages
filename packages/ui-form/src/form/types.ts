@@ -113,6 +113,11 @@ export interface UseFormClient<T extends string = string> {
     fieldErrors: ComputedRef<ValidationErrors<T>>;
     /** A `FormField` bound to this form's `fieldErrors`: `<form.Field name="email">`. */
     Field: FieldComponent<T>;
+    /**
+     * One field's props for a control that renders its own label and message:
+     * `<Textarea v-bind="form.field('description')" label="…" v-model="…" />`.
+     */
+    field: (name: T) => FieldProps;
     /** Refuse a field from the client, e.g. a check that runs before the request is sent. */
     refuse: (field: T, message: string) => void;
     /**
@@ -126,4 +131,9 @@ export interface UseFormClient<T extends string = string> {
     withdraw: (...fields: T[]) => void;
     /** Withdraw every client refusal, e.g. when an editor opens or closes. */
     clearClient: () => void;
+}
+
+/** What `useForm().field(name)` hands a control: the field's current message, read from `fieldErrors`. */
+export interface FieldProps {
+    error: string | undefined;
 }

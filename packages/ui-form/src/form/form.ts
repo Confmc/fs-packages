@@ -76,6 +76,7 @@ export const useForm = <T extends string = string>(
         clientErrors: readonly(client) as Readonly<Ref<ValidationErrors<T>>>,
         fieldErrors,
         Field: createField(fieldErrors),
+        field: (name: T) => ({error: fieldErrors.value[name]}),
         refuse,
         setRefusals,
         withdraw,

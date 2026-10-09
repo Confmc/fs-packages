@@ -33,6 +33,7 @@ export {useValidationErrors} from './form/validation-errors';
 export type {FormHttpService} from './form/http-contract';
 export type {
     UseForm,
+    FieldProps,
     UseFormOptions,
     UseFormSubmit,
     UseValidationErrors,
