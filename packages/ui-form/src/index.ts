@@ -32,11 +32,15 @@ export type {
     UseForm,
     FieldProps,
     SubmitOutcome,
+    FieldModel,
+    UseDraftForm,
+    UseDraftFormOptions,
     UseFormOptions,
     UseFormSubmit,
     UseValidationErrors,
     UseValidationErrorsOptions,
     ValidationErrors,
 } from './form/types';
+export type {Path, PathValue} from './form/path';
 
 export type {FieldBinding, SelectItem, LabelKey} from './types';

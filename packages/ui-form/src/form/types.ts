@@ -2,6 +2,7 @@ import type {ComputedRef, Ref} from 'vue';
 
 import type {FieldBinding} from '../types';
 import type {FieldLabelComponent, MessageComponent} from './field';
+import type {Path, PathValue} from './path';
 
 /** Field-error bag: the first backend validation message per field key. */
 export type ValidationErrors<T extends string = string> = Partial<Record<T, string>>;
@@ -153,3 +154,25 @@ export interface UseFormClient<T extends string = string> {
 export interface FieldProps extends FieldBinding {
     error: string | undefined;
 }
+
+/** What `field(name)` adds when the form has a draft: the value at that path, and the write back into it. */
+export interface FieldModel<V> {
+    modelValue: V;
+    'onUpdate:modelValue': (value: V) => void;
+}
+
+/** `useForm`'s options when it points at the component's draft: the field names are the draft's paths. */
+export type UseDraftFormOptions<D extends object> = UseFormOptions<Path<D>> & {
+    /**
+     * The component's own draft (a ref; stores and adapters stay untouched). With it, `field(name)`
+     * also carries the value at that path and writes changes back into `draft.value`, so
+     * `<TextInput v-bind="field('firstName')" />` needs no `v-model`.
+     */
+    draft: Ref<D>;
+};
+
+/** Everything `useForm` returns for a form with a draft: as `UseForm`, named by the draft's paths. */
+export type UseDraftForm<D extends object> = Omit<UseForm<Path<D>>, 'field'> & {
+    /** The wiring plus the value: `modelValue` is typed as the value at that path. */
+    field: <P extends Path<D>>(name: P) => FieldProps & FieldModel<PathValue<D, P>>;
+};

@@ -3,10 +3,19 @@ import type {Ref} from 'vue';
 import {computed, readonly, ref, useId} from 'vue';
 
 import type {FormHttpService} from './http-contract';
-import type {FieldProps, UseForm, UseFormOptions, ValidationErrors} from './types';
+import type {
+    FieldModel,
+    FieldProps,
+    UseDraftForm,
+    UseDraftFormOptions,
+    UseForm,
+    UseFormOptions,
+    ValidationErrors,
+} from './types';
 
 import {createFieldLabel, createMessage, fieldId, messageId} from './field';
 import {useFormSubmit} from './form-submit';
+import {readPath, writePath} from './path';
 import {useScrollToFirstError} from './scroll-to-first-error';
 import {useValidationErrors} from './validation-errors';
 
@@ -32,9 +41,17 @@ import {useValidationErrors} from './validation-errors';
  * @param options     `keyMapper`, `fields`, `onlyWhileSubmitting`, `scrollToError`, `scrollRoot`,
  *                    `scrollTarget`, `idPrefix` — see `UseFormOptions`.
  */
-export const useForm = <T extends string = string>(
+// Two call shapes: names are free strings, or, with a `draft`, the draft's paths with typed values.
+// The overloads are a type; the one implementation below is cast to it, since an arrow function cannot
+// declare overloads and its `field` cannot be checked against both generic shapes at once.
+interface UseFormCall {
+    <D extends object>(httpService: FormHttpService, options: UseDraftFormOptions<D>): UseDraftForm<D>;
+    <T extends string = string>(httpService: FormHttpService, options?: UseFormOptions<T>): UseForm<T>;
+}
+
+export const useForm = (<T extends string = string>(
     httpService: FormHttpService,
-    options: UseFormOptions<T> = {},
+    options: UseFormOptions<T> & {draft?: Ref<object>} = {},
 ): UseForm<T> => {
     const {
         keyMapper,
@@ -44,6 +61,7 @@ export const useForm = <T extends string = string>(
         scrollRoot,
         scrollTarget,
         idPrefix,
+        draft,
     } = options;
     const validation = useValidationErrors<T>(httpService, {
         keyMapper,
@@ -79,10 +97,21 @@ export const useForm = <T extends string = string>(
     const id = (name: T): string => fieldId(name, prefix);
     const message = (name: T): string | undefined => fieldErrors.value[name] || undefined;
 
-    const field = (name: T): FieldProps => {
+    const field = (name: T): FieldProps | (FieldProps & FieldModel<unknown>) => {
         const error = message(name);
+        const wiring = {
+            id: id(name),
+            invalid: Boolean(error),
+            describedby: error ? messageId(id(name)) : undefined,
+            error,
+        };
+        if (!draft) return wiring;
 
-        return {id: id(name), invalid: Boolean(error), describedby: error ? messageId(id(name)) : undefined, error};
+        return {
+            ...wiring,
+            modelValue: readPath(draft.value, name),
+            'onUpdate:modelValue': (value: unknown) => writePath(draft.value, name, value),
+        };
     };
 
     const clearClient = (): void => {
@@ -102,4 +131,4 @@ export const useForm = <T extends string = string>(
         withdraw,
         clearClient,
     };
-};
+}) as UseFormCall;
