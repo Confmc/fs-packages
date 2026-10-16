@@ -1,6 +1,6 @@
 # @script-development/fs-http
 
-## Unreleased
+## 0.7.0 — 2026-10-16
 
 ### Minor Changes
 

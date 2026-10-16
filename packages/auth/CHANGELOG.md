@@ -1,5 +1,11 @@
 # @script-development/fs-auth
 
+## 0.3.1 — 2026-10-16
+
+### Patch Changes
+
+- **Accepts `@script-development/fs-http` 0.7.** The peer and dev ranges now include `^0.7.0`.
+
 ## 0.3.0 — 2026-10-03
 
 ### Minor Changes
