@@ -12,6 +12,7 @@ import {cdp, page} from 'vitest/browser';
 import Checkbox from '../../src/components/Checkbox.vue';
 import RadioGroup from '../../src/components/RadioGroup.vue';
 import Switch from '../../src/components/Switch.vue';
+import TextInput from '../../src/components/TextInput.vue';
 import '../../styles.css';
 
 type Mode = 'none' | 'active';
@@ -25,7 +26,8 @@ const runnerViewport = {width: window.innerWidth, height: window.innerHeight};
 // The runner scales a viewport larger than its window, and a scaled screenshot resamples the
 // control onto a sub-pixel grid. A small viewport renders 1:1.
 beforeEach(async () => {
-    await page.viewport(480, 480);
+    slot = 0;
+    await page.viewport(760, 480);
 });
 
 afterEach(async () => {
@@ -46,10 +48,23 @@ const addHost = (left: number, top: number): HTMLElement => {
     return host;
 };
 
-let nextTop = 8;
+// Hosts fill a 3 × 7 grid, one cell each, so no two screenshots overlap; the right edge holds blanks.
+let slot = 0;
 const nextHost = (): HTMLElement => {
-    nextTop = nextTop > 400 ? 8 : nextTop + 48;
-    return addHost(8, nextTop);
+    if (slot >= 21) throw new Error('out of host slots');
+    const host = addHost(8 + Math.floor(slot / 7) * 230, 8 + (slot % 7) * 64);
+    slot++;
+    // Room for a cue drawn outside the control's own box (an outline); see hostOf.
+    host.style.padding = '6px';
+    host.dataset.paintHost = '';
+    return host;
+};
+
+/** The padded host around a control: the screenshot that also holds what paints outside its box. */
+const hostOf = (control: Element): Element => {
+    const host = control.closest('[data-paint-host]');
+    if (!host) throw new Error('control is not in a paint host');
+    return host;
 };
 
 const decode = async (element: Element): Promise<ImageData> => {
@@ -97,10 +112,26 @@ const expectVisiblyDifferent = async (a: Element, b: Element): Promise<void> => 
     expect.soft(count / total, `${count} of ${total} pixels differ`).toBeGreaterThan(VISIBLE);
 };
 
+const expectIdentical = async (a: Element, b: Element): Promise<void> => {
+    const {count, total} = await differing(a, b);
+    expect.soft(count, `${count} of ${total} pixels differ`).toBe(0);
+};
+
+/**
+ * The invalid cue is a ring around the control, not a fill, so it is measured on the padded host and
+ * held to a pixel floor rather than a share of the box: a ring covers a small share of a wide input.
+ */
+const RING = 60;
+
+const expectRingDiffers = async (valid: Element, invalid: Element): Promise<void> => {
+    const {count, total} = await differing(hostOf(valid), hostOf(invalid));
+    expect.soft(count, `${count} of ${total} pixels differ`).toBeGreaterThanOrEqual(RING);
+};
+
 /** An empty box at the control's size and sub-pixel offset: its screenshot is the bare page. */
 const blankBeside = (element: Element): HTMLElement => {
     const {left, top, width, height} = element.getBoundingClientRect();
-    const blank = addHost(left + 240, top);
+    const blank = addHost(700 + (left % 1), top);
     blank.style.width = `${width}px`;
     blank.style.height = `${height}px`;
     return blank;
@@ -109,7 +140,7 @@ const blankBeside = (element: Element): HTMLElement => {
 const mountCheckbox = async (props: Record<string, unknown>): Promise<Element> => {
     const {container} = await render(Checkbox, {
         container: nextHost(),
-        props: {id: `cb-${nextTop}`, label: 'Agree', ...props},
+        props: {id: `cb-${slot}`, label: 'Agree', ...props},
     });
     const control = container.querySelector('.ui-check__control');
     if (!control) throw new Error('no .ui-check__control');
@@ -119,7 +150,7 @@ const mountCheckbox = async (props: Record<string, unknown>): Promise<Element> =
 const mountSwitch = async (props: Record<string, unknown>): Promise<Element> => {
     const {container} = await render(Switch, {
         container: nextHost(),
-        props: {id: `sw-${nextTop}`, label: 'Notify', ...props},
+        props: {id: `sw-${slot}`, label: 'Notify', ...props},
     });
     const control = container.querySelector('.ui-switch__control');
     if (!control) throw new Error('no .ui-switch__control');
@@ -127,22 +158,22 @@ const mountSwitch = async (props: Record<string, unknown>): Promise<Element> => 
 };
 
 /**
- * The first option of a two-option RadioGroup, selected or not. The group always holds a selection:
- * a radio whose group has none matches `:indeterminate`, a different state from "not selected".
+ * The first option of a two-option RadioGroup. `1` selects it, `2` selects its sibling, `null` leaves
+ * the group without a selection — where every radio matches `:indeterminate`.
  */
-const mountRadio = async (selected: boolean, disabled = false): Promise<Element> => {
+const mountRadio = async (model: 1 | 2 | null, extra: Record<string, unknown> = {}): Promise<Element> => {
     const {container} = await render(RadioGroup, {
         container: nextHost(),
         props: {
-            id: `rg-${nextTop}`,
+            id: `rg-${slot}`,
             label: 'Fruit',
             optionLabel: 'name',
             options: [
                 {id: 1, name: 'Mango'},
                 {id: 2, name: 'Apricot'},
             ],
-            modelValue: selected ? 1 : 2,
-            disabled,
+            modelValue: model,
+            ...extra,
         },
     });
     const control = container.querySelector('.ui-check__control');
@@ -174,8 +205,8 @@ describe.each<Mode>(['none', 'active'])('forced-colors: %s — the checked state
 
     it('RadioGroup: a selected option differs from an unselected one', async () => {
         await setForcedColors(mode);
-        const off = await mountRadio(false);
-        const on = await mountRadio(true);
+        const off = await mountRadio(2);
+        const on = await mountRadio(1);
         await expectVisiblyDifferent(off, on);
     });
 
@@ -194,7 +225,44 @@ describe.each<Mode>(['none', 'active'])('forced-colors: %s — the checked state
             await mountCheckbox({modelValue: false, disabled: true}),
             await mountCheckbox({modelValue: true, disabled: true}),
         );
-        await expectVisiblyDifferent(await mountRadio(false, true), await mountRadio(true, true));
+        await expectVisiblyDifferent(await mountRadio(2, {disabled: true}), await mountRadio(1, {disabled: true}));
+    });
+
+    it('disabled indeterminate Checkbox differs from disabled unchecked and from enabled indeterminate', async () => {
+        await setForcedColors(mode);
+        const mixed = await mountCheckbox({modelValue: false, indeterminate: true, disabled: true});
+        await expectVisiblyDifferent(await mountCheckbox({modelValue: false, disabled: true}), mixed);
+        await expectVisiblyDifferent(await mountCheckbox({modelValue: false, indeterminate: true}), mixed);
+    });
+
+    it('RadioGroup: an option of a group with no selection paints as unselected', async () => {
+        await setForcedColors(mode);
+        await expectIdentical(await mountRadio(2), await mountRadio(null));
+        await expectIdentical(await mountRadio(2, {disabled: true}), await mountRadio(null, {disabled: true}));
+        await expectVisiblyDifferent(await mountRadio(null), await mountRadio(1));
+    });
+
+    it('invalid differs from valid on TextInput, Checkbox, RadioGroup and Switch', async () => {
+        await setForcedColors(mode);
+        const text = async (invalid: boolean) => {
+            const {container} = await render(TextInput, {
+                container: nextHost(),
+                props: {id: `ti-${slot}`, modelValue: 'Mango', invalid, 'aria-label': 'Fruit'},
+            });
+            const control = container.querySelector('.ui-control');
+            if (!control) throw new Error('no .ui-control');
+            return control;
+        };
+        await expectRingDiffers(await text(false), await text(true));
+        await expectRingDiffers(
+            await mountCheckbox({modelValue: false}),
+            await mountCheckbox({modelValue: false, invalid: true}),
+        );
+        await expectRingDiffers(await mountRadio(2), await mountRadio(2, {invalid: true}));
+        await expectRingDiffers(
+            await mountSwitch({modelValue: false}),
+            await mountSwitch({modelValue: false, invalid: true}),
+        );
     });
 });
 

@@ -494,7 +494,8 @@ outright, so whatever the sheet paints in an author colour disappears: a `box-sh
 filled background, a glyph drawn in `currentColor` off a background token. The rule the block
 follows is that **every state an author colour carries needs a forced-colours counterpart in a
 system colour** — `Highlight` / `HighlightText` for a focused, pressed, active or checked state,
-`CanvasText` for an outline that must exist at all, `GrayText` for disabled — rather than an opt-out
+`CanvasText` for an outline that must exist at all, `GrayText` for disabled, and a dashed
+`CanvasText` outline for invalid, since no system colour means "error" — rather than an opt-out
 through `forced-color-adjust`, since speaking the user's palette is the point of the mode. A state
 you add that paints itself only through a `--ui-*` colour needs its own line there. Your `--ui-*`
 overrides do not apply in that mode, and that is correct.
