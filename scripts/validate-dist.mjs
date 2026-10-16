@@ -1,42 +1,31 @@
 #!/usr/bin/env node
-// Dist-validation gate — asserts every workspace package's published tarball
-// carries its four REQUIRED dual-format build artifacts, present and non-empty.
+// Dist-validation gate — every file a workspace package's manifest promises consumers
+// must ship in its tarball, present and non-empty.
 //
-// WHY THIS EXISTS (PR-time, not just release-time):
-//   The same assertion previously lived ONLY inline in .github/workflows/publish.yml,
-//   gated behind `environment: npm-publish` + `paths: packages/*/package.json` — so
-//   it fired at RELEASE time and never on a PR. An empty/missing-dist regression (the
-//   exact class of the fs-http 0.1.1 / 0.1.2 empty-tarball incident — see territory
-//   pulse 2026-04-22) was therefore invisible until publish, after merge. This script
-//   is the single source of truth for the assertion so the PR-time gate (ci.yml, after
-//   `npm run build`) and the release-time gate (publish.yml, before `changeset publish`)
-//   CANNOT drift: both invoke `npm run validate:dist`.
+// RULE: the required set is derived from each packages/*/package.json — every `exports`
+//   target (all conditions, nested objects, subpath maps, string shorthand, fallback
+//   arrays) plus `main` / `module` / `types` / `typings`. Each must appear in the
+//   `npm pack --dry-run --json` file list with size > 0; a required `.css` must also hold
+//   at least one rule (comments and whitespace alone fail). A target the derivation
+//   cannot resolve to one file (a `*` pattern, a path outside `./`) fails the gate rather
+//   than being skipped. Zero packages, or zero required files in any package, fails too.
+//   Derivation and verdict live in validate-dist.core.mjs, exercised by
+//   validate-dist.test.mjs.
 //
-// CONTRACT:
-//   For each packages/*/package.json, runs `npm pack --dry-run --json` and inspects
-//   the would-be-published file list. Each of the four REQUIRED paths must be present
-//   and have size > 0. A missing path or a 0-byte artifact fails the gate (exit 1) with
-//   a GitHub `::error::` annotation per offending package/artifact.
+// One script, two callers: ci.yml runs it at PR time after `npm run build`, publish.yml
+//   before `changeset publish` — so an empty or missing artifact (the fs-http 0.1.1 /
+//   0.1.2 empty-tarball class) reds a PR, not a release.
 //
-//   `npm pack --dry-run` reflects the real published tarball (honors `files`/`.npmignore`/
-//   `exports`), so this catches both "build never ran" (no dist) and "build emitted an
-//   empty file" regressions, AND a package whose `files` manifest stops shipping dist.
-//
-// SCOPE: presence + non-emptiness of the four dual-format entry artifacts only. It does
-//   NOT validate artifact contents, type correctness (attw covers that in lint:pkg), or
-//   any non-entry file. The build must have run before this script (CI orders it after
-//   `npm run build`).
+// SCOPE: presence and non-emptiness only. Artifact contents and type correctness are
+//   attw's and publint's (lint:pkg).
 
 import {spawnSync} from 'node:child_process';
 import {readdirSync, readFileSync, statSync} from 'node:fs';
 import path from 'node:path';
 
-const PACKAGES_DIR = 'packages';
+import {checkPackage, requiredPaths} from './validate-dist.core.mjs';
 
-// The four dual-format (ESM + CJS) entry artifacts every package's tsdown build emits
-// and every manifest ships. Paths are tarball-relative (npm pack --dry-run --json
-// reports `dist/index.mjs`, not an absolute path).
-const REQUIRED = ['dist/index.mjs', 'dist/index.cjs', 'dist/index.d.mts', 'dist/index.d.cts'];
+const PACKAGES_DIR = 'packages';
 
 const listPackageDirs = () =>
     readdirSync(PACKAGES_DIR)
@@ -63,7 +52,7 @@ const listPackageDirs = () =>
         })
         .sort();
 
-const packageName = (dir) => JSON.parse(readFileSync(path.join(dir, 'package.json'), 'utf8')).name ?? dir;
+const readManifest = (dir) => JSON.parse(readFileSync(path.join(dir, 'package.json'), 'utf8'));
 
 // Returns the tarball file list from `npm pack --dry-run --json`, or null on failure.
 const packFileList = (dir) => {
@@ -101,9 +90,20 @@ const main = () => {
 
     const failures = [];
 
+    const counts = [];
+
     for (const dir of dirs) {
-        const name = packageName(dir);
+        const manifest = readManifest(dir);
+        const name = manifest.name ?? dir;
         process.stdout.write(`\n--- validate:dist ${name} (${dir}) ---\n`);
+
+        const {paths: required, errors} = requiredPaths(manifest);
+        for (const error of errors) {
+            const msg = `${name}: ${error}`;
+            process.stdout.write(`::error::${msg}\n`);
+            failures.push(msg);
+        }
+        counts.push(`${name}=${required.length}`);
 
         const files = packFileList(dir);
         if (files === null) {
@@ -113,21 +113,22 @@ const main = () => {
             continue;
         }
 
-        for (const required of REQUIRED) {
-            const entry = files.find((f) => f.path === required);
-            if (entry === undefined) {
-                const msg = `${name} is missing ${required} in published tarball`;
-                process.stdout.write(`::error::${msg}\n`);
-                failures.push(msg);
-            } else if (entry.size === 0) {
-                const msg = `${name} ${required} is 0 bytes`;
-                process.stdout.write(`::error::${msg}\n`);
-                failures.push(msg);
-            } else {
-                process.stdout.write(`  ${required}: ${entry.size} bytes OK\n`);
-            }
+        const verdict = checkPackage({
+            name,
+            required,
+            files,
+            readText: (file) => readFileSync(path.join(dir, file), 'utf8'),
+        });
+        for (const pass of verdict.passes) {
+            process.stdout.write(`  ${pass}\n`);
+        }
+        for (const msg of verdict.failures) {
+            process.stdout.write(`::error::${msg}\n`);
+            failures.push(msg);
         }
     }
+
+    process.stdout.write(`\nrequired files per package: ${counts.join(', ')}\n`);
 
     if (failures.length > 0) {
         process.stderr.write(`\nDist validation FAILED (${failures.length}). Refusing empty or incomplete tarballs:\n`);
@@ -138,7 +139,7 @@ const main = () => {
     }
 
     process.stdout.write(
-        `\nvalidate:dist gate PASS — ${dirs.length} packages: required dist/ artifacts present and non-empty.\n`,
+        `\nvalidate:dist gate PASS — ${dirs.length} packages: every manifest-promised file present and non-empty.\n`,
     );
 };
 

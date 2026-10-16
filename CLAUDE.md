@@ -141,7 +141,7 @@ Three properties now make the coupling impossible, all enforced at PR time by `n
 | `npm run format:check`  | Check formatting with oxfmt                    |
 | `npm run format`        | Fix formatting with oxfmt                      |
 | `npm run lint:pkg`      | Run publint + attw on all packages             |
-| `npm run validate:dist` | Assert every package's required dist artifacts are present and non-empty |
+| `npm run validate:dist` | Assert every file each manifest promises — every `exports` target plus `main`/`module`/`types` — ships in the tarball non-empty (a `.css` must hold a rule); an unresolvable target (`*` pattern, folder) fails. Tested by `scripts/validate-dist.test.mjs` |
 | `npm run validate:workflows` | Assert the release pipeline's artifact clock cannot be outrun by its approval clock, and every workflow job is time-bounded |
 | `npm run detect:publishable` | Report which packages differ from the registry — the release signal `publish.yml` gates its OIDC approval on |
 | `npm audit`             | Check for dependency vulnerabilities           |
