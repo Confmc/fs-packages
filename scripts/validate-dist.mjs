@@ -6,9 +6,10 @@
 //   target (all conditions, nested objects, subpath maps, string shorthand, fallback
 //   arrays) plus `main` / `module` / `types` / `typings`. Each must appear in the
 //   `npm pack --dry-run --json` file list with size > 0; a required `.css` must also hold
-//   at least one rule (comments and whitespace alone fail). A target the derivation
-//   cannot resolve to one file (a `*` pattern, a path outside `./`) fails the gate rather
-//   than being skipped. Zero packages, or zero required files in any package, fails too.
+//   a rule block — a selector or at-rule followed by `{…}`, outside comments (a structural
+//   test, not a CSS parser). A target the derivation cannot resolve to one file (a `*`
+//   pattern, a folder, a path outside `./`) fails the gate rather than being skipped.
+//   Zero packages, or zero required files in any package, fails too.
 //   Derivation and verdict live in validate-dist.core.mjs, exercised by
 //   validate-dist.test.mjs.
 //

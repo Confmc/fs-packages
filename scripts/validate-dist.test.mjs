@@ -105,8 +105,33 @@ describe('cssHasNoRules', () => {
         expect(cssHasNoRules('   \n')).toBe(true);
     });
 
+    it('is true for text that is not a rule block', () => {
+        expect(cssHasNoRules('not CSS')).toBe(true);
+        expect(cssHasNoRules('/* header */\nnot CSS\n')).toBe(true);
+    });
+
+    it('is true for a block with no selector or at-rule before it', () => {
+        expect(cssHasNoRules('{color:red}')).toBe(true);
+    });
+
+    it('is true for a rule hidden inside a comment', () => {
+        expect(cssHasNoRules('/* .a{color:red} */')).toBe(true);
+    });
+
+    it('is false for an empty rule block', () => {
+        expect(cssHasNoRules('.a{}')).toBe(false);
+    });
+
     it('is false once a rule survives the comments', () => {
         expect(cssHasNoRules('/* header */\n.a{color:red}')).toBe(false);
+    });
+
+    it('is false for a rule nested in an at-rule', () => {
+        expect(cssHasNoRules('@media (x){.a{color:red}}')).toBe(false);
+    });
+
+    it('is false for the shipped ui-inputs stylesheet', () => {
+        expect(cssHasNoRules(readFileSync('packages/ui-inputs/styles.css', 'utf8'))).toBe(false);
     });
 });
 
@@ -137,7 +162,12 @@ describe('checkPackage', () => {
 
     it('fails a stylesheet holding only comments', () => {
         const verdict = checkPackage({name: 'p', required: ['styles.css'], files, readText: () => '/* gone */\n'});
-        expect(verdict.failures).toEqual(['p styles.css holds only comments and whitespace']);
+        expect(verdict.failures).toEqual(['p styles.css holds no rule block']);
+    });
+
+    it('fails a stylesheet holding text that is not CSS', () => {
+        const verdict = checkPackage({name: 'p', required: ['styles.css'], files, readText: () => 'not CSS'});
+        expect(verdict.failures).toEqual(['p styles.css holds no rule block']);
     });
 
     it('does not read non-css files for rules', () => {

@@ -71,12 +71,16 @@ export const requiredPaths = (manifest) => {
     return {paths: [...paths].sort(), errors};
 };
 
-/** A stylesheet whose bytes are only comments and whitespace styles nothing. */
-export const cssHasNoRules = (text) => text.replaceAll(/\/\*[\s\S]*?\*\//g, '').trim() === '';
+/**
+ * True when, comments stripped, no rule block remains: a prelude (selector or at-rule)
+ * followed by `{` and its innermost `}`. A rule nested in `@media … { … }` counts. This is
+ * a structural test, not a parser — `nonsense {}` passes it; text with no block does not.
+ */
+export const cssHasNoRules = (text) => !/[^\s{};][^{};]*\{[^{}]*\}/.test(text.replaceAll(/\/\*[\s\S]*?\*\//g, ''));
 
 /**
  * The verdict for one package: every required path present in the `npm pack --dry-run`
- * file list with a non-zero size, and every required `.css` carrying at least one rule.
+ * file list with a non-zero size, and every required `.css` holding at least one rule block.
  * Zero required paths fails too — a package that promises nothing has not been checked.
  */
 export const checkPackage = ({name, required, files, readText}) => {
@@ -94,7 +98,7 @@ export const checkPackage = ({name, required, files, readText}) => {
         } else if (entry.size === 0) {
             failures.push(`${name} ${requiredPath} is 0 bytes`);
         } else if (requiredPath.endsWith('.css') && cssHasNoRules(readText(requiredPath))) {
-            failures.push(`${name} ${requiredPath} holds only comments and whitespace`);
+            failures.push(`${name} ${requiredPath} holds no rule block`);
         } else {
             passes.push(`${requiredPath}: ${entry.size} bytes OK`);
         }
