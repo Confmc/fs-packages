@@ -1338,6 +1338,65 @@ describe('router service', () => {
             expect(service.currentRouteRef.value.path).toBe('/hop/11');
         });
 
+        it('should drop the depth a redirect queued once its target is overtaken before its guards ran', async () => {
+            // Arrange — the redirect queues its depth under /hop/1, the chain's own first URL, and a
+            // push to the route already showing overtakes it before any guard of /hop/1 runs
+            vi.spyOn(console, 'error').mockImplementation(() => {});
+            const service = createRouterService(depthRoutes());
+            await service.goToRoute('home');
+            const seen: string[] = [];
+            let startRedirected = false;
+            const chain = chainOf(10);
+            service.registerBeforeRouteMiddleware((to) => {
+                seen.push(String(to.name));
+                if (to.name !== 'start') return chain(to);
+                startRedirected = true;
+
+                return {name: 'hop', id: 1};
+            });
+            const redirected = service.goToRoute('start');
+            while (!startRedirected) await Promise.resolve();
+            await Promise.resolve();
+            await Promise.all([redirected, service.goToRoute('home')]);
+            await flushPromises();
+            // Precondition — the target never reached a guard, and the router stayed put
+            expect(seen).toStrictEqual(['start']);
+            expect(service.currentRouteRef.value.name).toBe('home');
+
+            // Act
+            const errors = await runChain(service);
+
+            // Assert
+            expect(errors).toStrictEqual([]);
+            expect(service.currentRouteRef.value.path).toBe('/hop/11');
+        });
+
+        it('should give each of several overlapping redirect chains its own budget', async () => {
+            // Arrange — eleven hops wait in one guard, then each returns a single redirect in the same tick
+            const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+            const service = createRouterService(depthRoutes());
+            await service.goToRoute('home');
+            const gate = Promise.withResolvers<void>();
+            service.registerBeforeRouteMiddleware(async (to) => {
+                if (to.name !== 'hop') return false;
+                await gate.promise;
+
+                return {name: 'about'};
+            });
+            for (let id = 1; id <= 11; id += 1) {
+                void service.goToRoute('hop', id);
+                await flushPromises();
+            }
+
+            // Act
+            gate.resolve();
+            for (let flush = 0; flush < 30; flush += 1) await flushPromises();
+
+            // Assert
+            expect(consoleErrorSpy.mock.calls).toStrictEqual([]);
+            expect(service.currentRouteRef.value.name).toBe('about');
+        });
+
         it('should still trip the cap on a genuine loop after an interrupted chain', async () => {
             // Arrange
             vi.spyOn(console, 'error').mockImplementation(() => {});
