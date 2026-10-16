@@ -206,6 +206,8 @@ router.registerBeforeRouteMiddleware((to) => (to.meta.deadLink ? {name: 'dashboa
 
 The call that was redirected settles once the redirected navigation has: `await router.goToRoute('about')` (or `replaceRoute`, or `install()`) resolves with `currentRouteRef` already on the redirect's target, however many redirects the chain takes. If the redirected navigation fails, fs-router reports it once on the console and the call still resolves, on whatever route the router stopped at.
 
+A chain of more than ten redirects is treated as a loop: the eleventh is refused, the hop is cancelled, and one `console.error` names the loop. The count belongs to the chain while it is running, so a chain that ended in any way — landed, cancelled, failed, or overtaken by another navigation — leaves nothing behind for the next one.
+
 ### After Navigation
 
 ```typescript
