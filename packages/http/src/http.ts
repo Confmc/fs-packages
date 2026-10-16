@@ -72,18 +72,19 @@ export const createHttpService = (baseURL: string, options?: HttpServiceOptions)
     const responseErrorMiddleware: ResponseErrorMiddlewareFunc[] = [];
 
     // Smart credentials: toggle withCredentials based on request host matching base host
-    if (options?.smartCredentials) {
-        const prepareExternalRequest: RequestMiddlewareFunc = (request: InternalAxiosRequestConfig) => {
-            const requestUrl = new URL(http.getUri(request));
-            request.withCredentials = apiUrl.host === requestUrl.host;
-        };
-
-        requestMiddleware.push(prepareExternalRequest);
-    }
+    const prepareExternalRequest: RequestMiddlewareFunc | undefined = options?.smartCredentials
+        ? (request: InternalAxiosRequestConfig) => {
+              const requestUrl = new URL(http.getUri(request));
+              request.withCredentials = apiUrl.host === requestUrl.host;
+          }
+        : undefined;
 
     // Wire up interceptors
     http.interceptors.request.use((request) => {
         for (const middleware of requestMiddleware) middleware(request);
+
+        // WR-1457: decided after consumer middleware, which may still rewrite the target host.
+        prepareExternalRequest?.(request);
 
         return request;
     });
