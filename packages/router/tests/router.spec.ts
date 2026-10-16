@@ -211,6 +211,57 @@ describe('router service', () => {
             window.history.pushState({}, '', '/');
         });
 
+        it('should resolve, not reject, after reporting a guard that throws on the first navigation', async () => {
+            // Arrange
+            window.history.pushState({}, '', '/about');
+            const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+            const service = createRouterService(createTestRoutes());
+            const failure = new Error('guard boom');
+            service.registerBeforeRouteMiddleware(() => {
+                throw failure;
+            });
+
+            // Act
+            const installed = service.install();
+
+            // Assert — reported once by the library, so the caller has nothing left to handle
+            await expect(installed).resolves.toBeUndefined();
+            await expect(service.isReady()).resolves.toBeUndefined();
+            expect(consoleErrorSpy.mock.calls).toStrictEqual([['fs-router: navigation failed', failure]]);
+            // Reset
+            window.history.pushState({}, '', '/');
+        });
+
+        it('should leave no unhandled rejection behind a discarded install() whose guard throws', async () => {
+            // Arrange — `void routerService.install()` is how bootstraps call it
+            window.history.pushState({}, '', '/about');
+            vi.spyOn(console, 'error').mockImplementation(() => {});
+            const unhandled: unknown[] = [];
+            const recordUnhandled = (reason: unknown): void => {
+                unhandled.push(reason);
+            };
+            process.on('unhandledRejection', recordUnhandled);
+            const service = createRouterService(createTestRoutes());
+            service.registerBeforeRouteMiddleware(() => {
+                throw new Error('guard boom');
+            });
+            // Positive control — the listener sees a rejection nobody handles
+            void Promise.reject(new Error('control'));
+            await new Promise((resolve) => setTimeout(resolve, 0));
+            expect(unhandled).toHaveLength(1);
+
+            // Act
+            void service.install();
+            await service.isReady();
+            await new Promise((resolve) => setTimeout(resolve, 0));
+
+            // Assert — only the control
+            process.off('unhandledRejection', recordUnhandled);
+            expect(unhandled).toHaveLength(1);
+            // Reset
+            window.history.pushState({}, '', '/');
+        });
+
         it('should strip base path from location', async () => {
             // Arrange
             window.history.pushState({}, '', '/app/about');

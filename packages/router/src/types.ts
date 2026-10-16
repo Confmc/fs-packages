@@ -106,8 +106,9 @@ export interface RouterService<Routes extends RouteRecordRaw[]> {
      * Navigates to the current browser location, returning the navigation promise so a
      * consumer may `await routerService.install()` before mounting — until it settles,
      * `currentRouteRef` still holds vue-router's `START_LOCATION` and `RouterView` paints
-     * nothing. It is vue-router's own promise and therefore REJECTS when a guard throws;
-     * `isReady()` is the non-rejecting alternative. An unmatched URL is not a throw: it resolves
+     * nothing. It resolves and never rejects: a guard that throws is reported once on the console
+     * by fs-router itself and the promise then resolves with `undefined`, so a bare
+     * `void routerService.install()` needs no `catch`. An unmatched URL is not a throw: it resolves
      * and `RouterView` paints the not-found fallback. A middleware redirect is followed: the
      * promise settles once the redirected navigation has.
      */

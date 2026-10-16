@@ -705,14 +705,15 @@ describe('createRouterView', () => {
         service.registerBeforeRouteMiddleware(() => true);
 
         // Act
-        const installed = await service.install().then(
-            () => 'resolved',
-            (error: unknown) => String(error),
-        );
+        await service.install();
         await flushPromises();
 
-        // Assert
-        expect(installed).toBe('Error: /deep is an unknown route');
+        // Assert — the lookup's throw is reported (`install()` itself resolves after reporting);
+        // the miss path would have written nothing
+        expect(consoleErrorSpy).toHaveBeenCalledWith(
+            'fs-router: navigation failed',
+            expect.objectContaining({message: '/deep is an unknown route'}),
+        );
         expect(service.currentRouteRef.value.path).not.toBe('/deep');
 
         consoleWarnSpy.mockRestore();

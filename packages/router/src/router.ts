@@ -460,6 +460,8 @@ export const createRouterService = <Routes extends RouteRecordRaw[]>(
             // the sentinel route and nothing marked in flight — and paint the fallback.
             beginDispatch();
 
+            // A guard that throws has already been reported by `onError`, so the rejection would be
+            // a second channel for one failure, and bootstraps discard this promise.
             return router
                 .push(fullPath)
                 .then(async (outcome) => {
@@ -467,7 +469,8 @@ export const createRouterService = <Routes extends RouteRecordRaw[]>(
 
                     return outcome;
                 })
-                .finally(endDispatch);
+                .finally(endDispatch)
+                .catch(() => undefined);
         },
         isReady: () => readyPromise,
         normalizedRouteToSpecificRoute,
