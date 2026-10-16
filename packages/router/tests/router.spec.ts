@@ -211,6 +211,57 @@ describe('router service', () => {
             window.history.pushState({}, '', '/');
         });
 
+        it('should resolve, not reject, after reporting a guard that throws on the first navigation', async () => {
+            // Arrange
+            window.history.pushState({}, '', '/about');
+            const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+            const service = createRouterService(createTestRoutes());
+            const failure = new Error('guard boom');
+            service.registerBeforeRouteMiddleware(() => {
+                throw failure;
+            });
+
+            // Act
+            const installed = service.install();
+
+            // Assert — reported once by the library, so the caller has nothing left to handle
+            await expect(installed).resolves.toBeUndefined();
+            await expect(service.isReady()).resolves.toBeUndefined();
+            expect(consoleErrorSpy.mock.calls).toStrictEqual([['fs-router: navigation failed', failure]]);
+            // Reset
+            window.history.pushState({}, '', '/');
+        });
+
+        it('should leave no unhandled rejection behind a discarded install() whose guard throws', async () => {
+            // Arrange — `void routerService.install()` is how bootstraps call it
+            window.history.pushState({}, '', '/about');
+            vi.spyOn(console, 'error').mockImplementation(() => {});
+            const unhandled: unknown[] = [];
+            const recordUnhandled = (reason: unknown): void => {
+                unhandled.push(reason);
+            };
+            process.on('unhandledRejection', recordUnhandled);
+            const service = createRouterService(createTestRoutes());
+            service.registerBeforeRouteMiddleware(() => {
+                throw new Error('guard boom');
+            });
+            // Positive control — the listener sees a rejection nobody handles
+            void Promise.reject(new Error('control'));
+            await new Promise((resolve) => setTimeout(resolve, 0));
+            expect(unhandled).toHaveLength(1);
+
+            // Act
+            void service.install();
+            await service.isReady();
+            await new Promise((resolve) => setTimeout(resolve, 0));
+
+            // Assert — only the control
+            process.off('unhandledRejection', recordUnhandled);
+            expect(unhandled).toHaveLength(1);
+            // Reset
+            window.history.pushState({}, '', '/');
+        });
+
         it('should strip base path from location', async () => {
             // Arrange
             window.history.pushState({}, '', '/app/about');
@@ -1022,6 +1073,353 @@ describe('router service', () => {
             expect(consoleErrorSpy.mock.calls.filter((call) => String(call[0]).startsWith('fs-router:'))).toHaveLength(
                 1,
             );
+        });
+    });
+
+    describe('settling a redirected navigation', () => {
+        it('should resolve goToRoute only once the redirected navigation has landed', async () => {
+            // Arrange
+            const service = createRouterService(createTestRoutes());
+            await service.goToRoute('home');
+            service.registerBeforeRouteMiddleware((to) => (to.name === 'about' ? {name: 'items.overview'} : false));
+
+            // Act
+            await service.goToRoute('about');
+
+            // Assert — read with no flush in between: the caller is told the navigation is done
+            expect(service.currentRouteRef.value.name).toBe('items.overview');
+        });
+
+        it('should resolve goToRoute only once a multi-hop chain with async middleware has landed', async () => {
+            // Arrange
+            const service = createRouterService(createTestRoutes());
+            await service.goToRoute('home');
+            service.registerBeforeRouteMiddleware(async (to) => {
+                await new Promise((resolve) => setTimeout(resolve, 1));
+                if (to.name === 'about') return {name: 'items.create'};
+
+                return to.name === 'items.create' ? {name: 'items.edit', id: 3} : false;
+            });
+
+            // Act
+            await service.goToRoute('about');
+
+            // Assert
+            expect(service.currentRouteRef.value.name).toBe('items.edit');
+            expect(service.currentRouteRef.value.params.id).toBe('3');
+        });
+
+        it('should resolve replaceRoute only once the redirected navigation has landed', async () => {
+            // Arrange
+            const service = createRouterService(createTestRoutes());
+            await service.goToRoute('home');
+            service.registerBeforeRouteMiddleware((to) => (to.name === 'about' ? {name: 'items.overview'} : false));
+
+            // Act
+            await service.replaceRoute('about');
+
+            // Assert
+            expect(service.currentRouteRef.value.name).toBe('items.overview');
+        });
+
+        it('should resolve install only once a redirected first navigation has landed', async () => {
+            // Arrange
+            window.history.pushState({}, '', '/');
+            const service = createRouterService(createTestRoutes());
+            service.registerBeforeRouteMiddleware((to) => (to.name === 'home' ? {name: 'about'} : false));
+
+            // Act
+            await service.install();
+
+            // Assert — not START_LOCATION, and not the hop the redirect aborted
+            expect(service.currentRouteRef.value.name).toBe('about');
+        });
+
+        it('should resolve, not reject, when the redirected navigation fails, and report it once', async () => {
+            // Arrange — the failure belongs to the redirect, which the library reports; the caller
+            // asked for a navigation that was handed off, so it learns where the router stopped.
+            const service = createRouterService(createTestRoutes());
+            await service.goToRoute('home');
+            const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+            service.registerBeforeRouteMiddleware((to) => {
+                if (to.name === 'items.overview') throw new Error('downstream guard boom');
+
+                return to.name === 'about' ? {name: 'items.overview'} : false;
+            });
+
+            // Act
+            const outcome = service.goToRoute('about');
+
+            // Assert
+            await expect(outcome).resolves.toBeUndefined();
+            expect(service.currentRouteRef.value.name).toBe('home');
+            expect(consoleErrorSpy.mock.calls.map((call) => String(call[0]))).toStrictEqual([
+                'fs-router: navigation failed',
+            ]);
+        });
+
+        it('should resolve at once, on the current route, when a middleware cancels without redirecting', async () => {
+            // Arrange
+            const service = createRouterService(createTestRoutes());
+            await service.goToRoute('home');
+            service.registerBeforeRouteMiddleware((to) => to.name === 'about');
+
+            // Act
+            await service.goToRoute('about');
+
+            // Assert
+            expect(service.currentRouteRef.value.name).toBe('home');
+        });
+
+        it('should resolve when a later navigation overtakes the redirected one', async () => {
+            // Arrange — the redirect target's guard waits, and the caller navigates elsewhere meanwhile
+            const service = createRouterService(createTestRoutes());
+            await service.goToRoute('home');
+            let releaseTarget!: () => void;
+            const targetGate = new Promise<void>((resolve) => {
+                releaseTarget = resolve;
+            });
+            service.registerBeforeRouteMiddleware(async (to) => {
+                if (to.name === 'about') return {name: 'items.overview'};
+                if (to.name === 'items.overview') await targetGate;
+
+                return false;
+            });
+
+            // Act
+            const redirected = service.goToRoute('about');
+            await flushPromises();
+            const overtaking = service.goToRoute('items.create');
+            releaseTarget();
+            await Promise.all([redirected, overtaking]);
+
+            // Assert
+            expect(service.currentRouteRef.value.name).toBe('items.create');
+        });
+    });
+
+    describe('redirect depth after an interrupted chain', () => {
+        // Every terminal path must leave the redirect budget where a fresh chain expects it: a
+        // chain of exactly MAX_REDIRECT_DEPTH (10) redirects lands, one more trips the cap.
+        const depthRoutes = (): RouteRecordRaw[] => [
+            {path: '/', name: 'home', component: TestPage},
+            {path: '/about', name: 'about', component: TestPage},
+            {path: '/start', name: 'start', component: TestPage},
+            {path: '/hop/:id', name: 'hop', component: TestPage},
+            {
+                path: '/deep',
+                name: 'deep',
+                component: TestLayout,
+                children: [{path: 'leaf', name: 'deep.leaf', component: TestPage}],
+            },
+        ];
+
+        const chainOf = (redirects: number) => {
+            let taken = 0;
+
+            return (to: {name?: unknown}) => {
+                if (to.name !== 'hop' || taken >= redirects) return false;
+                taken += 1;
+
+                return {name: 'hop', id: taken + 1};
+            };
+        };
+
+        const runChain = async (service: ReturnType<typeof createRouterService>) => {
+            const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+            consoleErrorSpy.mockClear();
+            await service.goToRoute('hop', 1);
+            await flushPromises();
+
+            return consoleErrorSpy.mock.calls.map((call) => String(call[0]));
+        };
+
+        it('should give a fresh chain the full budget after a middleware threw mid-chain', async () => {
+            // Arrange
+            vi.spyOn(console, 'error').mockImplementation(() => {});
+            const service = createRouterService(depthRoutes());
+            await service.goToRoute('home');
+            const chain = chainOf(10);
+            service.registerBeforeRouteMiddleware((to) => {
+                if (to.name === 'start') return {name: 'about'};
+                if (to.name === 'about') throw new Error('interrupted');
+
+                return chain(to);
+            });
+            await service.goToRoute('start');
+            await flushPromises();
+
+            // Act
+            const errors = await runChain(service);
+
+            // Assert
+            expect(errors).toStrictEqual([]);
+            expect(service.currentRouteRef.value.path).toBe('/hop/11');
+        });
+
+        it('should give a fresh chain the full budget after the route lookup threw on a redirect target', async () => {
+            // Arrange — vue-router matches the parent at its own path; fs-router's lookup does not
+            vi.spyOn(console, 'error').mockImplementation(() => {});
+            const service = createRouterService(depthRoutes());
+            await service.goToRoute('home');
+            const chain = chainOf(10);
+            service.registerBeforeRouteMiddleware((to) => (to.name === 'start' ? {name: 'deep'} : chain(to)));
+            await service.goToRoute('start');
+            await flushPromises();
+            expect(service.currentRouteRef.value.name).toBe('home');
+
+            // Act
+            const errors = await runChain(service);
+
+            // Assert
+            expect(errors).toStrictEqual([]);
+            expect(service.currentRouteRef.value.path).toBe('/hop/11');
+        });
+
+        it('should give a fresh chain the full budget after a redirect target was overtaken before its guards ran', async () => {
+            // Arrange — a push to the route already showing overtakes the redirect target and runs no
+            // guard of its own; the hop resumes one microtask after its middleware returns, and
+            // dispatches the redirect then.
+            vi.spyOn(console, 'error').mockImplementation(() => {});
+            const service = createRouterService(depthRoutes());
+            await service.goToRoute('home');
+            const seen: string[] = [];
+            let startRedirected = false;
+            const chain = chainOf(10);
+            service.registerBeforeRouteMiddleware((to) => {
+                seen.push(String(to.name));
+                if (to.name !== 'start') return chain(to);
+                startRedirected = true;
+
+                return {name: 'about'};
+            });
+            const redirected = service.goToRoute('start');
+            while (!startRedirected) await Promise.resolve();
+            await Promise.resolve();
+            await Promise.all([redirected, service.goToRoute('home')]);
+            await flushPromises();
+            // Precondition — the target never reached a guard, and the router stayed put
+            expect(seen).toStrictEqual(['start']);
+            expect(service.currentRouteRef.value.name).toBe('home');
+
+            // Act
+            const errors = await runChain(service);
+
+            // Assert
+            expect(errors).toStrictEqual([]);
+            expect(service.currentRouteRef.value.path).toBe('/hop/11');
+        });
+
+        it('should give a fresh chain the full budget while an unrelated navigation is still in flight', async () => {
+            // Arrange — a guard that never settles keeps its hop in flight for the rest of the test,
+            // so "nothing is in flight" never becomes true again; single redirects then repeat.
+            vi.spyOn(console, 'error').mockImplementation(() => {});
+            const service = createRouterService(depthRoutes());
+            await service.goToRoute('home');
+            const chain = chainOf(10);
+            service.registerBeforeRouteMiddleware((to) => {
+                if (to.name === 'about') return new Promise<boolean>(() => {});
+
+                return to.name === 'start' ? {name: 'home'} : chain(to);
+            });
+            void service.goToRoute('about');
+            await flushPromises();
+            for (let redirect = 0; redirect < 10; redirect += 1) {
+                void service.goToRoute('start');
+                await flushPromises();
+            }
+
+            // Act
+            void service.goToRoute('hop', 1);
+            for (let flush = 0; flush < 30; flush += 1) await flushPromises();
+
+            // Assert
+            expect(vi.mocked(console.error).mock.calls).toStrictEqual([]);
+            expect(service.currentRouteRef.value.path).toBe('/hop/11');
+        });
+
+        it('should drop the depth a redirect queued once its target is overtaken before its guards ran', async () => {
+            // Arrange — the redirect queues its depth under /hop/1, the chain's own first URL, and a
+            // push to the route already showing overtakes it before any guard of /hop/1 runs
+            vi.spyOn(console, 'error').mockImplementation(() => {});
+            const service = createRouterService(depthRoutes());
+            await service.goToRoute('home');
+            const seen: string[] = [];
+            let startRedirected = false;
+            const chain = chainOf(10);
+            service.registerBeforeRouteMiddleware((to) => {
+                seen.push(String(to.name));
+                if (to.name !== 'start') return chain(to);
+                startRedirected = true;
+
+                return {name: 'hop', id: 1};
+            });
+            const redirected = service.goToRoute('start');
+            while (!startRedirected) await Promise.resolve();
+            await Promise.resolve();
+            await Promise.all([redirected, service.goToRoute('home')]);
+            await flushPromises();
+            // Precondition — the target never reached a guard, and the router stayed put
+            expect(seen).toStrictEqual(['start']);
+            expect(service.currentRouteRef.value.name).toBe('home');
+
+            // Act
+            const errors = await runChain(service);
+
+            // Assert
+            expect(errors).toStrictEqual([]);
+            expect(service.currentRouteRef.value.path).toBe('/hop/11');
+        });
+
+        it('should give each of several overlapping redirect chains its own budget', async () => {
+            // Arrange — eleven hops wait in one guard, then each returns a single redirect in the same tick
+            const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+            const service = createRouterService(depthRoutes());
+            await service.goToRoute('home');
+            const gate = Promise.withResolvers<void>();
+            service.registerBeforeRouteMiddleware(async (to) => {
+                if (to.name !== 'hop') return false;
+                await gate.promise;
+
+                return {name: 'about'};
+            });
+            for (let id = 1; id <= 11; id += 1) {
+                void service.goToRoute('hop', id);
+                await flushPromises();
+            }
+
+            // Act
+            gate.resolve();
+            for (let flush = 0; flush < 30; flush += 1) await flushPromises();
+
+            // Assert
+            expect(consoleErrorSpy.mock.calls).toStrictEqual([]);
+            expect(service.currentRouteRef.value.name).toBe('about');
+        });
+
+        it('should still trip the cap on a genuine loop after an interrupted chain', async () => {
+            // Arrange
+            vi.spyOn(console, 'error').mockImplementation(() => {});
+            const service = createRouterService(depthRoutes());
+            await service.goToRoute('home');
+            const chain = chainOf(11);
+            service.registerBeforeRouteMiddleware((to) => {
+                if (to.name === 'start') return {name: 'about'};
+                if (to.name === 'about') throw new Error('interrupted');
+
+                return chain(to);
+            });
+            await service.goToRoute('start');
+            await flushPromises();
+
+            // Act — one redirect more than the budget
+            const errors = await runChain(service);
+
+            // Assert
+            expect(errors).toStrictEqual([
+                'fs-router: middleware redirect chain exceeded 10 hops — aborting to break a redirect loop',
+            ]);
+            expect(service.currentRouteRef.value.name).toBe('home');
         });
     });
 
