@@ -92,11 +92,25 @@ export const createRouterService = <Routes extends RouteRecordRaw[]>(
     // its guards — but the successor's own dispatch was counted in, synchronously, before the
     // predecessor could be aborted, so the count never reaches zero across a chain. Under the
     // boolean this was not true and the close had to be withheld here.
+    // A hop this service aborts in order to dispatch a middleware redirect resolves on the abort,
+    // while the router is still on the previous route. Its caller asked for a navigation, so it
+    // waits for the redirect it was handed off to — keyed by the aborted hop's `to`, which
+    // vue-router hands back as the abort failure's `to`, so concurrent chains cannot cross. A
+    // failing redirect is reported by the library and does not reject the caller, whose own
+    // navigation did not fail: it settles where the router stopped.
+    const redirectSuccessors = new WeakMap<object, Promise<void>>();
+
+    const followRedirect = async (outcome: unknown): Promise<void> => {
+        if (!isNavigationFailure(outcome, NavigationFailureType.aborted)) return;
+
+        await redirectSuccessors.get(outcome.to)?.catch(() => undefined);
+    };
+
     const dispatchNavigation = async (navigate: () => Promise<unknown>, reportUnreported = true): Promise<void> => {
         beginDispatch();
 
         try {
-            await navigate();
+            await followRedirect(await navigate());
         } catch (error) {
             // `router.push`/`replace` throw SYNCHRONOUSLY for an unknown route name, and reject
             // when a guard throws. The synchronous throw reaches neither `afterEach` nor
@@ -336,7 +350,7 @@ export const createRouterService = <Routes extends RouteRecordRaw[]>(
                 }
 
                 redirectDepth += 1;
-                // Fire-and-forget: the dispatch resolves once the redirect navigation settles.
+                // The aborted hop's caller waits on this dispatch through `followRedirect`.
                 // `router.push`/`replace` resolve (not reject) for NavigationDuplicated/Aborted, but
                 // they DO reject when a guard or lazy component further down the redirected chain
                 // throws — attach a reporter so that surfaces instead of an unhandled rejection.
@@ -344,11 +358,13 @@ export const createRouterService = <Routes extends RouteRecordRaw[]>(
                 // `onError`; it still reports on its own for the one failure `onError` CANNOT see,
                 // an unknown route name, where `router.push({name})` throws synchronously and
                 // nothing is ever routed through `triggerError`.
-                void dispatchRedirect(result).catch((error: unknown) => {
+                const successor = dispatchRedirect(result);
+                void successor.catch((error: unknown) => {
                     if (alreadyReported(error)) return;
 
                     console.error('fs-router: middleware redirect navigation failed', error);
                 });
+                redirectSuccessors.set(to, successor);
 
                 // The chain continues in the dispatched navigation — do NOT reset the depth here,
                 // and do NOT let this hop's abort end the in-flight window or reach the console:
@@ -444,7 +460,14 @@ export const createRouterService = <Routes extends RouteRecordRaw[]>(
             // the sentinel route and nothing marked in flight — and paint the fallback.
             beginDispatch();
 
-            return router.push(fullPath).finally(endDispatch);
+            return router
+                .push(fullPath)
+                .then(async (outcome) => {
+                    await followRedirect(outcome);
+
+                    return outcome;
+                })
+                .finally(endDispatch);
         },
         isReady: () => readyPromise,
         normalizedRouteToSpecificRoute,

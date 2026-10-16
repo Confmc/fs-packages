@@ -1,5 +1,11 @@
 # @script-development/fs-router
 
+## Unreleased — patch (0.3.3)
+
+### Patch Changes
+
+- **A redirected navigation settles when the redirect lands, not when the hop it replaced is aborted.** fs-router redirects by aborting the pending hop and dispatching the middleware's target as a fresh navigation. `goToRoute`, `replaceRoute`, the CRUD shortcuts and `install()` returned the promise of the aborted hop, which resolved while `currentRouteRef` still held the PREVIOUS route (`START_LOCATION` on a cold start), so code after `await routerService.goToRoute('about')` read stale route state. Each call now waits for the redirect it was handed off to, through every hop of the chain, and resolves with the router on the redirect's target. A redirected navigation that fails is still reported once on the console and does not reject the caller, as before; the call resolves on whatever route the router stopped at. A middleware that cancels without redirecting resolves at once, as before. Of 118 awaited `goToRoute`/`replaceRoute`/CRUD-shortcut call sites across the six consuming frontends, none read route state right after the await (measured 2026-10-16), so no consumer has to change anything.
+
 ## 0.3.2 — 2026-10-07
 
 ### Patch Changes

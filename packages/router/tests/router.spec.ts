@@ -1025,6 +1025,128 @@ describe('router service', () => {
         });
     });
 
+    describe('settling a redirected navigation', () => {
+        it('should resolve goToRoute only once the redirected navigation has landed', async () => {
+            // Arrange
+            const service = createRouterService(createTestRoutes());
+            await service.goToRoute('home');
+            service.registerBeforeRouteMiddleware((to) => (to.name === 'about' ? {name: 'items.overview'} : false));
+
+            // Act
+            await service.goToRoute('about');
+
+            // Assert — read with no flush in between: the caller is told the navigation is done
+            expect(service.currentRouteRef.value.name).toBe('items.overview');
+        });
+
+        it('should resolve goToRoute only once a multi-hop chain with async middleware has landed', async () => {
+            // Arrange
+            const service = createRouterService(createTestRoutes());
+            await service.goToRoute('home');
+            service.registerBeforeRouteMiddleware(async (to) => {
+                await new Promise((resolve) => setTimeout(resolve, 1));
+                if (to.name === 'about') return {name: 'items.create'};
+
+                return to.name === 'items.create' ? {name: 'items.edit', id: 3} : false;
+            });
+
+            // Act
+            await service.goToRoute('about');
+
+            // Assert
+            expect(service.currentRouteRef.value.name).toBe('items.edit');
+            expect(service.currentRouteRef.value.params.id).toBe('3');
+        });
+
+        it('should resolve replaceRoute only once the redirected navigation has landed', async () => {
+            // Arrange
+            const service = createRouterService(createTestRoutes());
+            await service.goToRoute('home');
+            service.registerBeforeRouteMiddleware((to) => (to.name === 'about' ? {name: 'items.overview'} : false));
+
+            // Act
+            await service.replaceRoute('about');
+
+            // Assert
+            expect(service.currentRouteRef.value.name).toBe('items.overview');
+        });
+
+        it('should resolve install only once a redirected first navigation has landed', async () => {
+            // Arrange
+            window.history.pushState({}, '', '/');
+            const service = createRouterService(createTestRoutes());
+            service.registerBeforeRouteMiddleware((to) => (to.name === 'home' ? {name: 'about'} : false));
+
+            // Act
+            await service.install();
+
+            // Assert — not START_LOCATION, and not the hop the redirect aborted
+            expect(service.currentRouteRef.value.name).toBe('about');
+        });
+
+        it('should resolve, not reject, when the redirected navigation fails, and report it once', async () => {
+            // Arrange — the failure belongs to the redirect, which the library reports; the caller
+            // asked for a navigation that was handed off, so it learns where the router stopped.
+            const service = createRouterService(createTestRoutes());
+            await service.goToRoute('home');
+            const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+            service.registerBeforeRouteMiddleware((to) => {
+                if (to.name === 'items.overview') throw new Error('downstream guard boom');
+
+                return to.name === 'about' ? {name: 'items.overview'} : false;
+            });
+
+            // Act
+            const outcome = service.goToRoute('about');
+
+            // Assert
+            await expect(outcome).resolves.toBeUndefined();
+            expect(service.currentRouteRef.value.name).toBe('home');
+            expect(consoleErrorSpy.mock.calls.map((call) => String(call[0]))).toStrictEqual([
+                'fs-router: navigation failed',
+            ]);
+        });
+
+        it('should resolve at once, on the current route, when a middleware cancels without redirecting', async () => {
+            // Arrange
+            const service = createRouterService(createTestRoutes());
+            await service.goToRoute('home');
+            service.registerBeforeRouteMiddleware((to) => to.name === 'about');
+
+            // Act
+            await service.goToRoute('about');
+
+            // Assert
+            expect(service.currentRouteRef.value.name).toBe('home');
+        });
+
+        it('should resolve when a later navigation overtakes the redirected one', async () => {
+            // Arrange — the redirect target's guard waits, and the caller navigates elsewhere meanwhile
+            const service = createRouterService(createTestRoutes());
+            await service.goToRoute('home');
+            let releaseTarget!: () => void;
+            const targetGate = new Promise<void>((resolve) => {
+                releaseTarget = resolve;
+            });
+            service.registerBeforeRouteMiddleware(async (to) => {
+                if (to.name === 'about') return {name: 'items.overview'};
+                if (to.name === 'items.overview') await targetGate;
+
+                return false;
+            });
+
+            // Act
+            const redirected = service.goToRoute('about');
+            await flushPromises();
+            const overtaking = service.goToRoute('items.create');
+            releaseTarget();
+            await Promise.all([redirected, overtaking]);
+
+            // Assert
+            expect(service.currentRouteRef.value.name).toBe('items.create');
+        });
+    });
+
     describe('registerAfterRouteMiddleware', () => {
         it('should return unregister function', () => {
             // Arrange

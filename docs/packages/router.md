@@ -204,6 +204,8 @@ router.registerBeforeRouteMiddleware((to) => (to.meta.deadLink ? {name: 'dashboa
 
 `id`, `query`, and `parentId` on the redirect object thread through to the target exactly as they do for `goToRoute`. The redirect object short-circuits the middleware chain identically to a truthy boolean.
 
+The call that was redirected settles once the redirected navigation has: `await router.goToRoute('about')` (or `replaceRoute`, or `install()`) resolves with `currentRouteRef` already on the redirect's target, however many redirects the chain takes. If the redirected navigation fails, fs-router reports it once on the console and the call still resolves, on whatever route the router stopped at.
+
 ### After Navigation
 
 ```typescript
