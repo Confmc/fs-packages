@@ -39,7 +39,7 @@ Creates a new HTTP service instance.
 - `headers` — Additional default headers
 - `withCredentials` — Send cookies cross-origin (default: `true`)
 - `withXSRFToken` — Include XSRF token header (default: `false`)
-- `smartCredentials` — Auto-toggle `withCredentials` based on request host matching base URL host (default: `false`)
+- `smartCredentials` — Auto-toggle `withCredentials` based on the final request host (after request middleware) matching base URL host (default: `false`)
 - `timeout` — Request timeout in milliseconds (default: `30000`). Pass `0` to disable; pass any positive number to override.
 - `onMiddlewareError` — Handler (`GuardedMiddlewareErrorHandler`) for a throw from any auto-guarded middleware on this service (default: a loud `console.error`). Must not re-throw.
 

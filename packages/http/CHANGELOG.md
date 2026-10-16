@@ -1,6 +1,10 @@
 # @script-development/fs-http
 
-## Unreleased
+## 0.7.0 — 2026-10-16
+
+### Minor Changes
+
+- **`smartCredentials` now decides from the host the request is sent to (WR-1457).** The credential toggle used to run before every consumer request middleware, so a middleware rewriting `config.baseURL` sent the request to a host whose `withCredentials` was computed for the original one — cookies went to the rewritten foreign host, and a rewrite back to the API host went out uncredentialed. The decision now runs after all request middleware. Behaviour change for a consumer that combines `smartCredentials` with a cross-host `baseURL` rewrite: that request is no longer credentialed. If you need credentials there, drop `smartCredentials` (the `withCredentials: true` default then applies to every request). A request middleware can no longer set `withCredentials` itself while `smartCredentials` is on.
 
 ### Patch Changes
 

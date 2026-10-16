@@ -471,6 +471,55 @@ describe('createHttpService', () => {
             // Assert
             expect(response.config.withCredentials).toBe(false);
         });
+
+        // WR-1457: the decision must be taken against the host the request is SENT to, which a
+        // consumer request middleware may still rewrite (town-crier overrides config.baseURL).
+        it('withholds credentials when a consumer middleware rewrites baseURL to another host', async () => {
+            // Arrange
+            mock.onGet(/.*/).reply(200, {});
+            const service = createHttpService(BASE_URL, {smartCredentials: true});
+            service.registerRequestMiddleware((config) => {
+                config.baseURL = 'https://other-host.example.org';
+            });
+
+            // Act
+            const response = await service.getRequest('/rewritten');
+
+            // Assert
+            expect(response.config.baseURL).toBe('https://other-host.example.org');
+            expect(response.config.withCredentials).toBe(false);
+        });
+
+        it('sends credentials when a consumer middleware rewrites a cross-host baseURL back to the API host', async () => {
+            // Arrange
+            mock.onGet(/.*/).reply(200, {});
+            const service = createHttpService(BASE_URL, {smartCredentials: true});
+            service.registerRequestMiddleware((config) => {
+                config.baseURL = BASE_URL;
+            });
+
+            // Act
+            const response = await service.getRequest('/rewritten', {baseURL: 'https://other-host.example.org'});
+
+            // Assert
+            expect(response.config.baseURL).toBe(BASE_URL);
+            expect(response.config.withCredentials).toBe(true);
+        });
+
+        it('overrides a withCredentials value set by a consumer request middleware', async () => {
+            // Arrange
+            mock.onGet(/.*/).reply(200, {});
+            const service = createHttpService(BASE_URL, {smartCredentials: true});
+            service.registerRequestMiddleware((config) => {
+                config.withCredentials = true;
+            });
+
+            // Act
+            const response = await service.getRequest('https://external.com/api/data');
+
+            // Assert
+            expect(response.config.withCredentials).toBe(false);
+        });
     });
 
     describe('downloadRequest', () => {
