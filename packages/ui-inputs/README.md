@@ -490,13 +490,14 @@ The stylesheet ends with two gated blocks that deliberately step **outside** the
 because the user's own preferences outrank the theme.
 
 `@media (forced-colors: active)` — a high-contrast theme makes the user agent ignore author colours
-outright, so anything conveyed by colour alone disappears. Three states would: keyboard focus
-(painted through `box-shadow`, which forced-colors strips), the `aria-pressed` toggle state, and the
-`as` fallback's disabled state. The block restores each with a **system colour** — `Highlight` for
-the focus outline, `Highlight` / `HighlightText` for the pressed surface, `GrayText` for both
-disabled paths — rather than opting out with `forced-color-adjust`, since speaking the user's
-palette is the point of the mode. Your `--ui-pressable-bg-pressed` / `--ui-pressable-text-disabled`
-overrides do not apply there, and that is correct.
+outright, so whatever the sheet paints in an author colour disappears: a `box-shadow` focus ring, a
+filled background, a glyph drawn in `currentColor` off a background token. The rule the block
+follows is that **every state an author colour carries needs a forced-colours counterpart in a
+system colour** — `Highlight` / `HighlightText` for a focused, pressed, active or checked state,
+`CanvasText` for an outline that must exist at all, `GrayText` for disabled — rather than an opt-out
+through `forced-color-adjust`, since speaking the user's palette is the point of the mode. A state
+you add that paints itself only through a `--ui-*` colour needs its own line there. Your `--ui-*`
+overrides do not apply in that mode, and that is correct.
 
 `@media (prefers-reduced-motion: reduce)` zeroes every transition the sheet declares, scoped to the
 `ui-*` surfaces that carry one so your own transitions stay untouched.

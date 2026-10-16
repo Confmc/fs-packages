@@ -960,6 +960,59 @@
     .ui-switch.is-disabled {
         color: GrayText;
     }
+
+    /* The checked state is author-painted on an `appearance: none` chassis: the box and track fill,
+       the mark and dot in `currentColor` off a background token, the thumb in a background token,
+       and a switch with no border at all. Every one of those collapses onto Canvas, so checked,
+       unchecked and (for the switch) the whole control paint identical to the page. Each needs a
+       system colour of its own; source order matches the base sheet (checked, then disabled). */
+    .ui-check__input:checked,
+    .ui-check__input:indeterminate {
+        background: Highlight;
+        border-color: Highlight;
+    }
+    .ui-check__input:checked ~ .ui-check__icon,
+    .ui-check__input:indeterminate ~ .ui-check__icon {
+        color: HighlightText;
+    }
+    .ui-check__input:disabled {
+        border-color: GrayText;
+    }
+    .ui-check__input:disabled:checked,
+    .ui-check__input:disabled:indeterminate {
+        background: GrayText;
+        border-color: GrayText;
+    }
+    .ui-check__input:disabled:checked ~ .ui-check__icon,
+    .ui-check__input:disabled:indeterminate ~ .ui-check__icon {
+        color: Canvas;
+    }
+    .ui-switch__input {
+        border: 1px solid CanvasText;
+    }
+    .ui-switch__thumb {
+        background: CanvasText;
+    }
+    .ui-switch__input:checked {
+        background: Highlight;
+        border-color: Highlight;
+    }
+    .ui-switch__input:checked ~ .ui-switch__thumb {
+        background: HighlightText;
+    }
+    .ui-switch__input:disabled {
+        border-color: GrayText;
+    }
+    .ui-switch__input:disabled ~ .ui-switch__thumb {
+        background: GrayText;
+    }
+    .ui-switch__input:disabled:checked {
+        background: GrayText;
+        border-color: GrayText;
+    }
+    .ui-switch__input:disabled:checked ~ .ui-switch__thumb {
+        background: Canvas;
+    }
 }
 
 /* Respect a reduced-motion preference — zero every transition the stylesheet declares (the 0.12s

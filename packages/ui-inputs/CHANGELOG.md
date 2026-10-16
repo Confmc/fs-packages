@@ -1,5 +1,11 @@
 # @script-development/ui-inputs
 
+## Unreleased
+
+### Patch Changes
+
+- **A checked `Checkbox`, a selected `RadioGroup` option and an on `Switch` are visible under forced colours (WR-1339).** In a high-contrast theme the checked box, the radio dot, the switch track and its thumb were painted in author colours the theme discards, so checked and unchecked rendered pixel-identical and a switch did not render at all (measured in Chromium's emulated forced-colors palette). `styles.css` now paints them in system colours there: `Highlight` / `HighlightText` for checked and indeterminate, a `CanvasText` track outline and thumb on the switch, `GrayText` for the disabled variants. Nothing changes outside forced colours, and no `--ui-*` token changes.
+
 ## 0.17.0 — 2026-10-03
 
 ### Added
