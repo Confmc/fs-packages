@@ -73,20 +73,20 @@ npm run lint:pkg
 
 `.github/workflows/ci.yml` is the authority. Its `check` job runs these gates in order, a separate `browser-tests` job runs the real-browser lane, and `ci-passed` is green only when both report success:
 
-| Gate              | Command                        | What it checks                                                                             |
-| ----------------- | ------------------------------ | ------------------------------------------------------------------------------------------ |
-| Audit             | `npm audit --audit-level=high` | No known high or critical vulnerabilities in dependencies                                  |
-| Format            | `npm run format:check`         | Code follows oxfmt formatting rules                                                        |
-| Lint              | `npm run lint`                 | No oxlint violations, warnings included                                                    |
-| Build             | `npm run build`                | All packages compile successfully                                                          |
-| Tarball           | `npm run validate:dist`        | Every file a manifest promises ships in the tarball, non-empty                             |
-| Release pipeline  | `npm run validate:workflows`   | The publish workflow's invariants hold and every job is time-bounded                       |
-| Docs              | `npm run validate:docs`        | Every publishable package has a page, a sidebar entry, a home-page row and an install line |
-| Typecheck         | `npm run typecheck`            | No TypeScript errors in strict mode                                                        |
-| Package lint      | `npm run lint:pkg`             | Package exports are correct (publint + attw)                                               |
-| Coverage          | `npm run test:coverage`        | 100% code coverage per package                                                             |
-| Mutation          | `npm run test:mutation`        | 90% mutation score for every package with a Stryker config                                 |
-| Browser (own job) | `npm run test:browser`         | Real-Chromium behaviour and axe-core audits                                                |
+| Gate              | Command                        | What it checks                                                                              |
+| ----------------- | ------------------------------ | ------------------------------------------------------------------------------------------- |
+| Audit             | `npm audit --audit-level=high` | No known high or critical vulnerabilities in dependencies                                   |
+| Format            | `npm run format:check`         | Code follows oxfmt formatting rules                                                         |
+| Lint              | `npm run lint`                 | No oxlint violations, warnings included                                                     |
+| Build             | `npm run build`                | All packages compile successfully                                                           |
+| Tarball           | `npm run validate:dist`        | Every file a manifest promises ships in the tarball, non-empty                              |
+| Release pipeline  | `npm run validate:workflows`   | The publish workflow's invariants hold and every job is time-bounded                        |
+| Docs              | `npm run validate:docs`        | Every publishable package is on the site, and the site names no package that does not exist |
+| Typecheck         | `npm run typecheck`            | No TypeScript errors in strict mode                                                         |
+| Package lint      | `npm run lint:pkg`             | Package exports are correct (publint + attw)                                                |
+| Coverage          | `npm run test:coverage`        | 100% code coverage per package                                                              |
+| Mutation          | `npm run test:mutation`        | 90% mutation score for every package with a Stryker config                                  |
+| Browser (own job) | `npm run test:browser`         | Real-Chromium behaviour and axe-core audits                                                 |
 
 ::: tip Why mutation testing?
 100% code coverage means every line of code was executed during tests. It does not mean every line was actually **verified**. Mutation testing changes your code (introduces "mutants") and checks whether your tests catch the change. A 90% mutation score means your tests detect 90% of possible bugs — not just that they run the code.

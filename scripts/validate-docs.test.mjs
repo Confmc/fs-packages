@@ -4,7 +4,8 @@
  */
 import {describe, expect, it} from 'vitest';
 
-import {checkDocsEnumeration, describeMissing, isPublishable} from './validate-docs.core.mjs';
+import {isPrivateManifest} from './detect-publishable.core.mjs';
+import {checkDocsEnumeration, describeMissing, describeOrphan, isPublishable} from './validate-docs.core.mjs';
 
 const pkg = (dir, extra = {}) => ({dir, manifest: {name: `@script-development/${dir}`, ...extra}});
 
@@ -21,12 +22,18 @@ describe('isPublishable', () => {
         expect(isPublishable({name: 'x', private: false})).toBe(true);
         expect(isPublishable({name: 'x', private: true})).toBe(false);
     });
+
+    it('is the negation of the rule detect-publishable applies', () => {
+        for (const manifest of [{name: 'x'}, {name: 'x', private: false}, {name: 'x', private: true}]) {
+            expect(isPublishable(manifest)).toBe(!isPrivateManifest(manifest));
+        }
+    });
 });
 
 describe('checkDocsEnumeration', () => {
     it('passes when every surface names every publishable package', () => {
         const verdict = checkDocsEnumeration({packages: [pkg('fs-a'), pkg('fs-b')], ...docsFor('fs-a', 'fs-b')});
-        expect(verdict).toEqual({passed: true, scanned: 2, errors: [], missing: []});
+        expect(verdict).toEqual({passed: true, scanned: 2, errors: [], missing: [], orphans: []});
     });
 
     it.each([
@@ -91,7 +98,7 @@ describe('checkDocsEnumeration', () => {
             packages: [pkg('fs-a'), pkg('internal', {private: true})],
             ...docsFor('fs-a'),
         });
-        expect(verdict).toEqual({passed: true, scanned: 1, errors: [], missing: []});
+        expect(verdict).toEqual({passed: true, scanned: 1, errors: [], missing: [], orphans: []});
     });
 
     it.each([
@@ -124,6 +131,75 @@ describe('checkDocsEnumeration', () => {
             'packages/broken/package.json could not be read (Unexpected token)',
             'packages/nameless/package.json has no name',
         ]);
+    });
+});
+
+describe('checkDocsEnumeration — entries naming no package', () => {
+    const withExtra = (docs, dir) => ({
+        pages: [...docs.pages, `${dir}.md`],
+        sidebar: `${docs.sidebar}\n{text: '${dir}', link: '/packages/${dir}'},`,
+        index: `${docs.index}\n| [${dir}](/packages/${dir}) | ${dir} |`,
+        gettingStarted: `${docs.gettingStarted}\nnpm install @script-development/${dir}`,
+    });
+
+    it.each([
+        ['page', 'fs-gone'],
+        ['sidebar', 'fs-gone'],
+        ['index', 'fs-gone'],
+        ['gettingStarted', '@script-development/fs-gone'],
+    ])('reports an orphan on the %s surface, and only there', (surface, key) => {
+        const docs = docsFor('fs-a');
+        const field = surface === 'page' ? 'pages' : surface;
+        const planted = {...docs, [field]: withExtra(docs, 'fs-gone')[field]};
+        const verdict = checkDocsEnumeration({packages: [pkg('fs-a')], ...planted});
+        expect(verdict.passed).toBe(false);
+        expect(verdict.missing).toEqual([]);
+        expect(verdict.orphans).toEqual([{surface, key}]);
+    });
+
+    it('treats a page or link for a private package as naming no publishable package', () => {
+        const verdict = checkDocsEnumeration({
+            packages: [pkg('fs-a'), pkg('internal', {private: true})],
+            ...withExtra(docsFor('fs-a'), 'internal'),
+        });
+        expect(verdict.passed).toBe(false);
+        expect(verdict.orphans.map((entry) => entry.surface)).toEqual(['page', 'sidebar', 'index', 'gettingStarted']);
+    });
+
+    it('reports a package dropped from packages/ on every surface that still names it', () => {
+        const verdict = checkDocsEnumeration({packages: [pkg('fs-a')], ...docsFor('fs-a', 'fs-b')});
+        expect(verdict.orphans).toEqual([
+            {surface: 'page', key: 'fs-b'},
+            {surface: 'sidebar', key: 'fs-b'},
+            {surface: 'index', key: 'fs-b'},
+            {surface: 'gettingStarted', key: '@script-development/fs-b'},
+        ]);
+    });
+
+    it('ignores what is not a package entry: non-markdown files, prose links, third-party installs, anchors', () => {
+        const docs = docsFor('fs-a');
+        const verdict = checkDocsEnumeration({
+            packages: [pkg('fs-a')],
+            pages: [...docs.pages, '.gitkeep'],
+            sidebar: `${docs.sidebar}\n{text: 'Guide', link: '/getting-started'},\n{text: 'a', link: '/packages/fs-a#usage'},`,
+            index: `${docs.index}\nSee [the gone one](/packages/fs-gone) in prose.\n| [a](/packages/fs-a#usage) | a |`,
+            gettingStarted: `${docs.gettingStarted}\nnpm install vue`,
+        });
+        expect(verdict).toEqual({passed: true, scanned: 1, errors: [], missing: [], orphans: []});
+    });
+});
+
+describe('describeOrphan', () => {
+    it('names the file to edit', () => {
+        expect(describeOrphan({surface: 'page', key: 'fs-gone'})).toBe(
+            'docs/packages/fs-gone.md — a page for no publishable package under packages/',
+        );
+        expect(describeOrphan({surface: 'sidebar', key: 'fs-gone'})).toBe(
+            'fs-gone — named in docs/.vitepress/config.mts sidebar, but no publishable package under packages/ has that directory',
+        );
+        expect(describeOrphan({surface: 'gettingStarted', key: '@script-development/fs-gone'})).toBe(
+            '@script-development/fs-gone — named in docs/getting-started.md install list, but no publishable package under packages/ has that name',
+        );
     });
 });
 

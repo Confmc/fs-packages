@@ -2,13 +2,14 @@
 /**
  * I/O shell for `validate:docs`: every publishable package under `packages/` has a docs
  * page, a sidebar entry, a row in the home page's package tables and an install line in
- * Getting Started. The decision lives in `validate-docs.core.mjs`, exercised by
- * `validate-docs.test.mjs`; keep logic out of this file.
+ * Getting Started, and every package those four name exists. The decision lives in
+ * `validate-docs.core.mjs`, exercised by `validate-docs.test.mjs`; keep logic out of this
+ * file.
  */
 import {readdirSync, readFileSync} from 'node:fs';
 import path from 'node:path';
 
-import {checkDocsEnumeration, describeMissing} from './validate-docs.core.mjs';
+import {checkDocsEnumeration, describeMissing, describeOrphan} from './validate-docs.core.mjs';
 
 const readText = (file) => {
     try {
@@ -56,9 +57,10 @@ if (!verdict.passed) {
     console.error(`validate:docs gate FAIL — ${verdict.scanned} publishable package(s) scanned:\n`);
     for (const error of verdict.errors) console.error(`  - ${error}`);
     for (const entry of verdict.missing) console.error(`  - ${describeMissing(entry)}`);
+    for (const entry of verdict.orphans) console.error(`  - ${describeOrphan(entry)}`);
     process.exit(1);
 }
 
 console.log(
-    `validate:docs gate PASS — ${verdict.scanned} publishable package(s), each with a page, a sidebar entry, a home-page row and an install line.`,
+    `validate:docs gate PASS — ${verdict.scanned} publishable package(s), each with a page, a sidebar entry, a home-page row and an install line; no docs entry names a missing package.`,
 );

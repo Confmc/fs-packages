@@ -94,7 +94,7 @@ Every pull request runs the full CI gate set. [Contributing](/contributing#the-c
 - **Build** — tsdown compiles to dual ESM + CJS output
 - **Tarball validation** — every file a manifest promises ships in the tarball, non-empty
 - **Release-pipeline validation** — the publish workflow's invariants hold
-- **Docs validation** — every publishable package has a page, a sidebar entry, a row on this page and an install line
+- **Docs validation** — every publishable package has a page, a sidebar entry, a row on this page and an install line, and none of those names a package that does not exist
 - **Type checking** — TypeScript strict mode, no implicit any
 - **Package lint** — publint and attw verify package exports are correct
 - **Coverage** — 100% code coverage via vitest, for every package

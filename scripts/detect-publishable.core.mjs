@@ -45,6 +45,9 @@ export const interpretRegistry = ({stdout, stderr, message} = {}) => {
     return {error: `registry lookup failed: ${(text.split('\n')[0] || message || 'unknown error').trim()}`};
 };
 
+/** A manifest npm never receives. Shared with `validate-docs.core.mjs`, so the two gates hold one rule. */
+export const isPrivateManifest = (manifest) => manifest.private === true;
+
 /**
  * One package's verdict. `manifest` is either a parsed manifest or `{__unreadable}`;
  * `lookupRegistry` is called ONLY when a lookup can actually decide something, so a
@@ -59,7 +62,7 @@ export const decidePackage = ({dir, manifest, lookupRegistry}) => {
             reason: `manifest unreadable (${manifest.__unreadable})`,
         };
     }
-    if (manifest.private === true) {
+    if (isPrivateManifest(manifest)) {
         return {name: manifest.name ?? dir, publishable: false, reason: 'private, never published'};
     }
     if (!manifest.name || !manifest.version) {

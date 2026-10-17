@@ -144,7 +144,7 @@ Three properties now make the coupling impossible, all enforced at PR time by `n
 | `npm run lint:pkg`      | Run publint + attw on all packages             |
 | `npm run validate:dist` | Assert every file each manifest promises — every `exports` target plus `main`/`module`/`types` — ships in the tarball non-empty (a `.css` must hold a rule block — selector or at-rule followed by `{…}`, outside comments; structural, not a parser); an unresolvable target (`*` pattern, folder) fails. Tested by `scripts/validate-dist.test.mjs` |
 | `npm run validate:workflows` | Assert the release pipeline's artifact clock cannot be outrun by its approval clock, and every workflow job is time-bounded |
-| `npm run validate:docs` | Assert every publishable package (no `"private": true`) has a page under `docs/packages/`, a sidebar entry, a row in `docs/index.md`'s tables and an install line in `docs/getting-started.md`. Tested by `scripts/validate-docs.test.mjs` |
+| `npm run validate:docs` | Assert every publishable package (no `"private": true`) has a page under `docs/packages/`, a sidebar entry, a row in `docs/index.md`'s tables and an install line in `docs/getting-started.md` — and that none of those four names a package with no publishable manifest. The publishable rule is imported from `detect-publishable.core.mjs`. Tested by `scripts/validate-docs.test.mjs` |
 | `npm run detect:publishable` | Report which packages differ from the registry — the release signal `publish.yml` gates its OIDC approval on |
 | `npm audit`             | Check for dependency vulnerabilities           |
 
