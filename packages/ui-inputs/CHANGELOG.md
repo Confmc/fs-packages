@@ -1,6 +1,6 @@
 # @script-development/ui-inputs
 
-## Unreleased
+## 0.17.1 — 2026-10-17
 
 ### Patch Changes
 
