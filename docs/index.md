@@ -48,22 +48,25 @@ These packages have zero Vue dependency — they work in any TypeScript project.
 
 Vue-powered reactive services for common application concerns.
 
-| Package                                 | Description                                               |
-| --------------------------------------- | --------------------------------------------------------- |
-| [fs-theme](/packages/theme)             | Reactive dark/light mode with system preference detection |
-| [fs-loading](/packages/loading)         | Loading state service with HTTP middleware integration    |
-| [fs-toast](/packages/toast)             | Component-agnostic toast notification queue               |
-| [fs-dialog](/packages/dialog)           | Component-agnostic dialog stack with error middleware     |
-| [fs-translation](/packages/translation) | Type-safe reactive i18n with multi-locale support         |
+| Package                                 | Description                                                               |
+| --------------------------------------- | ------------------------------------------------------------------------- |
+| [fs-theme](/packages/theme)             | Reactive dark/light mode with system preference detection                 |
+| [fs-auth](/packages/auth)               | Sanctum SPA-cookie session store, safe-redirect guard and auth registrars |
+| [fs-loading](/packages/loading)         | Loading state service with HTTP middleware integration                    |
+| [fs-toast](/packages/toast)             | Component-agnostic toast notification queue                               |
+| [fs-dialog](/packages/dialog)           | Component-agnostic dialog stack with error middleware                     |
+| [fs-form](/packages/form)               | Double-submit guard plus 422 validation-error binding for fs-http         |
+| [fs-translation](/packages/translation) | Type-safe reactive i18n with multi-locale support                         |
 
 ### Domain
 
 Higher-level packages for domain-driven application architecture.
 
-| Package                                     | Description                                                   |
-| ------------------------------------------- | ------------------------------------------------------------- |
-| [fs-adapter-store](/packages/adapter-store) | Reactive state management with CRUD resource adapters         |
-| [fs-router](/packages/router)               | Type-safe router with CRUD navigation and middleware pipeline |
+| Package                                                   | Description                                                                            |
+| --------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| [fs-adapter-store](/packages/adapter-store)               | Reactive state management with CRUD resource adapters                                  |
+| [fs-cached-adapter-store](/packages/cached-adapter-store) | fs-adapter-store that refetches only when the server's hash for the collection changes |
+| [fs-router](/packages/router)                             | Type-safe router with CRUD navigation and middleware pipeline                          |
 
 ### UI Components
 

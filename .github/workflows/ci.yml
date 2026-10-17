@@ -43,6 +43,9 @@ jobs:
             # and placed here so re-coupling the two clocks fails the PR rather than
             # a release three days later. See scripts/validate-workflows.mjs.
             - run: npm run validate:workflows
+            # Every publishable package has a docs page, a sidebar entry, a home-page row
+            # and an install line. See scripts/validate-docs.mjs.
+            - run: npm run validate:docs
             - run: npm run typecheck
             - run: npm run lint:pkg
             - run: npm run test:coverage
