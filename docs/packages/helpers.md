@@ -61,7 +61,7 @@ interface User {
 
 type NewUser = Omit<User, 'id'>;
 
-function saveUser(user: User | NewUser) {
+const saveUser = (user: User | NewUser) => {
     if (isExisting(user)) {
         // TypeScript knows: user is User (has id)
         updateUser(user.id, user);
@@ -69,7 +69,7 @@ function saveUser(user: User | NewUser) {
         // TypeScript knows: user is NewUser (no id)
         createUser(user);
     }
-}
+};
 ```
 
 ## Case Conversion

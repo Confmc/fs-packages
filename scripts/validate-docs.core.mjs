@@ -6,9 +6,12 @@
  * install list in Getting Started. Nothing tied those four lists to `packages/`, so a
  * package could ship to npm and stay invisible on the site — three did.
  *
- * "Publishable" is the rule `detect-publishable.core.mjs` applies: a manifest without
- * `"private": true` is one npm will receive, so it owes the site an entry.
+ * The check runs both ways from one reading of each surface: every publishable package
+ * must appear on every surface, and every package a surface names must exist. A
+ * publishable package is one whose manifest is not private — the rule
+ * `detect-publishable.core.mjs` applies, imported rather than restated.
  */
+import {isPrivateManifest} from './detect-publishable.core.mjs';
 
 /** The four surfaces, in the order a finding is reported. */
 export const SURFACES = Object.freeze({
@@ -18,23 +21,39 @@ export const SURFACES = Object.freeze({
     gettingStarted: 'docs/getting-started.md install list',
 });
 
-export const isPublishable = (manifest) => manifest.private !== true;
+export const isPublishable = (manifest) => !isPrivateManifest(manifest);
 
-const escapeRegExp = (text) => text.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+const SIDEBAR_LINK = /link:\s*(['"])\/packages\/([^'"#]+)(?:#[^'"]*)?\1/g;
+const INDEX_LINK = /\]\(\/packages\/([^)#\s]+)(?:#[^)\s]*)?\)/g;
+const INSTALL_LINE = /^npm install (@script-development\/\S+)$/;
 
 /**
- * Whether each surface names the package. Every match is anchored on `/packages/<dir>`
- * plus a closing delimiter, so `adapter-store` can never be satisfied by
- * `cached-adapter-store` and the reverse.
+ * What each surface names, as exact keys: a package directory for the first three, the
+ * npm name for the install list. Both directions compare against these sets, so a match
+ * is exact by construction — `adapter-store` can never be satisfied by
+ * `cached-adapter-store`, and the reverse.
  */
-const surfaceHas = {
-    page: ({pages}, {dir}) => pages.includes(`${dir}.md`),
-    sidebar: ({sidebar}, {dir}) => new RegExp(String.raw`link:\s*(['"])/packages/${escapeRegExp(dir)}\1`).test(sidebar),
-    index: ({index}, {dir}) =>
-        index.split('\n').some((line) => line.trimStart().startsWith('|') && line.includes(`](/packages/${dir})`)),
-    gettingStarted: ({gettingStarted}, {name}) =>
-        gettingStarted.split('\n').some((line) => line.trim() === `npm install ${name}`),
+const surfaceNames = {
+    page: ({pages}) => new Set(pages.filter((file) => file.endsWith('.md')).map((file) => file.slice(0, -3))),
+    sidebar: ({sidebar}) => new Set([...sidebar.matchAll(SIDEBAR_LINK)].map((match) => match[2])),
+    index: ({index}) =>
+        new Set(
+            index
+                .split('\n')
+                .filter((line) => line.trimStart().startsWith('|'))
+                .flatMap((line) => [...line.matchAll(INDEX_LINK)].map((match) => match[1])),
+        ),
+    gettingStarted: ({gettingStarted}) =>
+        new Set(
+            gettingStarted
+                .split('\n')
+                .map((line) => INSTALL_LINE.exec(line.trim()))
+                .filter((match) => match !== null)
+                .map((match) => match[1]),
+        ),
 };
+
+const keyFor = (surface, {dir, name}) => (surface === 'gettingStarted' ? name : dir);
 
 /**
  * `packages` is `null` when the packages directory could not be read; each entry is
@@ -42,11 +61,15 @@ const surfaceHas = {
  * not be read arrives as `null`.
  *
  * A guard must assert a non-empty denominator: zero packages scanned reads as "every
- * package is documented" both when the tree is clean and when the scan is broken.
+ * package is documented" both when the tree is clean and when the scan is broken. The
+ * reverse direction needs no denominator of its own — it reads the same sets the forward
+ * direction does, so a surface that yields nothing reds the forward check for every
+ * package.
  */
 export const checkDocsEnumeration = ({packages, scanError, pages, sidebar, index, gettingStarted}) => {
     const errors = [];
     const missing = [];
+    const orphans = [];
 
     if (packages === null || packages === undefined) {
         errors.push(`the packages directory could not be read${scanError ? ` (${scanError})` : ''}`);
@@ -76,14 +99,25 @@ export const checkDocsEnumeration = ({packages, scanError, pages, sidebar, index
     }
 
     if (errors.length === 0) {
-        for (const pkg of documented) {
-            for (const surface of Object.keys(SURFACES)) {
-                if (!surfaceHas[surface](surfaces, pkg)) missing.push({...pkg, surface});
+        for (const surface of Object.keys(SURFACES)) {
+            const named = surfaceNames[surface](surfaces);
+            const known = new Set(documented.map((pkg) => keyFor(surface, pkg)));
+            for (const pkg of documented) {
+                if (!named.has(keyFor(surface, pkg))) missing.push({...pkg, surface});
+            }
+            for (const key of named) {
+                if (!known.has(key)) orphans.push({surface, key});
             }
         }
     }
 
-    return {passed: errors.length === 0 && missing.length === 0, scanned: documented.length, errors, missing};
+    return {
+        passed: errors.length === 0 && missing.length === 0 && orphans.length === 0,
+        scanned: documented.length,
+        errors,
+        missing,
+        orphans,
+    };
 };
 
 /** One line per missing entry, naming the file to edit. */
@@ -91,3 +125,11 @@ export const describeMissing = ({name, dir, surface}) =>
     surface === 'page'
         ? `${name} — no page at ${SURFACES.page.replace('<dir>', dir)}`
         : `${name} — no entry in ${SURFACES[surface]}`;
+
+/** One line per entry that names no publishable package, naming the file to edit. */
+export const describeOrphan = ({surface, key}) =>
+    surface === 'page'
+        ? `${SURFACES.page.replace('<dir>', key)} — a page for no publishable package under packages/`
+        : `${key} — named in ${SURFACES[surface]}, but no publishable package under packages/ has that ${
+              surface === 'gettingStarted' ? 'name' : 'directory'
+          }`;

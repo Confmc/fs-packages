@@ -143,10 +143,10 @@ Then import what you need in any component or composable:
 ```typescript
 import {http, toast} from '@/services';
 
-async function saveUser(data: UserData) {
+const saveUser = async (data: UserData) => {
     await http.postRequest('/users', data);
     toast.show({message: 'User saved', type: 'success'});
-}
+};
 ```
 
 ## What's Next
