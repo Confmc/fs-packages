@@ -1,5 +1,12 @@
 # @script-development/ui-inputs
 
+## Unreleased
+
+### Patch Changes
+
+- **A checked `Checkbox`, a selected `RadioGroup` option and an on `Switch` are visible under forced colours (WR-1339).** In a high-contrast theme the checked box, the radio dot, the switch track and its thumb were painted in author colours the theme discards, so checked and unchecked rendered pixel-identical and a switch did not render at all (measured in Chromium's emulated forced-colors palette). `styles.css` now paints them in system colours there: `Highlight` / `HighlightText` for checked and indeterminate, a `CanvasText` track outline and thumb on the switch, `GrayText` for the disabled variants. An invalid control (`invalid` on any input, select, Checkbox, RadioGroup or Switch) also painted identical to a valid one there; it now carries a dashed `CanvasText` outline, which gives way to the focus ring while focused. No `--ui-*` token changes.
+- **An option of a `RadioGroup` with no selection no longer paints as selected (WR-2299).** With `modelValue: null` every radio matches `:indeterminate`, and the checkbox's mixed-state fill was applied to it, so every option looked chosen. The indeterminate fill now applies to checkboxes only, with and without forced colours.
+
 ## 0.17.0 — 2026-10-03
 
 ### Added
