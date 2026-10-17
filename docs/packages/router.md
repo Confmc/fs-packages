@@ -204,6 +204,10 @@ router.registerBeforeRouteMiddleware((to) => (to.meta.deadLink ? {name: 'dashboa
 
 `id`, `query`, and `parentId` on the redirect object thread through to the target exactly as they do for `goToRoute`. The redirect object short-circuits the middleware chain identically to a truthy boolean.
 
+The call that was redirected settles once the redirected navigation has: `await router.goToRoute('about')` (or `replaceRoute`, or `install()`) resolves with `currentRouteRef` already on the redirect's target, however many redirects the chain takes. If the redirected navigation fails, fs-router reports it once on the console and the call still resolves, on whatever route the router stopped at.
+
+A chain of more than ten redirects is treated as a loop: the eleventh is refused, the hop is cancelled, and one `console.error` names the loop. Each chain keeps its own count: chains running at the same time never use up each other's ten, and a chain that ended in any way — landed, cancelled, failed, or overtaken by another navigation — leaves nothing behind for the next one.
+
 ### After Navigation
 
 ```typescript
@@ -281,7 +285,7 @@ const router = createRouterService(routes, {
 
 Without `notFoundComponent`, `RouterView` renders a bare `404` string for an unmatched depth. Provide a component to render your own designed not-found page instead — pair it with a catch-all route (`{path: '/:pathMatch(.*)*', ...}`) to also own the URL.
 
-The fallback is reserved for a **genuine** miss. While a navigation is **in flight** and `currentRouteRef` still holds vue-router's `START_LOCATION` sentinel, `RouterView` renders nothing at all rather than a not-found page — `await routerService.isReady()` before `mount()` if you want that window closed entirely. (`await routerService.install()` closes it too, but note that it forwards vue-router's navigation promise, which **rejects** when a guard throws. `isReady()` never rejects.)
+The fallback is reserved for a **genuine** miss. While a navigation is **in flight** and `currentRouteRef` still holds vue-router's `START_LOCATION` sentinel, `RouterView` renders nothing at all rather than a not-found page — `await routerService.isReady()` before `mount()` if you want that window closed entirely. (`await routerService.install()` closes it too. Neither rejects: a guard that throws on the first navigation is reported once on the console by fs-router, and `install()` then resolves with `undefined`, so `void routerService.install()` needs no `catch`.)
 
 Both halves of that condition matter:
 
@@ -317,7 +321,7 @@ Both halves of that condition matter:
 | `goToEditPage(name, id)`                     | Navigate to `name.edit` with `:id`                                                          |
 | `goToShowPage(name, id, query?)`             | Navigate to `name.show` with `:id`                                                          |
 | `goBack()`                                   | Navigate back in history                                                                    |
-| `install()`                                  | Navigate to the current browser location; returns the navigation promise                    |
+| `install()`                                  | Navigate to the current browser location; resolves when it has landed; never rejects        |
 | `isReady()`                                  | Resolves once the first un-superseded navigation has ended, however it ended; never rejects |
 
 ### Route State
