@@ -3,7 +3,7 @@
 Headless, themeable Vue 3 UI components — **form inputs** plus the **interactive controls that carry no value**
 (`Pressable`, `Disclosure`) — styled entirely through `--ui-*` CSS custom properties.
 
-Part of the Armory `ui-*` family. The components ship **no token vocabulary and no colour literal** — you map your design tokens onto the `--ui-*` contract once, and every component follows. Kendo-soft or brutalist, light or dark, from one component set.
+Part of the Armory `ui-*` family. The components ship **no token vocabulary and no colour literal** — you map your design tokens onto the `--ui-*` contract once, and every component follows. Soft or brutalist, light or dark, from one component set.
 
 ## Install
 

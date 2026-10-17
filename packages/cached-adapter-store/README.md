@@ -91,7 +91,7 @@ x-fs-cache-hashes-subscribe: v1.<urlencoded JSON array>
 
 ### 1. Tenancy is the consumer's responsibility
 
-The wrapper does not model tenants. Tenant-scoping of the persisted hash is achieved entirely through the `storageService` prefix the consumer territory supplies. For Kendo, this means the tenant-scoped `storageService` factory naturally prefixes the hash storage key. For Emmie's DB-per-tenant subdomain model, each subdomain is its own browser origin and localStorage is naturally origin-scoped. Either way: the wrapper inherits whatever isolation the consumer's `storageService` provides.
+The wrapper does not model tenants. Tenant-scoping of the persisted hash is achieved entirely through the `storageService` prefix the consumer territory supplies. For a consumer whose `storageService` factory is tenant-scoped, the factory naturally prefixes the hash storage key. For a DB-per-tenant subdomain model, each subdomain is its own browser origin and localStorage is naturally origin-scoped. Either way: the wrapper inherits whatever isolation the consumer's `storageService` provides.
 
 ### 2. Cancellation is fs-http's responsibility
 

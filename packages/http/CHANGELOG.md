@@ -66,7 +66,7 @@ The Surveyor M3 field report (`reports/fs-packages/field/2026-05-15-surveyor-lib
 
 ### Why
 
-`fs-http` should be HTTP transport. Coupling to `Blob`, `document.createElement`, and `URL.createObjectURL`/`revokeObjectURL` made every consumer's tests responsible for stubbing browser globals — fragile under formatters (oxfmt collapsed `function () { return obj }` into arrow-functions, breaking constructor-mock patterns across kendo and ublgenie in April 2026), exposed to vitest 4's class-mock requirement, and a coupling smell between library and test environment. Closes [#59](https://github.com/script-development/fs-packages/issues/59).
+`fs-http` should be HTTP transport. Coupling to `Blob`, `document.createElement`, and `URL.createObjectURL`/`revokeObjectURL` made every consumer's tests responsible for stubbing browser globals — fragile under formatters (oxfmt collapsed `function () { return obj }` into arrow-functions, breaking constructor-mock patterns across two sibling territories in April 2026), exposed to vitest 4's class-mock requirement, and a coupling smell between library and test environment. Closes [#59](https://github.com/script-development/fs-packages/issues/59).
 
 ### Migration
 
@@ -100,4 +100,4 @@ const blobUrl = URL.createObjectURL(data);
 
 ### Minor Changes
 
-- Initial release of @script-development/fs-http — framework-agnostic HTTP service factory with middleware architecture, based on proven patterns from BIO and kendo territories.
+- Initial release of @script-development/fs-http — framework-agnostic HTTP service factory with middleware architecture, based on proven patterns from two donor territories.
