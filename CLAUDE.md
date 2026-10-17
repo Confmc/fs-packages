@@ -11,7 +11,7 @@ Shared frontend service packages monorepo under the `@script-development` npm sc
 - **Format:** oxfmt
 - **Package lint:** publint + attw (Are The Types Wrong) — `lint:pkg` enforces fail-on-any-advisory via `scripts/lint-pkg.mjs` (suggestions, warnings, and errors all treat as fatal — publint CLI default and `--strict` both exit 0 on suggestions). Motivated by enforcement queue #33 + the PR #35 `git+` prefix regression that silently drifted across 10 packages because the unenforced gate only printed the suggestion. The same wrapper also asserts `engines.node` presence across the root manifest + all workspace packages — closes enforcement queue #31 (drift-prevention gate, deployed 2026-05-12; declarations themselves landed 2026-04-22 via commit `0605d99`). Presence-only check; the value (`>=24.0.0` today) is not validated — value alignment is a separate doctrine question tracked alongside the CI `node-version`.
 - **Publish:** OIDC Trusted Publishing to public npm registry (no stored tokens)
-- **CI:** three jobs. `check` — 11 sequential gates: audit → format → lint → build → validate:dist → **validate:workflows** → validate:docs → typecheck → lint:pkg → coverage → mutation; `browser-tests` — real Chromium via Playwright + axe-core; `ci-passed` — the fan-in rollup, green only when every lane it needs reports `success` (`scripts/ci-rollup.mjs`, tested by `ci-rollup.test.mjs`: a skipped lane or an empty `needs` set reds it). Lint runs `--deny-warnings`. (`validate:workflows` is the release-pipeline invariant gate, WR-0615 — see § Release Pipeline below — and also asserts every job in every workflow declares `timeout-minutes`, WR-0892.)
+- **CI:** three jobs. `check` — sequential gates: audit → format → lint → build → validate:dist → **validate:workflows** → validate:docs → typecheck → lint:pkg → coverage → mutation; `browser-tests` — real Chromium via Playwright + axe-core; `ci-passed` — the fan-in rollup, green only when every lane it needs reports `success` (`scripts/ci-rollup.mjs`, tested by `ci-rollup.test.mjs`: a skipped lane or an empty `needs` set reds it). Lint runs `--deny-warnings`. (`validate:workflows` is the release-pipeline invariant gate, WR-0615 — see § Release Pipeline below — and also asserts every job in every workflow declares `timeout-minutes`, WR-0892.)
 
 ## Doctrine #8 — HTTP Timeout Surface (fs-http)
 
@@ -44,7 +44,7 @@ Consumer territories must apply per-call timeouts at instantiation OR rely on th
 
 **Precedent + residue.** The prior consumer-side obligation ("every consumer MUST wrap its own middleware bodies") is **superseded** by the default guard. kendo WR-0078 (PR [#1538](https://github.com/script-development/kendo/pull/1538), 2026-06-15) and the WR-0290 fleet wave hand-wrapped consumer middleware under the old contract; those explicit `guarded()`/try-catch wraps (and fs-form's own `guarded()`) become **redundant-but-harmless double-wraps** (inner catches, outer auto-guard never fires) — strip in a later, unhurried cleanup, not a blocker. See the war-room `deferred.md [adr] fs-packages-fs-http-async-aware-middleware-rejection-doctrine` entry and ADR-0037.
 
-## Packages (14)
+## Packages
 
 `fs-*` are frontend **service** packages; `ui-*` (new family, ADR-0043) are headless, themeable Vue **UI components**.
 
@@ -56,6 +56,7 @@ Consumer territories must apply per-call timeouts at instantiation OR rely on th
 | fs-cloudflare           | No  | Express-compatible middleware 403ing any request whose client IP is outside Cloudflare's vendored egress ranges (`src/ranges.ts`, refreshed by `scripts/update-cf-ranges.mjs`, drift-checked weekly by `cf-ranges-drift.yml`). Duck-typed req/res — zero deps, no Express peer |
 | fs-theme                | Yes | Reactive dark/light mode with storage persistence                                                                |
 | fs-loading              | Yes | Loading state service with HTTP middleware                                                                       |
+| fs-auth                 | Yes | Sanctum SPA-cookie session store, safe-redirect guard and auth registrars for fs-http + fs-router                |
 | fs-adapter-store        | Yes | Reactive adapter-store pattern with CRUD resource adapters                                                       |
 | fs-cached-adapter-store | Yes | Hash-bumping cache wrapper around fs-adapter-store; middleware-driven invalidation with prime() bootstrap; no retrieveAll/retrieveById on the public surface |
 | fs-toast                | Yes | Component-agnostic toast queue (FIFO)                                                                            |
