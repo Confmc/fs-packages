@@ -122,3 +122,18 @@ Step 2, **field-controls into the package**: self-wrap in `FormField` when `labe
 - Branch cleanup is deferred until after the lead conversation: `experiment/ui-form-spread`,
   `-field`, `-no-http`, `-glue`, `-merge`, `form-merge`, `form-wiring`, the stray `experiment/ui-form`, plus
   the old feature branches `feat/dialog-before-close-guard` and `feat/ui-inputs-formfield-orientation`.
+
+## Release sequence (decided 2026-10-19, package side)
+
+The package PR comes from a FRESH branch off `main`, not from this experiment branch: the experiment history
+(41+ commits, some naming the consumer) must not land in main's log. Carry the package over in a few clean
+commits; leave `HANDOFF.md` and `EXPERIMENT-REPORT.md` behind.
+
+1. Fresh branch off `main`, the package in clean commits, `"private": true` KEPT, version `0.1.0`, CHANGELOG
+   `## Unreleased` renamed `## 0.1.0 — <date>`. PR, review, merge. Nothing publishes (`detect` sees private).
+2. Hand-bootstrap `0.1.0` from a clean `main` checkout (repo CLAUDE.md § Adding a Package, step 7: short-lived
+   token, never written to a tracked file, revoked after), then attach the Trusted Publisher on npmjs.org.
+3. Second PR: drop `"private"`, bump `0.1.1`, move `DOCS-PAGE.draft.md` into `docs/packages/ui-form.md` and add
+   the three listings in its header (validate:docs needs them once the package is publishable).
+4. Approve that run and read its log for `Successfully published` — that proves the grant.
+5. Cancel any `publish.yml` runs still waiting from before the bootstrap.
