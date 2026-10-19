@@ -15,6 +15,7 @@ import {userEvent} from 'vitest/browser';
 import {defineComponent, h, ref} from 'vue';
 
 import Combobox from '../../src/components/Combobox.vue';
+import MultiSelect from '../../src/components/MultiSelect.vue';
 import SingleSelect from '../../src/components/SingleSelect.vue';
 import '../../styles.css';
 
@@ -288,5 +289,38 @@ describe('listbox teleport — the open menu escapes a clipping ancestor (KD-113
         expect((document.getElementById('dlg') as HTMLElement).contains(popup)).toBe(true);
         expect(anchorOf(popup).getAttribute('popover')).toBe('manual');
         await expect.poll(() => popup.getBoundingClientRect().height).toBeGreaterThan(0);
+    });
+});
+
+describe('MultiSelect placement', () => {
+    it("opens the list above the box with placement 'top', below it by default", async () => {
+        const box = async (placement?: string) => {
+            const screen = await render(
+                defineComponent(
+                    () => () =>
+                        h('div', {style: 'padding-top: 300px;'}, [
+                            h(MultiSelect, {
+                                options: FRUITS,
+                                optionLabel: 'name',
+                                modelValue: [],
+                                ...(placement ? {placement} : {}),
+                            }),
+                        ]),
+                ),
+            );
+            const trigger = screen.container.querySelector('.ui-multiselect__trigger') as HTMLElement;
+            await userEvent.click(trigger);
+            const list = document.querySelector('[role="listbox"]') as HTMLElement;
+            await expect.poll(() => list.getBoundingClientRect().height).toBeGreaterThan(0);
+            const result = {list: list.getBoundingClientRect(), trigger: trigger.getBoundingClientRect()};
+            await userEvent.keyboard('{Escape}');
+            screen.unmount();
+            return result;
+        };
+
+        const top = await box('top');
+        expect(top.list.bottom).toBeLessThanOrEqual(top.trigger.top);
+        const below = await box();
+        expect(below.list.top).toBeGreaterThanOrEqual(below.trigger.bottom);
     });
 });

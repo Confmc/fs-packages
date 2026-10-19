@@ -107,6 +107,8 @@
 </template>
 
 <script setup lang="ts" generic="T extends SelectItem">
+import type {Placement} from '@floating-ui/vue';
+
 import {computed, useId, useTemplateRef} from 'vue';
 
 import type {GroupRow} from '../internal/group-rows';
@@ -134,6 +136,7 @@ const {
     optionsLabel = 'Options',
     removeLabel = 'Remove',
     mutedOptions,
+    placement,
 } = defineProps<{
     options: T[];
     /** property name or getter for an option's display string. */
@@ -164,6 +167,8 @@ const {
     removeLabel?: string;
     /** ids rendered visually muted (`.is-muted`) — still committable, still in the keyboard path. */
     mutedOptions?: T['id'][];
+    /** where the list opens against the box (default `'bottom-start'`; it still flips when there is no room). Read once. */
+    placement?: Placement;
 }>();
 
 // The mark: `invalid` when given, otherwise whether there is a message.
@@ -224,11 +229,17 @@ const reference = useTemplateRef<HTMLElement>('reference');
 // the box click-outside treats as inside. The <ul> inside it is positioned by nothing.
 const floating = useTemplateRef<HTMLElement>('floating');
 
-/** Toggle an id's membership — add when absent, drop when present. Always emits a fresh array. */
+/**
+ * Toggle an id's membership — add when absent, drop when present. Always emits a fresh array, kept in
+ * the order the options are shown in, so the model reads the same however it was picked. An id with no
+ * option yet (options still loading) keeps its place at the end.
+ */
 const toggleValue = (value: T['id']): void => {
-    model.value = model.value.includes(value)
+    const next = model.value.includes(value)
         ? model.value.filter((member) => member !== value)
         : [...model.value, value];
+    const shown = sorted.value.map((option) => option.id).filter((id) => next.includes(id));
+    model.value = [...shown, ...next.filter((id) => !shown.includes(id))];
 };
 
 // Both keyboard (Enter via useListbox) and pointer (OptionList `commit`) funnel through this
@@ -257,6 +268,7 @@ const {open, pointer, listboxId, optionId, activeDescendant, floatingStyles, onK
     onDismiss: () => close(),
     onOutside: () => close(),
     typeaheadLabels: () => optionLabels.value,
+    floatingOptions: {placement},
 });
 
 /** Per-chip remove — drops one committed id; never touches `open`. */
