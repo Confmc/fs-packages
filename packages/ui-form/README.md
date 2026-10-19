@@ -31,7 +31,11 @@ the package's, at the top of your first stylesheet, or it beats the package's ru
 | `TextInput`               | Native `text` / `email` / `password` / `search` / `tel` / `url` input                                                                                                               |
 | `NumberInput`             | Native `number` input; owns the `NaN`→`null` empty-value guard                                                                                                                      |
 | `DateInput`               | Native `date` input                                                                                                                                                                 |
-| `Textarea`                | Native `textarea` with `rows`                                                                                                                                                       |
+| `TimeInput`               | Native `time` input modelling `HH:MM` or `null`, with a clock glyph, a clear button and a minute `step`                                                                             |
+| `SearchInput`             | `type="search"` input with a magnifier and a clear button                                                                                                                           |
+| `PasswordInput`           | Password input with a show/hide toggle (`aria-pressed`) and a Caps Lock notice read with the field                                                                                  |
+| `InputGroup`              | Addon texts joined to a control (`prepend="€"`, `append="days"`), named in the control's `aria-describedby`                                                                         |
+| `Textarea`                | Native `textarea` with `rows`; `autogrow` follows the text up to `maxRows` lines                                                                                                    |
 | `Checkbox`                | Native checkbox, visually restyled; non-nullable `boolean` model, `indeterminate` as a visual prop                                                                                  |
 | `CheckboxGroup`           | Fieldset/legend group of checkboxes — models an array of option ids in **options order**                                                                                            |
 | `Switch`                  | The checkbox chassis with `role="switch"` — an on/off toggle with a themeable track + thumb                                                                                         |
@@ -83,6 +87,42 @@ shape at that fixed breakpoint (a custom property cannot drive a media query, so
 ```
 
 `FormField` hands its slot `field` (`{id, invalid, describedby}`), so one `v-bind` wires the control it wraps.
+
+### The text-like controls' extras
+
+**`autofocus`** on `TextInput`, `NumberInput`, `TimeInput`, `SearchInput` and `PasswordInput` focuses the input
+when it mounts. It runs in script, not as the native attribute, because the native one acts only on page load:
+a control in a dialog that opens later would never get focus.
+
+**`Textarea` `autogrow`** grows the box with its text instead of scrolling, from `rows` upward, on mount and on
+every change. `maxRows` stops the growth at that many lines; from there it scrolls.
+
+**`InputGroup`** joins addon texts to a control — a currency before an amount, a unit after a count. Each addon
+gets an id from the control's (`${id}-prepend`, `${id}-append`); add those to the control's `describedby` so a
+screen reader reads them with the field. The form-bound `TextField`, `NumberField`, `DateField` and `TimeField`
+take `prepend` / `append` and do that wiring themselves; the other bound fields refuse them in their types.
+
+```vue
+<InputGroup id="price" prepend="€">
+    <NumberInput id="price" v-model="price" describedby="price-prepend" />
+</InputGroup>
+```
+
+**`TimeInput`** models `HH:MM` or `null`, like `NumberInput` an honest empty value: clearing it emits `null`,
+because `''` is no time. `step` is in minutes (`15` for quarter hours) and sets both the picker and the arrow
+keys. A click on the input opens the browser's picker. The clear button shows while there is a time; set
+`clearable` to `false` for a time that must always be set.
+
+**`SearchInput`** is a `type="search"` box with a magnifier and a clear button (`clearable`, on by default);
+clearing emits `''`, like the other string inputs.
+
+**`PasswordInput`** has a show/hide toggle, a real button carrying `aria-pressed`, and a Caps Lock notice that
+appears while Caps Lock is on and is read with the field. `autocomplete` is `'current-password'` by default;
+pass `'new-password'` on a form that sets one.
+
+The clear buttons' and the toggle's accessible names and the Caps Lock text are props (`clearButtonLabel`,
+`showPasswordLabel`, `hidePasswordLabel`, `capsLockText`), so an app sets its language once through
+`createUiForm({texts})` (see [Forms and their errors](#forms-and-their-errors)).
 
 ### The select family's shared extras
 
@@ -170,7 +210,7 @@ input. The entry is danger-toned by default (`--ui-clear-text`, chains to
 
 ### Combobox
 
-`Combobox` shares `SingleSelect`'s generic contract (`:options`, `label`, `v-model`, `alphabeticalSort`,
+`Combobox` shares `SingleSelect`'s generic contract (`:options`, `optionLabel`, `v-model`, `alphabeticalSort`,
 `optionsLabel`, `emptyText`, `invalid`, `describedby`, `required`) but the trigger is a text `<input>`.
 As the user types, the listbox filters to options whose label contains the query
 (`labelOf(o).toLowerCase().includes(query)`), then the same optional alphabetical sort applies; an empty
@@ -193,7 +233,7 @@ integration needs.
 
 ### MultiSelect
 
-`MultiSelect` shares the family's generic contract (`:options`, `label`, `alphabeticalSort`,
+`MultiSelect` shares the family's generic contract (`:options`, `optionLabel`, `alphabeticalSort`,
 `optionsLabel`, `emptyText`, `invalid`, `describedby`, `required`) but models **an array of option
 ids** (`v-model="tagIds"`). Committing an option — Enter or click — **toggles its membership and the
 listbox stays open**, so picking several values is one open/close cycle, not five. The committed
@@ -255,9 +295,9 @@ groups: {options: T[]; text: string; header?: boolean}[];
 ```
 
 Each group carries its own `options`, a header `text`, and an optional `header` flag. Groups
-render in **caller order** — there is no `alphabeticalSort`, because the partition _is_ the
-order — and the flat option index runs through them in sequence, so a single `v-model` selects
-across the whole set.
+render in **caller order** — the partition _is_ the order — and the flat option index runs
+through them in sequence, so a single `v-model` selects across the whole set. `alphabeticalSort`
+sorts the options **within** each group; it never reorders the groups.
 
 - A **named** group renders `text` as a `role="group"` header labelling its options for
   assistive tech.
@@ -544,7 +584,7 @@ option — the anchor grows with it, so the popup stays on-screen.
 
 ## Nullable values
 
-Every text-like input (`TextInput`, `DateInput`, `Textarea`) models `string | null`, and `NumberInput` models `number | null`. A `null` from a nullable backend column binds directly — the control renders empty, no `?? ''` at the call site. When the user clears the field, the string inputs emit `''` (the raw native value); a Laravel backend's `ConvertEmptyStringsToNull` middleware maps that back to `null` on submit. `NumberInput` is the one exception: an empty number input emits `null` (not `NaN`, not `''`), since a `number` model can never hold `''` honestly — so it round-trips to `null` without relying on the middleware.
+Every text-like input (`TextInput`, `DateInput`, `Textarea`, `SearchInput`, `PasswordInput`, `TimeInput`) models `string | null`, and `NumberInput` models `number | null`. A `null` from a nullable backend column binds directly — the control renders empty, no `?? ''` at the call site. When the user clears the field, the string inputs emit `''` (the raw native value); a Laravel backend's `ConvertEmptyStringsToNull` middleware maps that back to `null` on submit. `NumberInput` is the one exception: an empty number input emits `null` (not `NaN`, not `''`), since a `number` model can never hold `''` honestly — so it round-trips to `null` without relying on the middleware. `TimeInput` does the same for the same reason: `''` is no time.
 
 **IME input.** `TextInput` and `Textarea` follow Vue's own `v-model` on a text field: while an input method (Japanese, Chinese, Korean, …) is composing, the candidate `input` events emit nothing, and the composed value is emitted once on `compositionend`. Swapping a native `v-model` for one of these controls does not hand you every candidate.
 
@@ -578,12 +618,21 @@ const {TextField, NumberField, SingleSelectField, handleSubmit} = useForm({draft
 </template>
 ```
 
-`useForm` hands out a bound version of every control (`TextField`, `NumberField`, `SingleSelectField`, …). Each
-draws the label, the control and the message, wired by the field's name; on a draft form the name must be a path
-holding that control's value type, checked by vue-tsc. Every other prop passes through to the control. For a
-compound field (a control plus a hint, an editor the package does not ship), use `field(name)` with `FormLabel`
-and `FormError`, as above. Set an app's texts once with `createUiForm({texts})`, which hands out `useForm` and the
-bare select controls with those texts as defaults.
+`useForm` hands out a bound version of the value controls: `TextField`, `TextareaField`, `NumberField`,
+`DateField`, `TimeField`, `PasswordField`, `CheckboxField`, `SwitchField`, `RadioGroupField`, `CheckboxGroupField`,
+`SingleSelectField`, `ComboboxField`, `MultiSelectField`, `MultiComboboxField`, `GroupSelectField` and
+`GroupComboboxField`. Each draws the label, the control and the message, wired by the field's name; on a draft
+form the name must be a path holding that control's value type, checked by vue-tsc. Every other prop passes
+through to the control and wins over the wiring. `TextField`, `NumberField`, `DateField` and `TimeField` also take
+`prepend` / `append` (an `InputGroup` around the control). `RadioGroupField` and `CheckboxGroupField` require
+`label`, their legend. Each has a stable component name, so a spec finds it with
+`findAllComponents({name: 'TextField'})`. For a compound field (a control plus a hint, an editor the package does
+not ship), use `field(name)` with `FormLabel` and `FormError`, as above.
+
+Set an app's texts once with `createUiForm({texts})`: `placeholder`, `emptyText`, `optionsLabel`, `removeLabel`,
+`requiredLabel`, `clearButtonLabel`, `showPasswordLabel`, `hidePasswordLabel` and `capsLockText`. It hands out
+`useForm`, whose bound controls carry them, and the bare controls that take texts, with them as defaults; a prop
+at the call site still wins.
 
 `useForm(options)` needs no HTTP service. It returns the error bag, `handleSubmit` with its double-submit guard,
 `submitting`, the refusal signal, client refusals (`refuse`, `setRefusals`, `withdraw`, `clearClient`) and the
