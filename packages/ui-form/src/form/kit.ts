@@ -13,6 +13,7 @@ import DateInput from '../components/DateInput.vue';
 import FormField from '../components/FormField.vue';
 import GroupCombobox from '../components/GroupCombobox.vue';
 import GroupSelect from '../components/GroupSelect.vue';
+import InputGroup from '../components/InputGroup.vue';
 import MultiCombobox from '../components/MultiCombobox.vue';
 import MultiSelect from '../components/MultiSelect.vue';
 import NumberInput from '../components/NumberInput.vue';
@@ -61,12 +62,20 @@ interface Shell<N> {
     orientation?: 'vertical' | 'horizontal';
 }
 
+/** A text-like bound control can carry addon texts joined to it (`InputGroup`). */
+interface Addons {
+    /** text joined to the start of the control (`€`); read with the field, via aria-describedby. */
+    prepend?: string;
+    /** text joined to the end of the control (`dagen`). */
+    append?: string;
+}
+
 // oxlint-disable-next-line typescript/no-explicit-any -- matches any component constructor
 type PropsOf<C> = C extends abstract new (...args: any) => {$props: infer P} ? P : never;
 
 /** A bound non-generic control: its shell, plus the control's own props minus the wiring. */
-type BoundControl<N, C, Value> = DefineSetupFnComponent<
-    Shell<N> & Omit<PropsOf<C>, Wiring | 'required' | 'label'> & ValueProps<N, Value>
+type BoundControl<N, C, Value, Extra = {}> = DefineSetupFnComponent<
+    Shell<N> & Extra & Omit<PropsOf<C>, Wiring | 'required' | 'label'> & ValueProps<N, Value>
 >;
 /** On a form without a draft the value comes from `v-model`; with one, from the draft. */
 type ValueProps<N, Value> = string extends N
@@ -93,11 +102,11 @@ type BoundSelect<N, Props, Value, Carrier> = Shell<N> &
 
 /** The form-bound controls for a form named by `N` (free strings) or by the paths of a draft `D`. */
 export interface BoundControls<D> {
-    TextField: BoundControl<Names<D, string | null>, typeof TextInput, string | null>;
+    TextField: BoundControl<Names<D, string | null>, typeof TextInput, string | null, Addons>;
     TextareaField: BoundControl<Names<D, string | null>, typeof Textarea, string | null>;
-    NumberField: BoundControl<Names<D, number | null>, typeof NumberInput, number | null>;
-    DateField: BoundControl<Names<D, string | null>, typeof DateInput, string | null>;
-    TimeField: BoundControl<Names<D, string | null>, typeof TimeInput, string | null>;
+    NumberField: BoundControl<Names<D, number | null>, typeof NumberInput, number | null, Addons>;
+    DateField: BoundControl<Names<D, string | null>, typeof DateInput, string | null, Addons>;
+    TimeField: BoundControl<Names<D, string | null>, typeof TimeInput, string | null, Addons>;
     /** `label` is the box's own label. */
     CheckboxField: DefineSetupFnComponent<
         Shell<Names<D, boolean>> &
@@ -164,10 +173,25 @@ type Field = (name: string) => FieldProps & {modelValue?: unknown; 'onUpdate:mod
  */
 const bind = (field: Field, control: Component, name: string, labelOnControl: boolean, texts: UiTexts) =>
     defineComponent(
-        (props: Shell<string>, {attrs, slots}) =>
+        (props: Shell<string> & Addons, {attrs, slots}) =>
             () => {
                 const {class: className, style, ...rest} = attrs;
                 const wiring = field(props.name);
+                const addons = [props.prepend && `${wiring.id}-prepend`, props.append && `${wiring.id}-append`];
+                const describedby = [wiring.describedby, ...addons].filter(Boolean).join(' ') || undefined;
+                const inner = () =>
+                    h(
+                        control,
+                        {
+                            ...texts,
+                            ...wiring,
+                            describedby,
+                            required: props.required,
+                            ...(labelOnControl ? {label: props.label} : {}),
+                            ...rest,
+                        },
+                        slots,
+                    );
                 return h(
                     FormField,
                     {
@@ -181,21 +205,13 @@ const bind = (field: Field, control: Component, name: string, labelOnControl: bo
                     },
                     {
                         default: () =>
-                            h(
-                                control,
-                                {
-                                    ...texts,
-                                    ...wiring,
-                                    required: props.required,
-                                    ...(labelOnControl ? {label: props.label} : {}),
-                                    ...rest,
-                                },
-                                slots,
-                            ),
+                            props.prepend || props.append
+                                ? h(InputGroup, {id: wiring.id, prepend: props.prepend, append: props.append}, inner)
+                                : inner(),
                     },
                 );
             },
-        {name, inheritAttrs: false, props: ['name', 'label', 'required', 'orientation']},
+        {name, inheritAttrs: false, props: ['name', 'label', 'required', 'orientation', 'prepend', 'append']},
     );
 
 /** The bound controls of one form. The casts: a setup-function component cannot carry these types. */

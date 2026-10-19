@@ -73,6 +73,9 @@
     --ui-control-pad-y: 0.5rem;
     --ui-control-shadow: none;
     --ui-control-shadow-hover: none;
+    /* InputGroup's addons: the text joined to a control. */
+    --ui-addon-bg: var(--ui-control-bg-disabled);
+    --ui-addon-text: var(--ui-control-text-muted);
     /* hover border on a resting control (not disabled, focused or invalid). */
     --ui-control-border-color-hover: #9aa39c;
     /* the ring an invalid control shows only while it has focus. */
@@ -396,6 +399,45 @@
     }
     .ui-search::-webkit-search-cancel-button {
         appearance: none;
+    }
+
+    /* InputGroup: addon texts joined to a control, read as one box. The control keeps its own
+       wrapper (and so its icons); it loses its rounding on the side an addon touches. */
+    .ui-input-group {
+        display: flex;
+        align-items: stretch;
+        width: 100%;
+    }
+    .ui-input-group > :not(.ui-input-group__addon) {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+    .ui-input-group__addon {
+        display: flex;
+        flex: none;
+        align-items: center;
+        padding: 0 var(--ui-control-pad-x);
+        border: var(--ui-control-border-width) solid var(--ui-control-border-color);
+        background: var(--ui-addon-bg);
+        color: var(--ui-addon-text);
+        font-size: var(--ui-control-font-size);
+        white-space: nowrap;
+    }
+    .ui-input-group__addon.is-start {
+        border-right: 0;
+        border-radius: var(--ui-control-radius) 0 0 var(--ui-control-radius);
+    }
+    .ui-input-group__addon.is-end {
+        border-left: 0;
+        border-radius: 0 var(--ui-control-radius) var(--ui-control-radius) 0;
+    }
+    .ui-input-group:has(> .is-start) .ui-control {
+        border-top-left-radius: 0;
+        border-bottom-left-radius: 0;
+    }
+    .ui-input-group:has(> .is-end) .ui-control {
+        border-top-right-radius: 0;
+        border-bottom-right-radius: 0;
     }
 
     .ui-input__icon {

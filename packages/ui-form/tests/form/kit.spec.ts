@@ -54,6 +54,35 @@ describe('form-bound controls', () => {
         expect(wrapper.find(`#${wrapper.find('input').attributes('aria-describedby')}`).text()).toBe('Te kort');
     });
 
+    it('joins addon texts to a text-like field and names them with the message in aria-describedby', async () => {
+        const draft = ref({rate: null as number | null});
+        let form!: ReturnType<typeof useForm<{rate: number | null}>>;
+        const wrapper = mount(
+            defineComponent({
+                setup: () => {
+                    form = useForm({draft});
+                    return () => h(form.NumberField, {name: 'rate', label: 'Tarief', prepend: '€', append: 'per uur'});
+                },
+            }),
+        );
+        const input = wrapper.find('input');
+        const id = input.attributes('id');
+
+        expect(wrapper.findAll('.ui-input-group__addon').map((addon) => addon.text())).toEqual(['€', 'per uur']);
+        expect(input.attributes('aria-describedby')).toBe(`${id}-prepend ${id}-append`);
+
+        form.refuse('rate', 'Vul een tarief in');
+        await nextTick();
+        expect(wrapper.find('input').attributes('aria-describedby')).toBe(`${id}-error ${id}-prepend ${id}-append`);
+    });
+
+    it('renders no group without addons', () => {
+        const {wrapper} = mountWith(({TextField}) => h(TextField, {name: 'name', label: 'Naam'}));
+
+        expect(wrapper.find('.ui-input-group').exists()).toBe(false);
+        expect(wrapper.find('input').attributes()).not.toHaveProperty('aria-describedby');
+    });
+
     it('lets the call site override the wiring: invalid false shows the message without the mark', async () => {
         const {wrapper, form} = mountWith(({TextField}) => h(TextField, {name: 'name', label: 'Naam', invalid: false}));
         form().refuse('name', 'Te kort');

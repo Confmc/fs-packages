@@ -21,8 +21,10 @@ import Disclosure from '../../src/components/Disclosure.vue';
 import FormField from '../../src/components/FormField.vue';
 import GroupCombobox from '../../src/components/GroupCombobox.vue';
 import GroupSelect from '../../src/components/GroupSelect.vue';
+import InputGroup from '../../src/components/InputGroup.vue';
 import MultiCombobox from '../../src/components/MultiCombobox.vue';
 import MultiSelect from '../../src/components/MultiSelect.vue';
+import NumberInput from '../../src/components/NumberInput.vue';
 import Pressable from '../../src/components/Pressable.vue';
 import RadioGroup from '../../src/components/RadioGroup.vue';
 import SearchInput from '../../src/components/SearchInput.vue';
@@ -168,6 +170,20 @@ describe('axe-core audits — zero violations, closed and open', () => {
     it('a labelled SearchInput with text: magnifier and clear button', async () => {
         const screen = await renderInField((slot) =>
             h(SearchInput, {...slot.field, modelValue: 'appel', 'onUpdate:modelValue': noop}),
+        );
+        await expectNoViolations(screen.container);
+    });
+
+    it('FormField + InputGroup around a NumberInput, the addons named in its describedby', async () => {
+        const screen = await renderInField((slot) =>
+            h(InputGroup, {id: slot.field.id, prepend: '€', append: 'per uur'}, () =>
+                h(NumberInput, {
+                    ...slot.field,
+                    describedby: `${slot.field.id}-prepend ${slot.field.id}-append`,
+                    modelValue: 12,
+                    'onUpdate:modelValue': noop,
+                }),
+            ),
         );
         await expectNoViolations(screen.container);
     });
