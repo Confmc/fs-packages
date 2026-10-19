@@ -141,16 +141,10 @@ The package PR comes from a FRESH branch off `main`, not from this experiment br
 commits; leave `HANDOFF.md` and `EXPERIMENT-REPORT.md` behind.
 
 1. Fresh branch off `main`, the package in clean commits, version `0.1.0`, CHANGELOG `## Unreleased` renamed
-   `## 0.1.0 — <date>`, `"private"` DROPPED (npm refuses to publish a private package, so the hand bootstrap
-   below needs it gone), and `DOCS-PAGE.draft.md` moved to `docs/packages/ui-form.md` with the three listings
+   `## 0.1.0 — <date>`, `"private"` DROPPED (npm refuses to publish a private package), and `DOCS-PAGE.draft.md` moved to `docs/packages/ui-form.md` with the three listings
    in its header (validate:docs requires them once the package is publishable). PR, review, merge.
-2. The merge raises a `publish.yml` approval (`detect` sees 0.1.0 missing on npm). DO NOT approve it: without a
-   Trusted Publisher it 404s.
-3. Hand-bootstrap `0.1.0` from a clean `main` checkout (repo CLAUDE.md § Adding a Package, step 7: short-lived
-   token, never written to a tracked file, revoked after), then attach the Trusted Publisher on npmjs.org.
-4. Cancel the waiting run from step 2 (it would now report nothing to publish and spend an approval).
-5. Second PR: bump `0.1.1`. Approve that run and read its log for `Successfully published`, which proves the
-   grant.
+2. Publishing is Gerard's (Marcel, 2026-10-19): the approval, the hand bootstrap, the Trusted Publisher and
+   any proving bump are his. Our part ends at the merged PR; don't plan or chase those steps.
 
 ## State at 2026-10-19 (control.21 @ 3ccd75b)
 
@@ -173,7 +167,7 @@ Decided since the 10-09 notes (emmie-2 now leads the emmie + package line; my si
   `draft.ts` and `path.ts` changed or landed after the last run (form.ts was 100%, the scope 92%).
 - README: document the new controls (TimeInput, SearchInput, PasswordInput, InputGroup), `prepend`/`append`,
   autogrow, autofocus and the kit list; the docs draft's API sections are still TODO.
-- Then the release sequence above (fresh branch off `main`; these notes and EXPERIMENT-REPORT.md stay behind).
+- Then the package PR (release sequence step 1; these notes and EXPERIMENT-REPORT.md stay behind). Gerard publishes.
 
 ### Open (small, package side)
 
