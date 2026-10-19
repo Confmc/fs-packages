@@ -30,8 +30,12 @@ import {useValidationErrors} from './validation-errors';
  * `field(name)` is a field's whole link to the form — id, invalid, describedby and its message from
  * `fieldErrors` (the server's errors with the form's own refusals on top):
  * `<TextInput v-bind="field('email')" v-model="email" />` + `<FormError name="email" />`, or one control
- * that draws its own label and message through `FormField`. Call it in a component `setup()`: the id
- * ids end in a part from `useId()` unless a fixed `idPrefix` is given.
+ * that draws its own label and message through `FormField`. `field()` reads the form when it is called,
+ * so call it in the render (the template), not once in `setup()`: a result kept from setup never
+ * changes.
+ *
+ * Call `useForm` in a component's `setup()`: its ids end in a part from `useId()`, unless a fixed
+ * `idPrefix` is given.
  *
  * @param options `keyMapper`, `fields`, `scrollToError`, `idPrefix`, `draft` — see `UseFormOptions`.
  */
