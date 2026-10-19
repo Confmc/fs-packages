@@ -79,3 +79,20 @@ describe('TextInput error icon and attributes', () => {
         expect(input.classes()).not.toContain('w-40');
     });
 });
+
+describe('TextInput autofocus', () => {
+    it('focuses the input when it mounts, also when that happens after page load (a dialog)', () => {
+        const wrapper = mount(TextInput, {props: {modelValue: '', autofocus: true}, attachTo: document.body});
+
+        expect(document.activeElement).toBe(wrapper.find('input').element);
+        wrapper.unmount();
+    });
+
+    it('leaves focus alone without it, and never renders the native attribute', () => {
+        const wrapper = mount(TextInput, {props: {modelValue: ''}, attachTo: document.body});
+
+        expect(document.activeElement).not.toBe(wrapper.find('input').element);
+        expect(wrapper.find('input').attributes()).not.toHaveProperty('autofocus');
+        wrapper.unmount();
+    });
+});

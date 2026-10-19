@@ -4,6 +4,7 @@
              included, lands on the <input>, as on the select family. -->
         <input
             v-bind="controlAttrs($attrs)"
+            ref="input"
             :id="controlId"
             :type="type"
             class="ui-control ui-input"
@@ -31,7 +32,7 @@
 </template>
 
 <script setup lang="ts">
-import {computed, useId} from 'vue';
+import {computed, onMounted, useId, useTemplateRef} from 'vue';
 
 import {commitOutsideComposition} from '../internal/composition';
 import {controlAttrs, rootAttrs} from '../internal/split-attrs';
@@ -41,6 +42,7 @@ const {
     id,
     invalid = undefined,
     error,
+    autofocus = false,
 } = defineProps<{
     /** control id; inside a `FormField` the field passes its own, standalone it defaults to `useId()`. */
     id?: string;
@@ -58,12 +60,22 @@ const {
     invalid?: boolean;
     /** id of the paired error element for `aria-describedby`. */
     describedby?: string;
+    /**
+     * focus the input when it mounts. Done in script, not with the native attribute: the browser only
+     * honours `autofocus` on page load, so an input in a dialog that opens later would stay unfocused.
+     */
+    autofocus?: boolean;
 }>();
 
-// The mark: `invalid` when given, otherwise whether there is a message.
 defineOptions({inheritAttrs: false});
 
+// The mark: `invalid` when given, otherwise whether there is a message.
 const marked = computed(() => invalid ?? Boolean(error));
+
+const input = useTemplateRef<HTMLInputElement>('input');
+onMounted(() => {
+    if (autofocus) input.value?.focus();
+});
 
 const ownId = useId();
 const controlId = computed(() => id ?? ownId);
