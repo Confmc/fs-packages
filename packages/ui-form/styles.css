@@ -37,6 +37,9 @@
     --ui-label-tracking: normal;
     /* the required mark; defaults to the danger colour it always had. */
     --ui-label-required-color: var(--ui-danger-text);
+    /* the note `useForm({markOptional})` puts on a field that is not required: lighter than the label. */
+    --ui-label-optional-color: var(--ui-label-color);
+    --ui-label-optional-weight: 400;
 
     /* control (input + select trigger) */
     --ui-control-bg: #ffffff;
@@ -265,6 +268,11 @@
     .ui-label__req {
         color: var(--ui-label-required-color);
         margin-left: 2px;
+    }
+    .ui-label__optional {
+        color: var(--ui-label-optional-color);
+        font-weight: var(--ui-label-optional-weight);
+        margin-left: 0.25em;
     }
 
     .ui-control {

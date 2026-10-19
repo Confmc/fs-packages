@@ -46,6 +46,8 @@ export interface UiTexts {
     hidePasswordLabel?: string;
     /** PasswordInput's warning while Caps Lock is on. */
     capsLockText?: string;
+    /** the note `useForm({markOptional: true})` puts in the label of a field that is not required. */
+    optionalNote?: string;
 }
 
 /** Which texts each control declares; nothing else reaches it, so no text leaks as an attribute. */
@@ -188,7 +190,14 @@ type Field = (name: string) => FieldProps & {modelValue?: unknown; 'onUpdate:mod
  * props and attributes pass through (`class`/`style` land on the field), and they win over the wiring,
  * so `:invalid="false"` or a `v-model` at the call site overrides the form's.
  */
-const bind = (field: Field, control: Component, name: string, labelOnControl: boolean, texts: UiTexts) =>
+const bind = (
+    field: Field,
+    control: Component,
+    name: string,
+    labelOnControl: boolean,
+    texts: UiTexts,
+    optionalNote: string | undefined,
+) =>
     defineComponent(
         (props: Shell<string> & Addons, {attrs, slots}) =>
             () => {
@@ -218,6 +227,7 @@ const bind = (field: Field, control: Component, name: string, labelOnControl: bo
                         error: wiring.error,
                         label: labelOnControl ? undefined : props.label,
                         required: props.required,
+                        optionalNote,
                         orientation: props.orientation,
                         class: className,
                         style,
@@ -236,29 +246,33 @@ const bind = (field: Field, control: Component, name: string, labelOnControl: bo
     );
 
 /** The bound controls of one form. The casts: a setup-function component cannot carry these types. */
-export const createBoundControls = <D>(field: Field, texts: UiTexts): BoundControls<D> => {
+export const createBoundControls = <D>(field: Field, texts: UiTexts, optionalNote?: string): BoundControls<D> => {
     const select = textsFor(texts, SELECT_TEXTS);
     const multi = textsFor(texts, MULTI_TEXTS);
     const group = textsFor(texts, GROUP_TEXTS);
     const clear = textsFor(texts, CLEAR_TEXTS);
 
+    // every bound control shares the form's field() and its note for a field that is not required
+    const control = (inner: Component, name: string, labelOnControl: boolean, controlTexts: UiTexts) =>
+        bind(field, inner, name, labelOnControl, controlTexts, optionalNote);
+
     return {
-        TextField: bind(field, TextInput, 'TextField', false, {}),
-        TextareaField: bind(field, Textarea, 'TextareaField', false, {}),
-        NumberField: bind(field, NumberInput, 'NumberField', false, {}),
-        DateField: bind(field, DateInput, 'DateField', false, {}),
-        TimeField: bind(field, TimeInput, 'TimeField', false, clear),
-        PasswordField: bind(field, PasswordInput, 'PasswordField', false, textsFor(texts, PASSWORD_TEXTS)),
-        CheckboxField: bind(field, Checkbox, 'CheckboxField', true, {}),
-        SwitchField: bind(field, Switch, 'SwitchField', true, {}),
-        RadioGroupField: bind(field, RadioGroup, 'RadioGroupField', true, {}),
-        CheckboxGroupField: bind(field, CheckboxGroup, 'CheckboxGroupField', true, group),
-        SingleSelectField: bind(field, SingleSelect, 'SingleSelectField', false, select),
-        ComboboxField: bind(field, Combobox, 'ComboboxField', false, select),
-        MultiSelectField: bind(field, MultiSelect, 'MultiSelectField', false, multi),
-        MultiComboboxField: bind(field, MultiCombobox, 'MultiComboboxField', false, multi),
-        GroupSelectField: bind(field, GroupSelect, 'GroupSelectField', false, select),
-        GroupComboboxField: bind(field, GroupCombobox, 'GroupComboboxField', false, select),
+        TextField: control(TextInput, 'TextField', false, {}),
+        TextareaField: control(Textarea, 'TextareaField', false, {}),
+        NumberField: control(NumberInput, 'NumberField', false, {}),
+        DateField: control(DateInput, 'DateField', false, {}),
+        TimeField: control(TimeInput, 'TimeField', false, clear),
+        PasswordField: control(PasswordInput, 'PasswordField', false, textsFor(texts, PASSWORD_TEXTS)),
+        CheckboxField: control(Checkbox, 'CheckboxField', true, {}),
+        SwitchField: control(Switch, 'SwitchField', true, {}),
+        RadioGroupField: control(RadioGroup, 'RadioGroupField', true, {}),
+        CheckboxGroupField: control(CheckboxGroup, 'CheckboxGroupField', true, group),
+        SingleSelectField: control(SingleSelect, 'SingleSelectField', false, select),
+        ComboboxField: control(Combobox, 'ComboboxField', false, select),
+        MultiSelectField: control(MultiSelect, 'MultiSelectField', false, multi),
+        MultiComboboxField: control(MultiCombobox, 'MultiComboboxField', false, multi),
+        GroupSelectField: control(GroupSelect, 'GroupSelectField', false, select),
+        GroupComboboxField: control(GroupCombobox, 'GroupComboboxField', false, select),
     } as unknown as BoundControls<D>;
 };
 

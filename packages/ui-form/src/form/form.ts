@@ -53,7 +53,7 @@ const useFormBody = <T extends string = string>(
     options: UseFormOptions<T> & {draft?: Ref<object>} = {},
     texts: UiTexts = {},
 ): UseForm<T> & BoundControls<T> => {
-    const {keyMapper, fields, scrollToError = true, idPrefix, draft} = options;
+    const {keyMapper, fields, scrollToError = true, idPrefix, draft, markOptional = false} = options;
     const validation = useValidationErrors<T>({keyMapper, fields});
     const submit = useFormSubmit(validation);
 
@@ -94,6 +94,8 @@ const useFormBody = <T extends string = string>(
     const unique = idPrefix === undefined ? {suffix: useId()} : {prefix: idPrefix};
     const id = (name: T): string => fieldId(name, unique);
     const message = (name: T): string | undefined => fieldErrors.value[name] || undefined;
+    // the one input is `required`; markOptional only chooses whether its absence shows
+    const optionalNote = markOptional ? (texts.optionalNote ?? 'optional') : undefined;
 
     const field = (name: T): FieldProps | (FieldProps & FieldModel<unknown>) => {
         const error = message(name);
@@ -145,8 +147,12 @@ const useFormBody = <T extends string = string>(
         fieldErrors,
         field,
         // the bound controls name fields by any string at runtime; their types narrow the names
-        ...createBoundControls<T>(field as (name: string) => FieldProps & Partial<FieldModel<unknown>>, texts),
-        FormLabel: createFormLabel(id),
+        ...createBoundControls<T>(
+            field as (name: string) => FieldProps & Partial<FieldModel<unknown>>,
+            texts,
+            optionalNote,
+        ),
+        FormLabel: createFormLabel(id, optionalNote),
         FormError: createFormError(message, id),
         refuse,
         setRefusals,
