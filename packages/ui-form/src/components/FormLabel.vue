@@ -2,9 +2,7 @@
     <label class="ui-label" :for="htmlFor">
         <slot />
         <span v-if="required" class="ui-label__req" aria-hidden="true">*</span>
-        <!-- read with the label, unlike the mark: it is the only place the field says it may stay empty -->
-        <span v-else-if="optionalNote" class="ui-label__optional">{{ optionalNote }}</span>
-        <!-- content after the label text and its mark or note, e.g. a tooltip -->
+        <!-- content after the label text and its required mark, e.g. a note like "optional" -->
         <slot name="after" />
     </label>
 </template>
@@ -15,7 +13,5 @@ defineProps<{
     htmlFor: string;
     /** render the required marker. */
     required?: boolean;
-    /** a note shown on a field that is not required ("optional"); omitted, such a field shows nothing. */
-    optionalNote?: string;
 }>();
 </script>

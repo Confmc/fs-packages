@@ -207,48 +207,6 @@ describe('form-bound controls', () => {
     });
 });
 
-describe('markOptional', () => {
-    const notes = (make: typeof useForm, markOptional?: boolean) => {
-        const draft = ref(newDraft());
-        const wrapper = mount(
-            defineComponent({
-                setup: () => {
-                    const form = make({draft, markOptional});
-                    // one root: a fragment's findAll does not keep document order
-                    return () =>
-                        h('div', [
-                            h(form.TextField, {name: 'name', label: 'Naam'}),
-                            h(form.TextField, {name: 'name', label: 'Verplicht', required: true}),
-                            h(form.FormLabel, {name: 'name', label: 'Los'}),
-                            h(form.CheckboxField, {name: 'active', label: 'Actief'}),
-                        ]);
-                },
-            }),
-        );
-        return wrapper.findAll('label').map((label) => {
-            const note = label.find('.ui-label__optional');
-            return note.exists() ? note.text() : '';
-        });
-    };
-
-    it('notes every field that is not required, the bound label included, with the package text', () => {
-        expect(notes(useForm, true)).toEqual(['optional', '', 'optional', '']);
-    });
-
-    it('takes the note text from createUiForm', () => {
-        expect(notes(createUiForm({texts: {optionalNote: 'optioneel'}}).useForm, true)).toEqual([
-            'optioneel',
-            '',
-            'optioneel',
-            '',
-        ]);
-    });
-
-    it('notes nothing unless the form asks for it', () => {
-        expect(notes(useForm)).toEqual(['', '', '', '']);
-    });
-});
-
 describe('createUiForm', () => {
     const ui = createUiForm({
         texts: {

@@ -84,13 +84,6 @@ export type UseFormOptions<T extends string = string> = UseValidationErrorsOptio
      * id something outside the form must know.
      */
     idPrefix?: string;
-    /**
-     * Note every field that is not required (the `optionalNote` text, "optional" by default) in its label:
-     * the bound controls that draw a label and the bound `FormLabel`. `required` stays the one input; this
-     * only chooses whether its absence shows.
-     * @default false
-     */
-    markOptional?: boolean;
 };
 
 /**

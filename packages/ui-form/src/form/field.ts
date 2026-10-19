@@ -29,13 +29,13 @@ export interface BoundFormLabelProps<T extends string = string> {
  * `for` at the id `field('firstName')` gives the control. Attributes fall through to the `<label>`; its
  * default slot renders after the label text and the required mark (a note like "optioneel").
  */
-export const createFormLabel = <T extends string>(id: (name: T) => string, optionalNote?: string) =>
+export const createFormLabel = <T extends string>(id: (name: T) => string) =>
     defineComponent(
         (props: BoundFormLabelProps<T>, {slots}) =>
             () =>
                 h(
                     FormLabel,
-                    {htmlFor: id(props.name), required: props.required, optionalNote},
+                    {htmlFor: id(props.name), required: props.required},
                     {default: () => props.label, after: slots.default},
                 ),
         {name: 'FormLabel', props: ['name', 'label', 'required']},

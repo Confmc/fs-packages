@@ -57,28 +57,6 @@ describe('FormField', () => {
         expect(head.element.lastElementChild?.outerHTML).toBe('<span class="toggle">email</span>');
     });
 
-    it('notes a field that is not required, before label-after content, when given an optionalNote', () => {
-        const wrapper = mount(FormField, {
-            props: {label: 'Email', id: 'email', optionalNote: 'optional'},
-            slots: {default: wiringSlot, 'label-after': '<i class="tip">?</i>'},
-        });
-
-        const note = wrapper.find('label.ui-label .ui-label__optional');
-        expect(note.text()).toBe('optional');
-        expect(note.element.nextElementSibling?.className).toBe('tip');
-    });
-
-    it('notes no required field, and no field without an optionalNote', () => {
-        const required = mount(FormField, {
-            props: {label: 'Email', id: 'email', required: true, optionalNote: 'optional'},
-            slots: {default: wiringSlot},
-        });
-        const plain = mount(FormField, {props: {label: 'Email', id: 'email'}, slots: {default: wiringSlot}});
-
-        expect(required.find('.ui-label__optional').exists()).toBe(false);
-        expect(plain.find('.ui-label__optional').exists()).toBe(false);
-    });
-
     it('keeps the label a direct child of the field without an aside', () => {
         const wrapper = mount(FormField, {props: {label: 'Email', id: 'email'}, slots: {default: wiringSlot}});
 

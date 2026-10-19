@@ -2,12 +2,12 @@
     <div class="ui-field" :class="{'is-horizontal': orientation === 'horizontal' && Boolean(label)}">
         <!-- with an aside the label shares a row with it; without one the label stays a direct child, as in 0.17 -->
         <div v-if="label && $slots.aside" class="ui-field__head">
-            <FormLabel :html-for="field.id" :required="required" :optional-note="optionalNote">
+            <FormLabel :html-for="field.id" :required="required">
                 {{ label }}<template #after><slot name="label-after" /></template>
             </FormLabel>
             <slot name="aside" :field="field" />
         </div>
-        <FormLabel v-else-if="label" :html-for="field.id" :required="required" :optional-note="optionalNote">
+        <FormLabel v-else-if="label" :html-for="field.id" :required="required">
             {{ label }}<template #after><slot name="label-after" /></template>
         </FormLabel>
         <!-- the slot receives `field`, whose keys are the control's own prop names, so one
@@ -35,13 +35,10 @@ const {
     error,
     id,
     orientation = 'vertical',
-    optionalNote,
 } = defineProps<{
     /** label text; omit for an unlabelled field. */
     label?: string;
     required?: boolean;
-    /** a note in the label of a field that is not required ("optional"); `useForm({markOptional})` sets it. */
-    optionalNote?: string;
     /** resolved error string, supplied by the consumer (error-as-prop); empty means no error. */
     error?: string;
     /** control id; omit and the field generates one with `useId()`. */
