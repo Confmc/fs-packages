@@ -1,5 +1,8 @@
 # Handoff: ui-form experiment (fs-packages side)
 
+> **Read the last section first** ("State at 2026-10-19"): it supersedes "Open" and "Next steps" below,
+> which are from 2026-10-09. `EXPERIMENT-REPORT.md` is the 10-09 report for the lead and is not kept current.
+
 Written 2026-10-09, end of day, for a fresh session on another machine. Read this first, then
 `EXPERIMENT-REPORT.md` next to it (the full shape, decisions and gaps, written for Gerard).
 
@@ -80,7 +83,7 @@ control.13 / control.14 (today's last packs, one commit each):
 | RichTextEditor (tiptap) / file upload stay in emmie, wired through `field()` / `FormField`                 | Marcel                           |
 | Package CSS = defaults that consumer CSS always overrides → `@layer ui-form`                               | Marcel                           |
 
-## Open
+## Open (2026-10-09, superseded: see the last section)
 
 - **Pending with Gerard:** the 422-per-form model (he asked for an example); `string | null` vs `string`
   for the text controls' model.
@@ -95,7 +98,7 @@ control.13 / control.14 (today's last packs, one commit each):
   intermittently, mostly under coverage, in code the experiment didn't touch. They pass on rerun. Look at
   them before release.
 
-## Next steps (agreed order)
+## Next steps (2026-10-09, superseded: see the last section)
 
 Step 1, **emmie adopts ui-form's controls**, control by control, emmie's behaviour ported as is:
 
@@ -155,3 +158,36 @@ Decided since the 10-09 notes (emmie-2 now leads the emmie + package line; my si
   (prepend/append), PasswordInput. Combobox and RadioGroup needed nothing.
 - Remaining: GroupSelect/GroupCombobox `alphabeticalSort`; the date picker last (emmie's DatePickerField works via
   `field()` meanwhile); then the release sequence above.
+
+### Before the package PR (package side)
+
+- Run Stryker once over the scope (`src/form`, `src/composables`, `src/internal`): `src/form/kit.ts`,
+  `draft.ts` and `path.ts` changed or landed after the last run (form.ts was 100%, the scope 92%).
+- README: document the new controls (TimeInput, SearchInput, PasswordInput, InputGroup), `prepend`/`append`,
+  autogrow, autofocus and the kit list; the docs draft's API sections are still TODO.
+- Then the release sequence above (fresh branch off `main`; these notes and EXPERIMENT-REPORT.md stay behind).
+
+### Open (small, package side)
+
+- A bound field's `prepend` on a non-text control (CheckboxField …) is not rejected by its type; harmless,
+  the props pass to `InputGroup` only where `bind()` sees them.
+- emmie-side, noted by emmie-2: `.ui-error:not(:empty)` on the first branch that loads ui-form; drafts as
+  `FormDraft<T>`; `createUiForm` texts incl. clearButtonLabel / showPasswordLabel / hidePasswordLabel /
+  capsLockText.
+
+### Learned today (gotchas)
+
+- Stryker does not mutate inside a type assertion: `useForm`'s body sat in `(...) as UseFormCall` with 0
+  mutants. Keep casts at the export (`const body = …; export const x = body as T`).
+- Kit typing: a generic select's `T` is not inferred through `Omit<props>`; the bound select types declare
+  `options`/`groups` + `optionLabel` explicitly (`Carries<T>`).
+- `vitest-browser-vue`'s `render()` returns a promise here (`await render(…)`). Two `renderInField` calls in one
+  axe test give two `<main>` (landmark violations); a test that throws mid-render leaks its `<main>` into every
+  later axe test, so fix the first failure first.
+- happy-dom has no layout (`scrollHeight` 0) and no `showPicker`: size logic is pinned in the browser suite,
+  happy-dom specs stub measurements.
+- `.stryker-incremental.json` can go stale and skip work: move it aside for a full run.
+- The select-family unit flake is local and load-only (0 test failures in 200 CI runs).
+- Packs now: ui-form only (the shims are gone). Bump `packages/ui-form/package.json`, `npm install
+--ignore-scripts`, build, `npm pack --pack-destination ../../.experiment-packs`, commit, push to `fork`.
+- Scope: fix what this work owns; don't chase issues merely noticed elsewhere (Marcel, 2026-10-19).
