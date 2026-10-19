@@ -38,5 +38,6 @@ export type {
     ValidationErrors,
 } from './form/types';
 export type {Path, PathValue} from './form/path';
+export type {FormDraft} from './form/draft';
 
 export type {FieldBinding, SelectItem, LabelKey} from './types';
