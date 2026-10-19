@@ -2,6 +2,7 @@ import type {ComputedRef, Ref} from 'vue';
 
 import type {FieldBinding} from '../types';
 import type {FormErrorComponent, FormLabelComponent} from './field';
+import type {BoundControls} from './kit';
 import type {Path, PathValue} from './path';
 
 /** Field-error bag: the first backend validation message per field key. */
@@ -87,11 +88,11 @@ export type UseFormOptions<T extends string = string> = UseValidationErrorsOptio
 };
 
 /**
- * Everything `useForm` returns: the field-error bag and `clearErrors` from
- * `useValidationErrors`, plus `handleSubmit` and the `submitting` loading flag
- * from `useFormSubmit` — wired together so a page composes one call, not two.
+ * A form's state without its bound controls: the field-error bag and `clearErrors` from
+ * `useValidationErrors`, plus `handleSubmit` and the `submitting` loading flag from `useFormSubmit`,
+ * and the client refusals and wiring.
  */
-export type UseForm<T extends string = string> = UseValidationErrors<T> &
+type FormCore<T extends string = string> = UseValidationErrors<T> &
     Pick<UseFormSubmit, 'submitting'> &
     UseFormClient<T> & {
         /**
@@ -158,7 +159,13 @@ export type UseDraftFormOptions<D extends object> = UseFormOptions<Path<D>> & {
 };
 
 /** Everything `useForm` returns for a form with a draft: as `UseForm`, named by the draft's paths. */
-export type UseDraftForm<D extends object> = Omit<UseForm<Path<D>>, 'field'> & {
+export type UseDraftForm<D extends object> = Omit<FormCore<Path<D>>, 'field'> & {
     /** The wiring plus the value: `modelValue` is typed as the value at that path. */
     field: <P extends Path<D>>(name: P) => FieldBinding & FieldModel<PathValue<D, P>>;
-};
+} & BoundControls<D>;
+
+/**
+ * Everything `useForm()` returns: the form's state, its submit, its wiring and its bound controls. Type a
+ * child component's `form` prop with it (or with `UseDraftForm<D>` for a form over a draft).
+ */
+export type UseForm<T extends string = string> = FormCore<T> & BoundControls<T>;

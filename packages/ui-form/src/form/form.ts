@@ -3,7 +3,7 @@ import type {Ref} from 'vue';
 import {computed, nextTick, readonly, ref, useId} from 'vue';
 
 import type {FieldBinding} from '../types';
-import type {BoundControls, UiTexts} from './kit';
+import type {UiTexts} from './kit';
 import type {
     FieldModel,
     SubmitOutcome,
@@ -45,14 +45,16 @@ import {useValidationErrors} from './validation-errors';
 // The overloads are a type; the one implementation below is cast to it, since an arrow function cannot
 // declare overloads and its `field` cannot be checked against both generic shapes at once.
 export interface UseFormCall {
-    <D extends object>(options: UseDraftFormOptions<D>): UseDraftForm<D> & BoundControls<D>;
-    <T extends string = string>(options?: UseFormOptions<T>): UseForm<T> & BoundControls<T>;
+    <D extends object>(options: UseDraftFormOptions<D>): UseDraftForm<D>;
+    // `draft` refused here: a draft TypeScript cannot read as a Ref (a generic shallowRef) is an error at
+    // the call, not a silent fall back to a form without one. Name the type there: useForm<D>({draft}).
+    <T extends string = string>(options?: UseFormOptions<T> & {draft?: never}): UseForm<T>;
 }
 
 const useFormBody = <T extends string = string>(
     options: UseFormOptions<T> & {draft?: Ref<object>} = {},
     texts: UiTexts = {},
-): UseForm<T> & BoundControls<T> => {
+): UseForm<T> => {
     const {keyMapper, fields, scrollToError = true, idPrefix, draft} = options;
     const validation = useValidationErrors<T>({keyMapper, fields});
     const submit = useFormSubmit(validation);
