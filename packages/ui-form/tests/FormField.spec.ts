@@ -57,6 +57,31 @@ describe('FormField', () => {
         expect(head.element.lastElementChild?.outerHTML).toBe('<span class="toggle">email</span>');
     });
 
+    it('renders a hint between the control and the message, read with the field after the message', () => {
+        const wrapper = mount(FormField, {
+            props: {label: 'Email', id: 'email', error: 'Bad email'},
+            slots: {default: wiringSlot, hint: 'We never share it'},
+        });
+
+        const parts = [...wrapper.find('.ui-field').element.children].map((child) => child.className);
+        expect(parts.slice(-3)).toEqual(['ui-field__control', 'ui-hint', 'ui-error']);
+        expect(wrapper.find('.ui-hint').attributes('id')).toBe('email-hint');
+        expect(wrapper.find('.ui-hint').text()).toBe('We never share it');
+        expect(wrapper.text()).toContain('db:email-error email-hint');
+    });
+
+    it('names the hint alone while there is no message, and nothing without a hint', () => {
+        const hinted = mount(FormField, {
+            props: {label: 'Email', id: 'email'},
+            slots: {default: wiringSlot, hint: 'We never share it'},
+        });
+        const plain = mount(FormField, {props: {label: 'Email', id: 'email'}, slots: {default: wiringSlot}});
+
+        expect(hinted.text()).toContain('inv:false|db:email-hint');
+        expect(plain.find('.ui-hint').exists()).toBe(false);
+        expect(plain.text()).toContain('db:undefined');
+    });
+
     it('keeps the label a direct child of the field without an aside', () => {
         const wrapper = mount(FormField, {props: {label: 'Email', id: 'email'}, slots: {default: wiringSlot}});
 

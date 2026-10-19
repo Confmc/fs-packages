@@ -76,6 +76,18 @@ describe('form-bound controls', () => {
         expect(wrapper.find('input').attributes('aria-describedby')).toBe(`${id}-error ${id}-prepend ${id}-append`);
     });
 
+    it('hands a hint to the field and names it after the message, before the addons', async () => {
+        const {wrapper, form} = mountWith(({TextField}) =>
+            h(TextField, {name: 'name', label: 'Naam', append: 'tekens'}, {hint: () => 'Zoals op het paspoort'}),
+        );
+        form().refuse('name', 'Te kort');
+        await nextTick();
+        const id = wrapper.find('input').attributes('id');
+
+        expect(wrapper.find('.ui-hint').text()).toBe('Zoals op het paspoort');
+        expect(wrapper.find('input').attributes('aria-describedby')).toBe(`${id}-error ${id}-hint ${id}-append`);
+    });
+
     it('joins a single addon text too', () => {
         const {wrapper} = mountWith(({TextField}) => h(TextField, {name: 'name', label: 'Naam', append: 'dagen'}));
         const id = wrapper.find('input').attributes('id');

@@ -2,7 +2,7 @@ import type {Component, DefineSetupFnComponent, VNode} from 'vue';
 
 import {defineComponent, h} from 'vue';
 
-import type {LabelKey, SelectItem} from '../types';
+import type {FieldBinding, LabelKey, SelectItem} from '../types';
 import type {PathsOf} from './path';
 import type {FieldProps} from './types';
 
@@ -194,17 +194,17 @@ const bind = (field: Field, control: Component, name: string, labelOnControl: bo
             () => {
                 const {class: className, style, ...rest} = attrs;
                 // the frame's slots go to the field, every other slot to the control
-                const {'label-after': labelAfter, aside, ...controlSlots} = slots;
+                const {'label-after': labelAfter, aside, hint, ...controlSlots} = slots;
                 const wiring = field(props.name);
                 const addons = [props.prepend && `${wiring.id}-prepend`, props.append && `${wiring.id}-append`];
-                const describedby = [wiring.describedby, ...addons].filter(Boolean).join(' ') || undefined;
-                const inner = () =>
+                // the frame names the message and the hint; the addons follow them
+                const inner = (frame: FieldBinding) =>
                     h(
                         control,
                         {
                             ...texts,
                             ...wiring,
-                            describedby,
+                            describedby: [frame.describedby, ...addons].filter(Boolean).join(' ') || undefined,
                             required: props.required,
                             ...(labelOnControl ? {label: props.label} : {}),
                             ...rest,
@@ -223,12 +223,15 @@ const bind = (field: Field, control: Component, name: string, labelOnControl: bo
                         style,
                     },
                     {
-                        default: () =>
+                        default: ({field: frame}: {field: FieldBinding}) =>
                             props.prepend || props.append
-                                ? h(InputGroup, {id: wiring.id, prepend: props.prepend, append: props.append}, inner)
-                                : inner(),
+                                ? h(InputGroup, {id: wiring.id, prepend: props.prepend, append: props.append}, () =>
+                                      inner(frame),
+                                  )
+                                : inner(frame),
                         'label-after': labelAfter,
                         aside,
+                        hint,
                     },
                 );
             },

@@ -16,16 +16,17 @@
         <div class="ui-field__control">
             <slot :field="field" />
         </div>
+        <div v-if="$slots.hint" :id="hintId(field.id)" class="ui-hint"><slot name="hint" /></div>
         <FormError v-if="message" :error="message" :id="errorId" />
     </div>
 </template>
 
 <script setup lang="ts">
-import {computed, useId} from 'vue';
+import {computed, useId, useSlots} from 'vue';
 
 import type {FieldBinding} from '../types';
 
-import {messageId} from '../form/field';
+import {hintId, messageId} from '../form/field';
 import FormError from './FormError.vue';
 import FormLabel from './FormLabel.vue';
 
@@ -54,19 +55,23 @@ const {
 
 defineSlots<{
     default?: (scope: {field: FieldBinding}) => unknown;
-    /** inside the label, after its text and required mark: a note ("optional"), a tooltip. */
+    /** inside the label, after its text and required mark: a tooltip. */
     'label-after'?: () => unknown;
     /** at the far end of the label's row, e.g. a switch that belongs to the field. */
     aside?: (scope: {field: FieldBinding}) => unknown;
+    /** under the control, above the message: what the field expects. Read with the field after the message. */
+    hint?: () => unknown;
 }>();
+const slots = useSlots();
 
 const generatedId = useId();
 const errorId = computed(() => messageId(id ?? generatedId));
 const message = computed(() => error || undefined);
 
-const field = computed<FieldBinding>(() => ({
-    id: id ?? generatedId,
-    invalid: Boolean(message.value),
-    describedby: message.value ? errorId.value : undefined,
-}));
+const field = computed<FieldBinding>(() => {
+    const own = id ?? generatedId;
+    const describedby = [message.value && errorId.value, slots.hint && hintId(own)].filter(Boolean).join(' ');
+
+    return {id: own, invalid: Boolean(message.value), describedby: describedby || undefined};
+});
 </script>
