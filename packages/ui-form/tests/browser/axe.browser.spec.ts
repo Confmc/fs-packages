@@ -624,3 +624,92 @@ describe('axe-core audits — fields linked by field(name), zero violations', ()
         await expectNoViolations(screen.container);
     });
 });
+
+describe('axe-core audits — the field frame: hint, label row and native groups', () => {
+    it('a field with a hint, a label-after tooltip and an aside switch, while it shows a message', async () => {
+        const notify = ref(false);
+        const screen = await render(
+            defineComponent(
+                () => () =>
+                    h('main', [
+                        h('h1', 'Test form'),
+                        h(
+                            FormField,
+                            {label: 'Budget', id: 'budget', error: 'Fill in a budget', required: true},
+                            {
+                                default: ({field}: {field: object}) =>
+                                    h(NumberInput, {...field, required: true, modelValue: null}),
+                                'label-after': () => h('span', {title: 'Per year'}, '?'),
+                                aside: () =>
+                                    h(Switch, {
+                                        id: 'budget-hours',
+                                        label: 'In hours',
+                                        modelValue: notify.value,
+                                        'onUpdate:modelValue': (next: boolean) => (notify.value = next),
+                                    }),
+                                hint: () => 'The amount awarded for the whole period',
+                            },
+                        ),
+                    ]),
+            ),
+        );
+        await expectNoViolations(screen.container);
+    });
+
+    it('a native group wired by the slot aria is named by the label and described by message and hint', async () => {
+        const screen = await render(
+            defineComponent(
+                () => () =>
+                    h('main', [
+                        h('h1', 'Test form'),
+                        h(
+                            FormField,
+                            {label: 'Laws', id: 'laws', error: 'Pick at least one'},
+                            {
+                                default: ({aria}: {aria: object}) =>
+                                    h('div', {role: 'group', ...aria}, [
+                                        h('button', {type: 'button', 'aria-pressed': 'false'}, 'Wlz'),
+                                        h('button', {type: 'button', 'aria-pressed': 'true'}, 'Zvw'),
+                                    ]),
+                                hint: () => 'Any that apply',
+                            },
+                        ),
+                    ]),
+            ),
+        );
+        await expectNoViolations(screen.container);
+
+        const group = screen.container.querySelector('[role="group"]') as HTMLElement;
+        const label = document.getElementById(group.getAttribute('aria-labelledby') as string);
+        expect(label?.textContent?.trim()).toBe('Laws');
+        expect(group.getAttribute('aria-describedby')).toBe('laws-error laws-hint');
+    });
+
+    it("the bound FormField after a refusal: the form's ids, and no violation", async () => {
+        let form!: ReturnType<typeof useForm>;
+        const screen = await render(
+            defineComponent({
+                setup: () => {
+                    form = useForm();
+                    return () =>
+                        h('main', [
+                            h('h1', 'Test form'),
+                            h(
+                                form.FormField,
+                                {name: 'municipality', label: 'Municipality'},
+                                {
+                                    default: ({field}: {field: object}) => h(TextInput, {...field, modelValue: ''}),
+                                    hint: () => 'Where the client lives',
+                                },
+                            ),
+                        ]);
+                },
+            }),
+        );
+        form.refuse('municipality', 'Pick a municipality');
+        await new Promise((resolve) => setTimeout(resolve));
+
+        await expectNoViolations(screen.container);
+        expect(screen.container.querySelector('input')?.id).toBe(form.field('municipality').id);
+    });
+});
