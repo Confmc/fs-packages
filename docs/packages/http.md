@@ -55,6 +55,8 @@ const http = createHttpService('https://api.example.com', {
 
 When `smartCredentials` is enabled, the service automatically includes credentials for same-origin requests and excludes them for cross-origin requests. This is useful when your application talks to both your own API and third-party services.
 
+The host is compared after every registered request middleware has run, so a middleware that rewrites `config.baseURL` gets the decision for the host the request is actually sent to — a rewrite to another host goes out without credentials. A request middleware cannot set `withCredentials` itself while `smartCredentials` is on; the host comparison overrides it.
+
 ## Timeout
 
 The factory ships a compliant timeout surface per the **Doctrine #8 library-author extension** (war-room CLAUDE.md, 2026-04-22).

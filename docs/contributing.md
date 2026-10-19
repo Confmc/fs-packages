@@ -69,20 +69,24 @@ Every package is checked by [publint](https://publint.dev/) (correct exports) an
 npm run lint:pkg
 ```
 
-## The 8-Gate CI Pipeline
+## The CI Pipeline
 
-Every pull request must pass all 8 gates in order:
+`.github/workflows/ci.yml` is the authority. Its `check` job runs these gates in order, a separate `browser-tests` job runs the real-browser lane, and `ci-passed` is green only when both report success:
 
-| Gate            | Command                 | What it checks                               |
-| --------------- | ----------------------- | -------------------------------------------- |
-| 1. Audit        | `npm audit`             | No known vulnerabilities in dependencies     |
-| 2. Format       | `npm run format:check`  | Code follows oxfmt formatting rules          |
-| 3. Lint         | `npm run lint`          | No oxlint violations                         |
-| 4. Build        | `npm run build`         | All packages compile successfully            |
-| 5. Typecheck    | `npm run typecheck`     | No TypeScript errors in strict mode          |
-| 6. Package lint | `npm run lint:pkg`      | Package exports are correct (publint + attw) |
-| 7. Coverage     | `npm run test:coverage` | 100% code coverage per package               |
-| 8. Mutation     | `npm run test:mutation` | 90% mutation score per package               |
+| Gate              | Command                        | What it checks                                                                              |
+| ----------------- | ------------------------------ | ------------------------------------------------------------------------------------------- |
+| Audit             | `npm audit --audit-level=high` | No known high or critical vulnerabilities in dependencies                                   |
+| Format            | `npm run format:check`         | Code follows oxfmt formatting rules                                                         |
+| Lint              | `npm run lint`                 | No oxlint violations, warnings included                                                     |
+| Build             | `npm run build`                | All packages compile successfully                                                           |
+| Tarball           | `npm run validate:dist`        | Every file a manifest promises ships in the tarball, non-empty                              |
+| Release pipeline  | `npm run validate:workflows`   | The publish workflow's invariants hold and every job is time-bounded                        |
+| Docs              | `npm run validate:docs`        | Every publishable package is on the site, and the site names no package that does not exist |
+| Typecheck         | `npm run typecheck`            | No TypeScript errors in strict mode                                                         |
+| Package lint      | `npm run lint:pkg`             | Package exports are correct (publint + attw)                                                |
+| Coverage          | `npm run test:coverage`        | 100% code coverage per package                                                              |
+| Mutation          | `npm run test:mutation`        | 90% mutation score for every package with a Stryker config                                  |
+| Browser (own job) | `npm run test:browser`         | Real-Chromium behaviour and axe-core audits                                                 |
 
 ::: tip Why mutation testing?
 100% code coverage means every line of code was executed during tests. It does not mean every line was actually **verified**. Mutation testing changes your code (introduces "mutants") and checks whether your tests catch the change. A 90% mutation score means your tests detect 90% of possible bugs — not just that they run the code.
@@ -163,7 +167,7 @@ Push to `main` triggers an automatic publish (see [Publishing](#publishing) belo
 Every service package exports a `createXxxService()` factory:
 
 ```typescript
-export function createExampleService(config: ExampleConfig): ExampleService {
+export const createExampleService = (config: ExampleConfig): ExampleService => {
     // private state here
     const state = ref(initialValue);
 
@@ -174,7 +178,7 @@ export function createExampleService(config: ExampleConfig): ExampleService {
             /* ... */
         },
     };
-}
+};
 ```
 
 ### Types
@@ -222,7 +226,7 @@ Packages are published to npm via **OIDC Trusted Publishing** — no stored toke
 The flow:
 
 1. Create your changes on a branch (including a `version` bump in the affected package's `package.json` per the rules in [Adding a New Package § 5](#_5-bump-the-package-version)).
-2. Open a PR — CI runs the full gate set (audit → format → lint → build → validate:dist → validate:workflows → typecheck → lint:pkg → coverage → mutation, plus the browser-test lane).
+2. Open a PR — CI runs the full gate set (audit → format → lint → build → validate:dist → validate:workflows → validate:docs → typecheck → lint:pkg → coverage → mutation, plus the browser-test lane).
 3. On merge to `main`, the publish workflow detects the `package.json` change and:
     - **`build`** — builds all packages and uploads `packages/*/dist/` as the `build-output` artifact.
     - **`publish`** — waits for approval on the **`npm-publish` deployment environment**, then downloads that artifact and, for each package whose published version differs from the local `package.json#version`, publishes via OIDC Trusted Publishing. Provenance attestation is enabled (`NPM_CONFIG_PROVENANCE=true`).

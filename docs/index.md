@@ -23,7 +23,7 @@ features:
     - title: Middleware Architecture
       details: HTTP, loading, dialog, and router all support composable middleware pipelines. Register a handler, get an unregister function back. Stack behaviors without modifying source code.
     - title: 100% Test Coverage
-      details: Every package maintains 100% code coverage and 90% mutation testing score. An 8-gate CI pipeline runs audit, format, lint, build, typecheck, package lint, coverage, and mutation testing on every PR.
+      details: Every package is held to 100% code coverage, and every package with a Stryker config to a 90% mutation score. Every pull request runs the full CI gate set — audit, format, lint, build, tarball and docs validation, typecheck, package lint, coverage, mutation testing and a real-browser lane.
     - title: Component Agnostic
       details: Toast and dialog services manage lifecycle and state — you bring your own Vue components. No opinionated UI. Your design system, our plumbing.
     - title: Type Safe
@@ -48,22 +48,25 @@ These packages have zero Vue dependency — they work in any TypeScript project.
 
 Vue-powered reactive services for common application concerns.
 
-| Package                                 | Description                                               |
-| --------------------------------------- | --------------------------------------------------------- |
-| [fs-theme](/packages/theme)             | Reactive dark/light mode with system preference detection |
-| [fs-loading](/packages/loading)         | Loading state service with HTTP middleware integration    |
-| [fs-toast](/packages/toast)             | Component-agnostic toast notification queue               |
-| [fs-dialog](/packages/dialog)           | Component-agnostic dialog stack with error middleware     |
-| [fs-translation](/packages/translation) | Type-safe reactive i18n with multi-locale support         |
+| Package                                 | Description                                                               |
+| --------------------------------------- | ------------------------------------------------------------------------- |
+| [fs-theme](/packages/theme)             | Reactive dark/light mode with system preference detection                 |
+| [fs-auth](/packages/auth)               | Sanctum SPA-cookie session store, safe-redirect guard and auth registrars |
+| [fs-loading](/packages/loading)         | Loading state service with HTTP middleware integration                    |
+| [fs-toast](/packages/toast)             | Component-agnostic toast notification queue                               |
+| [fs-dialog](/packages/dialog)           | Component-agnostic dialog stack with error middleware                     |
+| [fs-form](/packages/form)               | Double-submit guard plus 422 validation-error binding for fs-http         |
+| [fs-translation](/packages/translation) | Type-safe reactive i18n with multi-locale support                         |
 
 ### Domain
 
 Higher-level packages for domain-driven application architecture.
 
-| Package                                     | Description                                                   |
-| ------------------------------------------- | ------------------------------------------------------------- |
-| [fs-adapter-store](/packages/adapter-store) | Reactive state management with CRUD resource adapters         |
-| [fs-router](/packages/router)               | Type-safe router with CRUD navigation and middleware pipeline |
+| Package                                                   | Description                                                                            |
+| --------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| [fs-adapter-store](/packages/adapter-store)               | Reactive state management with CRUD resource adapters                                  |
+| [fs-cached-adapter-store](/packages/cached-adapter-store) | fs-adapter-store that refetches only when the server's hash for the collection changes |
+| [fs-router](/packages/router)                             | Type-safe router with CRUD navigation and middleware pipeline                          |
 
 ### UI Components
 
@@ -83,13 +86,17 @@ Packages integrating a third-party platform. Runtime differs per package — `fs
 
 ## Quality Guarantees
 
-Every package passes an 8-gate CI pipeline before it can be published:
+Every pull request runs the full CI gate set. [Contributing](/contributing#the-ci-pipeline) lists each gate with its command.
 
-1. **Security audit** — `npm audit` for known vulnerabilities
-2. **Formatting** — oxfmt enforces consistent code style
-3. **Linting** — oxlint catches bugs and anti-patterns
-4. **Build** — tsdown compiles to dual ESM + CJS output
-5. **Type checking** — TypeScript strict mode, no implicit any
-6. **Package lint** — publint and attw verify package exports are correct
-7. **Coverage** — 100% code coverage via vitest
-8. **Mutation testing** — 90% mutation score via Stryker ensures tests actually verify behavior
+- **Security audit** — `npm audit` for known vulnerabilities
+- **Formatting** — oxfmt enforces consistent code style
+- **Linting** — oxlint catches bugs and anti-patterns
+- **Build** — tsdown compiles to dual ESM + CJS output
+- **Tarball validation** — every file a manifest promises ships in the tarball, non-empty
+- **Release-pipeline validation** — the publish workflow's invariants hold
+- **Docs validation** — every publishable package has a page, a sidebar entry, a row on this page and an install line, and none of those names a package that does not exist
+- **Type checking** — TypeScript strict mode, no implicit any
+- **Package lint** — publint and attw verify package exports are correct
+- **Coverage** — 100% code coverage via vitest, for every package
+- **Mutation testing** — a 90% mutation score via Stryker, for every package with a Stryker config
+- **Browser tests** — behaviour a simulated DOM cannot show, plus axe-core audits, in real Chromium

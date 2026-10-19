@@ -21,13 +21,16 @@ npm install @script-development/fs-cloudflare
 
 # Services (Vue required)
 npm install @script-development/fs-theme
+npm install @script-development/fs-auth
 npm install @script-development/fs-loading
 npm install @script-development/fs-toast
 npm install @script-development/fs-dialog
+npm install @script-development/fs-form
 npm install @script-development/fs-translation
 
 # Domain (Vue required)
 npm install @script-development/fs-adapter-store
+npm install @script-development/fs-cached-adapter-store
 npm install @script-development/fs-router
 
 # UI Components (Vue required)
@@ -140,10 +143,10 @@ Then import what you need in any component or composable:
 ```typescript
 import {http, toast} from '@/services';
 
-async function saveUser(data: UserData) {
+const saveUser = async (data: UserData) => {
     await http.postRequest('/users', data);
     toast.show({message: 'User saved', type: 'success'});
-}
+};
 ```
 
 ## What's Next

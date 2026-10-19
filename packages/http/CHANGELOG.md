@@ -1,6 +1,10 @@
 # @script-development/fs-http
 
-## Unreleased
+## 0.7.0 — 2026-10-16
+
+### Minor Changes
+
+- **`smartCredentials` now decides from the host the request is sent to (WR-1457).** The credential toggle used to run before every consumer request middleware, so a middleware rewriting `config.baseURL` sent the request to a host whose `withCredentials` was computed for the original one — cookies went to the rewritten foreign host, and a rewrite back to the API host went out uncredentialed. The decision now runs after all request middleware. Behaviour change for a consumer that combines `smartCredentials` with a cross-host `baseURL` rewrite: that request is no longer credentialed. If you need credentials there, drop `smartCredentials` (the `withCredentials: true` default then applies to every request). A request middleware can no longer set `withCredentials` itself while `smartCredentials` is on.
 
 ### Patch Changes
 
@@ -62,7 +66,7 @@ The Surveyor M3 field report (`reports/fs-packages/field/2026-05-15-surveyor-lib
 
 ### Why
 
-`fs-http` should be HTTP transport. Coupling to `Blob`, `document.createElement`, and `URL.createObjectURL`/`revokeObjectURL` made every consumer's tests responsible for stubbing browser globals — fragile under formatters (oxfmt collapsed `function () { return obj }` into arrow-functions, breaking constructor-mock patterns across kendo and ublgenie in April 2026), exposed to vitest 4's class-mock requirement, and a coupling smell between library and test environment. Closes [#59](https://github.com/script-development/fs-packages/issues/59).
+`fs-http` should be HTTP transport. Coupling to `Blob`, `document.createElement`, and `URL.createObjectURL`/`revokeObjectURL` made every consumer's tests responsible for stubbing browser globals — fragile under formatters (oxfmt collapsed `function () { return obj }` into arrow-functions, breaking constructor-mock patterns across two sibling territories in April 2026), exposed to vitest 4's class-mock requirement, and a coupling smell between library and test environment. Closes [#59](https://github.com/script-development/fs-packages/issues/59).
 
 ### Migration
 
@@ -96,4 +100,4 @@ const blobUrl = URL.createObjectURL(data);
 
 ### Minor Changes
 
-- Initial release of @script-development/fs-http — framework-agnostic HTTP service factory with middleware architecture, based on proven patterns from BIO and kendo territories.
+- Initial release of @script-development/fs-http — framework-agnostic HTTP service factory with middleware architecture, based on proven patterns from two donor territories.

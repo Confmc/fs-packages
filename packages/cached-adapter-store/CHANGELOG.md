@@ -1,9 +1,10 @@
 # @script-development/fs-cached-adapter-store
 
-## Unreleased
+## 0.2.7 — 2026-10-16
 
 ### Patch Changes
 
+- **Accepts `@script-development/fs-http` 0.7.** The peer and dev ranges now include `^0.7.0`.
 - **Published object-shape type aliases are now declared as `interface` (WR-1633).** Runtime is unchanged. An `interface` has no implicit index signature, so a converted type is no longer assignable to `Record<string, unknown>` without one (0 consumers measured across 64,338 fleet files). Declaration merging becomes possible, which is additive.
 
 ## 0.2.6 — 2026-09-02
@@ -22,4 +23,4 @@
 
 ### Patch Changes
 
-- **Fix: all-numeric persisted cache hash coerced to Number under non-string storage default → spurious cold-load refetch.** The persisted-hash read used a non-string default (`storageService.get(hashStorageKey, null)`), which sends fs-storage down its `JSON.parse` branch — fs-storage only returns the raw stored string verbatim for a _string_ default. An all-numeric, no-leading-zero hash (exactly the `crc32b(uuid())` shape kendo's backend emits, e.g. `'55776784'`) round-tripped back as a Number, so `localHash` never strict-equaled the string server hash, the skip-when-equal guard never matched, and a redundant `retrieveAll()` fired on every affected cold page-load. The read now uses a string default (raw value returned verbatim) and normalizes the empty-string sentinel back to `null` so the `localHash !== null` cold-start guard is preserved. Consumers pick this up on the version bump; kendo is the live-exposed consumer. Closes enforcement queue #130; mirrors wijs PR #122.
+- **Fix: all-numeric persisted cache hash coerced to Number under non-string storage default → spurious cold-load refetch.** The persisted-hash read used a non-string default (`storageService.get(hashStorageKey, null)`), which sends fs-storage down its `JSON.parse` branch — fs-storage only returns the raw stored string verbatim for a _string_ default. An all-numeric, no-leading-zero hash (exactly the `crc32b(uuid())` shape a consumer backend emits, e.g. `'55776784'`) round-tripped back as a Number, so `localHash` never strict-equaled the string server hash, the skip-when-equal guard never matched, and a redundant `retrieveAll()` fired on every affected cold page-load. The read now uses a string default (raw value returned verbatim) and normalizes the empty-string sentinel back to `null` so the `localHash !== null` cold-start guard is preserved. Consumers pick this up on the version bump; one consumer is live-exposed. Closes enforcement queue #130; mirrors [private-org]/[allied-app]#REDACTED.

@@ -8,10 +8,32 @@ import type {BeforeRouteMiddleware, MiddlewareRedirect, RouteName, RouterService
 import {createRouterLink, createRouterView} from './components';
 import {CREATE_PAGE_NAME, EDIT_PAGE_NAME, OVERVIEW_PAGE_NAME, SHOW_PAGE_NAME} from './routes';
 
+// The lookup `createRouterService` builds sees two levels: a top-level route and its direct
+// children. vue-router accepts a third, so a third-level route would match, reach fs-router's
+// `beforeEach`, and throw "unknown route" there — at navigation time, and only on that route.
+// Refusing the tree at construction turns that silent limit into a loud one at startup.
+// An empty `children` array adds no route, so it is not a third level.
+const assertTwoLevelRouteTree = (routes: readonly RouteRecordRaw[]): void => {
+    for (const route of routes) {
+        for (const child of route.children ?? []) {
+            if (!child.children?.length) continue;
+
+            const label = String(child.name ?? child.path);
+            throw new Error(
+                `fs-router: route "${label}" has children of its own, but fs-router supports two levels only ` +
+                    '(a route and its children). Compose the deeper level into the path instead, ' +
+                    'e.g. "/parent/:parentId/child".',
+            );
+        }
+    }
+};
+
 export const createRouterService = <Routes extends RouteRecordRaw[]>(
     routes: Routes,
     options?: RouterServiceOptions,
 ): RouterService<Routes> => {
+    assertTwoLevelRouteTree(routes);
+
     const router = createRouter({history: createWebHistory(options?.base), routes});
 
     const flattenedRoutes = routes
@@ -70,11 +92,25 @@ export const createRouterService = <Routes extends RouteRecordRaw[]>(
     // its guards — but the successor's own dispatch was counted in, synchronously, before the
     // predecessor could be aborted, so the count never reaches zero across a chain. Under the
     // boolean this was not true and the close had to be withheld here.
+    // A hop this service aborts in order to dispatch a middleware redirect resolves on the abort,
+    // while the router is still on the previous route. Its caller asked for a navigation, so it
+    // waits for the redirect it was handed off to — keyed by the aborted hop's `to`, which
+    // vue-router hands back as the abort failure's `to`, so concurrent chains cannot cross. A
+    // failing redirect is reported by the library and does not reject the caller, whose own
+    // navigation did not fail: it settles where the router stopped.
+    const redirectSuccessors = new WeakMap<object, Promise<void>>();
+
+    const followRedirect = async (outcome: unknown): Promise<void> => {
+        if (!isNavigationFailure(outcome, NavigationFailureType.aborted)) return;
+
+        await redirectSuccessors.get(outcome.to)?.catch(() => undefined);
+    };
+
     const dispatchNavigation = async (navigate: () => Promise<unknown>, reportUnreported = true): Promise<void> => {
         beginDispatch();
 
         try {
-            await navigate();
+            await followRedirect(await navigate());
         } catch (error) {
             // `router.push`/`replace` throw SYNCHRONOUSLY for an unknown route name, and reject
             // when a guard throws. The synchronous throw reaches neither `afterEach` nor
@@ -104,15 +140,58 @@ export const createRouterService = <Routes extends RouteRecordRaw[]>(
     const replaceRoute: RouterService<Routes>['replaceRoute'] = (name, id, query, parentId) =>
         dispatchNavigation(() => router.replace(buildRouteLocation(name, id, query, parentId)));
 
+    // Bounds the middleware redirect-return chain. Each returned `MiddlewareRedirect` cancels the
+    // pending hop and dispatches a fresh navigation, which re-enters `beforeEach` and re-runs the
+    // whole chain — so two middleware that redirect into each other's guarded routes (a
+    // misconfigured login↔dashboard guard) would recurse without bound. Mirrors vue-router's own
+    // internal max-redirect ceiling.
+    //
+    // The depth belongs to the chain, never to the service: a hop a redirect dispatched starts one
+    // deeper than the hop that returned it, and every other hop starts at zero. A redirect queues its
+    // depth under its target's `fullPath` and the target's `beforeEach` takes it, so chains running at
+    // the same time never spend each other's budget and a chain that ends leaves nothing behind. A
+    // queued depth whose target never reaches a guard (overtaken, refused, or redirected by its route
+    // record) is dropped when its dispatch settles. Residual: a redirect and another navigation to
+    // the same URL in flight at the same moment can swap depths.
+    const MAX_REDIRECT_DEPTH = 10;
+    const queuedDepths = new Map<string, {depth: number}[]>();
+
+    const queueDepth = (fullPath: string, entry: {depth: number}): void => {
+        const queue = queuedDepths.get(fullPath) ?? [];
+        queue.push(entry);
+        queuedDepths.set(fullPath, queue);
+    };
+
+    const dropQueuedDepth = (fullPath: string, entry?: {depth: number}): {depth: number} | undefined => {
+        const queue = queuedDepths.get(fullPath);
+        if (!queue) return undefined;
+
+        const index = entry ? queue.indexOf(entry) : 0;
+        const [dropped] = index === -1 ? [] : queue.splice(index, 1);
+        if (queue.length === 0) queuedDepths.delete(fullPath);
+
+        return dropped;
+    };
+
     // The redirect a middleware returns, dispatched as its own navigation. It is `goToRoute` /
     // `replaceRoute` in everything but the last-resort reporter, which it declines: the `.catch`
     // attached at the call site is this path's designated reporter and names the redirect.
-    const dispatchRedirect = (redirect: MiddlewareRedirect<Routes>): Promise<void> =>
-        dispatchNavigation(() => {
-            const location = buildRouteLocation(redirect.name, redirect.id, redirect.query, redirect.parentId);
+    const dispatchRedirect = async (redirect: MiddlewareRedirect<Routes>, depth: number): Promise<void> => {
+        const entry = {depth};
+        let target: string | undefined;
 
-            return redirect.replace ? router.replace(location) : router.push(location);
-        }, false);
+        try {
+            await dispatchNavigation(() => {
+                const location = buildRouteLocation(redirect.name, redirect.id, redirect.query, redirect.parentId);
+                target = router.resolve(location).fullPath;
+                queueDepth(target, entry);
+
+                return redirect.replace ? router.replace(location) : router.push(location);
+            }, false);
+        } finally {
+            if (target !== undefined) dropQueuedDepth(target, entry);
+        }
+    };
 
     const normalizedRouteToSpecificRoute: RouterService<Routes>['normalizedRouteToSpecificRoute'] = (route) => {
         const specificRoute = flattenedRoutes.find(({path, name}) => name === route.name || path === route.path);
@@ -267,31 +346,16 @@ export const createRouterService = <Routes extends RouteRecordRaw[]>(
     // same path that matters — see the read order in `afterEach` below (WR-1119 r8).
     const redirectAbortedPaths = new Set<string>();
 
-    // Bounds the middleware redirect-return chain. Each returned `MiddlewareRedirect` cancels the
-    // pending hop and dispatches a fresh navigation, which re-enters `beforeEach` and re-runs the
-    // whole chain — so two middleware that redirect into each other's guarded routes (a
-    // misconfigured login↔dashboard guard) would recurse without bound. `redirectDepth` counts
-    // consecutive redirects and is reset to 0 the moment a chain terminates — a navigation is
-    // allowed to proceed, or a middleware cancels without redirecting — so the cap only ever trips
-    // on a genuine loop, never on unrelated back-to-back navigations. Mirrors vue-router's own
-    // internal max-redirect ceiling.
-    const MAX_REDIRECT_DEPTH = 10;
-    let redirectDepth = 0;
-
     const beforeRouteMiddleware: BeforeRouteMiddleware<Routes>[] = [];
     router.beforeEach(async (to, from) => {
         beginHop();
+        const hopDepth = dropQueuedDepth(to.fullPath)?.depth ?? 0;
 
         // An unmatched URL is a 404, not a failed navigation (WR-1160): let it land on nothing so
         // `RouterView` paints the fallback. The test is vue-router's own verdict, never the
         // flattened lookup below — that sees two levels only, and treating its miss as a 404 would
-        // walk a deeper matched route past every middleware. It is a terminal hop, so it ends any
-        // redirect chain exactly as a clean proceed does.
-        if (to.matched.length === 0) {
-            redirectDepth = 0;
-
-            return undefined;
-        }
+        // walk a deeper matched route past every middleware.
+        if (to.matched.length === 0) return undefined;
 
         const toNormalized = normalizedRouteToSpecificRoute(to);
         const fromNormalized = from.name ? normalizedRouteToSpecificRoute(from) : toNormalized;
@@ -304,8 +368,7 @@ export const createRouterService = <Routes extends RouteRecordRaw[]>(
             // A truthy object return cancels the pending hop and navigates to the target in one
             // step — replace when `replace: true`, push otherwise. A boolean `true` just cancels.
             if (result !== true) {
-                if (redirectDepth >= MAX_REDIRECT_DEPTH) {
-                    redirectDepth = 0;
+                if (hopDepth >= MAX_REDIRECT_DEPTH) {
                     console.error(
                         `fs-router: middleware redirect chain exceeded ${MAX_REDIRECT_DEPTH} hops — aborting to break a redirect loop`,
                     );
@@ -313,8 +376,7 @@ export const createRouterService = <Routes extends RouteRecordRaw[]>(
                     return false;
                 }
 
-                redirectDepth += 1;
-                // Fire-and-forget: the dispatch resolves once the redirect navigation settles.
+                // The aborted hop's caller waits on this dispatch through `followRedirect`.
                 // `router.push`/`replace` resolve (not reject) for NavigationDuplicated/Aborted, but
                 // they DO reject when a guard or lazy component further down the redirected chain
                 // throws — attach a reporter so that surfaces instead of an unhandled rejection.
@@ -322,15 +384,17 @@ export const createRouterService = <Routes extends RouteRecordRaw[]>(
                 // `onError`; it still reports on its own for the one failure `onError` CANNOT see,
                 // an unknown route name, where `router.push({name})` throws synchronously and
                 // nothing is ever routed through `triggerError`.
-                void dispatchRedirect(result).catch((error: unknown) => {
+                const successor = dispatchRedirect(result, hopDepth + 1);
+                void successor.catch((error: unknown) => {
                     if (alreadyReported(error)) return;
 
                     console.error('fs-router: middleware redirect navigation failed', error);
                 });
+                redirectSuccessors.set(to, successor);
 
-                // The chain continues in the dispatched navigation — do NOT reset the depth here,
-                // and do NOT let this hop's abort end the in-flight window or reach the console:
-                // the redirect is a success in progress, not a failed navigation.
+                // The chain continues in the dispatched navigation — do NOT let this hop's abort
+                // end the in-flight window or reach the console: the redirect is a success in
+                // progress, not a failed navigation.
                 redirectAbortedPaths.add(to.fullPath);
 
                 return false;
@@ -340,10 +404,6 @@ export const createRouterService = <Routes extends RouteRecordRaw[]>(
             cancelled = true;
             break;
         }
-
-        // The chain terminated without dispatching a redirect (a `true` cancel or a clean proceed),
-        // so reset the depth for the next, unrelated navigation.
-        redirectDepth = 0;
 
         return cancelled ? false : undefined;
     });
@@ -422,7 +482,17 @@ export const createRouterService = <Routes extends RouteRecordRaw[]>(
             // the sentinel route and nothing marked in flight — and paint the fallback.
             beginDispatch();
 
-            return router.push(fullPath).finally(endDispatch);
+            // A guard that throws has already been reported by `onError`, so the rejection would be
+            // a second channel for one failure, and bootstraps discard this promise.
+            return router
+                .push(fullPath)
+                .then(async (outcome) => {
+                    await followRedirect(outcome);
+
+                    return outcome;
+                })
+                .finally(endDispatch)
+                .catch(() => undefined);
         },
         isReady: () => readyPromise,
         normalizedRouteToSpecificRoute,

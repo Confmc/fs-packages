@@ -50,6 +50,7 @@ export default defineConfig({
                     collapsed: false,
                     items: [
                         {text: 'fs-adapter-store', link: '/packages/adapter-store'},
+                        {text: 'fs-cached-adapter-store', link: '/packages/cached-adapter-store'},
                         {text: 'fs-router', link: '/packages/router'},
                     ],
                 },
