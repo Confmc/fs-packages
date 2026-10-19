@@ -2,6 +2,7 @@ import type {Ref} from 'vue';
 
 import {computed, nextTick, readonly, ref, useId} from 'vue';
 
+import type {BoundControls, UiTexts} from './kit';
 import type {
     FieldModel,
     FieldProps,
@@ -15,6 +16,7 @@ import type {
 
 import {createFormError, createFormLabel, fieldId, messageId} from './field';
 import {useFormSubmit} from './form-submit';
+import {createBoundControls, createTextedControls} from './kit';
 import {readPath, writePath} from './path';
 import {scrollToFirstError} from './scroll-to-first-error';
 import {useValidationErrors} from './validation-errors';
@@ -43,13 +45,14 @@ import {useValidationErrors} from './validation-errors';
 // The overloads are a type; the one implementation below is cast to it, since an arrow function cannot
 // declare overloads and its `field` cannot be checked against both generic shapes at once.
 interface UseFormCall {
-    <D extends object>(options: UseDraftFormOptions<D>): UseDraftForm<D>;
-    <T extends string = string>(options?: UseFormOptions<T>): UseForm<T>;
+    <D extends object>(options: UseDraftFormOptions<D>): UseDraftForm<D> & BoundControls<D>;
+    <T extends string = string>(options?: UseFormOptions<T>): UseForm<T> & BoundControls<T>;
 }
 
 const useFormBody = <T extends string = string>(
     options: UseFormOptions<T> & {draft?: Ref<object>} = {},
-): UseForm<T> => {
+    texts: UiTexts = {},
+): UseForm<T> & BoundControls<T> => {
     const {keyMapper, fields, scrollToError = true, idPrefix, draft} = options;
     const validation = useValidationErrors<T>({keyMapper, fields});
     const submit = useFormSubmit(validation);
@@ -141,6 +144,8 @@ const useFormBody = <T extends string = string>(
         clientErrors: readonly(client) as Readonly<Ref<ValidationErrors<T>>>,
         fieldErrors,
         field,
+        // the bound controls name fields by any string at runtime; their types narrow the names
+        ...createBoundControls<T>(field as (name: string) => FieldProps & Partial<FieldModel<unknown>>, texts),
         FormLabel: createFormLabel(id),
         FormError: createFormError(message, id),
         refuse,
@@ -152,4 +157,15 @@ const useFormBody = <T extends string = string>(
 
 // The cast sits here, apart from the body, so mutation testing reaches the body (Stryker does not
 // mutate inside a type assertion).
-export const useForm = useFormBody as UseFormCall;
+export const useForm = ((options?: UseFormOptions) => useFormBody(options)) as UseFormCall;
+
+/**
+ * The package configured once for an app: `useForm` and the bare controls that carry texts, with
+ * those texts as their defaults (`createUiForm({texts: {placeholder: 'Kies…', emptyText: 'Geen opties'}})`).
+ * Call it once at module level of the app and import its `useForm` where a form is built; the package's
+ * own `useForm` is the same with the package's texts.
+ */
+export const createUiForm = ({texts = {}}: {texts?: UiTexts} = {}) => ({
+    useForm: ((options?: UseFormOptions) => useFormBody(options, texts)) as UseFormCall,
+    ...createTextedControls(texts),
+});

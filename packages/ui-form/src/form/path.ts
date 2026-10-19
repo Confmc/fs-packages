@@ -47,3 +47,11 @@ export const writePath = (target: unknown, path: string, value: unknown): void =
         throw new Error(`[ui-form] cannot write "${path}": "${keys.join('.')}" is ${String(parent)}`);
     (parent as Indexable)[last] = value;
 };
+
+/**
+ * The paths of `T` whose value is exactly `V`, in both directions: a control reads `V` from the path
+ * and writes `V` back. A form-bound control takes only these as its `name`.
+ */
+export type PathsOf<T, V> = {
+    [P in Path<T>]: [PathValue<T, P>] extends [V] ? ([V] extends [PathValue<T, P>] ? P : never) : never;
+}[Path<T>];

@@ -21,7 +21,7 @@ export {default as Pressable} from './components/Pressable.vue';
 export {default as Disclosure} from './components/Disclosure.vue';
 
 // Form state (formerly @script-development/fs-form): useForm's field(name) links a control to the form.
-export {useForm} from './form/form';
+export {createUiForm, useForm} from './form/form';
 export {useFormSubmit} from './form/form-submit';
 export {useValidationErrors} from './form/validation-errors';
 export type {
@@ -39,5 +39,7 @@ export type {
 } from './form/types';
 export type {Path, PathValue} from './form/path';
 export type {FormDraft} from './form/draft';
+export type {BoundControls, UiTexts} from './form/kit';
+export type {PathsOf} from './form/path';
 
 export type {FieldBinding, SelectItem, LabelKey} from './types';
