@@ -39,7 +39,7 @@
     /* control (input + select trigger) */
     --ui-control-bg: #ffffff;
     /* background-on-state hooks — default to the resting background so they are a
-       no-op until a territory opts in (brick fills the control on focus/invalid). */
+       no-op until a territory opts in (a theme may fill the control on focus/invalid). */
     --ui-control-bg-focus: var(--ui-control-bg);
     --ui-control-bg-invalid: var(--ui-control-bg);
     --ui-control-bg-disabled: #fbf8f2;

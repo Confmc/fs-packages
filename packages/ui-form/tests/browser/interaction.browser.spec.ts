@@ -348,7 +348,7 @@ describe('MultiCombobox — input-as-trigger, real focus choreography', () => {
 
         await userEvent.tab();
         expect(document.activeElement).toBe(input);
-        expect(menu()).not.toBeNull(); // kendo's searchable choreography — focus is the context
+        expect(menu()).not.toBeNull(); // the searchable choreography — focus is the context
     });
 
     it('a real click commit toggles membership, STAYS open, clears the query, and REFOCUSES the input', async () => {

@@ -16,7 +16,7 @@ import {CheckboxGroup, FormField, Textarea, TextInput, useForm} from '../../src'
 // a real HttpService answers 422 → fs-form's middleware fills the bag through keyMapper →
 // form.field(name) reads the message from that form's bag → FormField draws it, v-bind marks and describes the control.
 
-// A real 422 from emmie's care plan (UpdateCarePlanRequest, Dutch messages), raw snake keys.
+// A real 422 from a consumer's care-plan request (Dutch messages), raw snake keys.
 const CARE_PLAN_422 = {
     message: 'x',
     errors: {
@@ -50,7 +50,7 @@ const answering =
             }),
         );
 
-const care = createHttpService('https://emmie.test');
+const care = createHttpService('https://api.test');
 const send = (data: unknown, status = 422) => care.putRequest('/care-plan', {}, {adapter: answering(status, data)});
 
 interface Mounted {

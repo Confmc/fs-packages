@@ -47,10 +47,10 @@ describe('styles.css — resting defaults', () => {
         const computed = getComputedStyle(control);
 
         expect(computed.backgroundColor).toBe('rgb(255, 255, 255)'); // --ui-control-bg
-        expect(computed.color).toBe('rgb(0, 0, 0)'); // --ui-control-text (emmie's look)
+        expect(computed.color).toBe('rgb(0, 0, 0)'); // --ui-control-text
         expect(computed.borderTopWidth).toBe('1px'); // --ui-control-border-width
-        expect(computed.borderTopColor).toBe('rgb(225, 218, 206)'); // --ui-control-border-color (emmie border)
-        expect(computed.borderTopLeftRadius).toBe('12px'); // --ui-control-radius (emmie radius)
+        expect(computed.borderTopColor).toBe('rgb(225, 218, 206)'); // --ui-control-border-color
+        expect(computed.borderTopLeftRadius).toBe('12px'); // --ui-control-radius
         expect(computed.boxShadow).toBe('none'); // --ui-control-shadow
     });
 
@@ -148,7 +148,7 @@ describe('styles.css — :root overrides (the --ui-* contract)', () => {
 
     it("keeps a territory's max(100%, 240px) floor working, and grows the anchor with it", () => {
         addStyle(uiCss);
-        // kendo's shipped override, verbatim (shared/styles/ui-inputs.css).
+        // a consumer's shipped override, verbatim.
         document.documentElement.style.setProperty('--ui-menu-min-width', 'max(100%, 240px)');
         const {anchor, menu} = addAnchoredMenu('180px');
 
@@ -213,7 +213,7 @@ describe('styles.css — group header (--ui-group-header-*)', () => {
 });
 
 describe('styles.css — WR-0512 font-size source-order regression pins', () => {
-    it("the default is emmie's 14px; `--ui-control-font-size: inherit` restores following the parent", () => {
+    it('the default is 14px; `--ui-control-font-size: inherit` restores following the parent', () => {
         addStyle(uiCss);
         const control = addControl('font-size: 18px');
         expect(getComputedStyle(control).fontSize).toBe('14px');
@@ -358,7 +358,7 @@ describe('styles.css — state-variant hooks on real states', () => {
         const control = addControl();
         control.disabled = true;
 
-        expect(getComputedStyle(control).backgroundColor).toBe('rgb(251, 248, 242)'); // --ui-control-bg-disabled (emmie)
+        expect(getComputedStyle(control).backgroundColor).toBe('rgb(251, 248, 242)'); // --ui-control-bg-disabled
         expect(getComputedStyle(control).color).toBe('rgb(107, 114, 128)'); // --ui-control-text-muted
         expect(getComputedStyle(control).cursor).toBe('not-allowed');
     });

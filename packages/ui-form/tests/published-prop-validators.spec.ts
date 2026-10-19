@@ -15,7 +15,7 @@ import {afterEach, describe, expect, it, vi} from 'vitest';
  * resolves both. But an arm is only *honoured* if the SFC compiler emits it into the prop's
  * runtime validator, and `keyof T` on an unresolved generic is not statically expandable.
  * The compiler dropped that arm and emitted `{type: Function}`, so the property-name form
- * warned on every mount in every consumer (found in kendo#1823 Phase A adoption).
+ * warned on every mount in every consumer (found during a consumer's adoption).
  *
  * **This suite imports the package by name — i.e. the built `dist` — deliberately, and it is
  * the only place in the repo that can witness the defect.** `@vitejs/plugin-vue` emits

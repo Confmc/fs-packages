@@ -2,7 +2,7 @@ import type {StyleValue} from 'vue';
 
 /**
  * The select family's attribute split. `class` and `style` stay on the root, where consumers style
- * the whole control (ublgenie passes `class` on four of them); everything else — `aria-label`,
+ * the whole control (consumers pass `class` on them); everything else — `aria-label`,
  * `aria-labelledby`, `data-*`, listeners — goes to the element carrying role="combobox", the only
  * place an accessible name can land.
  */

@@ -25,7 +25,7 @@ interface FieldScope {
     field: {id: string; invalid: boolean; describedby: string | undefined};
 }
 
-// A control from OUTSIDE the package (an emmie control): plain props, no composable.
+// A control from OUTSIDE the package (a consumer's own control): plain props, no composable.
 const OutsideControl = defineComponent({
     props: {
         id: {type: String, default: undefined},

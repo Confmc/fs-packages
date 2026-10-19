@@ -19,7 +19,7 @@
             @compositionend="onCompositionend"
             @change="onChange"
         />
-        <!-- emmie's in-input error icon; decorative, the message itself is read via aria-describedby -->
+        <!-- the in-input error icon; decorative, the message itself is read via aria-describedby -->
         <svg v-if="marked" class="ui-input__icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
             <path
                 fill="currentColor"

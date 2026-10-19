@@ -24,7 +24,7 @@
                 </button>
             </span>
 
-            <!-- The INPUT is the trigger (kendo's searchable choreography; the APG-canonical
+            <!-- The INPUT is the trigger (a consumer's searchable choreography; the APG-canonical
                  combobox — an in-popup search input has an awkward focus/activedescendant
                  story). It flexes over all remaining space, so clicking the empty part of
                  the chip bar is clicking the input. Keyboard listens HERE (not on the root,
@@ -258,7 +258,7 @@ const toggleValue = (value: T['id']): void => {
 
 // Both keyboard (Enter via useListbox) and pointer (OptionList `commit`) funnel through this
 // one guard. Toggle-in-place: a commit flips membership and the menu STAYS OPEN. The
-// multi-combobox choreography on top (kendo's searchable mode): the query clears so the
+// multi-combobox choreography on top (the searchable mode consumers ship): the query clears so the
 // full list is re-offered, and DOM focus returns to the input (a pointer commit lands on a
 // non-focusable <li> and would otherwise drop focus to the body). The highlight resets only
 // when clearing the query actually changed the list — an unfiltered keyboard walk keeps its
@@ -338,7 +338,7 @@ const onInput = (event: Event) => {
     openList();
     resetHighlight();
 };
-// Focusing or clicking the (enabled) input opens the list (kendo's searchable choreography —
+// Focusing or clicking the (enabled) input opens the list (the searchable choreography consumers ship —
 // focus is managed into the input, and the list is its context). A disabled input never
 // dispatches either event.
 const onOpen = openList;
