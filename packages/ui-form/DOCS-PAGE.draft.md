@@ -83,8 +83,9 @@ over the wiring, so `:invalid="false"` at the call site overrides the form's.
 | `GroupSelectField`, `GroupComboboxField`                                       | `GroupSelect`, `GroupCombobox`                             |                                               |
 
 A bound control hands two slots to its field frame and every other slot to the control: `#label-after` renders
-inside the label after its text and required mark (a note, a tooltip), `#aside` at the far end of the label row
-(a switch that belongs to the field).
+inside the label after its text and required mark (a tooltip), `#aside` at the far end of the label row
+(a switch that belongs to the field). A form whose design marks the fields that may stay empty sets
+`markOptional` (see [useForm](#useform)); the note follows from `required`, so no field carries a second flag.
 
 Each bound control has a stable component name, so a spec finds it with `findAllComponents({name: 'TextField'})`
 or by the control inside. For a compound field (a control plus a hint, or an editor this package does not ship),
@@ -102,13 +103,14 @@ export const {useForm, SingleSelect, MultiSelect} = createUiForm({
 });
 ```
 
-| Text                                                     | Used by                                        |
-| -------------------------------------------------------- | ---------------------------------------------- |
-| `placeholder`, `emptyText`, `optionsLabel`               | the select family                              |
-| `removeLabel`                                            | `MultiSelect`, `MultiCombobox` (chip remove)   |
-| `requiredLabel`                                          | `CheckboxGroup` (required, for screen readers) |
-| `clearButtonLabel`                                       | `TimeInput`, `SearchInput`                     |
-| `showPasswordLabel`, `hidePasswordLabel`, `capsLockText` | `PasswordInput`                                |
+| Text                                                     | Used by                                           |
+| -------------------------------------------------------- | ------------------------------------------------- |
+| `placeholder`, `emptyText`, `optionsLabel`               | the select family                                 |
+| `removeLabel`                                            | `MultiSelect`, `MultiCombobox` (chip remove)      |
+| `requiredLabel`                                          | `CheckboxGroup` (required, for screen readers)    |
+| `clearButtonLabel`                                       | `TimeInput`, `SearchInput`                        |
+| `showPasswordLabel`, `hidePasswordLabel`, `capsLockText` | `PasswordInput`                                   |
+| `optionalNote`                                           | the label note of `useForm({markOptional: true})` |
 
 ## useForm
 
@@ -121,6 +123,7 @@ export const {useForm, SingleSelect, MultiSelect} = createUiForm({
 | `fields`        | `readonly T[]`            | Keep only these names in `errors`; the rest go to `unmapped` (default: every key)                                                                                                        |
 | `scrollToError` | `boolean`                 | On a refused submit, scroll the first refused field into view, found by this form's own ids (default: `true`)                                                                            |
 | `idPrefix`      | `string`                  | A fixed prefix for the ids `field()` derives (`invoice-firstName`), for an id something outside the form must know (default: the name plus a part from Vue's `useId()`, `firstName-v-3`) |
+| `markOptional`  | `boolean`                 | Note every field that is not required in its label, with the `optionalNote` text; `required` stays the one input (default: `false`)                                                      |
 
 **Returns:**
 
@@ -226,7 +229,7 @@ before the package's, at the very top of your first stylesheet:
 The `--ui-*` custom properties stay outside the layer, as in [ui-inputs](/packages/ui-inputs#theming-the-ui-contract).
 
 The defaults of the control look changed, and there are new tokens: `--ui-control-border-color-hover`,
-`--ui-danger-ring-focus`, `--ui-addon-bg`, `--ui-addon-text`, `--ui-warning-text` and `--ui-label-required-color`. The
+`--ui-danger-ring-focus`, `--ui-addon-bg`, `--ui-addon-text`, `--ui-warning-text`, `--ui-label-required-color`, `--ui-label-optional-color` and `--ui-label-optional-weight`. The
 [CHANGELOG](https://github.com/script-development/fs-packages/blob/main/packages/ui-form/CHANGELOG.md#migrating)
 lists every changed default with its old value, so a theme can keep the old look.
 
