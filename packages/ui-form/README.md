@@ -129,6 +129,21 @@ take `prepend` / `append` and do that wiring themselves; the other bound fields 
 </InputGroup>
 ```
 
+Inside a form's `FormField`, where the field already names its message and hint, add the addon ids after them:
+
+```vue
+<FormField name="budgetCents" label="Budget" v-slot="{field}">
+    <InputGroup :id="field.id" prepend="€">
+        <NumberInput
+            v-bind="field"
+            :describedby="[field.describedby, `${field.id}-prepend`].filter(Boolean).join(' ')"
+            :model-value="euros"
+            @update:model-value="setEuros"
+        />
+    </InputGroup>
+</FormField>
+```
+
 **`TimeInput`** models `HH:MM` or `null`, like `NumberInput` an honest empty value: clearing it emits `null`,
 because `''` is no time. `step` is in minutes (`15` for quarter hours) and sets both the picker and the arrow
 keys. A click on the input opens the browser's picker. The clear button shows while there is a time; set
@@ -682,6 +697,8 @@ out, the field renders no hint and names none.
 
 **Testing.** A shallow mount stubs the bound controls, `FormField` and `FormError`, so a field's message does not
 render in such a spec. Un-stub what the spec reads: `stubs: {TextField: false, FormField: false, FormError: false}`.
+`#label-after` content renders inside the label, so a spec that reads it un-stubs `FormLabel` too, and one that
+reads addon texts un-stubs `InputGroup`.
 A form takes only its own action's 422, so a spec that checks a refusal makes the save itself reject with one.
 The frame's classes are stable and safe to select on: `.ui-field` (the frame, where a `data-test` on a bound
 `FormField` lands), `.ui-hint` and `.ui-error` (the message). A bound control's `data-test` lands on the control,
