@@ -3,7 +3,7 @@ import type {Component, DefineSetupFnComponent, SlotsType, VNode} from 'vue';
 import {defineComponent, h} from 'vue';
 
 import type {FieldAria, FieldBinding, LabelKey, SelectItem} from '../types';
-import type {Path, PathsOf} from './path';
+import type {Path, PathsFor, PathsOf} from './path';
 
 import Checkbox from '../components/Checkbox.vue';
 import CheckboxGroup from '../components/CheckboxGroup.vue';
@@ -115,12 +115,12 @@ type BoundSelect<N, Props, Value, Carrier> = Shell<N> &
 
 /** The form-bound controls for a form named by `N` (free strings) or by the paths of a draft `D`. */
 export interface BoundControls<D> {
-    TextField: BoundControl<Names<D, string | null>, typeof TextInput, string | null, Addons>;
-    TextareaField: BoundControl<Names<D, string | null>, typeof Textarea, string | null>;
+    TextField: BoundControl<NamesFor<D, string | null, string>, typeof TextInput, string | null, Addons>;
+    TextareaField: BoundControl<NamesFor<D, string | null, string>, typeof Textarea, string | null>;
     NumberField: BoundControl<Names<D, number | null>, typeof NumberInput, number | null, Addons>;
-    DateField: BoundControl<Names<D, string | null>, typeof DateInput, string | null, Addons>;
+    DateField: BoundControl<NamesFor<D, string | null, string>, typeof DateInput, string | null, Addons>;
     TimeField: BoundControl<Names<D, string | null>, typeof TimeInput, string | null, Addons>;
-    PasswordField: BoundControl<Names<D, string | null>, typeof PasswordInput, string | null>;
+    PasswordField: BoundControl<NamesFor<D, string | null, string>, typeof PasswordInput, string | null>;
     /** `label` is the box's own label. */
     CheckboxField: DefineSetupFnComponent<
         Shell<Names<D, boolean>> &
@@ -137,9 +137,12 @@ export interface BoundControls<D> {
     >;
     /** `label` is the group's legend, required: a group without one has no accessible name. */
     RadioGroupField: <T extends SelectItem>(
-        props: BoundSelect<Names<D, T['id'] | null>, SelectParams<typeof RadioGroup<T>>, T['id'] | null, Carries<T>> & {
-            label: string;
-        },
+        props: BoundSelect<
+            NamesFor<D, T['id'] | null, T['id']>,
+            SelectParams<typeof RadioGroup<T>>,
+            T['id'] | null,
+            Carries<T>
+        > & {label: string},
     ) => VNode;
     /** `label` is the group's legend, required: a group without one has no accessible name. */
     CheckboxGroupField: <T extends SelectItem>(
@@ -147,11 +150,18 @@ export interface BoundControls<D> {
             label: string;
         },
     ) => VNode;
-    SingleSelectField: <T extends SelectItem>(
-        props: BoundSelect<Names<D, T['id'] | null>, SelectParams<typeof SingleSelect<T>>, T['id'] | null, Carries<T>>,
+    SingleSelectField: <T extends SelectItem, C extends string | undefined = undefined>(
+        props: BoundSelect<
+            SelectNames<D, T['id'], C>,
+            SelectParams<typeof SingleSelect<T>>,
+            T['id'] | null,
+            Carries<T>
+        > & {clearLabel?: C},
     ) => VNode;
-    ComboboxField: <T extends SelectItem>(
-        props: BoundSelect<Names<D, T['id'] | null>, SelectParams<typeof Combobox<T>>, T['id'] | null, Carries<T>>,
+    ComboboxField: <T extends SelectItem, C extends string | undefined = undefined>(
+        props: BoundSelect<SelectNames<D, T['id'], C>, SelectParams<typeof Combobox<T>>, T['id'] | null, Carries<T>> & {
+            clearLabel?: C;
+        },
     ) => VNode;
     MultiSelectField: <T extends SelectItem>(
         props: BoundSelect<Names<D, T['id'][]>, SelectParams<typeof MultiSelect<T>>, T['id'][], Carries<T>>,
@@ -159,21 +169,21 @@ export interface BoundControls<D> {
     MultiComboboxField: <T extends SelectItem>(
         props: BoundSelect<Names<D, T['id'][]>, SelectParams<typeof MultiCombobox<T>>, T['id'][], Carries<T>>,
     ) => VNode;
-    GroupSelectField: <T extends SelectItem>(
+    GroupSelectField: <T extends SelectItem, C extends string | undefined = undefined>(
         props: BoundSelect<
-            Names<D, T['id'] | null>,
+            SelectNames<D, T['id'], C>,
             SelectParams<typeof GroupSelect<T>>,
             T['id'] | null,
             CarriesGroups<T>
-        >,
+        > & {clearLabel?: C},
     ) => VNode;
-    GroupComboboxField: <T extends SelectItem>(
+    GroupComboboxField: <T extends SelectItem, C extends string | undefined = undefined>(
         props: BoundSelect<
-            Names<D, T['id'] | null>,
+            SelectNames<D, T['id'], C>,
             SelectParams<typeof GroupCombobox<T>>,
             T['id'] | null,
             CarriesGroups<T>
-        >,
+        > & {clearLabel?: C},
     ) => VNode;
     /**
      * The field frame by name, for a control the kit has no bound version of (your own, or one that edits
@@ -193,6 +203,13 @@ type FrameSlots = SlotsType<{
 
 /** A form without a draft (`D` a string of names) takes any of its names; a draft form only the paths holding `V`. */
 type Names<D, V> = D extends string ? D : PathsOf<D, V>;
+/**
+ * The names a single-value select takes: it writes null only through its clear entry, so with `clearLabel` (`C`
+ * a string) the path must hold null, and without one a path that is never empty fits too.
+ */
+type SelectNames<D, Id, C> = [C] extends [string] ? Names<D, Id | null> : NamesFor<D, Id | null, Id>;
+/** As `Names`, for a control that reads `Reads` but writes only `Writes`: a path that is never empty fits too. */
+type NamesFor<D, Reads, Writes> = D extends string ? D : PathsFor<D, Reads, Writes>;
 
 type Field = (name: string) => FieldBinding & {modelValue?: unknown; 'onUpdate:modelValue'?: (value: unknown) => void};
 
