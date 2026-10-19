@@ -129,11 +129,14 @@ The package PR comes from a FRESH branch off `main`, not from this experiment br
 (41+ commits, some naming the consumer) must not land in main's log. Carry the package over in a few clean
 commits; leave `HANDOFF.md` and `EXPERIMENT-REPORT.md` behind.
 
-1. Fresh branch off `main`, the package in clean commits, `"private": true` KEPT, version `0.1.0`, CHANGELOG
-   `## Unreleased` renamed `## 0.1.0 — <date>`. PR, review, merge. Nothing publishes (`detect` sees private).
-2. Hand-bootstrap `0.1.0` from a clean `main` checkout (repo CLAUDE.md § Adding a Package, step 7: short-lived
+1. Fresh branch off `main`, the package in clean commits, version `0.1.0`, CHANGELOG `## Unreleased` renamed
+   `## 0.1.0 — <date>`, `"private"` DROPPED (npm refuses to publish a private package, so the hand bootstrap
+   below needs it gone), and `DOCS-PAGE.draft.md` moved to `docs/packages/ui-form.md` with the three listings
+   in its header (validate:docs requires them once the package is publishable). PR, review, merge.
+2. The merge raises a `publish.yml` approval (`detect` sees 0.1.0 missing on npm). DO NOT approve it: without a
+   Trusted Publisher it 404s.
+3. Hand-bootstrap `0.1.0` from a clean `main` checkout (repo CLAUDE.md § Adding a Package, step 7: short-lived
    token, never written to a tracked file, revoked after), then attach the Trusted Publisher on npmjs.org.
-3. Second PR: drop `"private"`, bump `0.1.1`, move `DOCS-PAGE.draft.md` into `docs/packages/ui-form.md` and add
-   the three listings in its header (validate:docs needs them once the package is publishable).
-4. Approve that run and read its log for `Successfully published` — that proves the grant.
-5. Cancel any `publish.yml` runs still waiting from before the bootstrap.
+4. Cancel the waiting run from step 2 (it would now report nothing to publish and spend an approval).
+5. Second PR: bump `0.1.1`. Approve that run and read its log for `Successfully published`, which proves the
+   grant.
