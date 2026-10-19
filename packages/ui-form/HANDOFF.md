@@ -1,10 +1,10 @@
 # Handoff: ui-form experiment (fs-packages side)
 
 > **Read the last section first** ("State at 2026-10-19"): it supersedes "Open" and "Next steps" below,
-> which are from 2026-10-09. `EXPERIMENT-REPORT.md` is the 10-09 report for the lead and is not kept current.
+> which are from 2026-10-09. `EXPERIMENT-REPORT.md` is the 10-09 report and is not kept current.
 
 Written 2026-10-09, end of day, for a fresh session on another machine. Read this first, then
-`EXPERIMENT-REPORT.md` next to it (the full shape, decisions and gaps, written for Gerard).
+`EXPERIMENT-REPORT.md` next to it (the full shape, decisions and gaps as of 10-09).
 
 ## Where things are
 
@@ -34,7 +34,7 @@ Written 2026-10-09, end of day, for a fresh session on another machine. Read thi
   external day-update requests), so a 422's keys arrive as dotted camelCase paths (`learningGoals.0.title`).
   That is what makes the identity default and `field('a.0.b')` right.
 
-## How we work (Marcel's rules)
+## How we work
 
 - Prototype mode: shape over polish. A quick test + typecheck before packing is enough; skip
   mutation/README polish.
@@ -42,7 +42,7 @@ Written 2026-10-09, end of day, for a fresh session on another machine. Read thi
   per pack (`0.1.0-control.N`, `0.18.0-control.N`, `0.4.0-control.N`), `npm install --ignore-scripts` to
   refresh the lock, pack, push to `fork`, and tell the emmie session the file names.
 - Clean package code first, then the consumer's goals, then migration cost (a cost, never a veto). Don't
-  invent constraints nobody set. Since 2026-10-09: **emmie first** (Gerard); being agnostic is nice to have.
+  invent constraints nobody set. **emmie first**: being agnostic is nice to have.
 - Relay findings to the emmie session; push back when something smells (it worked: layers instead of
   `:where()`, keeping messages until the next save).
 
@@ -68,32 +68,30 @@ control.13 / control.14 (today's last packs, one commit each):
    `@layer base, ui-form;` first in `sass/app.scss` and has its `_base.scss` in `@layer base`; checked by
    the emmie session in the browser (`w-70` on a TextField now works).
 
-## Decisions (with source)
+## Decisions
 
-Partly superseded: the two rows marked † were replaced by K2 (the bound controls are the field-controls,
+Partly superseded: the two items marked † were replaced by K2 (the bound controls are the field-controls,
 and the kit was decided before them). See the last section.
 
-| Decision                                                                                                     | Source                           |
-| ------------------------------------------------------------------------------------------------------------ | -------------------------------- |
-| Merge fs-form + ui-inputs into `ui-form`                                                                     | Marcel; Gerard's "combine them"  |
-| No provide/inject; shape = `v-bind="field(name)"`, FormLabel/FormError by name, form as prop †               | Gerard                           |
-| Order: (1) emmie adopts ui-form's controls → (2) field-controls into the package → (3) then decide the kit † | Marcel/Gerard                    |
-| emmie first; agnostic is nice to have                                                                        | Gerard                           |
-| Generated ids, fixed prefix only when needed                                                                 | Gerard ("geweldig")              |
-| Form-bound pieces take the old names                                                                         | Gerard; Marcel prefers old names |
-| ADR-0043 amendment                                                                                           | Gerard writes it                 |
-| Messages stay until the next save; `withdraw` is explicit (clear-on-edit reverted, control.12)               | Marcel                           |
-| `error` + `invalid` override ("message without red")                                                         | Marcel                           |
-| No shims; emmie renames its imports in one pass                                                              | Marcel                           |
-| `Message`/`FormError` always present; `FormField`'s own message only when there is one                       | Marcel                           |
-| `keyMapper` default stays identity (casing lives in emmie's http middleware)                                 | Marcel                           |
-| `refusedUnnamed` = "no field the form holds"; keep `'ignored'`; keep the one overload cast                   | Marcel                           |
-| RichTextEditor (tiptap) / file upload stay in emmie, wired through `field()` / `FormField`                   | Marcel                           |
-| Package CSS = defaults that consumer CSS always overrides → `@layer ui-form`                                 | Marcel                           |
+- Merge fs-form + ui-inputs into `ui-form`
+- No provide/inject; shape = `v-bind="field(name)"`, FormLabel/FormError by name, form as prop †
+- Order: (1) emmie adopts ui-form's controls → (2) field-controls into the package → (3) then decide the kit †
+- emmie first; agnostic is nice to have
+- Generated ids, fixed prefix only when needed
+- Form-bound pieces take the old names
+- Messages stay until the next save; `withdraw` is explicit (clear-on-edit was reverted in control.12)
+- `error` + `invalid` override ("message without red")
+- No shims; emmie renames its imports in one pass
+- `Message`/`FormError` always present; `FormField`'s own message only when there is one
+- `keyMapper` default stays identity (casing lives in emmie's http middleware)
+- `refusedUnnamed` = "no field the form holds"; keep `'ignored'`; keep the one overload cast
+- RichTextEditor (tiptap) / file upload stay in emmie, wired through `field()` / `FormField`
+- Package CSS = defaults that consumer CSS always overrides → `@layer ui-form`
+- ADR-0043 gets an amendment for the merge.
 
 ## Open (2026-10-09, superseded: see the last section)
 
-- **Pending with Gerard:** the 422-per-form model (he asked for an example); `string | null` vs `string`
+- **Pending:** the 422-per-form model (an example was asked for); `string | null` vs `string`
   for the text controls' model.
 - The emmie red (`#D45F52`) is not yet the package's danger default (asked, no answer yet).
 - emmie's look currently reaches every `.ui-control` (shared tokens), not just `TextInput`. That's
@@ -129,8 +127,8 @@ Step 2, **field-controls into the package**: self-wrap in `FormField` when `labe
   `node_modules/.bin/vue-tsc -p "$PWD/tsconfig.json"` for a scratch type check.
 - `useId()` is unique per Vue **app**: specs that mount two forms separately get the same ids; mount
   them under one parent.
-- The hook here blocks `git branch -D` in script-development repos; branch cleanup waits for Marcel.
-- Branch cleanup is deferred until after the lead conversation: `experiment/ui-form-spread`,
+- The hook here blocks `git branch -D` in script-development repos; branch cleanup is done by hand.
+- Branch cleanup is deferred: `experiment/ui-form-spread`,
   `-field`, `-no-http`, `-glue`, `-merge`, `form-merge`, `form-wiring`, the stray `experiment/ui-form`, plus
   the old feature branches `feat/dialog-before-close-guard` and `feat/ui-inputs-formfield-orientation`.
 
@@ -143,8 +141,8 @@ commits; leave `HANDOFF.md` and `EXPERIMENT-REPORT.md` behind.
 1. Fresh branch off `main`, the package in clean commits, version `0.1.0`, CHANGELOG `## Unreleased` renamed
    `## 0.1.0 — <date>`, `"private"` DROPPED (npm refuses to publish a private package), and `DOCS-PAGE.draft.md` moved to `docs/packages/ui-form.md` with the three listings
    in its header (validate:docs requires them once the package is publishable). PR, review, merge.
-2. Publishing is Gerard's (Marcel, 2026-10-19): the approval, the hand bootstrap, the Trusted Publisher and
-   any proving bump are his. Our part ends at the merged PR; don't plan or chase those steps.
+2. Publishing is not part of this work: the approval, the hand bootstrap, the Trusted Publisher and any proving
+   bump happen elsewhere. This work ends at the merged PR.
 
 ## State at 2026-10-19 (control.21 @ 3ccd75b)
 
@@ -167,7 +165,7 @@ Decided since the 10-09 notes (emmie-2 now leads the emmie + package line; my si
   `draft.ts` and `path.ts` changed or landed after the last run (form.ts was 100%, the scope 92%).
 - README: document the new controls (TimeInput, SearchInput, PasswordInput, InputGroup), `prepend`/`append`,
   autogrow, autofocus and the kit list; the docs draft's API sections are still TODO.
-- Then the package PR (release sequence step 1; these notes and EXPERIMENT-REPORT.md stay behind). Gerard publishes.
+- Then the package PR (release sequence step 1; these notes and EXPERIMENT-REPORT.md stay behind).
 
 ### Open (small, package side)
 
@@ -192,4 +190,4 @@ Decided since the 10-09 notes (emmie-2 now leads the emmie + package line; my si
 - The select-family unit flake is local and load-only (0 test failures in 200 CI runs).
 - Packs now: ui-form only (the shims are gone). Bump `packages/ui-form/package.json`, `npm install
 --ignore-scripts`, build, `npm pack --pack-destination ../../.experiment-packs`, commit, push to `fork`.
-- Scope: fix what this work owns; don't chase issues merely noticed elsewhere (Marcel, 2026-10-19).
+- Scope: fix what this work owns; don't chase issues merely noticed elsewhere.
