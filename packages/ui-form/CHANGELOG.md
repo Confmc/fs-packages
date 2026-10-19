@@ -28,9 +28,46 @@ First release of `@script-development/ui-form`: `@script-development/fs-form` an
 
 - **The select family's option-text prop is `optionLabel`,** so `label` is the field label everywhere, as on `RadioGroup` and `CheckboxGroup` already.
 - **Every component rule sits in the `ui-form` cascade layer.** Consumer CSS outside a layer (utilities included) always overrides the package, whatever its specificity or load order. A consumer with an element base puts it in a layer declared first: `@layer base, ui-form;`. The `--ui-*` tokens stay unlayered.
-- **New token defaults** for the control look, and two new tokens: `--ui-control-border-color-hover` and `--ui-danger-ring-focus`.
+- **New token defaults** for the control look (listed in the migration table below), and two new tokens: `--ui-control-border-color-hover` (the border on a resting control under the pointer) and `--ui-danger-ring-focus` (the ring an invalid control shows only while focused).
 - **`TextInput`'s root is a `span.ui-input-wrap`**: `class` and `style` land on it, every other attribute on the `<input>`.
-- TODO: a migration table from ui-inputs and fs-form.
+
+### Migrating
+
+ui-form runs next to fs-form and ui-inputs, so one form can move at a time. Load only ui-form's stylesheet once any form uses it: it styles ui-inputs' markup too.
+
+| From                                                                                                         | To                                                                                                                 |
+| ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| `import … from '@script-development/fs-form'` / `'@script-development/ui-inputs'`                            | `import … from '@script-development/ui-form'`                                                                      |
+| `import '@script-development/ui-inputs/style.css'`                                                           | `import '@script-development/ui-form/style.css'`, and `@layer base, ui-form;` first if the app has an element base |
+| `useForm(httpService, options)`                                                                              | `useForm(options)`                                                                                                 |
+| `useValidationErrors(httpService, options)`                                                                  | `useValidationErrors(options)`, then `take(error)` with each caught error                                          |
+| `useFormSubmit({clearErrors})`                                                                               | `useFormSubmit({clearErrors, take})`                                                                               |
+| `onlyWhileSubmitting`, `acceptWhen`                                                                          | removed: a form takes only its own submit's 422                                                                    |
+| an action that catches its own 422                                                                           | rethrow it, or `if (!form.take(error)) throw error;`                                                               |
+| a 422 from a request outside a submit (a lookup)                                                             | `form.take(error)` in its catch                                                                                    |
+| `await handleSubmit(action)` (`void`)                                                                        | `const outcome = await handleSubmit(action, {validate})`: `'sent'`, `'refused'` or `'ignored'`                     |
+| `scrollToError` (default off), `scrollRoot`, `scrollTarget`                                                  | `scrollToError` (default on), by the form's own ids; the other two are removed                                     |
+| `<FormLabel :html-for="id">`, `<FormError :id :error>`                                                       | form-bound `<FormLabel name="x" label="…" />`, `<FormError name="x" />` from `useForm`, or `FormField`             |
+| `id`, `invalid`, `describedby` by hand on a control                                                          | `v-bind="field('x')"`                                                                                              |
+| `label="name"` on `SingleSelect`, `Combobox`, `MultiSelect`, `MultiCombobox`, `GroupSelect`, `GroupCombobox` | `option-label="name"`                                                                                              |
+| `:invalid="Boolean(error)"`                                                                                  | `:error="error"` (`invalid` stays as an override)                                                                  |
+| `class` / `style` on `TextInput` styling the `<input>`                                                       | they land on its new `span.ui-input-wrap` root; every other attribute still reaches the `<input>`                  |
+
+Token defaults that changed (set the old value in your theme to keep the old look):
+
+| Token                             | ui-inputs                           | ui-form                              |
+| --------------------------------- | ----------------------------------- | ------------------------------------ |
+| `--ui-control-text`               | `#111827`                           | `#000000`                            |
+| `--ui-control-font-size`          | `inherit`                           | `0.875rem`                           |
+| `--ui-control-line-height`        | `inherit`                           | `1.5`                                |
+| `--ui-control-pad-x`              | `0.75rem`                           | `0.875rem`                           |
+| `--ui-control-pad-y`              | `0.55rem`                           | `0.5rem`                             |
+| `--ui-control-radius`             | `8px`                               | `12px`                               |
+| `--ui-control-border-color`       | `#d1d5db`                           | `#e1dace`                            |
+| `--ui-control-border-color-focus` | `var(--ui-control-border-color)`    | `#de7356`                            |
+| `--ui-control-bg-disabled`        | `#f3f4f6`                           | `#fbf8f2`                            |
+| `--ui-focus-ring`                 | `0 0 0 3px rgba(37, 99, 235, 0.35)` | `0 0 0 4px rgba(222, 115, 86, 0.25)` |
+| `--ui-danger-shadow`              | `0 0 0 3px rgba(220, 38, 38, 0.2)`  | `none`                               |
 
 ## History carried over from @script-development/ui-inputs
 
