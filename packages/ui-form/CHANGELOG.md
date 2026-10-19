@@ -17,6 +17,11 @@ First release of `@script-development/ui-form`: `@script-development/fs-form` an
 - **An in-input error icon on `TextInput`,** shown while it is marked.
 - **Form-bound controls.** `useForm` hands out a bound version of each control (`TextField`, `TextareaField`, `NumberField`, `DateField`, `CheckboxField`, `SwitchField`, `RadioGroupField`, `CheckboxGroupField`, `SingleSelectField`, `ComboboxField`, `MultiSelectField`, `MultiComboboxField`, `GroupSelectField`, `GroupComboboxField`): `<TextField name="title" label="Title" />` draws the label, the control and the message, wired by `field(name)`. On a draft form `name` takes only a path holding that control's value type (a select's id type comes from its `options`). Every other prop passes through to the control and wins over the wiring. Each has a stable component name, so a spec finds it with `findAllComponents({name: 'TextField'})` or by the control inside.
 - **`createUiForm({texts})`**: an app's texts (`placeholder`, `emptyText`, `optionsLabel`, `removeLabel`, `requiredLabel`) set once. It hands out `useForm`, whose bound controls carry them, and the bare text-carrying controls with them as defaults. The package's own `useForm` is the same with the package's texts.
+- **New controls.** `TimeInput` (`HH:MM` or `null`, a clock glyph, a clear button unless `clearable` is false, `step` in minutes, the picker on a click), `SearchInput` (a `type="search"` box with a magnifier and a clear button), `PasswordInput` (a show/hide toggle with `aria-pressed`, a Caps Lock notice read with the field, `autocomplete`) and `InputGroup` (addon texts joined to a control, `prepend` / `append`). The kit adds `TimeField` and `PasswordField`; `TextField`, `NumberField`, `DateField` and `TimeField` take `prepend` / `append` and name the addons in `aria-describedby`.
+- **`autofocus`** on `TextInput`, `NumberInput`, `TimeInput`, `SearchInput` and `PasswordInput`, done on mount so it also works in a dialog that opens later.
+- **`Textarea` `autogrow` and `maxRows`**: the height follows the text, on mount and on every change, up to `maxRows` lines.
+- **`MultiSelect` `placement`**: where the list opens (it still flips when there is no room).
+- **More `createUiForm` texts:** `clearButtonLabel`, `showPasswordLabel`, `hidePasswordLabel`, `capsLockText`.
 - **`FormDraft<T>`**: a record's form state. Every value a control can clear is nullable; booleans, lists and nested objects keep their shape; `readonly` goes.
 
 ### Changed (from fs-form)
@@ -32,6 +37,9 @@ First release of `@script-development/ui-form`: `@script-development/fs-form` an
 - **Every component rule sits in the `ui-form` cascade layer.** Consumer CSS outside a layer (utilities included) always overrides the package, whatever its specificity or load order. A consumer with an element base puts it in a layer declared first: `@layer base, ui-form;`. The `--ui-*` tokens stay unlayered.
 - **New token defaults** for the control look (listed in the migration table below), and two new tokens: `--ui-control-border-color-hover` (the border on a resting control under the pointer) and `--ui-danger-ring-focus` (the ring an invalid control shows only while focused).
 - **`TextInput`'s root is a `span.ui-input-wrap`**: `class` and `style` land on it, every other attribute on the `<input>`.
+- **`MultiSelect` and `MultiCombobox` keep the model in the order the options are shown in** (alphabetical with `alphabeticalSort`, else your order), not the order picked. An id with no option yet stays at the end.
+- **`NumberInput` hides the browser's spin buttons.**
+- **New tokens:** `--ui-addon-bg`, `--ui-addon-text` (InputGroup) and `--ui-warning-text` (PasswordInput's Caps Lock notice).
 
 ### Migrating
 
@@ -54,6 +62,7 @@ ui-form runs next to fs-form and ui-inputs, so one form can move at a time. Load
 | `label="name"` on `SingleSelect`, `Combobox`, `MultiSelect`, `MultiCombobox`, `GroupSelect`, `GroupCombobox` | `option-label="name"`                                                                                              |
 | `:invalid="Boolean(error)"`                                                                                  | `:error="error"` (`invalid` stays as an override)                                                                  |
 | `class` / `style` on `TextInput` styling the `<input>`                                                       | they land on its new `span.ui-input-wrap` root; every other attribute still reaches the `<input>`                  |
+| code that relies on a multi-select's model being in pick order                                               | it is now in display order                                                                                         |
 
 Token defaults that changed (set the old value in your theme to keep the old look):
 
