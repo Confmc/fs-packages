@@ -1,4 +1,40 @@
-# @script-development/ui-inputs
+# @script-development/ui-form
+
+## Unreleased
+
+First release of `@script-development/ui-form`: `@script-development/fs-form` and `@script-development/ui-inputs` as one package. Both stay published and unchanged, so a consumer can run old and new side by side and migrate form by form. The version, the date and the final wording are set when the package is cut.
+
+### Added
+
+- **One package for form state and form controls.** Every ui-inputs control, `FormField` and the form composables, under one name and one stylesheet (`@script-development/ui-form/style.css`).
+- **`field(name)`: one name per field.** Returns the field's whole wiring, `{id, invalid, describedby, error}`, so `<TextInput v-bind="field('email')" />` links the control to its label and message.
+- **Form-bound `FormLabel` and `FormError`.** `useForm()` hands them out bound to that form: `<FormLabel name="email" label="E-mail" required />` points at the control `field('email')` wires, `<FormError name="email" />` renders that field's message. `FormError` is always present (empty without a message) so it can hold its place in a row layout.
+- **A typed draft.** `useForm({draft})` with the component's own `Ref` types every name as a path into the draft (`learningGoals.0.title`), and `field(name)` also carries the value at that path and writes changes back, typed so a control only accepts a path of its own value type.
+- **Client refusals next to the server's.** `refuse`, `setRefusals`, `withdraw` and `clearClient`, with `clientErrors` and `fieldErrors` (server and client, the client winning per field).
+- **`handleSubmit` reports how it ended:** `'sent'`, `'refused'` or `'ignored'` (a call while one is in flight). Its `validate` option runs a client check first; a refusal skips the action.
+- **`take(error)`** binds a 422 caught outside a submit and returns whether it was one.
+- **Every control takes `error`.** The mark is `invalid ?? Boolean(error)`: an error marks the control, and `invalid: false` shows a message without the mark.
+- **An in-input error icon on `TextInput`,** shown while it is marked.
+- TODO (kit decision): form-bound controls handed out by `useForm`, and their default texts.
+
+### Changed (from fs-form)
+
+- **`useForm` takes no HTTP service.** `handleSubmit` takes the 422 its own action rejected with, so a form holds exactly its own requests' refusals; another form's request never lands in it. An action that catches its own 422 must rethrow it or pass it to `take`. `onlyWhileSubmitting` and `acceptWhen` are gone; nothing is registered on a service.
+- **Scroll to the first error is on by default** and is a step of a refused submit, found by the form's own ids in document order. `scrollRoot` and `scrollTarget` are gone.
+- **Ids are generated per form:** the name first, then a part from Vue's `useId()` (`firstName-v-3`); `idPrefix` sets a fixed prefix instead (`invoice-firstName`).
+- **The `keyMapper` default stays identity.** The field keys of a 422 bind as the server sent them.
+
+### Changed (from ui-inputs)
+
+- **The select family's option-text prop is `optionLabel`,** so `label` is the field label everywhere, as on `RadioGroup` and `CheckboxGroup` already.
+- **Every component rule sits in the `ui-form` cascade layer.** Consumer CSS outside a layer (utilities included) always overrides the package, whatever its specificity or load order. A consumer with an element base puts it in a layer declared first: `@layer base, ui-form;`. The `--ui-*` tokens stay unlayered.
+- **New token defaults** for the control look, and two new tokens: `--ui-control-border-color-hover` and `--ui-danger-ring-focus`.
+- **`TextInput`'s root is a `span.ui-input-wrap`**: `class` and `style` land on it, every other attribute on the `<input>`.
+- TODO: a migration table from ui-inputs and fs-form.
+
+## History carried over from @script-development/ui-inputs
+
+The entries below are ui-inputs' own, up to the version this package was cut from. fs-form's history stays in its own changelog.
 
 ## 0.17.1 — 2026-10-17
 
