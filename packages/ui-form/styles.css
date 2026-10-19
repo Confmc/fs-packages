@@ -35,6 +35,8 @@
     --ui-label-weight: 500;
     --ui-label-transform: none;
     --ui-label-tracking: normal;
+    /* the required mark; defaults to the danger colour it always had. */
+    --ui-label-required-color: var(--ui-danger-text);
 
     /* control (input + select trigger) */
     --ui-control-bg: #ffffff;
@@ -225,7 +227,8 @@
             grid-template-columns: var(--ui-field-label-width) minmax(0, 1fr);
             align-items: start;
         }
-        .ui-field.is-horizontal > .ui-label {
+        .ui-field.is-horizontal > .ui-label,
+        .ui-field.is-horizontal > .ui-field__head {
             grid-column: 1;
             grid-row: 1;
             align-self: var(--ui-field-label-align);
@@ -244,6 +247,14 @@
         }
     }
 
+    /* The label row a field gets when it has an aside: the label at the start, the aside at the far end. */
+    .ui-field__head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: var(--ui-field-gap);
+    }
+
     .ui-label {
         color: var(--ui-label-color);
         font-size: var(--ui-label-size);
@@ -252,7 +263,7 @@
         letter-spacing: var(--ui-label-tracking);
     }
     .ui-label__req {
-        color: var(--ui-danger-text);
+        color: var(--ui-label-required-color);
         margin-left: 2px;
     }
 

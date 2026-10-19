@@ -1,6 +1,15 @@
 <template>
     <div class="ui-field" :class="{'is-horizontal': orientation === 'horizontal' && Boolean(label)}">
-        <FormLabel v-if="label" :html-for="field.id" :required="required">{{ label }}</FormLabel>
+        <!-- with an aside the label shares a row with it; without one the label stays a direct child, as in 0.17 -->
+        <div v-if="label && $slots.aside" class="ui-field__head">
+            <FormLabel :html-for="field.id" :required="required">
+                {{ label }}<template #after><slot name="label-after" /></template>
+            </FormLabel>
+            <slot name="aside" :field="field" />
+        </div>
+        <FormLabel v-else-if="label" :html-for="field.id" :required="required">
+            {{ label }}<template #after><slot name="label-after" /></template>
+        </FormLabel>
         <!-- the slot receives `field`, whose keys are the control's own prop names, so one
              `v-bind="field"` wires the control; the wrapper keeps multi-node slot content in one
              grid cell when horizontal (display: contents otherwise) -->
@@ -43,7 +52,13 @@ const {
     orientation?: 'vertical' | 'horizontal';
 }>();
 
-defineSlots<{default?: (scope: {field: FieldBinding}) => unknown}>();
+defineSlots<{
+    default?: (scope: {field: FieldBinding}) => unknown;
+    /** inside the label, after its text and required mark: a note ("optional"), a tooltip. */
+    'label-after'?: () => unknown;
+    /** at the far end of the label's row, e.g. a switch that belongs to the field. */
+    aside?: (scope: {field: FieldBinding}) => unknown;
+}>();
 
 const generatedId = useId();
 const errorId = computed(() => messageId(id ?? generatedId));

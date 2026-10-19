@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import {mount} from '@vue/test-utils';
 import {describe, expect, it} from 'vitest';
+import {h} from 'vue';
 
 import FormField from '../src/components/FormField.vue';
 
@@ -29,6 +30,38 @@ describe('FormField', () => {
 
         expect(wrapper.find('.ui-error').text()).toBe('Bad email');
         expect(wrapper.text()).toContain('inv:true|db:email-error');
+    });
+
+    it('puts label-after content inside the label, after the text and the required mark', () => {
+        const wrapper = mount(FormField, {
+            props: {label: 'Email', required: true, id: 'email'},
+            slots: {default: wiringSlot, 'label-after': '<em class="note">optional</em>'},
+        });
+
+        const label = wrapper.find('label.ui-label');
+        expect(label.find('.note').text()).toBe('optional');
+        expect(label.element.lastElementChild?.className).toBe('note');
+    });
+
+    it('puts aside at the end of the label row, with the field wiring', () => {
+        const wrapper = mount(FormField, {
+            props: {label: 'Email', id: 'email'},
+            slots: {
+                default: wiringSlot,
+                aside: ({field}: {field: {id: string}}) => h('span', {class: 'toggle'}, field.id),
+            },
+        });
+
+        const head = wrapper.find('.ui-field > .ui-field__head');
+        expect(head.find('label.ui-label').text()).toBe('Email');
+        expect(head.element.lastElementChild?.outerHTML).toBe('<span class="toggle">email</span>');
+    });
+
+    it('keeps the label a direct child of the field without an aside', () => {
+        const wrapper = mount(FormField, {props: {label: 'Email', id: 'email'}, slots: {default: wiringSlot}});
+
+        expect(wrapper.find('.ui-field > .ui-label').exists()).toBe(true);
+        expect(wrapper.find('.ui-field__head').exists()).toBe(false);
     });
 
     it('omits the label when none is given, keeping the wiring on the provided id', () => {

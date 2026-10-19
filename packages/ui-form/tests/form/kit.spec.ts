@@ -92,6 +92,28 @@ describe('form-bound controls', () => {
         expect(wrapper.text()).toContain('Te kort');
     });
 
+    it('hands label-after and aside to the field frame, and every other slot to the control', async () => {
+        const {wrapper} = mountWith(({SingleSelectField}) =>
+            h(
+                SingleSelectField,
+                {name: 'debtorId', label: 'Debiteur', options: debtors, optionLabel: 'name'},
+                {
+                    'label-after': () => h('em', {class: 'note'}, 'optioneel'),
+                    aside: () => h('span', {class: 'toggle'}, 'aan'),
+                    option: ({option}: {option: {name: string}}) => h('b', option.name),
+                },
+            ),
+        );
+
+        expect(wrapper.find('label.ui-label .note').text()).toBe('optioneel');
+        expect(wrapper.find('.ui-field__head .toggle').text()).toBe('aan');
+        await wrapper.find('button').trigger('click');
+        expect(wrapper.findAll('[role="option"] b').map((option) => option.text())).toEqual([
+            'Gemeente',
+            'Zorgkantoor',
+        ]);
+    });
+
     it("puts a checkbox's label on the box itself, not in a field label column", () => {
         const {wrapper} = mountWith(({CheckboxField}) => h(CheckboxField, {name: 'active', label: 'Actief'}));
 

@@ -193,6 +193,8 @@ const bind = (field: Field, control: Component, name: string, labelOnControl: bo
         (props: Shell<string> & Addons, {attrs, slots}) =>
             () => {
                 const {class: className, style, ...rest} = attrs;
+                // the frame's slots go to the field, every other slot to the control
+                const {'label-after': labelAfter, aside, ...controlSlots} = slots;
                 const wiring = field(props.name);
                 const addons = [props.prepend && `${wiring.id}-prepend`, props.append && `${wiring.id}-append`];
                 const describedby = [wiring.describedby, ...addons].filter(Boolean).join(' ') || undefined;
@@ -207,7 +209,7 @@ const bind = (field: Field, control: Component, name: string, labelOnControl: bo
                             ...(labelOnControl ? {label: props.label} : {}),
                             ...rest,
                         },
-                        slots,
+                        controlSlots,
                     );
                 return h(
                     FormField,
@@ -225,6 +227,8 @@ const bind = (field: Field, control: Component, name: string, labelOnControl: bo
                             props.prepend || props.append
                                 ? h(InputGroup, {id: wiring.id, prepend: props.prepend, append: props.append}, inner)
                                 : inner(),
+                        'label-after': labelAfter,
+                        aside,
                     },
                 );
             },
