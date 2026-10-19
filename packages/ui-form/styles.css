@@ -193,6 +193,8 @@
     --ui-danger-shadow: none;
     --ui-error-size: 0.8125rem;
     --ui-error-weight: 400;
+    /* a warning beside a field that is not an error (PasswordInput's Caps Lock notice) */
+    --ui-warning-text: #b45309;
 }
 
 @layer ui-form {
@@ -400,6 +402,17 @@
     }
     .ui-search::-webkit-search-cancel-button {
         appearance: none;
+    }
+
+    /* PasswordInput: the field, and under it the Caps Lock notice while it is on. */
+    .ui-password {
+        display: block;
+    }
+    .ui-password__caps {
+        display: block;
+        margin-top: var(--ui-field-gap);
+        color: var(--ui-warning-text);
+        font-size: var(--ui-error-size);
     }
 
     /* InputGroup: addon texts joined to a control, read as one box. The control keeps its own

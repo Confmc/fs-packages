@@ -153,6 +153,7 @@ describe('createUiForm', () => {
             removeLabel: 'Verwijder',
             requiredLabel: '(verplicht)',
             clearButtonLabel: 'Wis',
+            showPasswordLabel: 'Toon wachtwoord',
         },
     });
 
@@ -221,6 +222,20 @@ describe('createUiForm', () => {
         const wrapper = mount(ui.SearchInput, {props: {modelValue: 'appel'}});
 
         expect(wrapper.find('.ui-input__button').attributes('aria-label')).toBe('Wis');
+    });
+
+    it("names a PasswordField's toggle with the configured text", () => {
+        const draft = ref({password: null as string | null});
+        const wrapper = mount(
+            defineComponent({
+                setup: () => {
+                    const {PasswordField} = ui.useForm({draft});
+                    return () => h(PasswordField, {name: 'password', label: 'Wachtwoord'});
+                },
+            }),
+        );
+
+        expect(wrapper.find('.ui-input__button').attributes('aria-label')).toBe('Toon wachtwoord');
     });
 
     it('hands out the package controls themselves when no texts are configured', () => {

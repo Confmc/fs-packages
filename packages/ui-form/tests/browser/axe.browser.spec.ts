@@ -25,6 +25,7 @@ import InputGroup from '../../src/components/InputGroup.vue';
 import MultiCombobox from '../../src/components/MultiCombobox.vue';
 import MultiSelect from '../../src/components/MultiSelect.vue';
 import NumberInput from '../../src/components/NumberInput.vue';
+import PasswordInput from '../../src/components/PasswordInput.vue';
 import Pressable from '../../src/components/Pressable.vue';
 import RadioGroup from '../../src/components/RadioGroup.vue';
 import SearchInput from '../../src/components/SearchInput.vue';
@@ -184,6 +185,14 @@ describe('axe-core audits — zero violations, closed and open', () => {
                     'onUpdate:modelValue': noop,
                 }),
             ),
+        );
+        await expectNoViolations(screen.container);
+    });
+
+    it('FormField + PasswordInput with an error: toggle button and error icon', async () => {
+        const screen = await renderInField(
+            (slot) => h(PasswordInput, {...slot.field, modelValue: 'geheim', 'onUpdate:modelValue': noop}),
+            {error: 'Onjuist wachtwoord'},
         );
         await expectNoViolations(screen.container);
     });

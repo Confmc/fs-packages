@@ -19,6 +19,7 @@ import {
     TextInput,
     TimeInput,
     SearchInput,
+    PasswordInput,
 } from '../src';
 
 // Every control, the props it needs to render, and the element that carries the mark.
@@ -29,6 +30,7 @@ const CONTROLS: [string, unknown, Record<string, unknown>, string][] = [
     ['DateInput', DateInput, {modelValue: null}, 'input'],
     ['TimeInput', TimeInput, {modelValue: null}, 'input'],
     ['SearchInput', SearchInput, {modelValue: null}, 'input'],
+    ['PasswordInput', PasswordInput, {modelValue: null}, 'input'],
     ['Checkbox', Checkbox, {modelValue: false, label: 'Accept'}, 'input'],
     ['Switch', Switch, {modelValue: false, label: 'On'}, 'input'],
     ['RadioGroup', RadioGroup, {options: [], optionLabel: 'name', label: 'Fruit', modelValue: null}, 'fieldset'],

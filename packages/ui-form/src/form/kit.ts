@@ -17,6 +17,7 @@ import InputGroup from '../components/InputGroup.vue';
 import MultiCombobox from '../components/MultiCombobox.vue';
 import MultiSelect from '../components/MultiSelect.vue';
 import NumberInput from '../components/NumberInput.vue';
+import PasswordInput from '../components/PasswordInput.vue';
 import RadioGroup from '../components/RadioGroup.vue';
 import SearchInput from '../components/SearchInput.vue';
 import SingleSelect from '../components/SingleSelect.vue';
@@ -39,6 +40,12 @@ export interface UiTexts {
     requiredLabel?: string;
     /** the accessible name of an in-input clear button (TimeInput, SearchInput). */
     clearButtonLabel?: string;
+    /** PasswordInput's toggle name while the password is hidden. */
+    showPasswordLabel?: string;
+    /** PasswordInput's toggle name while the password is shown. */
+    hidePasswordLabel?: string;
+    /** PasswordInput's warning while Caps Lock is on. */
+    capsLockText?: string;
 }
 
 /** Which texts each control declares; nothing else reaches it, so no text leaks as an attribute. */
@@ -46,6 +53,7 @@ const SELECT_TEXTS = ['placeholder', 'emptyText', 'optionsLabel'] as const;
 const MULTI_TEXTS = [...SELECT_TEXTS, 'removeLabel'] as const;
 const GROUP_TEXTS = ['requiredLabel'] as const;
 const CLEAR_TEXTS = ['clearButtonLabel'] as const;
+const PASSWORD_TEXTS = ['showPasswordLabel', 'hidePasswordLabel', 'capsLockText'] as const;
 
 const textsFor = (texts: UiTexts, keys: readonly (keyof UiTexts)[]): UiTexts =>
     Object.fromEntries(keys.filter((key) => texts[key] !== undefined).map((key) => [key, texts[key]]));
@@ -107,6 +115,7 @@ export interface BoundControls<D> {
     NumberField: BoundControl<Names<D, number | null>, typeof NumberInput, number | null, Addons>;
     DateField: BoundControl<Names<D, string | null>, typeof DateInput, string | null, Addons>;
     TimeField: BoundControl<Names<D, string | null>, typeof TimeInput, string | null, Addons>;
+    PasswordField: BoundControl<Names<D, string | null>, typeof PasswordInput, string | null>;
     /** `label` is the box's own label. */
     CheckboxField: DefineSetupFnComponent<
         Shell<Names<D, boolean>> &
@@ -227,6 +236,7 @@ export const createBoundControls = <D>(field: Field, texts: UiTexts): BoundContr
         NumberField: bind(field, NumberInput, 'NumberField', false, {}),
         DateField: bind(field, DateInput, 'DateField', false, {}),
         TimeField: bind(field, TimeInput, 'TimeField', false, clear),
+        PasswordField: bind(field, PasswordInput, 'PasswordField', false, textsFor(texts, PASSWORD_TEXTS)),
         CheckboxField: bind(field, Checkbox, 'CheckboxField', true, {}),
         SwitchField: bind(field, Switch, 'SwitchField', true, {}),
         RadioGroupField: bind(field, RadioGroup, 'RadioGroupField', true, {}),
@@ -265,5 +275,6 @@ export const createTextedControls = (texts: UiTexts) => {
         CheckboxGroup: withTexts(CheckboxGroup, 'CheckboxGroup', textsFor(texts, GROUP_TEXTS)),
         TimeInput: withTexts(TimeInput, 'TimeInput', textsFor(texts, CLEAR_TEXTS)),
         SearchInput: withTexts(SearchInput, 'SearchInput', textsFor(texts, CLEAR_TEXTS)),
+        PasswordInput: withTexts(PasswordInput, 'PasswordInput', textsFor(texts, PASSWORD_TEXTS)),
     };
 };
