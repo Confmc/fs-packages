@@ -245,8 +245,12 @@ describe.each<Mode>(['none', 'active'])('forced-colors: %s — the checked state
     it('invalid differs from valid on TextInput, Checkbox, RadioGroup and Switch', async () => {
         await setForcedColors(mode);
         const text = async (invalid: boolean) => {
+            // ui-form's invalid TextInput pads room for its error icon, which widens a shrink-to-fit
+            // host; a fixed width keeps the two screenshots the same size (220px with the padding).
+            const host = nextHost();
+            host.style.width = '208px';
             const {container} = await render(TextInput, {
-                container: nextHost(),
+                container: host,
                 props: {id: `ti-${slot}`, modelValue: 'Mango', invalid, 'aria-label': 'Fruit'},
             });
             const control = container.querySelector('.ui-control');

@@ -716,7 +716,7 @@
         border-radius: 50%;
     }
     .ui-check__input:checked,
-    .ui-check__input:indeterminate {
+    .ui-check__input:where([type='checkbox']):indeterminate {
         background: var(--ui-check-bg-checked);
         border-color: var(--ui-check-bg-checked);
     }
@@ -735,7 +735,7 @@
         box-shadow: none;
     }
     .ui-check__input:disabled:checked,
-    .ui-check__input:disabled:indeterminate {
+    .ui-check__input:disabled:where([type='checkbox']):indeterminate {
         background: var(--ui-control-text-muted);
         border-color: var(--ui-control-text-muted);
     }
@@ -942,6 +942,19 @@
        selectors, so it wins the specificity tie over each base `outline: none`. `Highlight` is a
        system colour forced-colors maps to the user's palette (author colours are ignored here). */
     @media (forced-colors: active) {
+        /* Invalid is conveyed ONLY by the danger border, background and box-shadow — all discarded here,
+           so an invalid control painted identical to a valid one. There is no system colour for an
+           error, so the cue is a SHAPE: a dashed CanvasText outline, which contrasts with Canvas in any
+           palette, stays apart from the solid Highlight focus ring even where the two colours coincide,
+           and takes no layout room. It sits before the focus rule so a focused invalid control shows the
+           focus ring while focused (WCAG 2.4.7), and the dashes return on blur. */
+        .ui-control.is-invalid,
+        .ui-check__input.is-invalid,
+        .ui-switch__input.is-invalid {
+            outline: 2px dashed CanvasText;
+            outline-offset: 2px;
+        }
+
         .ui-control:focus-visible,
         .ui-multiselect__box:focus-within,
         .ui-multicombobox__box:focus-within,
@@ -1002,6 +1015,59 @@
         .ui-check.is-disabled,
         .ui-switch.is-disabled {
             color: GrayText;
+        }
+
+        /* The checked state is author-painted on an `appearance: none` chassis: the box and track fill,
+           the mark and dot in `currentColor` off a background token, the thumb in a background token,
+           and a switch with no border at all. Every one of those collapses onto Canvas, so checked,
+           unchecked and (for the switch) the whole control paint identical to the page. Each needs a
+           system colour of its own; source order matches the base sheet (checked, then disabled). */
+        .ui-check__input:checked,
+        .ui-check__input:where([type='checkbox']):indeterminate {
+            background: Highlight;
+            border-color: Highlight;
+        }
+        .ui-check__input:checked ~ .ui-check__icon,
+        .ui-check__input:where([type='checkbox']):indeterminate ~ .ui-check__icon {
+            color: HighlightText;
+        }
+        .ui-check__input:disabled {
+            border-color: GrayText;
+        }
+        .ui-check__input:disabled:checked,
+        .ui-check__input:disabled:where([type='checkbox']):indeterminate {
+            background: GrayText;
+            border-color: GrayText;
+        }
+        .ui-check__input:disabled:checked ~ .ui-check__icon,
+        .ui-check__input:disabled:where([type='checkbox']):indeterminate ~ .ui-check__icon {
+            color: Canvas;
+        }
+        .ui-switch__input {
+            border: 1px solid CanvasText;
+        }
+        .ui-switch__thumb {
+            background: CanvasText;
+        }
+        .ui-switch__input:checked {
+            background: Highlight;
+            border-color: Highlight;
+        }
+        .ui-switch__input:checked ~ .ui-switch__thumb {
+            background: HighlightText;
+        }
+        .ui-switch__input:disabled {
+            border-color: GrayText;
+        }
+        .ui-switch__input:disabled ~ .ui-switch__thumb {
+            background: GrayText;
+        }
+        .ui-switch__input:disabled:checked {
+            background: GrayText;
+            border-color: GrayText;
+        }
+        .ui-switch__input:disabled:checked ~ .ui-switch__thumb {
+            background: Canvas;
         }
     }
 
