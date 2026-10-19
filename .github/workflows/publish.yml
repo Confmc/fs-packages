@@ -148,7 +148,26 @@ jobs:
             # assertions cannot drift. Refuses to publish empty or incomplete tarballs
             # (fs-http 0.1.1/0.1.2 empty-tarball class).
             - run: npm run validate:dist
+            # `changeset publish` tags every package it publishes with an annotated tag,
+            # which needs a tagger identity the runner does not have. It ignores a failed
+            # `git tag` and prints "Created git tags." either way.
+            - name: Set the tagger identity
+              run: |
+                  git config user.name 'github-actions[bot]'
+                  git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
             - run: npx changeset publish
               env:
                   NPM_CONFIG_PROVENANCE: 'true'
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            # The tags exist only in this clone until pushed. The checkout fetches no
+            # tags, so every tag at HEAD is one this run created.
+            - name: Push release tags
+              run: |
+                  set -euo pipefail
+                  tags=$(git tag --points-at HEAD)
+                  if [ -z "$tags" ]; then
+                    echo "::warning title=No release tags::changeset publish created no tags at ${GITHUB_SHA}. Either nothing was published, or git tag failed (changesets does not report that)."
+                    exit 0
+                  fi
+                  printf '%s\n' "$tags"
+                  git push origin $(printf 'refs/tags/%s ' $tags)

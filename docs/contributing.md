@@ -229,7 +229,7 @@ The flow:
 2. Open a PR — CI runs the full gate set (audit → format → lint → build → validate:dist → validate:workflows → validate:docs → typecheck → lint:pkg → coverage → mutation, plus the browser-test lane).
 3. On merge to `main`, the publish workflow detects the `package.json` change and:
     - **`build`** — builds all packages and uploads `packages/*/dist/` as the `build-output` artifact.
-    - **`publish`** — waits for approval on the **`npm-publish` deployment environment**, then downloads that artifact and, for each package whose published version differs from the local `package.json#version`, publishes via OIDC Trusted Publishing. Provenance attestation is enabled (`NPM_CONFIG_PROVENANCE=true`).
+    - **`publish`** — waits for approval on the **`npm-publish` deployment environment**, then downloads that artifact and, for each package whose published version differs from the local `package.json#version`, publishes via OIDC Trusted Publishing. Provenance attestation is enabled (`NPM_CONFIG_PROVENANCE=true`). It then pushes one annotated `<name>@<version>` tag per published package (e.g. `@script-development/fs-http@0.7.0`) at the released commit.
 
 There is no changeset bot and no "Version Packages" intermediate PR. Version bumps are author-managed in the source PR; the publish step reacts to whatever shipped on `main`.
 
