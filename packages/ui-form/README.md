@@ -663,6 +663,20 @@ wiring without the value, `field(name)` minus `modelValue`, so the control keeps
 For a value the draft holds, bind it yourself (`v-model="draft.startDate"`) or use `v-bind="field(name)"`,
 which carries the value too.
 
+`field` suits this package's controls, whose props have those names. A native element of your own, such as a
+`<div role="group">` of chips, takes the slot's `aria` instead: `v-bind="aria"` gives it the id,
+`aria-labelledby` (a `<label for>` names only a form control, so the label gets the id `${id}-label`),
+`aria-invalid` while there is a message, and `aria-describedby`:
+
+```vue
+<FormField name="lawIds" label="Laws" v-slot="{aria}">
+    <div role="group" v-bind="aria"><LawChip v-for="law in laws" :key="law.id" :law /></div>
+</FormField>
+```
+
+A hint that is not always there is a conditional slot, `<template v-if="hint" #hint>{{ hint }}</template>`: left
+out, the field renders no hint and names none.
+
 **Testing.** A shallow mount stubs the bound controls, `FormField` and `FormError`, so a field's message does not
 render in such a spec. Un-stub what the spec reads: `stubs: {TextField: false, FormField: false, FormError: false}`.
 A form takes only its own action's 422, so a spec that checks a refusal makes the save itself reject with one.

@@ -91,7 +91,8 @@ or by the control inside.
 
 For a control the kit has no bound version of, `useForm` hands out a `FormField` bound by name:
 `<FormField name="municipalityId" label="Municipality" v-slot="{field}">` draws the label, hint and message with
-the form's ids, and its slot gets the wiring without the value, so the control keeps its own `v-model`. The
+the form's ids, and its slot gets the wiring without the value, so the control keeps its own `v-model`; a native
+element of your own (a `<div role="group">`) takes the slot's `aria` instead, the same wiring as attributes. The
 frame's `#hint` slot renders under the control, above the message, and is read with the field.
 
 ### Your app's texts
@@ -130,7 +131,7 @@ export const {useForm, SingleSelect, MultiSelect} = createUiForm({
 
 | Property         | Type                                              | Description                                                                                               |
 | ---------------- | ------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `field(name)`    | `(name) => FieldBinding`                            | The field's wiring `{id, invalid, describedby, error}`; with a draft also `modelValue` and its write-back |
+| `field(name)`    | `(name) => FieldBinding`                          | The field's wiring `{id, invalid, describedby, error}`; with a draft also `modelValue` and its write-back |
 | `FormLabel`      | component                                         | `<FormLabel name="email" label="E-mail" required />`                                                      |
 | `FormError`      | component                                         | `<FormError name="email" />`, always rendered, empty without a message                                    |
 | `FormField`      | component                                         | The field frame by name; its slot gets the wiring without the value                                       |
