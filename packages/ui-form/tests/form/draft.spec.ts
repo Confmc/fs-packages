@@ -121,5 +121,6 @@ describe('readPath / writePath', () => {
     it('refuses loudly to write under a missing parent', () => {
         expect(() => writePath({a: null}, 'a.b', 1)).toThrow('[ui-form] cannot write "a.b": "a" is null');
         expect(() => writePath({}, 'a.0.b', 1)).toThrow('"a.0" is undefined');
+        expect(() => writePath({a: 'x'}, 'a.b', 1)).toThrow('[ui-form] cannot write "a.b": "a" is x');
     });
 });

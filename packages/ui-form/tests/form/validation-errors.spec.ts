@@ -172,6 +172,16 @@ describe('useValidationErrors', () => {
         expect(result().refusedUnnamed.value).toBe(true);
     });
 
+    it('clears refusedUnnamed with the rest', () => {
+        const {result} = mountComposable({fields: ['name']});
+        result().take(refusal(422, {message: 'Nope', errors: {other: ['Taken']}}));
+        expect(result().refusedUnnamed.value).toBe(true);
+
+        result().clearErrors();
+
+        expect(result().refusedUnnamed.value).toBe(false);
+    });
+
     it('keeps the previous bag and unmapped keys when the keyMapper throws on a later 422', () => {
         const keyMapper = (key: string) => {
             if (key === 'boom') throw new Error('mapper blew up');

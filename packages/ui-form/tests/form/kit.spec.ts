@@ -76,6 +76,47 @@ describe('form-bound controls', () => {
         expect(wrapper.find('input').attributes('aria-describedby')).toBe(`${id}-error ${id}-prepend ${id}-append`);
     });
 
+    it('joins a single addon text too', () => {
+        const {wrapper} = mountWith(({TextField}) => h(TextField, {name: 'name', label: 'Naam', append: 'dagen'}));
+        const id = wrapper.find('input').attributes('id');
+
+        expect(wrapper.findAll('.ui-input-group__addon').map((addon) => addon.text())).toEqual(['dagen']);
+        expect(wrapper.find('input').attributes('aria-describedby')).toBe(`${id}-append`);
+    });
+
+    it('keeps its own props off the control, and hands every other attribute to the control, not the field', () => {
+        const {wrapper} = mountWith(({TextField}) =>
+            h(TextField, {name: 'name', label: 'Naam', orientation: 'horizontal', prepend: '€', 'data-test': 'naam'}),
+        );
+        const field = wrapper.find('.ui-field');
+        const input = wrapper.find('input');
+
+        expect(field.classes()).toContain('is-horizontal');
+        expect(field.attributes()).not.toHaveProperty('data-test');
+        expect(input.attributes('data-test')).toBe('naam');
+        expect(input.attributes()).not.toHaveProperty('orientation');
+        expect(input.attributes()).not.toHaveProperty('prepend');
+        expect(input.attributes()).not.toHaveProperty('label');
+    });
+
+    it('binds FormLabel and FormError by name, under stable component names, with nothing stray on the label', async () => {
+        const {wrapper, form} = mountWith((bound) =>
+            h('div', [
+                h(bound.FormLabel, {name: 'name', label: 'Naam', required: true}),
+                h(bound.FormError, {name: 'name'}),
+            ]),
+        );
+        form().refuse('name', 'Te kort');
+        await nextTick();
+        const label = wrapper.find('label');
+
+        expect(label.text()).toBe('Naam*');
+        expect(label.find('.ui-label__req').exists()).toBe(true);
+        expect(Object.keys(label.attributes())).toEqual(['class', 'for']);
+        expect(wrapper.findComponent({name: 'FormLabel'}).exists()).toBe(true);
+        expect(wrapper.findComponent({name: 'FormError'}).text()).toBe('Te kort');
+    });
+
     it('renders no group without addons', () => {
         const {wrapper} = mountWith(({TextField}) => h(TextField, {name: 'name', label: 'Naam'}));
 
@@ -300,6 +341,14 @@ describe('createUiForm', () => {
         );
 
         expect(wrapper.find('.ui-input__button').attributes('aria-label')).toBe('Toon wachtwoord');
+    });
+
+    it('keeps the control name on every bare control it wraps with texts', () => {
+        const wrapped = Object.entries(ui).filter(([key]) => key !== 'useForm');
+
+        expect(wrapped.map(([key, control]) => [key, (control as {name?: string}).name])).toEqual(
+            wrapped.map(([key]) => [key, key]),
+        );
     });
 
     it('hands out the package controls themselves when no texts are configured', () => {

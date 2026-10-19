@@ -147,6 +147,15 @@ describe('useForm scroll-to-error', () => {
         wrapper.unmount();
     });
 
+    it('passes over a field whose message is empty', async () => {
+        const {wrapper, form} = mountFields(['first', 'second']);
+
+        await form().handleSubmit(() => Promise.reject(refusal(422, {errors: {first: [''], second: ['Taken']}})));
+
+        expect(scrollIntoView.mock.contexts[0]).toBe(wrapper.findAll('input')[1].element);
+        wrapper.unmount();
+    });
+
     it('takes the first in document order, not the order the bag lists the fields in', async () => {
         const {wrapper, form} = mountFields(['first', 'second']);
 
