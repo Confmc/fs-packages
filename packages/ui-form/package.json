@@ -42,7 +42,7 @@
         "test": "vitest run",
         "test:coverage": "vitest run --coverage",
         "test:mutation": "stryker run",
-        "typecheck": "vue-tsc --noEmit && vue-tsc --noEmit -p tsconfig.types.json"
+        "typecheck": "vue-tsc --noEmit && vue-tsc --noEmit -p tsconfig.types.json && vue-tsc -p tests/declaration/tsconfig.json"
     },
     "dependencies": {
         "@floating-ui/vue": "^2.0.1"

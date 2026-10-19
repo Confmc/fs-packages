@@ -44,7 +44,7 @@ import {useValidationErrors} from './validation-errors';
 // Two call shapes: names are free strings, or, with a `draft`, the draft's paths with typed values.
 // The overloads are a type; the one implementation below is cast to it, since an arrow function cannot
 // declare overloads and its `field` cannot be checked against both generic shapes at once.
-interface UseFormCall {
+export interface UseFormCall {
     <D extends object>(options: UseDraftFormOptions<D>): UseDraftForm<D> & BoundControls<D>;
     <T extends string = string>(options?: UseFormOptions<T>): UseForm<T> & BoundControls<T>;
 }
