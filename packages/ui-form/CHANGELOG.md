@@ -24,6 +24,7 @@ First release of `@script-development/ui-form`: `@script-development/fs-form` an
 - **`FormField` slots `label-after` and `aside`**: content inside the label after its text and required mark (a tooltip), and content at the far end of the label row (a switch). The bound controls hand both to their field. Without an aside the markup is as before.
 - **`FormField` `#hint`**: what the field expects, under the control and above the message, named in `aria-describedby` after the message. The bound controls forward it.
 - **A `FormField` bound by name from `useForm`**, for a control the kit has no bound version of: the form's ids, label, hint and message, and in its slot the field's wiring without the value. `FormField`'s slot scope now includes `error`, and `aria` (the same wiring as attributes, `FieldAria`) for a native element; the label takes the id `${id}-label` for its `aria-labelledby`.
+- **`UseForm<T>` and `UseDraftForm<D>` are everything `useForm` returns**, the bound controls included: type a child's `form` prop with them.
 - **`FieldBinding` takes `error`** (optional); `FieldProps`, the same with `error`, is gone: one type for a field's wiring.
 - **`GroupSelect` and `GroupCombobox` `alphabeticalSort`**: sorts the options within each group by display string; the groups keep your order. Off by default, as on the rest of the select family.
 - **More `createUiForm` texts:** `clearButtonLabel`, `showPasswordLabel`, `hidePasswordLabel`, `capsLockText`.

@@ -711,7 +711,11 @@ at the call site still wins.
 
 `useForm(options)` needs no HTTP service. It returns the error bag, `handleSubmit` with its double-submit guard,
 `submitting`, the refusal signal, client refusals (`refuse`, `setRefusals`, `withdraw`, `clearClient`) and the
-field wiring (`field`, `FormLabel`, `FormError`). A child component that renders fields takes the form as a prop.
+field wiring (`field`, `FormLabel`, `FormError`). A child component that renders fields takes the form as a prop,
+typed `UseDraftForm<D>` (or `UseForm` without a draft): both are everything `useForm` returns, the bound controls
+included. A host that builds the form for its child (a dialog host, say) passes it the same way and keeps
+`handleSubmit` for the save. In a helper generic over its draft, name the type, `useForm<D>({draft})`: a generic
+`shallowRef(model)` hides its `Ref<D>` from TypeScript, and the call would not see the draft's paths.
 
 `handleSubmit(action, {validate})` takes the 422 its own action rejected with, so a form holds exactly its own
 requests' refusals; another form's request never lands in it. It resolves to `'sent'`, `'refused'` or
