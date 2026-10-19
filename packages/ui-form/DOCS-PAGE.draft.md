@@ -82,6 +82,10 @@ over the wiring, so `:invalid="false"` at the call site overrides the form's.
 | `SingleSelectField`, `ComboboxField`, `MultiSelectField`, `MultiComboboxField` | `SingleSelect`, `Combobox`, `MultiSelect`, `MultiCombobox` |                                               |
 | `GroupSelectField`, `GroupComboboxField`                                       | `GroupSelect`, `GroupCombobox`                             |                                               |
 
+A bound control hands two slots to its field frame and every other slot to the control: `#label-after` renders
+inside the label after its text and required mark (a note, a tooltip), `#aside` at the far end of the label row
+(a switch that belongs to the field).
+
 Each bound control has a stable component name, so a spec finds it with `findAllComponents({name: 'TextField'})`
 or by the control inside. For a compound field (a control plus a hint, or an editor this package does not ship),
 use `field(name)` with `FormLabel` and `FormError`, as above.
@@ -222,7 +226,7 @@ before the package's, at the very top of your first stylesheet:
 The `--ui-*` custom properties stay outside the layer, as in [ui-inputs](/packages/ui-inputs#theming-the-ui-contract).
 
 The defaults of the control look changed, and there are new tokens: `--ui-control-border-color-hover`,
-`--ui-danger-ring-focus`, `--ui-addon-bg`, `--ui-addon-text` and `--ui-warning-text`. The
+`--ui-danger-ring-focus`, `--ui-addon-bg`, `--ui-addon-text`, `--ui-warning-text` and `--ui-label-required-color`. The
 [CHANGELOG](https://github.com/script-development/fs-packages/blob/main/packages/ui-form/CHANGELOG.md#migrating)
 lists every changed default with its old value, so a theme can keep the old look.
 

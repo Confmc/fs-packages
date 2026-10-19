@@ -88,6 +88,22 @@ shape at that fixed breakpoint (a custom property cannot drive a media query, so
 
 `FormField` hands its slot `field` (`{id, invalid, describedby}`), so one `v-bind` wires the control it wraps.
 
+### More in the label row
+
+Two slots extend the label without replacing it. `#label-after` renders inside the `<label>`, after its text and
+required mark: a note such as "optional", or a tooltip. `#aside` renders at the far end of the label's row (a
+`.ui-field__head` flex row; in the horizontal layout it takes the label column), for a control that belongs to
+the field, such as a switch; it receives the same `field` as the default slot. Without an aside the label stays
+a direct child of `.ui-field`. The bound controls hand both slots to their field. The required mark's colour is
+`--ui-label-required-color` (default `var(--ui-danger-text)`).
+
+```vue
+<TextField name="email" label="E-mail">
+    <template #label-after><span class="optional">optional</span></template>
+    <template #aside><Switch id="notify" v-model="notify" aria-label="Send updates" /></template>
+</TextField>
+```
+
 ### The text-like controls' extras
 
 **`autofocus`** on `TextInput`, `NumberInput`, `TimeInput`, `SearchInput` and `PasswordInput` focuses the input

@@ -21,6 +21,7 @@ First release of `@script-development/ui-form`: `@script-development/fs-form` an
 - **`autofocus`** on `TextInput`, `NumberInput`, `TimeInput`, `SearchInput` and `PasswordInput`, done on mount so it also works in a dialog that opens later.
 - **`Textarea` `autogrow` and `maxRows`**: the height follows the text, on mount and on every change, up to `maxRows` lines.
 - **`MultiSelect` `placement`**: where the list opens (it still flips when there is no room).
+- **`FormField` slots `label-after` and `aside`**: content inside the label after its text and required mark (a note, a tooltip), and content at the far end of the label row (a switch). The bound controls hand both to their field. Without an aside the markup is as before.
 - **`GroupSelect` and `GroupCombobox` `alphabeticalSort`**: sorts the options within each group by display string; the groups keep your order. Off by default, as on the rest of the select family.
 - **More `createUiForm` texts:** `clearButtonLabel`, `showPasswordLabel`, `hidePasswordLabel`, `capsLockText`.
 - **`FormDraft<T>`**: a record's form state. Every value a control can clear is nullable; booleans, lists and nested objects keep their shape; `readonly` goes.
@@ -40,7 +41,7 @@ First release of `@script-development/ui-form`: `@script-development/fs-form` an
 - **`TextInput`'s root is a `span.ui-input-wrap`**: `class` and `style` land on it, every other attribute on the `<input>`.
 - **`MultiSelect` and `MultiCombobox` keep the model in the order the options are shown in** (alphabetical with `alphabeticalSort`, else your order), not the order picked. An id with no option yet stays at the end.
 - **`NumberInput` hides the browser's spin buttons.**
-- **New tokens:** `--ui-addon-bg`, `--ui-addon-text` (InputGroup) and `--ui-warning-text` (PasswordInput's Caps Lock notice).
+- **New tokens:** `--ui-addon-bg`, `--ui-addon-text` (InputGroup), `--ui-warning-text` (PasswordInput's Caps Lock notice) and `--ui-label-required-color` (the required mark, default `var(--ui-danger-text)`).
 
 ### Migrating
 
