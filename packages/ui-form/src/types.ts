@@ -17,7 +17,7 @@ export interface SelectItem {
 export type LabelKey<T> = (keyof T & string) | ((option: T) => string);
 
 /**
- * What `FormField`'s slot hands the control as `field`; `v-bind="field"` puts it on the control, so
+ * A field's wiring, what `useForm().field(name)` and `FormField`'s slot hand the control as `field`; `v-bind="field"` puts it on the control, so
  * each key is a prop every control declares. `required` is left out on purpose: a control that does
  * not declare it would take it as a native attribute and switch on browser validation. Pass
  * `required` to a control that conveys it (`aria-required`).
@@ -26,4 +26,6 @@ export interface FieldBinding {
     id: string;
     invalid: boolean;
     describedby: string | undefined;
+    /** the field's message; a control marks itself by it unless `invalid` says otherwise. */
+    error?: string | undefined;
 }

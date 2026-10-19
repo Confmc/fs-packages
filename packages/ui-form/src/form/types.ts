@@ -117,7 +117,7 @@ export interface UseFormClient<T extends string = string> {
      * plus `<FormError name="email" />`, or a control that draws its own label and message.
      * The id is the name plus the form's unique part, so it is the same on every render and unique per form.
      */
-    field: (name: T) => FieldProps;
+    field: (name: T) => FieldBinding;
     /** A label for one of this form's fields: `<FormLabel name="email" label="E-mail" required />`. */
     FormLabel: FormLabelComponent<T>;
     /** One field's message, its element always rendered: `<FormError name="email" />`. */
@@ -140,11 +140,6 @@ export interface UseFormClient<T extends string = string> {
     clearClient: () => void;
 }
 
-/** What `useForm().field(name)` hands a control: the wiring plus the field's message from `fieldErrors`. */
-export interface FieldProps extends FieldBinding {
-    error: string | undefined;
-}
-
 /** What `field(name)` adds when the form has a draft: the value at that path, and the write back into it. */
 export interface FieldModel<V> {
     modelValue: V;
@@ -165,5 +160,5 @@ export type UseDraftFormOptions<D extends object> = UseFormOptions<Path<D>> & {
 /** Everything `useForm` returns for a form with a draft: as `UseForm`, named by the draft's paths. */
 export type UseDraftForm<D extends object> = Omit<UseForm<Path<D>>, 'field'> & {
     /** The wiring plus the value: `modelValue` is typed as the value at that path. */
-    field: <P extends Path<D>>(name: P) => FieldProps & FieldModel<PathValue<D, P>>;
+    field: <P extends Path<D>>(name: P) => FieldBinding & FieldModel<PathValue<D, P>>;
 };

@@ -4,7 +4,6 @@ import {defineComponent, h} from 'vue';
 
 import type {FieldBinding, LabelKey, SelectItem} from '../types';
 import type {Path, PathsOf} from './path';
-import type {FieldProps} from './types';
 
 import Checkbox from '../components/Checkbox.vue';
 import CheckboxGroup from '../components/CheckboxGroup.vue';
@@ -59,7 +58,7 @@ const textsFor = (texts: UiTexts, keys: readonly (keyof UiTexts)[]): UiTexts =>
     Object.fromEntries(keys.filter((key) => texts[key] !== undefined).map((key) => [key, texts[key]]));
 
 /** The keys `field(name)` supplies; a bound control takes them from the form, not the template. */
-type Wiring = keyof FieldProps | 'modelValue' | 'onUpdate:modelValue';
+type Wiring = keyof FieldBinding | 'modelValue' | 'onUpdate:modelValue';
 
 /** What every bound control takes itself: the field's name and its frame. */
 interface Shell<N> {
@@ -186,16 +185,16 @@ export interface BoundControls<D> {
 
 /** The slots of the field frame: the control gets the wiring; the label, its row and the hint get content. */
 type FrameSlots = SlotsType<{
-    default: (scope: {field: FieldProps}) => VNode[];
+    default: (scope: {field: FieldBinding}) => VNode[];
     'label-after'?: () => VNode[];
-    aside?: (scope: {field: FieldProps}) => VNode[];
+    aside?: (scope: {field: FieldBinding}) => VNode[];
     hint?: () => VNode[];
 }>;
 
 /** A form without a draft (`D` a string of names) takes any of its names; a draft form only the paths holding `V`. */
 type Names<D, V> = D extends string ? D : PathsOf<D, V>;
 
-type Field = (name: string) => FieldProps & {modelValue?: unknown; 'onUpdate:modelValue'?: (value: unknown) => void};
+type Field = (name: string) => FieldBinding & {modelValue?: unknown; 'onUpdate:modelValue'?: (value: unknown) => void};
 
 /**
  * One form-bound control: `FormField` around the control, wired by `field(name)`. The control's own

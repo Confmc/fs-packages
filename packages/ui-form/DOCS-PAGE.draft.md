@@ -130,7 +130,7 @@ export const {useForm, SingleSelect, MultiSelect} = createUiForm({
 
 | Property         | Type                                              | Description                                                                                               |
 | ---------------- | ------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `field(name)`    | `(name) => FieldProps`                            | The field's wiring `{id, invalid, describedby, error}`; with a draft also `modelValue` and its write-back |
+| `field(name)`    | `(name) => FieldBinding`                            | The field's wiring `{id, invalid, describedby, error}`; with a draft also `modelValue` and its write-back |
 | `FormLabel`      | component                                         | `<FormLabel name="email" label="E-mail" required />`                                                      |
 | `FormError`      | component                                         | `<FormError name="email" />`, always rendered, empty without a message                                    |
 | `FormField`      | component                                         | The field frame by name; its slot gets the wiring without the value                                       |

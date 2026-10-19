@@ -31,7 +31,6 @@ export {useFormSubmit} from './form/form-submit';
 export {useValidationErrors} from './form/validation-errors';
 export type {
     UseForm,
-    FieldProps,
     SubmitOutcome,
     FieldModel,
     UseDraftForm,

@@ -24,7 +24,7 @@
 <script setup lang="ts">
 import {computed, useId, useSlots} from 'vue';
 
-import type {FieldProps} from '../form/types';
+import type {FieldBinding} from '../types';
 
 import {hintId, messageId} from '../form/field';
 import FormError from './FormError.vue';
@@ -54,11 +54,11 @@ const {
 }>();
 
 defineSlots<{
-    default?: (scope: {field: FieldProps}) => unknown;
+    default?: (scope: {field: FieldBinding}) => unknown;
     /** inside the label, after its text and required mark: a tooltip. */
     'label-after'?: () => unknown;
     /** at the far end of the label's row, e.g. a switch that belongs to the field. */
-    aside?: (scope: {field: FieldProps}) => unknown;
+    aside?: (scope: {field: FieldBinding}) => unknown;
     /** under the control, above the message: what the field expects. Read with the field after the message. */
     hint?: () => unknown;
 }>();
@@ -68,7 +68,7 @@ const generatedId = useId();
 const errorId = computed(() => messageId(id ?? generatedId));
 const message = computed(() => error || undefined);
 
-const field = computed<FieldProps>(() => {
+const field = computed<FieldBinding>(() => {
     const own = id ?? generatedId;
     const describedby = [message.value && errorId.value, slots.hint && hintId(own)].filter(Boolean).join(' ');
 

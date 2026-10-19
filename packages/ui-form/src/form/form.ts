@@ -2,10 +2,10 @@ import type {Ref} from 'vue';
 
 import {computed, nextTick, readonly, ref, useId} from 'vue';
 
+import type {FieldBinding} from '../types';
 import type {BoundControls, UiTexts} from './kit';
 import type {
     FieldModel,
-    FieldProps,
     SubmitOutcome,
     UseDraftForm,
     UseDraftFormOptions,
@@ -95,7 +95,7 @@ const useFormBody = <T extends string = string>(
     const id = (name: T): string => fieldId(name, unique);
     const message = (name: T): string | undefined => fieldErrors.value[name] || undefined;
 
-    const field = (name: T): FieldProps | (FieldProps & FieldModel<unknown>) => {
+    const field = (name: T): FieldBinding | (FieldBinding & FieldModel<unknown>) => {
         const error = message(name);
         const wiring = {
             id: id(name),
@@ -145,7 +145,7 @@ const useFormBody = <T extends string = string>(
         fieldErrors,
         field,
         // the bound controls name fields by any string at runtime; their types narrow the names
-        ...createBoundControls<T>(field as (name: string) => FieldProps & Partial<FieldModel<unknown>>, texts),
+        ...createBoundControls<T>(field as (name: string) => FieldBinding & Partial<FieldModel<unknown>>, texts),
         FormLabel: createFormLabel(id),
         FormError: createFormError(message, id),
         refuse,
