@@ -104,13 +104,17 @@ export interface BoundControls<D> {
             Omit<PropsOf<typeof Switch>, Wiring | 'required'> &
             ValueProps<Names<D, boolean>, boolean>
     >;
-    /** `label` is the group's legend. */
+    /** `label` is the group's legend, required: a group without one has no accessible name. */
     RadioGroupField: <T extends SelectItem>(
-        props: BoundSelect<Names<D, T['id'] | null>, SelectParams<typeof RadioGroup<T>>, T['id'] | null, Carries<T>>,
+        props: BoundSelect<Names<D, T['id'] | null>, SelectParams<typeof RadioGroup<T>>, T['id'] | null, Carries<T>> & {
+            label: string;
+        },
     ) => VNode;
-    /** `label` is the group's legend. */
+    /** `label` is the group's legend, required: a group without one has no accessible name. */
     CheckboxGroupField: <T extends SelectItem>(
-        props: BoundSelect<Names<D, T['id'][]>, SelectParams<typeof CheckboxGroup<T>>, T['id'][], Carries<T>>,
+        props: BoundSelect<Names<D, T['id'][]>, SelectParams<typeof CheckboxGroup<T>>, T['id'][], Carries<T>> & {
+            label: string;
+        },
     ) => VNode;
     SingleSelectField: <T extends SelectItem>(
         props: BoundSelect<Names<D, T['id'] | null>, SelectParams<typeof SingleSelect<T>>, T['id'] | null, Carries<T>>,

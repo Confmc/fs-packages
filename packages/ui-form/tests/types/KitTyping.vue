@@ -32,6 +32,10 @@
     <NumberField name="contractNumber" :min="'0'" />
     <!-- @vue-expect-error name is required -->
     <TextField label="x" />
+    <!-- @vue-expect-error a radio group needs its legend -->
+    <RadioGroupField name="debtorId" :options="debtors" option-label="name" />
+    <!-- @vue-expect-error a checkbox group needs its legend -->
+    <CheckboxGroupField name="tagIds" :options="debtors" option-label="name" />
     <PlainText name="anything" v-model="free" />
 </template>
 
