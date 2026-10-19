@@ -46,6 +46,11 @@
     <SingleSelectField name="debtorId" :options="debtors" option-label="name" append="p/m" />
     <!-- @vue-expect-error addons join text-like controls only -->
     <TextareaField name="remarks" prepend="€" />
+    <FormField v-slot="{field}" name="startDate" label="Start">
+        <DateInput v-bind="field" v-model="free" />
+    </FormField>
+    <!-- @vue-expect-error not a path of the draft -->
+    <FormField name="nope" label="x" />
     <PlainText name="anything" v-model="free" />
 </template>
 
@@ -54,6 +59,7 @@ import {ref} from 'vue';
 
 import type {FormDraft} from '../../src';
 
+import DateInput from '../../src/components/DateInput.vue';
 import {useForm} from '../../src/form/form';
 
 interface Contract {
@@ -83,6 +89,7 @@ const {
     MultiSelectField,
     RadioGroupField,
     CheckboxGroupField,
+    FormField,
 } = useForm({draft});
 
 // without a draft, names are free and the value comes from v-model

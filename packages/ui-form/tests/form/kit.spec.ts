@@ -111,6 +111,55 @@ describe('form-bound controls', () => {
         expect(input.attributes()).not.toHaveProperty('label');
     });
 
+    it("binds a FormField by name: the form's ids, label, hint and message, and the wiring without the value", async () => {
+        let scope!: Record<string, unknown>;
+        const {wrapper, form} = mountWith(({FormField}) =>
+            h(
+                FormField,
+                {name: 'name', label: 'Naam', required: true, class: 'w-40'},
+                {
+                    default: ({field}: {field: Record<string, unknown>}) => {
+                        scope = field;
+                        return h(TextInput, {...field, modelValue: 'eigen'});
+                    },
+                    hint: () => 'Zoals op het paspoort',
+                },
+            ),
+        );
+        form().refuse('name', 'Te kort');
+        await nextTick();
+        const id = form().field('name').id;
+
+        expect(wrapper.find('input').attributes('id')).toBe(id);
+        expect(wrapper.find('label').attributes('for')).toBe(id);
+        expect(wrapper.find('.ui-field').classes()).toContain('w-40');
+        expect(wrapper.find(`#${id}-error`).text()).toBe('Te kort');
+        expect(scope).toEqual({id, invalid: true, describedby: `${id}-error ${id}-hint`, error: 'Te kort'});
+    });
+
+    it("leaves a bound FormField's control its own v-model: the draft is not written", async () => {
+        const own = ref<string | null>(null);
+        const {wrapper, draft} = mountWith(({FormField}) =>
+            h(
+                FormField,
+                {name: 'name', label: 'Gemeente'},
+                {
+                    default: ({field}: {field: Record<string, unknown>}) =>
+                        h(TextInput, {
+                            ...field,
+                            modelValue: own.value,
+                            'onUpdate:modelValue': (next: string | null) => (own.value = next),
+                        }),
+                },
+            ),
+        );
+
+        await wrapper.find('input').setValue('Utrecht');
+
+        expect(own.value).toBe('Utrecht');
+        expect(draft.value.name).toBe('Ann');
+    });
+
     it('binds FormLabel and FormError by name, under stable component names, with nothing stray on the label', async () => {
         const {wrapper, form} = mountWith((bound) =>
             h('div', [

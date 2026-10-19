@@ -1,9 +1,9 @@
-import type {Component, DefineSetupFnComponent, VNode} from 'vue';
+import type {Component, DefineSetupFnComponent, SlotsType, VNode} from 'vue';
 
 import {defineComponent, h} from 'vue';
 
 import type {FieldBinding, LabelKey, SelectItem} from '../types';
-import type {PathsOf} from './path';
+import type {Path, PathsOf} from './path';
 import type {FieldProps} from './types';
 
 import Checkbox from '../components/Checkbox.vue';
@@ -176,7 +176,21 @@ export interface BoundControls<D> {
             CarriesGroups<T>
         >,
     ) => VNode;
+    /**
+     * The field frame by name, for a control the kit has no bound version of (your own, or one that edits
+     * a derived value): the form's ids, label, hint and message, and in its slot the field's wiring without
+     * the value, so the control keeps its own `v-model`.
+     */
+    FormField: DefineSetupFnComponent<Shell<D extends string ? D : Path<D>>, {}, FrameSlots>;
 }
+
+/** The slots of the field frame: the control gets the wiring; the label, its row and the hint get content. */
+type FrameSlots = SlotsType<{
+    default: (scope: {field: FieldProps}) => VNode[];
+    'label-after'?: () => VNode[];
+    aside?: (scope: {field: FieldProps}) => VNode[];
+    hint?: () => VNode[];
+}>;
 
 /** A form without a draft (`D` a string of names) takes any of its names; a draft form only the paths holding `V`. */
 type Names<D, V> = D extends string ? D : PathsOf<D, V>;
@@ -238,6 +252,21 @@ const bind = (field: Field, control: Component, name: string, labelOnControl: bo
         {name, inheritAttrs: false, props: ['name', 'label', 'required', 'orientation', 'prepend', 'append']},
     );
 
+/** The field frame by name: `FormField` with the form's id and message for that name; its slot gets the wiring. */
+const bindFrame = (field: Field) =>
+    defineComponent(
+        (props: Shell<string>, {slots}) =>
+            () => {
+                const {id, error} = field(props.name);
+                return h(
+                    FormField,
+                    {id, error, label: props.label, required: props.required, orientation: props.orientation},
+                    slots,
+                );
+            },
+        {name: 'FormField', props: ['name', 'label', 'required', 'orientation']},
+    );
+
 /** The bound controls of one form. The casts: a setup-function component cannot carry these types. */
 export const createBoundControls = <D>(field: Field, texts: UiTexts): BoundControls<D> => {
     const select = textsFor(texts, SELECT_TEXTS);
@@ -262,6 +291,7 @@ export const createBoundControls = <D>(field: Field, texts: UiTexts): BoundContr
         MultiComboboxField: bind(field, MultiCombobox, 'MultiComboboxField', false, multi),
         GroupSelectField: bind(field, GroupSelect, 'GroupSelectField', false, select),
         GroupComboboxField: bind(field, GroupCombobox, 'GroupComboboxField', false, select),
+        FormField: bindFrame(field),
     } as unknown as BoundControls<D>;
 };
 
