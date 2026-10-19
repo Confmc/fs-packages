@@ -1,7 +1,7 @@
 {
     "name": "@script-development/ui-inputs",
-    "version": "0.18.0-control.14",
-    "description": "DEPRECATED: renamed to @script-development/ui-form; re-exports it",
+    "version": "0.17.1",
+    "description": "Headless, themeable Vue 3 UI components — form inputs (field, label, error, text/number/date input, textarea, select, checkbox/radio/switch) plus keyboard-correct interactive controls (pressable, disclosure) — styled entirely through --ui-* CSS custom properties.",
     "homepage": "https://packages.script.nl/packages/ui-inputs",
     "license": "MIT",
     "repository": {
@@ -38,17 +38,23 @@
     "scripts": {
         "build": "tsdown",
         "lint:pkg": "publint && attw --pack",
-        "test": "vitest run --passWithNoTests",
+        "test": "vitest run",
         "test:coverage": "vitest run --coverage",
-        "test:mutation": "echo ui-inputs: re-export shim, nothing to mutate.",
-        "typecheck": "tsc --noEmit"
+        "test:mutation": "echo 'ui-inputs: mutation testing is NOT wired (WR-0897). This is a stub, not a pass — src/composables/useListbox.ts and src/internal/*.ts are real .ts Stryker would mutate. Behaviour is guarded by the 100% coverage gate alone.'",
+        "typecheck": "vue-tsc --noEmit"
+    },
+    "dependencies": {
+        "@floating-ui/vue": "^2.0.1"
     },
     "devDependencies": {
-        "@script-development/ui-form": "0.1.0-control.14",
-        "vue": "^3.5.43"
+        "@vitejs/plugin-vue": "^6.0.9",
+        "@vue/test-utils": "^2.5.1",
+        "happy-dom": "^20.14.5",
+        "unplugin-vue": "^8.0.0",
+        "vue": "^3.5.43",
+        "vue-tsc": "^3.3.11"
     },
     "peerDependencies": {
-        "@script-development/ui-form": "0.1.0-control.14",
         "vue": "^3.5.43"
     },
     "engines": {

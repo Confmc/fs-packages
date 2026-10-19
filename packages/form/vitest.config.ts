@@ -7,7 +7,6 @@ export default defineProject({
         // the pre-`test.projects` root config — root test.exclude is not inherited here.
         exclude: [...configDefaults.exclude, '**/.stryker-tmp/**'],
         name: 'form',
-        passWithNoTests: true,
         coverage: {
             provider: 'v8',
             include: ['src/**/*.ts'],
