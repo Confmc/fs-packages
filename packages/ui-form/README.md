@@ -724,6 +724,14 @@ requests' refusals; another form's request never lands in it. It resolves to `'s
 it to `take(error)`, which binds a 422 caught anywhere (a lookup outside a submit) and says whether it was one.
 Messages stay until the next submit; `withdraw(name)` drops one sooner.
 
+A message is keyed by its path, index included (`goals.1.title`). When rows are added or removed before a refused
+one, its message would sit on another row, so the code that changes the list withdraws what was said about it:
+`withdraw('goals')` drops `goals` and every `goals.*` message.
+
+**In a spec**, give the form a fixed `idPrefix` and build it in plain test code, no host component needed:
+`const form = useForm({draft, idPrefix: 'test'})`, then pass it as the `form` prop. Without `idPrefix`, `useForm`
+takes its ids from Vue's `useId()`, which only works inside a component's `setup()`.
+
 With `useForm({draft})` (the component's own `Ref`), every name is a path into the draft
 (`learningGoals.0.title`), checked by vue-tsc, and `field(name)` also carries the value at that path and writes
 changes back, so a control needs no `v-model`. A 422's field keys bind as the server sent them; pass `keyMapper`
