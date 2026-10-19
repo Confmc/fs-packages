@@ -467,3 +467,30 @@ describe('useForm FormLabel and FormError (form-bound)', () => {
         expect(message.text()).toBe('');
     });
 });
+
+describe('useForm withdraw', () => {
+    it('leaves both bags untouched when the field has nothing to withdraw, so a keystroke costs no re-render', () => {
+        const {result} = mountForm<'email' | 'name'>();
+        result().take(refusal(422, {errors: {email: ['Taken']}}));
+        result().refuse('email', 'Too short');
+        const errors = result().errors.value;
+        const client = result().clientErrors.value;
+
+        result().withdraw('name');
+
+        expect(result().errors.value).toBe(errors);
+        expect(result().clientErrors.value).toBe(client);
+    });
+
+    it('replaces only the bag that held the field', () => {
+        const {result} = mountForm<'email' | 'name'>();
+        result().take(refusal(422, {errors: {email: ['Taken']}}));
+        result().refuse('name', 'Required');
+        const errors = result().errors.value;
+
+        result().withdraw('name');
+
+        expect(result().errors.value).toBe(errors);
+        expect(result().clientErrors.value).toEqual({});
+    });
+});
