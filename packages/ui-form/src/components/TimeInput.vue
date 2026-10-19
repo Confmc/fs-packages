@@ -2,7 +2,7 @@
     <span v-bind="rootAttrs($attrs)" class="ui-input-wrap">
         <!-- class/style style the whole control (this root); everything else lands on the <input>. -->
         <!-- the clock glyph; decorative, it stands in for the browser's own (hidden in the sheet) -->
-        <svg class="ui-time__icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <svg class="ui-input__lead" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
             <path
                 fill="currentColor"
                 fill-rule="evenodd"
@@ -14,7 +14,7 @@
             ref="input"
             :id="controlId"
             type="time"
-            class="ui-control ui-input ui-time"
+            class="ui-control ui-input ui-time has-lead"
             :class="{'is-invalid': marked, 'has-clear': showClear}"
             :value="model ?? ''"
             :step="step === undefined ? undefined : step * 60"
@@ -30,7 +30,7 @@
         <button
             v-if="showClear"
             type="button"
-            class="ui-time__clear"
+            class="ui-input__clear"
             tabindex="-1"
             :aria-label="clearButtonLabel"
             @mousedown.prevent

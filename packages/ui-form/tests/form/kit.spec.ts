@@ -185,7 +185,7 @@ describe('createUiForm', () => {
             }),
         );
 
-        expect(wrapper.find('.ui-time__clear').attributes('aria-label')).toBe('Wis');
+        expect(wrapper.find('.ui-input__clear').attributes('aria-label')).toBe('Wis');
     });
 
     it('hands out the package controls themselves when no texts are configured', () => {

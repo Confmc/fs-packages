@@ -338,21 +338,18 @@
     .ui-input-wrap > .ui-input.is-invalid {
         padding-right: calc(var(--ui-control-pad-x) * 2 + 1em);
     }
-    /* TimeInput: a clock glyph on the left (the browser's own is hidden), a clear button on the
-       right, and room in the text for both. Keyed on ui-form's own .ui-time classes. */
-    .ui-time {
+    /* A leading glyph (TimeInput's clock, SearchInput's magnifier) and an in-input clear button,
+       with room in the text for both. ui-form's own classes: no ui-inputs 0.17 control has them. */
+    .ui-input-wrap > .ui-input.has-lead {
         padding-left: calc(var(--ui-control-pad-x) * 2 + 1em);
     }
-    .ui-time::-webkit-calendar-picker-indicator {
-        display: none;
-    }
-    .ui-input-wrap > .ui-time.has-clear {
+    .ui-input-wrap > .ui-input.has-clear {
         padding-right: calc(var(--ui-control-pad-x) * 2 + 1em);
     }
-    .ui-input-wrap > .ui-time.has-clear.is-invalid {
+    .ui-input-wrap > .ui-input.has-clear.is-invalid {
         padding-right: calc(var(--ui-control-pad-x) * 3 + 2em);
     }
-    .ui-time__icon {
+    .ui-input__lead {
         position: absolute;
         top: 50%;
         left: var(--ui-control-pad-x);
@@ -363,7 +360,7 @@
         font-size: var(--ui-control-font-size);
         pointer-events: none;
     }
-    .ui-time__clear {
+    .ui-input__clear {
         position: absolute;
         top: 50%;
         right: var(--ui-control-pad-x);
@@ -382,16 +379,23 @@
         transform: translateY(-50%);
         cursor: pointer;
     }
-    .ui-time__clear svg {
+    .ui-input__clear svg {
         width: 0.75em;
         height: 0.75em;
     }
-    .ui-time__clear:hover {
+    .ui-input__clear:hover {
         color: var(--ui-control-text);
     }
     /* with the error icon at the edge, the clear button moves in beside it */
-    .ui-time.is-invalid ~ .ui-time__clear {
+    .ui-input.is-invalid ~ .ui-input__clear {
         right: calc(var(--ui-control-pad-x) * 2 + 1em);
+    }
+    /* the browser's own glyph and clear button give way to these */
+    .ui-time::-webkit-calendar-picker-indicator {
+        display: none;
+    }
+    .ui-search::-webkit-search-cancel-button {
+        appearance: none;
     }
 
     .ui-input__icon {
