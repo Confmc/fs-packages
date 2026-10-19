@@ -83,7 +83,7 @@ over the wiring, so `:invalid="false"` at the call site overrides the form's.
 | `GroupSelectField`, `GroupComboboxField`                                       | `GroupSelect`, `GroupCombobox`                             |                                               |
 
 A bound control hands two slots to its field frame and every other slot to the control: `#label-after` renders
-inside the label after its text and required mark (a note, a tooltip), `#aside` at the far end of the label row
+inside the label after its text and required mark (a tooltip), `#aside` at the far end of the label row
 (a switch that belongs to the field).
 
 Each bound control has a stable component name, so a spec finds it with `findAllComponents({name: 'TextField'})`
