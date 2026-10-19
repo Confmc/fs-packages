@@ -1037,3 +1037,29 @@ describe('styles.css — FormField orientation layout', () => {
         expect(getComputedStyle(field).display).toBe('grid');
     });
 });
+
+describe('styles.css — TextInput error icon padding, scoped to ui-form markup', () => {
+    const invalidInput = (wrapped: boolean): HTMLInputElement => {
+        const input = document.createElement('input');
+        input.className = 'ui-control ui-input is-invalid';
+        const parent = document.createElement(wrapped ? 'span' : 'div');
+        if (wrapped) parent.className = 'ui-input-wrap';
+        parent.append(input);
+        document.body.append(parent);
+        cleanupTargets.push(parent);
+        return input;
+    };
+
+    it("pads room for the icon on ui-form's wrapped TextInput", () => {
+        addStyle(uiCss);
+
+        // 2 × --ui-control-pad-x (0.875rem = 14px) + 1em (the 14px control font size)
+        expect(getComputedStyle(invalidInput(true)).paddingRight).toBe('42px');
+    });
+
+    it('leaves an invalid ui-inputs 0.17 TextInput (no wrap, no icon) on the plain control padding', () => {
+        addStyle(uiCss);
+
+        expect(getComputedStyle(invalidInput(false)).paddingRight).toBe('14px');
+    });
+});
