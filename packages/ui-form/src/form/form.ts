@@ -43,7 +43,7 @@ interface UseFormCall {
     <T extends string = string>(options?: UseFormOptions<T>): UseForm<T>;
 }
 
-export const useForm = (<T extends string = string>(
+const useFormBody = <T extends string = string>(
     options: UseFormOptions<T> & {draft?: Ref<object>} = {},
 ): UseForm<T> => {
     const {keyMapper, fields, scrollToError = true, idPrefix, draft} = options;
@@ -144,4 +144,8 @@ export const useForm = (<T extends string = string>(
         withdraw,
         clearClient,
     };
-}) as UseFormCall;
+};
+
+// The cast sits here, apart from the body, so mutation testing reaches the body (Stryker does not
+// mutate inside a type assertion).
+export const useForm = useFormBody as UseFormCall;
