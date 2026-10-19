@@ -39,6 +39,13 @@
     <RadioGroupField name="debtorId" :options="debtors" option-label="name" />
     <!-- @vue-expect-error a checkbox group needs its legend -->
     <CheckboxGroupField name="tagIds" :options="debtors" option-label="name" />
+    <TextField name="name" prepend="€" append="p/m" />
+    <!-- @vue-expect-error addons join text-like controls only -->
+    <CheckboxField name="active" prepend="€" />
+    <!-- @vue-expect-error addons join text-like controls only -->
+    <SingleSelectField name="debtorId" :options="debtors" option-label="name" append="p/m" />
+    <!-- @vue-expect-error addons join text-like controls only -->
+    <TextareaField name="remarks" prepend="€" />
     <PlainText name="anything" v-model="free" />
 </template>
 

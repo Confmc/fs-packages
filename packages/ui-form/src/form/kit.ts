@@ -77,12 +77,17 @@ interface Addons {
     /** text joined to the end of the control (`dagen`). */
     append?: string;
 }
+/** Any other bound control refuses them: a template would otherwise take them as fallthrough attributes. */
+interface NoAddons {
+    prepend?: never;
+    append?: never;
+}
 
 // oxlint-disable-next-line typescript/no-explicit-any -- matches any component constructor
 type PropsOf<C> = C extends abstract new (...args: any) => {$props: infer P} ? P : never;
 
 /** A bound non-generic control: its shell, plus the control's own props minus the wiring. */
-type BoundControl<N, C, Value, Extra = {}> = DefineSetupFnComponent<
+type BoundControl<N, C, Value, Extra = NoAddons> = DefineSetupFnComponent<
     Shell<N> & Extra & Omit<PropsOf<C>, Wiring | 'required' | 'label'> & ValueProps<N, Value>
 >;
 /** On a form without a draft the value comes from `v-model`; with one, from the draft. */
@@ -105,6 +110,7 @@ interface CarriesGroups<T> {
 }
 type BoundSelect<N, Props, Value, Carrier> = Shell<N> &
     Carrier &
+    NoAddons &
     Omit<Props, Wiring | 'required' | keyof Carrier> &
     ValueProps<N, Value>;
 
@@ -119,12 +125,14 @@ export interface BoundControls<D> {
     /** `label` is the box's own label. */
     CheckboxField: DefineSetupFnComponent<
         Shell<Names<D, boolean>> &
+            NoAddons &
             Omit<PropsOf<typeof Checkbox>, Wiring | 'required'> &
             ValueProps<Names<D, boolean>, boolean>
     >;
     /** `label` is the switch's own label. */
     SwitchField: DefineSetupFnComponent<
         Shell<Names<D, boolean>> &
+            NoAddons &
             Omit<PropsOf<typeof Switch>, Wiring | 'required'> &
             ValueProps<Names<D, boolean>, boolean>
     >;
