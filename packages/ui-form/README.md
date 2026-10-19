@@ -4,7 +4,7 @@ Headless, themeable Vue 3 form components and the form state behind them — **f
 (422 validation errors, client refusals, double-submit guard) plus the **interactive controls that carry no
 value** (`Pressable`, `Disclosure`) — styled entirely through `--ui-*` CSS custom properties.
 
-Part of the Armory `ui-*` family. The components ship **no token vocabulary and no colour literal** — you map your design tokens onto the `--ui-*` contract once, and every component follows. Soft or brutalist, light or dark, from one component set.
+Part of the Armory `ui-*` family. Every rule reads a `--ui-*` custom property and the package ships a default value for each — you map your design tokens onto the `--ui-*` contract once, and every component follows. Soft or brutalist, light or dark, from one component set. The component rules sit in the `ui-form` cascade layer, so your own CSS (utility classes included) always overrides them.
 
 ## Install
 
@@ -18,12 +18,16 @@ Peer dependency: `vue@^3.5`. Import the stylesheet once (e.g. in your entry):
 import '@script-development/ui-form/style.css';
 ```
 
+If your app has an element base (`input { font-size: inherit }`, `p { margin-bottom: 1rem }`), put it in a layer declared before
+the package's, at the top of your first stylesheet, or it beats the package's rules: `@layer base, ui-form;` then
+`@layer base { … }`.
+
 ## Components
 
 | Component                 | Purpose                                                                                                                                                                             |
 | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `FormField`               | Label + error + required-marker composition wrapper (error-as-prop)                                                                                                                 |
-| `FormLabel` / `FormError` | The atoms `FormField` composes                                                                                                                                                      |
+| `FormLabel` / `FormError` | Bound to a form by `useForm`: the label and the message of one field, by its name (`FormField` uses the unbound ones internally)                                                    |
 | `TextInput`               | Native `text` / `email` / `password` / `search` / `tel` / `url` input                                                                                                               |
 | `NumberInput`             | Native `number` input; owns the `NaN`→`null` empty-value guard                                                                                                                      |
 | `DateInput`               | Native `date` input                                                                                                                                                                 |
@@ -45,20 +49,21 @@ import '@script-development/ui-form/style.css';
 <script setup lang="ts">
 import {SingleSelect, useForm} from '@script-development/ui-form';
 
-const {Field, handleSubmit} = useForm(http);
+const {field, FormLabel, FormError, handleSubmit} = useForm();
 </script>
 
 <template>
-    <Field name="fruit" label="Fruit" v-slot="{field}">
-        <SingleSelect v-bind="field" v-model="fruit" :options="fruits" label="name" />
-    </Field>
+    <FormLabel name="fruit" label="Fruit" required />
+    <SingleSelect v-bind="field('fruit')" v-model="fruit" :options="fruits" option-label="name" required />
+    <FormError name="fruit" />
 </template>
 ```
 
-`Field` is a `FormField` bound to this form's errors: it shows the message under `name` and hands the control
-`field` (`{id, invalid, describedby}`), whose keys are the control's own props, so one `v-bind` wires label,
-mark and message together. `required` is not in `field` (a control that does not declare it would take it as a
-native attribute); pass it to the control yourself. Examples below use `Field` from a `useForm` the same way.
+`field(name)` is a field's whole wiring, `{id, invalid, describedby, error}`, whose keys are the control's own
+props, so one `v-bind` links the control to the form's `FormLabel` and `FormError` of the same name. Every control
+takes `error`: it marks the control unless `invalid` says otherwise (`:invalid="false"` shows a message without the
+mark). `required` is not in `field`; pass it to the control and the label yourself. Examples below bind `field(name)` from a `useForm` the same way. To draw the label and the message around a
+control instead, wrap it in `FormField` (next section).
 
 ### Horizontal field layout
 
@@ -72,10 +77,12 @@ renders vertical** — the label column has no room on a phone, so the sheet col
 shape at that fixed breakpoint (a custom property cannot drive a media query, so it is not a `--ui-*` var):
 
 ```vue
-<Field name="fruit" label="Fruit" orientation="horizontal" v-slot="{field}">
-    <SingleSelect v-bind="field" v-model="fruit" :options="fruits" label="name" />
-</Field>
+<FormField label="Fruit" :error="errors.fruit" orientation="horizontal" v-slot="{field}">
+    <SingleSelect v-bind="field" v-model="fruit" :options="fruits" option-label="name" />
+</FormField>
 ```
+
+`FormField` hands its slot `field` (`{id, invalid, describedby}`), so one `v-bind` wires the control it wraps.
 
 ### The select family's shared extras
 
@@ -93,7 +100,7 @@ typed against your option type `T`. Highlight and selection chrome (`.is-active`
 re-creates them:
 
 ```vue
-<SingleSelect id="label" v-model="labelId" :options="labels" label="name">
+<SingleSelect id="label" v-model="labelId" :options="labels" option-label="name">
     <template #option="{option}">
         <span class="swatch" :style="{background: option.color}" /> {{ option.name }}
     </template>
@@ -155,7 +162,7 @@ input. The entry is danger-toned by default (`--ui-clear-text`, chains to
     id="sprint"
     v-model="sprintId"
     :options="sprints"
-    label="name"
+    option-label="name"
     clear-label="No sprint"
     empty-display-value="No sprint (backlog)"
 />
@@ -177,9 +184,7 @@ full list, and the committed label sits fully selected so the first keystroke re
 a fresh filter. The filter engages only once the query diverges from the committed rendering.
 
 ```vue
-<Field name="city" label="City" v-slot="{field}">
-    <Combobox ref="cityBox" v-bind="field" v-model="city" :options="cities" label="name" />
-</Field>
+<Combobox ref="cityBox" v-bind="field('city')" v-model="city" :options="cities" option-label="name" />
 ```
 
 **Imperative focus handle.** `Combobox` exposes `focus()` via `defineExpose`, so a parent can move DOM
@@ -198,9 +203,7 @@ territories can localise it, like `optionsLabel`), and **Backspace on the focuse
 last committed value**. There is no text input and no filtering — that stays `Combobox`'s job.
 
 ```vue
-<Field name="tags" label="Tags" v-slot="{field}">
-    <MultiSelect v-bind="field" v-model="tagIds" :options="tags" label="name" />
-</Field>
+<MultiSelect v-bind="field('tags')" v-model="tagIds" :options="tags" option-label="name" />
 ```
 
 The listbox is marked `aria-multiselectable="true"`; `aria-selected` marks committed **membership**
@@ -231,9 +234,7 @@ the query, the committed selection is additionally conveyed to assistive tech th
 `aria-describedby` summary (the input-as-trigger analogue of MultiSelect's hidden value span).
 
 ```vue
-<Field name="tags" label="Tags" v-slot="{field}">
-    <MultiCombobox v-bind="field" v-model="tagIds" :options="tags" label="name" />
-</Field>
+<MultiCombobox v-bind="field('tags')" v-model="tagIds" :options="tags" option-label="name" />
 ```
 
 Like `Combobox` it exposes an imperative `focus()` handle. `clearLabel` / `emptyDisplayValue`
@@ -267,17 +268,15 @@ across the whole set.
   also covers a group the filter drains to nothing: a header never outlives its options.
 
 ```vue
-<Field name="fruit" label="Fruit" v-slot="{field}">
-    <GroupSelect
-        v-bind="field"
-        v-model="fruit"
-        :groups="[
-            {text: 'Tropical', options: tropical},
-            {text: 'Stone', options: stone},
-        ]"
-        label="name"
-    />
-</Field>
+<GroupSelect
+    v-bind="field('fruit')"
+    v-model="fruit"
+    :groups="[
+        {text: 'Tropical', options: tropical},
+        {text: 'Stone', options: stone},
+    ]"
+    option-label="name"
+/>
 ```
 
 ### Checkbox family
@@ -564,12 +563,21 @@ whitespace-containing `option.id` never breaks the `aria-activedescendant` linka
 
 ## Forms and their errors
 
-`useForm(http)` registers a 422 middleware on your fs-http service (any object with fs-http's
-`registerResponseErrorMiddleware` fits; the package imports nothing from fs-http) and returns the error bag,
-`handleSubmit` with its double-submit guard, `submitting`, the refusal signal, client refusals (`refuse`,
-`setRefusals`, `withdraw`, `clearClient`) and `Field`. A child component that renders fields takes the form
-(or just its `Field`) as a prop.
+`useForm(options)` needs no HTTP service. It returns the error bag, `handleSubmit` with its double-submit guard,
+`submitting`, the refusal signal, client refusals (`refuse`, `setRefusals`, `withdraw`, `clearClient`) and the
+field wiring (`field`, `FormLabel`, `FormError`). A child component that renders fields takes the form as a prop.
 
-The components never import an error service. `Field` reads only the bag it was made from, and nothing is
-provided or injected: `createField(bag)` makes one from any other source of messages, or for a component spec.
-Without a form, pass `error` to `FormField` and bind its `field` the same way.
+`handleSubmit(action, {validate})` takes the 422 its own action rejected with, so a form holds exactly its own
+requests' refusals; another form's request never lands in it. It resolves to `'sent'`, `'refused'` or
+`'ignored'` (a call while one is in flight), runs `validate` first when given (a refusal skips the action), and on
+`'refused'` scrolls the first refused field into view. An action that catches its own 422 must rethrow it or pass
+it to `take(error)`, which binds a 422 caught anywhere (a lookup outside a submit) and says whether it was one.
+Messages stay until the next submit; `withdraw(name)` drops one sooner.
+
+With `useForm({draft})` (the component's own `Ref`), every name is a path into the draft
+(`learningGoals.0.title`), checked by vue-tsc, and `field(name)` also carries the value at that path and writes
+changes back, so a control needs no `v-model`. A 422's field keys bind as the server sent them; pass `keyMapper`
+to map them.
+
+The components never import an error service, and nothing is provided or injected. Without a form, pass `error`
+to `FormField` and bind its `field` the same way.
