@@ -21,7 +21,7 @@ describe('SearchInput', () => {
 
     it("clears to '' with its clear button, keeping focus on the input", async () => {
         const wrapper = mountSearch();
-        const clear = wrapper.find('.ui-input__clear');
+        const clear = wrapper.find('.ui-input__button');
 
         expect(clear.attributes('aria-label')).toBe('Clear');
         const down = new MouseEvent('mousedown', {cancelable: true});
@@ -42,14 +42,14 @@ describe('SearchInput', () => {
     ])('has no clear button with %s', (_, props) => {
         const wrapper = mountSearch(props);
 
-        expect(wrapper.find('.ui-input__clear').exists()).toBe(false);
+        expect(wrapper.find('.ui-input__button').exists()).toBe(false);
         wrapper.unmount();
     });
 
     it('names the clear button as asked, and focuses on mount with autofocus', () => {
         const wrapper = mountSearch({clearButtonLabel: 'Wis zoekterm', autofocus: true});
 
-        expect(wrapper.find('.ui-input__clear').attributes('aria-label')).toBe('Wis zoekterm');
+        expect(wrapper.find('.ui-input__button').attributes('aria-label')).toBe('Wis zoekterm');
         expect(document.activeElement).toBe(wrapper.find('input').element);
         wrapper.unmount();
     });

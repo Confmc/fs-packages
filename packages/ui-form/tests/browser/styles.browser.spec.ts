@@ -1089,13 +1089,13 @@ describe('styles.css — TimeInput layout', () => {
         wrap.className = 'ui-input-wrap';
         wrap.style.width = '200px';
         wrap.innerHTML =
-            '<svg class="ui-input__lead"></svg><input type="time" class="ui-control ui-input ui-time has-lead has-clear">' +
-            '<button class="ui-input__clear"></button>';
+            '<svg class="ui-input__lead"></svg><input type="time" class="ui-control ui-input ui-time has-lead has-button">' +
+            '<button class="ui-input__button"></button>';
         document.body.append(wrap);
         cleanupTargets.push(wrap);
         const input = wrap.querySelector('input') as HTMLInputElement;
         const icon = wrap.querySelector('.ui-input__lead') as HTMLElement;
-        const clear = wrap.querySelector('.ui-input__clear') as HTMLElement;
+        const clear = wrap.querySelector('.ui-input__button') as HTMLElement;
         const box = input.getBoundingClientRect();
         const style = getComputedStyle(input);
 

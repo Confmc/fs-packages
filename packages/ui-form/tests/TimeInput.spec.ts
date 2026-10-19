@@ -34,7 +34,7 @@ describe('TimeInput', () => {
 
     it('offers a clear button while there is a time, which clears to null and keeps focus on the input', async () => {
         const wrapper = mountTime();
-        const clear = wrapper.find('.ui-input__clear');
+        const clear = wrapper.find('.ui-input__button');
 
         expect(clear.attributes('aria-label')).toBe('Clear');
         expect(clear.attributes('tabindex')).toBe('-1');
@@ -55,15 +55,15 @@ describe('TimeInput', () => {
     ])('has no clear button with %s', (_, props) => {
         const wrapper = mountTime(props);
 
-        expect(wrapper.find('.ui-input__clear').exists()).toBe(false);
-        expect(wrapper.find('input').classes()).not.toContain('has-clear');
+        expect(wrapper.find('.ui-input__button').exists()).toBe(false);
+        expect(wrapper.find('input').classes()).not.toContain('has-button');
         wrapper.unmount();
     });
 
     it('names the clear button as asked', () => {
         const wrapper = mountTime({clearButtonLabel: 'Wis tijd'});
 
-        expect(wrapper.find('.ui-input__clear').attributes('aria-label')).toBe('Wis tijd');
+        expect(wrapper.find('.ui-input__button').attributes('aria-label')).toBe('Wis tijd');
         wrapper.unmount();
     });
 

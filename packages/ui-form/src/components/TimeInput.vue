@@ -15,7 +15,7 @@
             :id="controlId"
             type="time"
             class="ui-control ui-input ui-time has-lead"
-            :class="{'is-invalid': marked, 'has-clear': showClear}"
+            :class="{'is-invalid': marked, 'has-button': showClear}"
             :value="model ?? ''"
             :step="step === undefined ? undefined : step * 60"
             :disabled="disabled"
@@ -30,7 +30,7 @@
         <button
             v-if="showClear"
             type="button"
-            class="ui-input__clear"
+            class="ui-input__button"
             tabindex="-1"
             :aria-label="clearButtonLabel"
             @mousedown.prevent

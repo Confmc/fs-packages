@@ -214,13 +214,13 @@ describe('createUiForm', () => {
             }),
         );
 
-        expect(wrapper.find('.ui-input__clear').attributes('aria-label')).toBe('Wis');
+        expect(wrapper.find('.ui-input__button').attributes('aria-label')).toBe('Wis');
     });
 
     it('gives a bare SearchInput the configured clear button name', () => {
         const wrapper = mount(ui.SearchInput, {props: {modelValue: 'appel'}});
 
-        expect(wrapper.find('.ui-input__clear').attributes('aria-label')).toBe('Wis');
+        expect(wrapper.find('.ui-input__button').attributes('aria-label')).toBe('Wis');
     });
 
     it('hands out the package controls themselves when no texts are configured', () => {

@@ -341,15 +341,16 @@
     .ui-input-wrap > .ui-input.is-invalid {
         padding-right: calc(var(--ui-control-pad-x) * 2 + 1em);
     }
-    /* A leading glyph (TimeInput's clock, SearchInput's magnifier) and an in-input clear button,
-       with room in the text for both. ui-form's own classes: no ui-inputs 0.17 control has them. */
+    /* A leading glyph (TimeInput's clock, SearchInput's magnifier) and an in-input button (a clear
+       button, the password toggle), with room in the text for both. ui-form's own classes: no
+       ui-inputs 0.17 control has them. */
     .ui-input-wrap > .ui-input.has-lead {
         padding-left: calc(var(--ui-control-pad-x) * 2 + 1em);
     }
-    .ui-input-wrap > .ui-input.has-clear {
+    .ui-input-wrap > .ui-input.has-button {
         padding-right: calc(var(--ui-control-pad-x) * 2 + 1em);
     }
-    .ui-input-wrap > .ui-input.has-clear.is-invalid {
+    .ui-input-wrap > .ui-input.has-button.is-invalid {
         padding-right: calc(var(--ui-control-pad-x) * 3 + 2em);
     }
     .ui-input__lead {
@@ -363,7 +364,7 @@
         font-size: var(--ui-control-font-size);
         pointer-events: none;
     }
-    .ui-input__clear {
+    .ui-input__button {
         position: absolute;
         top: 50%;
         right: var(--ui-control-pad-x);
@@ -382,15 +383,15 @@
         transform: translateY(-50%);
         cursor: pointer;
     }
-    .ui-input__clear svg {
+    .ui-input__button svg {
         width: 0.75em;
         height: 0.75em;
     }
-    .ui-input__clear:hover {
+    .ui-input__button:hover {
         color: var(--ui-control-text);
     }
     /* with the error icon at the edge, the clear button moves in beside it */
-    .ui-input.is-invalid ~ .ui-input__clear {
+    .ui-input.is-invalid ~ .ui-input__button {
         right: calc(var(--ui-control-pad-x) * 2 + 1em);
     }
     /* the browser's own glyph and clear button give way to these */

@@ -15,7 +15,7 @@
             :id="controlId"
             type="search"
             class="ui-control ui-input ui-search has-lead"
-            :class="{'is-invalid': marked, 'has-clear': showClear}"
+            :class="{'is-invalid': marked, 'has-button': showClear}"
             :value="shown"
             :placeholder="placeholder"
             :disabled="disabled"
@@ -31,7 +31,7 @@
         <button
             v-if="showClear"
             type="button"
-            class="ui-input__clear"
+            class="ui-input__button"
             tabindex="-1"
             :aria-label="clearButtonLabel"
             @mousedown.prevent
