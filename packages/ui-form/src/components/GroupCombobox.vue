@@ -95,6 +95,7 @@ const {
     id,
     placeholder = 'Select…',
     disabled = false,
+    alphabeticalSort = false,
     required = false,
     invalid = undefined,
     error,
@@ -113,6 +114,8 @@ const {
     id?: string;
     placeholder?: string;
     disabled?: boolean;
+    /** sort the options within each group by display string — off by default; the groups keep the caller's order. */
+    alphabeticalSort?: boolean;
     /** conveys the required state to assistive tech via `aria-required`. */
     required?: boolean;
     /**
@@ -159,6 +162,12 @@ const labelOf = (option: T): string =>
         ? optionLabel(option)
         : String((option as Record<PropertyKey, unknown>)[optionLabel as PropertyKey]);
 
+// Groups stay caller-ordered; `alphabeticalSort` reorders only the options inside each group.
+const sorted = computed(() =>
+    alphabeticalSort
+        ? groups.map((g) => ({...g, options: [...g.options].sort((a, b) => labelOf(a).localeCompare(labelOf(b)))}))
+        : groups,
+);
 // All options across all groups in declaration order — the base flat list.
 const allOptions = computed(() => groups.flatMap((g) => g.options));
 const selected = computed(() => allOptions.value.find((option) => option.id === model.value));
@@ -178,7 +187,7 @@ const query = ref(selectedLabel.value);
 const filteredData = computed(() => {
     const engaged = query.value !== selectedLabel.value;
     const needle = engaged ? query.value.trim().toLowerCase() : '';
-    return groups
+    return sorted.value
         .map((group) => ({
             ...group,
             options: needle

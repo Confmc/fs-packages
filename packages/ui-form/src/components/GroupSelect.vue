@@ -103,6 +103,7 @@ const {
     id,
     placeholder = 'Select…',
     disabled = false,
+    alphabeticalSort = false,
     required = false,
     invalid = undefined,
     error,
@@ -121,6 +122,8 @@ const {
     id?: string;
     placeholder?: string;
     disabled?: boolean;
+    /** sort the options within each group by display string — off by default; the groups keep the caller's order. */
+    alphabeticalSort?: boolean;
     /** conveys the required state to assistive tech via `aria-required`. */
     required?: boolean;
     /**
@@ -167,16 +170,22 @@ const labelOf = (option: T): string =>
         ? optionLabel(option)
         : String((option as Record<PropertyKey, unknown>)[optionLabel as PropertyKey]);
 
-// All options across all groups in declaration order — the flat index space useListbox and
-// commit/isSelected/isMuted operate on. Groups are caller-ordered; no alphabeticalSort.
-const flatOptions = computed(() => groups.flatMap((g) => g.options));
+// Groups stay caller-ordered; `alphabeticalSort` reorders only the options inside each group.
+const sorted = computed(() =>
+    alphabeticalSort
+        ? groups.map((g) => ({...g, options: [...g.options].sort((a, b) => labelOf(a).localeCompare(labelOf(b)))}))
+        : groups,
+);
+// All options across all groups in rendered order — the flat index space useListbox and
+// commit/isSelected/isMuted operate on.
+const flatOptions = computed(() => sorted.value.flatMap((g) => g.options));
 const selected = computed(() => flatOptions.value.find((option) => option.id === model.value));
 // Stable `v-for` keys for OptionList, indexed by the flat option index `rows` navigates.
 const optionKeys = computed(() => flatOptions.value.map((option) => String(option.id)));
 
 // The mixed header/boundary/option row sequence — the encoding lives once in `buildGroupRows`
 // (shared with GroupCombobox), so the boundary/empty-group rules stay a single-site invariant.
-const rows = computed(() => buildGroupRows(groups));
+const rows = computed(() => buildGroupRows(sorted.value));
 
 /** `aria-selected` marks the COMMITTED value — OptionList only asks about rendered indices. */
 const isSelected = (index: number): boolean => flatOptions.value[index].id === model.value;

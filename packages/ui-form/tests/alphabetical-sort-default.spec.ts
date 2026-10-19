@@ -5,6 +5,8 @@ import {mount} from '@vue/test-utils';
 import {afterEach, describe, expect, it} from 'vitest';
 
 import Combobox from '../src/components/Combobox.vue';
+import GroupCombobox from '../src/components/GroupCombobox.vue';
+import GroupSelect from '../src/components/GroupSelect.vue';
 import MultiCombobox from '../src/components/MultiCombobox.vue';
 import MultiSelect from '../src/components/MultiSelect.vue';
 import SingleSelect from '../src/components/SingleSelect.vue';
@@ -44,5 +46,37 @@ describe.each(SORTABLE)('$name — option order', ({component, modelValue, opene
 
     it('sorts by display string when `alphabeticalSort` is set', async () => {
         expect(await renderedOrder({alphabeticalSort: true})).toEqual(['Apricot', 'Mango', 'Watermelon']);
+    });
+});
+
+// Grouped: the groups are the caller's order either way; the opt-in sorts the options within each group.
+const CALLER_GROUPS = [
+    {text: 'Zeta', options: [CALLER_ORDER[0], CALLER_ORDER[1]]},
+    {text: 'Alpha', options: [CALLER_ORDER[2], {id: 4, name: 'Banana'}]},
+];
+
+const GROUPED = [
+    {name: 'GroupSelect', component: GroupSelect, opener: 'button'},
+    {name: 'GroupCombobox', component: GroupCombobox, opener: 'input'},
+] as const;
+
+describe.each(GROUPED)('$name — option order', ({component, opener}) => {
+    const renderedOrder = async (extra: Record<string, unknown>) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- two generic SFCs through one mount
+        const wrapper = mount(component as any, {
+            props: {groups: CALLER_GROUPS, optionLabel: 'name', id: 'f', modelValue: null, ...extra},
+            attachTo: document.body,
+        });
+        await wrapper.find(opener).trigger(opener === 'input' ? 'focus' : 'click');
+        if (opener === 'input') await wrapper.find(opener).trigger('keydown', {key: 'ArrowDown'});
+        return wrapper.findAll('[role="option"]').map((option) => option.text());
+    };
+
+    it("keeps the caller's order by default", async () => {
+        expect(await renderedOrder({})).toEqual(['Watermelon', 'Apricot', 'Mango', 'Banana']);
+    });
+
+    it('sorts the options within each group, and keeps the groups in order, when `alphabeticalSort` is set', async () => {
+        expect(await renderedOrder({alphabeticalSort: true})).toEqual(['Apricot', 'Watermelon', 'Banana', 'Mango']);
     });
 });
