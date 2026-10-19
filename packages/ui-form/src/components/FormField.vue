@@ -71,22 +71,26 @@ const errorId = computed(() => messageId(id ?? generatedId));
 const message = computed(() => error || undefined);
 
 const field = computed<FieldBinding>(() => {
-    const own = id ?? generatedId;
-    const describedby = [message.value && errorId.value, slots.hint && hintId(own)].filter(Boolean).join(' ');
+    const controlId = id ?? generatedId;
+    const describedby = [message.value && errorId.value, slots.hint && hintId(controlId)].filter(Boolean).join(' ');
 
-    return {id: own, invalid: Boolean(message.value), describedby: describedby || undefined, error: message.value};
+    return {
+        id: controlId,
+        invalid: Boolean(message.value),
+        describedby: describedby || undefined,
+        error: message.value,
+    };
 });
 
 // A <label for> names only a form control; a native element is named by aria-labelledby instead. An attribute
 // that does not apply is left out, not set undefined, so one the consumer adds holds in any binding order.
 const aria = computed<FieldAria>(() => {
-    const {id: own, invalid, describedby} = field.value;
+    const {id: controlId, invalid, describedby} = field.value;
+    const attributes: FieldAria = {id: controlId};
+    if (label) attributes['aria-labelledby'] = labelId(controlId);
+    if (invalid) attributes['aria-invalid'] = 'true';
+    if (describedby) attributes['aria-describedby'] = describedby;
 
-    return {
-        id: own,
-        ...(label ? {'aria-labelledby': labelId(own)} : {}),
-        ...(invalid ? {'aria-invalid': 'true' as const} : {}),
-        ...(describedby ? {'aria-describedby': describedby} : {}),
-    };
+    return attributes;
 });
 </script>
