@@ -104,6 +104,11 @@ a direct child of `.ui-field`. The bound controls hand both slots to their field
 </TextField>
 ```
 
+**A hint under the control.** `#hint` renders what the field expects between the control and the message, as
+`.ui-hint` with the id `${id}-hint`, and the slot's `describedby` names it after the message, so a screen reader
+reads it with the field. In the horizontal layout the hint and the message sit under the control. The bound
+controls forward it. Styled by `--ui-hint-text` and `--ui-hint-size`.
+
 ### The text-like controls' extras
 
 **`autofocus`** on `TextInput`, `NumberInput`, `TimeInput`, `SearchInput` and `PasswordInput` focuses the input
@@ -642,8 +647,25 @@ form the name must be a path holding that control's value type, checked by vue-t
 through to the control and wins over the wiring. `TextField`, `NumberField`, `DateField` and `TimeField` also take
 `prepend` / `append` (an `InputGroup` around the control). `RadioGroupField` and `CheckboxGroupField` require
 `label`, their legend. Each has a stable component name, so a spec finds it with
-`findAllComponents({name: 'TextField'})`. For a compound field (a control plus a hint, an editor the package does
-not ship), use `field(name)` with `FormLabel` and `FormError`, as above.
+`findAllComponents({name: 'TextField'})`.
+
+For a control the kit has no bound version of (your own editor, a control that edits a derived value, a field
+that swaps its control for a link), `useForm` also hands out a `FormField` bound by name. It draws the label,
+hint and message with the form's ids, so a refused submit still scrolls to it, and its slot gets the field's
+wiring without the value, `field(name)` minus `modelValue`, so the control keeps its own `v-model`:
+
+```vue
+<FormField name="municipalityId" label="Municipality" v-slot="{field}">
+    <Combobox v-bind="field" v-model="municipality" :options="municipalities" option-label="name" />
+</FormField>
+```
+
+For a value the draft holds, bind it yourself (`v-model="draft.startDate"`) or use `v-bind="field(name)"`,
+which carries the value too.
+
+**Testing.** A shallow mount stubs the bound controls, `FormField` and `FormError`, so a field's message does not
+render in such a spec. Un-stub what the spec reads: `stubs: {TextField: false, FormField: false, FormError: false}`.
+A form takes only its own action's 422, so a spec that checks a refusal makes the save itself reject with one.
 
 Set an app's texts once with `createUiForm({texts})`: `placeholder`, `emptyText`, `optionsLabel`, `removeLabel`,
 `requiredLabel`, `clearButtonLabel`, `showPasswordLabel`, `hidePasswordLabel` and `capsLockText`. It hands out
