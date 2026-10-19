@@ -203,10 +203,13 @@ const query = ref('');
 // The visible list = filter by the trimmed, case-folded query (empty query ⇒ all),
 // then the same optional alphabetical pass the siblings apply. Both aria-activedescendant
 // and Enter index into THIS filtered list, not the raw `options`.
+// Every option in display order; the model keeps this order whatever the query shows.
+const ordered = computed(() =>
+    alphabeticalSort ? [...options].sort((a, b) => labelOf(a).localeCompare(labelOf(b))) : options,
+);
 const filtered = computed(() => {
     const needle = query.value.trim().toLowerCase();
-    const matched = needle ? options.filter((option) => labelOf(option).toLowerCase().includes(needle)) : options;
-    return alphabeticalSort ? [...matched].sort((a, b) => labelOf(a).localeCompare(labelOf(b))) : matched;
+    return needle ? ordered.value.filter((option) => labelOf(option).toLowerCase().includes(needle)) : ordered.value;
 });
 
 // The chip bar renders the committed values in selection order. An id whose option has not
@@ -249,11 +252,17 @@ const input = useTemplateRef<HTMLInputElement>('input');
 // the box click-outside treats as inside. The <ul> inside it is positioned by nothing.
 const floating = useTemplateRef<HTMLElement>('floating');
 
-/** Toggle an id's membership — add when absent, drop when present. Always emits a fresh array. */
+/**
+ * Toggle an id's membership — add when absent, drop when present. Always emits a fresh array, kept in
+ * the order of the whole option list (not the filtered one, so the query never reorders it); an id
+ * with no option yet keeps its place at the end. As MultiSelect.
+ */
 const toggleValue = (value: T['id']): void => {
-    model.value = model.value.includes(value)
+    const next = model.value.includes(value)
         ? model.value.filter((member) => member !== value)
         : [...model.value, value];
+    const shown = ordered.value.map((option) => option.id).filter((id) => next.includes(id));
+    model.value = [...shown, ...next.filter((id) => !shown.includes(id))];
 };
 
 // Both keyboard (Enter via useListbox) and pointer (OptionList `commit`) funnel through this

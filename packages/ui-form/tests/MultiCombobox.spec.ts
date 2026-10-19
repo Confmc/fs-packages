@@ -164,7 +164,7 @@ describe('MultiCombobox', () => {
         expect(apricot.classes()).toContain('is-active');
 
         await apricot.trigger('click');
-        expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[3, 2]]); // appended
+        expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[2, 3]]); // in display order, not the order picked
         expect(menu(wrapper).exists()).toBe(true); // stays open
         expect(document.activeElement).toBe(input.element); // refocused after the pointer commit
     });
@@ -327,7 +327,7 @@ describe('MultiCombobox', () => {
         expect(options.map((option) => option.attributes('aria-selected'))).toEqual(['false', 'true']);
 
         await options[0].trigger('click'); // add 'b'
-        expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([['a', 'b']]);
+        expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([['b', 'a']]); // the caller's order, as shown
     });
 
     it('renders per-option custom content through the #option scoped slot over the FILTERED list', async () => {
@@ -436,5 +436,26 @@ describe('MultiCombobox', () => {
 
         await input.setValue('m'); // matches return → the region empties again
         expect(region.text()).toBe('');
+    });
+});
+
+describe('MultiCombobox model order', () => {
+    it('keeps the whole list order while a query narrows what is shown, and an unknown id at the end', async () => {
+        const fruits = [
+            {id: 1, name: 'Banana'},
+            {id: 2, name: 'Apple'},
+            {id: 3, name: 'Cherry'},
+        ];
+        const wrapper = mount(MultiCombobox, {
+            props: {options: fruits, optionLabel: 'name', modelValue: [3, 99], alphabeticalSort: true},
+            attachTo: document.body,
+        });
+        await wrapper.find('input').trigger('click');
+        await wrapper.find('input').setValue('ban');
+        await menu(wrapper).findAll('.ui-multicombobox__option')[0]!.trigger('click');
+
+        // shown as Apple, Banana, Cherry: Banana before Cherry, the unloaded 99 last
+        expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[1, 3, 99]]);
+        wrapper.unmount();
     });
 });
