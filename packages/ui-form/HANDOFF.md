@@ -140,3 +140,18 @@ commits; leave `HANDOFF.md` and `EXPERIMENT-REPORT.md` behind.
 4. Cancel the waiting run from step 2 (it would now report nothing to publish and spend an approval).
 5. Second PR: bump `0.1.1`. Approve that run and read its log for `Successfully published`, which proves the
    grant.
+
+## State at 2026-10-19 (control.21 @ 3ccd75b)
+
+Decided since the 10-09 notes (emmie-2 now leads the emmie + package line; my side = the package):
+
+- Kit = K2: `useForm` hands out bound controls (`TextField` … `GroupComboboxField`, `TimeField`, `PasswordField`)
+  typed by `PathsOf` on `FormDraft<T>` drafts; `createUiForm({texts})` for an app's texts; `field()` stays public.
+- Drafts are nullable (`FormDraft<T>`; booleans/lists/nested keep shape). Messages stay until the next submit.
+- No shims; ui-form runs next to npm ui-inputs 0.17 + fs-form, and its CSS (one `@layer ui-form`) must keep 0.17
+  markup working: new styling only on new class names.
+- Parity done: TextInput/NumberInput autofocus, NumberInput hidden spin (`.ui-number`), Textarea autogrow +
+  maxRows, MultiSelect/MultiCombobox model in display order (+ placement), TimeInput, SearchInput, InputGroup
+  (prepend/append), PasswordInput. Combobox and RadioGroup needed nothing.
+- Remaining: GroupSelect/GroupCombobox `alphabeticalSort`; the date picker last (emmie's DatePickerField works via
+  `field()` meanwhile); then the release sequence above.
