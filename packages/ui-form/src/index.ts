@@ -3,6 +3,7 @@ export {default as TextInput} from './components/TextInput.vue';
 export {default as NumberInput} from './components/NumberInput.vue';
 export {default as DateInput} from './components/DateInput.vue';
 export {default as TimeInput} from './components/TimeInput.vue';
+export {default as SearchInput} from './components/SearchInput.vue';
 export {default as Textarea} from './components/Textarea.vue';
 export {default as Checkbox} from './components/Checkbox.vue';
 export {default as CheckboxGroup} from './components/CheckboxGroup.vue';

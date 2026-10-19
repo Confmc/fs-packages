@@ -17,6 +17,7 @@ import MultiCombobox from '../components/MultiCombobox.vue';
 import MultiSelect from '../components/MultiSelect.vue';
 import NumberInput from '../components/NumberInput.vue';
 import RadioGroup from '../components/RadioGroup.vue';
+import SearchInput from '../components/SearchInput.vue';
 import SingleSelect from '../components/SingleSelect.vue';
 import Switch from '../components/Switch.vue';
 import Textarea from '../components/Textarea.vue';
@@ -35,7 +36,7 @@ export interface UiTexts {
     removeLabel?: string;
     /** CheckboxGroup's required marker for assistive tech. */
     requiredLabel?: string;
-    /** the accessible name of an in-input clear button (TimeInput). */
+    /** the accessible name of an in-input clear button (TimeInput, SearchInput). */
     clearButtonLabel?: string;
 }
 
@@ -247,5 +248,6 @@ export const createTextedControls = (texts: UiTexts) => {
         GroupCombobox: withTexts(GroupCombobox, 'GroupCombobox', select),
         CheckboxGroup: withTexts(CheckboxGroup, 'CheckboxGroup', textsFor(texts, GROUP_TEXTS)),
         TimeInput: withTexts(TimeInput, 'TimeInput', textsFor(texts, CLEAR_TEXTS)),
+        SearchInput: withTexts(SearchInput, 'SearchInput', textsFor(texts, CLEAR_TEXTS)),
     };
 };

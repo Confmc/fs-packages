@@ -25,6 +25,7 @@ import MultiCombobox from '../../src/components/MultiCombobox.vue';
 import MultiSelect from '../../src/components/MultiSelect.vue';
 import Pressable from '../../src/components/Pressable.vue';
 import RadioGroup from '../../src/components/RadioGroup.vue';
+import SearchInput from '../../src/components/SearchInput.vue';
 import SingleSelect from '../../src/components/SingleSelect.vue';
 import Switch from '../../src/components/Switch.vue';
 import Textarea from '../../src/components/Textarea.vue';
@@ -160,6 +161,13 @@ describe('axe-core audits — zero violations, closed and open', () => {
                     required: slot.required,
                 }),
             {required: true, error: 'Vul een tijd in'},
+        );
+        await expectNoViolations(screen.container);
+    });
+
+    it('a labelled SearchInput with text: magnifier and clear button', async () => {
+        const screen = await renderInField((slot) =>
+            h(SearchInput, {...slot.field, modelValue: 'appel', 'onUpdate:modelValue': noop}),
         );
         await expectNoViolations(screen.container);
     });
