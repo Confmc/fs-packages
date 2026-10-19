@@ -563,6 +563,28 @@ whitespace-containing `option.id` never breaks the `aria-activedescendant` linka
 
 ## Forms and their errors
 
+```vue
+<script setup lang="ts">
+import {useForm, type FormDraft} from '@script-development/ui-form';
+
+const draft = ref<FormDraft<Contract>>(initial);
+const {TextField, NumberField, SingleSelectField, handleSubmit} = useForm({draft});
+</script>
+
+<template>
+    <TextField name="name" label="Name" required />
+    <NumberField name="contractNumber" label="Number" />
+    <SingleSelectField name="debtorId" label="Debtor" :options="debtors" option-label="name" />
+</template>
+```
+
+`useForm` hands out a bound version of every control (`TextField`, `NumberField`, `SingleSelectField`, …). Each
+draws the label, the control and the message, wired by the field's name; on a draft form the name must be a path
+holding that control's value type, checked by vue-tsc. Every other prop passes through to the control. For a
+compound field (a control plus a hint, an editor the package does not ship), use `field(name)` with `FormLabel`
+and `FormError`, as above. Set an app's texts once with `createUiForm({texts})`, which hands out `useForm` and the
+bare select controls with those texts as defaults.
+
 `useForm(options)` needs no HTTP service. It returns the error bag, `handleSubmit` with its double-submit guard,
 `submitting`, the refusal signal, client refusals (`refuse`, `setRefusals`, `withdraw`, `clearClient`) and the
 field wiring (`field`, `FormLabel`, `FormError`). A child component that renders fields takes the form as a prop.

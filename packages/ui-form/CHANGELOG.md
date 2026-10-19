@@ -15,7 +15,9 @@ First release of `@script-development/ui-form`: `@script-development/fs-form` an
 - **`take(error)`** binds a 422 caught outside a submit and returns whether it was one.
 - **Every control takes `error`.** The mark is `invalid ?? Boolean(error)`: an error marks the control, and `invalid: false` shows a message without the mark.
 - **An in-input error icon on `TextInput`,** shown while it is marked.
-- TODO (kit decision): form-bound controls handed out by `useForm`, and their default texts.
+- **Form-bound controls.** `useForm` hands out a bound version of each control (`TextField`, `TextareaField`, `NumberField`, `DateField`, `CheckboxField`, `SwitchField`, `RadioGroupField`, `CheckboxGroupField`, `SingleSelectField`, `ComboboxField`, `MultiSelectField`, `MultiComboboxField`, `GroupSelectField`, `GroupComboboxField`): `<TextField name="title" label="Title" />` draws the label, the control and the message, wired by `field(name)`. On a draft form `name` takes only a path holding that control's value type (a select's id type comes from its `options`). Every other prop passes through to the control and wins over the wiring. Each has a stable component name, so a spec finds it with `findAllComponents({name: 'TextField'})` or by the control inside.
+- **`createUiForm({texts})`**: an app's texts (`placeholder`, `emptyText`, `optionsLabel`, `removeLabel`, `requiredLabel`) set once. It hands out `useForm`, whose bound controls carry them, and the bare text-carrying controls with them as defaults. The package's own `useForm` is the same with the package's texts.
+- **`FormDraft<T>`**: a record's form state. Every value a control can clear is nullable; booleans, lists and nested objects keep their shape; `readonly` goes.
 
 ### Changed (from fs-form)
 
