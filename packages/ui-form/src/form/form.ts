@@ -75,10 +75,13 @@ const useFormBody = <T extends string = string>(
 
     // The user acted on these fields, so what was said about them no longer holds: drop their server
     // messages and client refusals. Reassigned only when something goes, so a keystroke is free.
+    // A path takes everything under it along: `withdraw('goals')` drops `goals.1.title` too, for a list whose
+    // rows moved (a message keyed by an index would otherwise sit on another row).
     const withdraw = (...fields: T[]): void => {
         const {errors} = validation;
-        const said = fields.filter((field) => Object.hasOwn(errors.value, field));
-        const refused = fields.filter((field) => Object.hasOwn(client.value, field));
+        const named = (key: string) => fields.some((field) => key === field || key.startsWith(`${field}.`));
+        const said = (Object.keys(errors.value) as T[]).filter(named);
+        const refused = (Object.keys(client.value) as T[]).filter(named);
 
         if (said.length) {
             const next = {...errors.value};

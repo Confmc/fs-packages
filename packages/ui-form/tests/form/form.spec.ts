@@ -502,4 +502,26 @@ describe('useForm withdraw', () => {
         expect(result().errors.value).toBe(errors);
         expect(result().clientErrors.value).toEqual({});
     });
+
+    // A message is keyed by its path, index included: after a row is added or removed before it, it would
+    // sit on another row. The component that changes the list withdraws what was said about it.
+    it('withdraws everything under a path: the list itself and every row, nothing that merely shares the prefix', () => {
+        const {result} = mountForm<string>();
+        result().take(
+            refusal(422, {
+                errors: {
+                    goals: ['Add a goal'],
+                    'goals.1.title': ['Fill in a title'],
+                    'goals.2.end': ['Too early'],
+                    goalsNote: ['Too long'],
+                },
+            }),
+        );
+        result().refuse('goals.0.title', 'Too short');
+
+        result().withdraw('goals');
+
+        expect(result().errors.value).toEqual({goalsNote: 'Too long'});
+        expect(result().clientErrors.value).toEqual({});
+    });
 });
