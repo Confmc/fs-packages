@@ -144,7 +144,7 @@ commits; leave `HANDOFF.md` and `EXPERIMENT-REPORT.md` behind.
 2. Publishing is not part of this work: the approval, the hand bootstrap, the Trusted Publisher and any proving
    bump happen elsewhere. This work ends at the merged PR.
 
-## State at 2026-10-19 (control.21 @ 3ccd75b)
+## State at 2026-10-19 morning (control.21 @ 3ccd75b, superseded: see the last section)
 
 Decided since the 10-09 notes (emmie-2 now leads the emmie + package line; my side = the package):
 
@@ -191,3 +191,44 @@ Decided since the 10-09 notes (emmie-2 now leads the emmie + package line; my si
 - Packs now: ui-form only (the shims are gone). Bump `packages/ui-form/package.json`, `npm install
 --ignore-scripts`, build, `npm pack --pack-destination ../../.experiment-packs`, commit, push to `fork`.
 - Scope: fix what this work owns; don't chase issues merely noticed elsewhere.
+
+## State at 2026-10-19 evening (control.29, home machine)
+
+This side leads the package until the package PR; the emmie side is the test bed and tests what it is asked.
+Packs bump `0.1.0-control.N` (a pre-release counter, never published); commits stay local and go to `fork`
+only when asked. The published version is 0.1.0 (docs/contributing.md § 5). Mutation runs are parked until
+asked: the API comes first.
+
+Done today, each tested on emmie (ContractFormDrawer, FinancingFormDrawer + PersonRouteBudgetFields: pass):
+
+- Non-text bound fields refuse `prepend`/`append` in their types; GroupSelect/GroupCombobox `alphabeticalSort`
+  (options within each group, groups keep the caller's order).
+- FormField slots `#label-after` (a tooltip), `#aside` (the end of the label row, `.ui-field__head`), `#hint`
+  (under the control, named in describedby after the message); the bound controls forward all three.
+  `--ui-label-required-color`, `--ui-hint-text`, `--ui-hint-size`.
+- `useForm` hands out a `FormField` bound by name: the form's ids, its slot gets the wiring without the value.
+  The slot also gives `aria` (`FieldAria`) for a native element, with `aria-labelledby` (labels take
+  `${id}-label`); attributes that do not apply are left out, so a consumer's own one holds in any order.
+- One wiring type: `FieldBinding` takes `error` (optional); `FieldProps` is gone.
+- `UseFormCall` is exported (an app's `export const {useForm} = createUiForm(...)` failed TS4023); typecheck
+  runs a declaration check on that re-export.
+- A bound control binds a path by what it reads and writes (`PathsFor`): text/date/password fields and a select
+  without `clearLabel` bind never-empty paths. Type the draft as the honest model; `FormDraft` is the escape hatch.
+- CHANGELOG names the source packages instead of copying ui-inputs history.
+
+Decided against: an optional-field note (`markOptional`; `required` is the one signal, reverted), a
+format/parse pair on bound fields (euros over cents stays hand-built), a RadioGroup option slot (rare; the
+bound FormField with `aria` covers card groups), a named `asDraft` helper.
+
+fs-form and ui-inputs: deprecate in favour of ui-form, then remove from the repo in a separate PR once ui-form is
+published. Consumers pin their versions, so they are no reason to keep either. The ADR-0043 amendment does not
+exist yet; this work writes it (the merge, the deprecation, a default look instead of purely headless).
+
+Running on the emmie side: Test 3 (a modal through the dialog host: where does useForm live, since it needs
+setup for useId) and Test 4 (lists: a 422 on row 1, then remove row 0 — do messages keyed by index land on the
+wrong row?). Test 5 tomorrow: both drawers visually, plus a horizontal field with a hint and a message.
+
+Gates: unit 851, browser 196 + 3 new axe audits, typecheck, lint, coverage 100% green. On this Windows machine
+format:check, validate:dist and lint:pkg fail for every package (CRLF checkout artefacts; spawnSync('npm')
+without a shell); publint and attw pass for ui-form run directly. Playwright wanted headless shell 1243: a
+junction to the installed 1234 in %LOCALAPPDATA%\ms-playwright.
