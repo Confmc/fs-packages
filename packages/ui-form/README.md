@@ -91,26 +91,18 @@ shape at that fixed breakpoint (a custom property cannot drive a media query, so
 ### More in the label row
 
 Two slots extend the label without replacing it. `#label-after` renders inside the `<label>`, after its text and
-required mark, for a tooltip. `#aside` renders at the far end of the label's row (a `.ui-field__head` flex row; in
-the horizontal layout it takes the label column), for a control that belongs to the field, such as a switch; it
-receives the same `field` as the default slot. Without an aside the label stays a direct child of `.ui-field`. The
-bound controls hand both slots to their field. The required mark's colour is `--ui-label-required-color` (default
-`var(--ui-danger-text)`).
+required mark: a note such as "optional", or a tooltip. `#aside` renders at the far end of the label's row (a
+`.ui-field__head` flex row; in the horizontal layout it takes the label column), for a control that belongs to
+the field, such as a switch; it receives the same `field` as the default slot. Without an aside the label stays
+a direct child of `.ui-field`. The bound controls hand both slots to their field. The required mark's colour is
+`--ui-label-required-color` (default `var(--ui-danger-text)`).
 
 ```vue
 <TextField name="email" label="E-mail">
-    <template #label-after><HelpTip text="Where we send the invoice" /></template>
+    <template #label-after><span class="optional">optional</span></template>
     <template #aside><Switch id="notify" v-model="notify" aria-label="Send updates" /></template>
 </TextField>
 ```
-
-**A note on the fields that may stay empty.** A design that marks optional fields instead of (or as well as)
-required ones does not need a second flag per field: `required` already says which fields are not optional.
-`useForm({markOptional: true})` puts a note in the label of every field that is not required (every bound
-control that draws a label, and the bound `FormLabel`); a required field keeps its asterisk. The note reads
-"optional", or the `optionalNote` text set with `createUiForm`, and unlike the asterisk it is part of the
-label's accessible name. `FormField` takes the text as `optionalNote` directly. It is styled by
-`--ui-label-optional-color` (default the label colour) and `--ui-label-optional-weight` (default `400`).
 
 ### The text-like controls' extras
 
@@ -654,7 +646,7 @@ through to the control and wins over the wiring. `TextField`, `NumberField`, `Da
 not ship), use `field(name)` with `FormLabel` and `FormError`, as above.
 
 Set an app's texts once with `createUiForm({texts})`: `placeholder`, `emptyText`, `optionsLabel`, `removeLabel`,
-`requiredLabel`, `clearButtonLabel`, `showPasswordLabel`, `hidePasswordLabel`, `capsLockText` and `optionalNote`. It hands out
+`requiredLabel`, `clearButtonLabel`, `showPasswordLabel`, `hidePasswordLabel` and `capsLockText`. It hands out
 `useForm`, whose bound controls carry them, and the bare controls that take texts, with them as defaults; a prop
 at the call site still wins.
 
