@@ -29,6 +29,7 @@ import SingleSelect from '../../src/components/SingleSelect.vue';
 import Switch from '../../src/components/Switch.vue';
 import Textarea from '../../src/components/Textarea.vue';
 import TextInput from '../../src/components/TextInput.vue';
+import TimeInput from '../../src/components/TimeInput.vue';
 import {useForm} from '../../src/form/form';
 import '../../styles.css';
 
@@ -138,6 +139,27 @@ describe('axe-core audits — zero violations, closed and open', () => {
                     required: slot.required,
                 }),
             {required: true, error: 'Fruit is required'},
+        );
+        await expectNoViolations(screen.container);
+    });
+
+    it('FormField + TimeInput with a time: clock glyph and clear button', async () => {
+        const screen = await renderInField((slot) =>
+            h(TimeInput, {...slot.field, modelValue: '09:30', 'onUpdate:modelValue': noop, required: slot.required}),
+        );
+        await expectNoViolations(screen.container);
+    });
+
+    it('FormField + TimeInput with an error: the error icon beside the clear button', async () => {
+        const screen = await renderInField(
+            (slot) =>
+                h(TimeInput, {
+                    ...slot.field,
+                    modelValue: '09:30',
+                    'onUpdate:modelValue': noop,
+                    required: slot.required,
+                }),
+            {required: true, error: 'Vul een tijd in'},
         );
         await expectNoViolations(screen.container);
     });

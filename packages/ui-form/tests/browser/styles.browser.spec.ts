@@ -1081,3 +1081,39 @@ describe('styles.css — NumberInput spin buttons, scoped to ui-form markup', ()
         expect(getComputedStyle(numberInput('ui-control ui-input')).appearance).not.toBe('textfield');
     });
 });
+
+describe('styles.css — TimeInput layout', () => {
+    it('keeps the text clear of the clock and the clear button, and moves the clear button beside the error icon', () => {
+        addStyle(uiCss);
+        const wrap = document.createElement('span');
+        wrap.className = 'ui-input-wrap';
+        wrap.style.width = '200px';
+        wrap.innerHTML =
+            '<svg class="ui-time__icon"></svg><input type="time" class="ui-control ui-input ui-time has-clear">' +
+            '<button class="ui-time__clear"></button>';
+        document.body.append(wrap);
+        cleanupTargets.push(wrap);
+        const input = wrap.querySelector('input') as HTMLInputElement;
+        const icon = wrap.querySelector('.ui-time__icon') as HTMLElement;
+        const clear = wrap.querySelector('.ui-time__clear') as HTMLElement;
+        const box = input.getBoundingClientRect();
+        const style = getComputedStyle(input);
+
+        expect(box.left + Number.parseFloat(style.paddingLeft)).toBeGreaterThanOrEqual(
+            icon.getBoundingClientRect().right,
+        );
+        expect(box.right - Number.parseFloat(style.paddingRight)).toBeLessThanOrEqual(
+            clear.getBoundingClientRect().left,
+        );
+
+        const valid = clear.getBoundingClientRect().right;
+        input.classList.add('is-invalid');
+        const invalid = clear.getBoundingClientRect().right;
+
+        // the error icon takes the edge, so the clear button moves in by about one icon and a gap
+        expect(valid - invalid).toBeGreaterThan(20);
+        expect(box.right - Number.parseFloat(getComputedStyle(input).paddingRight)).toBeLessThanOrEqual(
+            clear.getBoundingClientRect().left,
+        );
+    });
+});

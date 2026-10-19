@@ -21,6 +21,7 @@ import SingleSelect from '../components/SingleSelect.vue';
 import Switch from '../components/Switch.vue';
 import Textarea from '../components/Textarea.vue';
 import TextInput from '../components/TextInput.vue';
+import TimeInput from '../components/TimeInput.vue';
 
 /** The texts a consumer sets once for its language; a control left without one keeps the package's. */
 export interface UiTexts {
@@ -34,12 +35,15 @@ export interface UiTexts {
     removeLabel?: string;
     /** CheckboxGroup's required marker for assistive tech. */
     requiredLabel?: string;
+    /** the accessible name of an in-input clear button (TimeInput). */
+    clearButtonLabel?: string;
 }
 
 /** Which texts each control declares; nothing else reaches it, so no text leaks as an attribute. */
 const SELECT_TEXTS = ['placeholder', 'emptyText', 'optionsLabel'] as const;
 const MULTI_TEXTS = [...SELECT_TEXTS, 'removeLabel'] as const;
 const GROUP_TEXTS = ['requiredLabel'] as const;
+const CLEAR_TEXTS = ['clearButtonLabel'] as const;
 
 const textsFor = (texts: UiTexts, keys: readonly (keyof UiTexts)[]): UiTexts =>
     Object.fromEntries(keys.filter((key) => texts[key] !== undefined).map((key) => [key, texts[key]]));
@@ -92,6 +96,7 @@ export interface BoundControls<D> {
     TextareaField: BoundControl<Names<D, string | null>, typeof Textarea, string | null>;
     NumberField: BoundControl<Names<D, number | null>, typeof NumberInput, number | null>;
     DateField: BoundControl<Names<D, string | null>, typeof DateInput, string | null>;
+    TimeField: BoundControl<Names<D, string | null>, typeof TimeInput, string | null>;
     /** `label` is the box's own label. */
     CheckboxField: DefineSetupFnComponent<
         Shell<Names<D, boolean>> &
@@ -197,12 +202,14 @@ export const createBoundControls = <D>(field: Field, texts: UiTexts): BoundContr
     const select = textsFor(texts, SELECT_TEXTS);
     const multi = textsFor(texts, MULTI_TEXTS);
     const group = textsFor(texts, GROUP_TEXTS);
+    const clear = textsFor(texts, CLEAR_TEXTS);
 
     return {
         TextField: bind(field, TextInput, 'TextField', false, {}),
         TextareaField: bind(field, Textarea, 'TextareaField', false, {}),
         NumberField: bind(field, NumberInput, 'NumberField', false, {}),
         DateField: bind(field, DateInput, 'DateField', false, {}),
+        TimeField: bind(field, TimeInput, 'TimeField', false, clear),
         CheckboxField: bind(field, Checkbox, 'CheckboxField', true, {}),
         SwitchField: bind(field, Switch, 'SwitchField', true, {}),
         RadioGroupField: bind(field, RadioGroup, 'RadioGroupField', true, {}),
@@ -239,5 +246,6 @@ export const createTextedControls = (texts: UiTexts) => {
         GroupSelect: withTexts(GroupSelect, 'GroupSelect', select),
         GroupCombobox: withTexts(GroupCombobox, 'GroupCombobox', select),
         CheckboxGroup: withTexts(CheckboxGroup, 'CheckboxGroup', textsFor(texts, GROUP_TEXTS)),
+        TimeInput: withTexts(TimeInput, 'TimeInput', textsFor(texts, CLEAR_TEXTS)),
     };
 };

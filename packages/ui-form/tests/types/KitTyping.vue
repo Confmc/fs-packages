@@ -6,6 +6,9 @@
     <TextareaField name="remarks" label="Opmerkingen" :rows="3" />
     <NumberField name="contractNumber" label="Nummer" :min="0" />
     <DateField name="startDate" label="Start" />
+    <TimeField name="startTime" label="Tijd" :step="15" />
+    <!-- @vue-expect-error a number path on a time field -->
+    <TimeField name="contractNumber" />
     <CheckboxField name="active" label="Actief" />
     <SwitchField name="active" label="Actief" />
     <SingleSelectField name="debtorId" :options="debtors" option-label="name" label="Debiteur" />
@@ -51,6 +54,7 @@ interface Contract {
     remarks: string;
     contractNumber: number;
     startDate: string;
+    startTime: string;
     active: boolean;
     debtorId: number;
     tagIds: number[];
@@ -64,6 +68,7 @@ const {
     TextareaField,
     NumberField,
     DateField,
+    TimeField,
     CheckboxField,
     SwitchField,
     SingleSelectField,

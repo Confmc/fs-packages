@@ -338,6 +338,62 @@
     .ui-input-wrap > .ui-input.is-invalid {
         padding-right: calc(var(--ui-control-pad-x) * 2 + 1em);
     }
+    /* TimeInput: a clock glyph on the left (the browser's own is hidden), a clear button on the
+       right, and room in the text for both. Keyed on ui-form's own .ui-time classes. */
+    .ui-time {
+        padding-left: calc(var(--ui-control-pad-x) * 2 + 1em);
+    }
+    .ui-time::-webkit-calendar-picker-indicator {
+        display: none;
+    }
+    .ui-input-wrap > .ui-time.has-clear {
+        padding-right: calc(var(--ui-control-pad-x) * 2 + 1em);
+    }
+    .ui-input-wrap > .ui-time.has-clear.is-invalid {
+        padding-right: calc(var(--ui-control-pad-x) * 3 + 2em);
+    }
+    .ui-time__icon {
+        position: absolute;
+        top: 50%;
+        left: var(--ui-control-pad-x);
+        width: 1em;
+        height: 1em;
+        transform: translateY(-50%);
+        color: var(--ui-control-text-muted);
+        font-size: var(--ui-control-font-size);
+        pointer-events: none;
+    }
+    .ui-time__clear {
+        position: absolute;
+        top: 50%;
+        right: var(--ui-control-pad-x);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.5em;
+        height: 1.5em;
+        margin-right: -0.25em;
+        padding: 0;
+        border: none;
+        border-radius: 50%;
+        background: transparent;
+        color: var(--ui-control-text-muted);
+        font-size: var(--ui-control-font-size);
+        transform: translateY(-50%);
+        cursor: pointer;
+    }
+    .ui-time__clear svg {
+        width: 0.75em;
+        height: 0.75em;
+    }
+    .ui-time__clear:hover {
+        color: var(--ui-control-text);
+    }
+    /* with the error icon at the edge, the clear button moves in beside it */
+    .ui-time.is-invalid ~ .ui-time__clear {
+        right: calc(var(--ui-control-pad-x) * 2 + 1em);
+    }
+
     .ui-input__icon {
         position: absolute;
         top: 50%;

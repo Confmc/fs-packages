@@ -123,6 +123,7 @@ describe('createUiForm', () => {
             optionsLabel: 'Opties',
             removeLabel: 'Verwijder',
             requiredLabel: '(verplicht)',
+            clearButtonLabel: 'Wis',
         },
     });
 
@@ -171,6 +172,20 @@ describe('createUiForm', () => {
 
         expect(defaulted.findComponent(SingleSelect).props('placeholder')).toBe('Kies…');
         expect(overridden.findComponent(SingleSelect).props('placeholder')).toBe('Eigen');
+    });
+
+    it("names a TimeField's clear button with the configured text", () => {
+        const draft = ref({start: '09:00' as string | null});
+        const wrapper = mount(
+            defineComponent({
+                setup: () => {
+                    const {TimeField} = ui.useForm({draft});
+                    return () => h(TimeField, {name: 'start', label: 'Start'});
+                },
+            }),
+        );
+
+        expect(wrapper.find('.ui-time__clear').attributes('aria-label')).toBe('Wis');
     });
 
     it('hands out the package controls themselves when no texts are configured', () => {
