@@ -47,7 +47,7 @@ for the whole line. The emmie side decides that line; this side builds the packa
 what emmie must change. Without the peer session at home, leave notes for it in the commit messages and
 `HANDOFF.md`, or update `PLAN.md` on that branch directly if asked to.
 
-Not yet sent to the emmie side: four corrections to `PLAN.md`.
+Sent to the emmie side on 2026-10-19: four corrections to `PLAN.md` (check they landed there):
 
 1. `private` comes out in the package PR itself (npm refuses to publish a private package); the plan keeps it.
 2. Phase 2 steps 1–3 are done and step 4 is folded into the kit; the MultiSelect sorted-model item is closed.
