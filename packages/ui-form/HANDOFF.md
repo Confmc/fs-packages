@@ -24,10 +24,15 @@ Written 2026-10-09, end of day, for a fresh session on another machine. Read thi
     for p in ui-form ui-inputs form; do (cd packages/$p && npm pack --pack-destination ../../.experiment-packs); done
     ```
 
-- **emmie side:** branch `experiment/fs-packages-control` on emmie's origin (worktree `emmie-2` on the work
-  machine). Its report is `docs/plans/fs-packages-experiment/REPORT.md`. The emmie-side session
-  ("emmie-0924-fs-form-collector…") drives the experiment and relays Marcel's / Gerard's decisions; this side
-  builds the package and pushes back where something smells.
+- **emmie side:** branch `error-keys-raw` on emmie's origin (pushed, no PR; worktree `emmie-2` on the work
+  machine). Its plan is `docs/plans/fs-packages-ui-form/PLAN.md` there. `experiment/fs-packages-control` is
+  reference only (it has local unpushed merges, including a dropped approach), and its `REPORT.md` is outdated
+  against PLAN.md. The emmie-side session ("emmie-0924-fs-form-collector…") leads the emmie + package line and
+  decides it; this side builds the package and pushes back where something smells.
+- **Why keyMapper is identity:** emmie's phase 1 removed both backend casing traits
+  (`ResponseErrorAttributesToCamelTrait` everywhere; `InputAndFilesToSnakeCaseTrait` everywhere but the three
+  external day-update requests), so a 422's keys arrive as dotted camelCase paths (`learningGoals.0.title`).
+  That is what makes the identity default and `field('a.0.b')` right.
 
 ## How we work (Marcel's rules)
 
@@ -65,23 +70,26 @@ control.13 / control.14 (today's last packs, one commit each):
 
 ## Decisions (with source)
 
-| Decision                                                                                                   | Source                           |
-| ---------------------------------------------------------------------------------------------------------- | -------------------------------- |
-| Merge fs-form + ui-inputs into `ui-form`                                                                   | Marcel; Gerard's "combine them"  |
-| No provide/inject; shape = `v-bind="field(name)"`, FormLabel/FormError by name, form as prop               | Gerard                           |
-| Order: (1) emmie adopts ui-form's controls → (2) field-controls into the package → (3) then decide the kit | Marcel/Gerard                    |
-| emmie first; agnostic is nice to have                                                                      | Gerard                           |
-| Generated ids, fixed prefix only when needed                                                               | Gerard ("geweldig")              |
-| Form-bound pieces take the old names                                                                       | Gerard; Marcel prefers old names |
-| ADR-0043 amendment                                                                                         | Gerard writes it                 |
-| Messages stay until the next save; `withdraw` is explicit (clear-on-edit reverted, control.12)             | Marcel                           |
-| `error` + `invalid` override ("message without red")                                                       | Marcel                           |
-| No shims; emmie renames its imports in one pass                                                            | Marcel                           |
-| `Message`/`FormError` always present; `FormField`'s own message only when there is one                     | Marcel                           |
-| `keyMapper` default stays identity (casing lives in emmie's http middleware)                               | Marcel                           |
-| `refusedUnnamed` = "no field the form holds"; keep `'ignored'`; keep the one overload cast                 | Marcel                           |
-| RichTextEditor (tiptap) / file upload stay in emmie, wired through `field()` / `FormField`                 | Marcel                           |
-| Package CSS = defaults that consumer CSS always overrides → `@layer ui-form`                               | Marcel                           |
+Partly superseded: the two rows marked † were replaced by K2 (the bound controls are the field-controls,
+and the kit was decided before them). See the last section.
+
+| Decision                                                                                                     | Source                           |
+| ------------------------------------------------------------------------------------------------------------ | -------------------------------- |
+| Merge fs-form + ui-inputs into `ui-form`                                                                     | Marcel; Gerard's "combine them"  |
+| No provide/inject; shape = `v-bind="field(name)"`, FormLabel/FormError by name, form as prop †               | Gerard                           |
+| Order: (1) emmie adopts ui-form's controls → (2) field-controls into the package → (3) then decide the kit † | Marcel/Gerard                    |
+| emmie first; agnostic is nice to have                                                                        | Gerard                           |
+| Generated ids, fixed prefix only when needed                                                                 | Gerard ("geweldig")              |
+| Form-bound pieces take the old names                                                                         | Gerard; Marcel prefers old names |
+| ADR-0043 amendment                                                                                           | Gerard writes it                 |
+| Messages stay until the next save; `withdraw` is explicit (clear-on-edit reverted, control.12)               | Marcel                           |
+| `error` + `invalid` override ("message without red")                                                         | Marcel                           |
+| No shims; emmie renames its imports in one pass                                                              | Marcel                           |
+| `Message`/`FormError` always present; `FormField`'s own message only when there is one                       | Marcel                           |
+| `keyMapper` default stays identity (casing lives in emmie's http middleware)                                 | Marcel                           |
+| `refusedUnnamed` = "no field the form holds"; keep `'ignored'`; keep the one overload cast                   | Marcel                           |
+| RichTextEditor (tiptap) / file upload stay in emmie, wired through `field()` / `FormField`                   | Marcel                           |
+| Package CSS = defaults that consumer CSS always overrides → `@layer ui-form`                                 | Marcel                           |
 
 ## Open (2026-10-09, superseded: see the last section)
 
