@@ -58,7 +58,7 @@ value control that draws all three:
 
 ```vue
 <script setup lang="ts">
-const draft = ref<FormDraft<Contract>>(initial);
+const draft = ref<Contract>(initial);
 const {TextField, NumberField, SingleSelectField, handleSubmit} = useForm({draft});
 </script>
 
@@ -199,9 +199,11 @@ The controls are the ui-inputs set, plus `TimeInput`, `SearchInput`, `PasswordIn
   `:invalid="false"` shows a message without the mark. `field(name)` passes both.
 - **The select family's option-text prop is `optionLabel`**, so `label` is the field label everywhere.
 - **The value controls model a nullable value.** A cleared `TextInput`, `Textarea`, `DateInput`, `SearchInput`
-  or `PasswordInput` emits `''`; a cleared `NumberInput` or `TimeInput` emits `null`. Type a record's form state
-  with `FormDraft<T>`: every value a control can clear becomes nullable, while booleans, lists and nested objects
-  keep their shape.
+  or `PasswordInput` emits `''`; a cleared `NumberInput` or `TimeInput` emits `null`. Type the draft as your model,
+  honestly: a bound control takes a path when it can read the value there and the value's type holds what it
+  writes, so a `string` field fits a `DateField` and an id that is never empty fits a select without
+  `clearLabel`. `FormDraft<T>`, which makes every clearable value nullable, is an escape hatch for a model you
+  cannot make honest yet.
 
 | New control     | Model            | Props beyond the shared `id`, `disabled`, `required`, `error`, `invalid`, `describedby`                                                                  |
 | --------------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |

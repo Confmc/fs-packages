@@ -27,7 +27,8 @@ First release of `@script-development/ui-form`: `@script-development/fs-form` an
 - **`FieldBinding` takes `error`** (optional); `FieldProps`, the same with `error`, is gone: one type for a field's wiring.
 - **`GroupSelect` and `GroupCombobox` `alphabeticalSort`**: sorts the options within each group by display string; the groups keep your order. Off by default, as on the rest of the select family.
 - **More `createUiForm` texts:** `clearButtonLabel`, `showPasswordLabel`, `hidePasswordLabel`, `capsLockText`.
-- **`FormDraft<T>`**: a record's form state. Every value a control can clear is nullable; booleans, lists and nested objects keep their shape; `readonly` goes.
+- **A bound control binds a path by what it reads and writes**: a field that is never empty fits a control that never empties it (`DateField` on `string`, a select without `clearLabel` on an id), so a draft typed as the honest model needs no cast.
+- **`FormDraft<T>`**, an escape hatch for a model you cannot make honest yet: every value a control can clear is nullable; booleans, lists and nested objects keep their shape; `readonly` goes.
 
 ### Changed (from fs-form)
 

@@ -626,9 +626,9 @@ whitespace-containing `option.id` never breaks the `aria-activedescendant` linka
 
 ```vue
 <script setup lang="ts">
-import {useForm, type FormDraft} from '@script-development/ui-form';
+import {useForm} from '@script-development/ui-form';
 
-const draft = ref<FormDraft<Contract>>(initial);
+const draft = ref<Contract>(initial);
 const {TextField, NumberField, SingleSelectField, handleSubmit} = useForm({draft});
 </script>
 
@@ -643,7 +643,7 @@ const {TextField, NumberField, SingleSelectField, handleSubmit} = useForm({draft
 `DateField`, `TimeField`, `PasswordField`, `CheckboxField`, `SwitchField`, `RadioGroupField`, `CheckboxGroupField`,
 `SingleSelectField`, `ComboboxField`, `MultiSelectField`, `MultiComboboxField`, `GroupSelectField` and
 `GroupComboboxField`. Each draws the label, the control and the message, wired by the field's name; on a draft
-form the name must be a path holding that control's value type, checked by vue-tsc. Every other prop passes
+form the name must be a path the control fits, checked by vue-tsc (see [Typing the draft](#typing-the-draft)). Every other prop passes
 through to the control and wins over the wiring. `TextField`, `NumberField`, `DateField` and `TimeField` also take
 `prepend` / `append` (an `InputGroup` around the control). `RadioGroupField` and `CheckboxGroupField` require
 `label`, their legend. Each has a stable component name, so a spec finds it with
@@ -707,6 +707,25 @@ With `useForm({draft})` (the component's own `Ref`), every name is a path into t
 (`learningGoals.0.title`), checked by vue-tsc, and `field(name)` also carries the value at that path and writes
 changes back, so a control needs no `v-model`. A 422's field keys bind as the server sent them; pass `keyMapper`
 to map them.
+
+### Typing the draft
+
+Type the draft as your model, honestly: a field a control can empty is `| null`, a field that is never empty is
+not. A bound control takes a path when it can read the value there and the value's type holds everything the
+control writes:
+
+| Bound control                                                                  | Writes                                        | Binds a never-empty path  |
+| ------------------------------------------------------------------------------ | --------------------------------------------- | ------------------------- |
+| `TextField`, `TextareaField`, `DateField`, `PasswordField`                     | a string (`''` when cleared)                  | yes (`string`)            |
+| `RadioGroupField`                                                              | an option's id                                | yes                       |
+| `SingleSelectField`, `ComboboxField`, `GroupSelectField`, `GroupComboboxField` | an option's id; `null` only from `clearLabel` | yes, without `clearLabel` |
+| `NumberField`, `TimeField`                                                     | `null` when emptied                           | no: the path is `\| null` |
+| `CheckboxField`, `SwitchField`, the multi-selects, `CheckboxGroupField`        | a boolean or a list                           | (never null)              |
+
+`FormDraft<T>` is an escape hatch for a model you cannot make honest yet (an id with `0` for "none"): it makes
+every value a control can clear nullable, booleans, lists and nested objects keeping their shape. It widens
+fields that are never empty too, so code that reads the draft as the model needs null checks it would not
+otherwise.
 
 The components never import an error service, and nothing is provided or injected. Without a form, pass `error`
 to `FormField` and bind its `field` the same way.
