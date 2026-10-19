@@ -674,12 +674,18 @@ which carries the value too.
 </FormField>
 ```
 
+A field without a label whose name comes from elsewhere (a step title) adds its own `aria-labelledby` next to
+`v-bind="aria"`; `aria` leaves out every attribute that does not apply, so yours holds in either order.
+
 A hint that is not always there is a conditional slot, `<template v-if="hint" #hint>{{ hint }}</template>`: left
 out, the field renders no hint and names none.
 
 **Testing.** A shallow mount stubs the bound controls, `FormField` and `FormError`, so a field's message does not
 render in such a spec. Un-stub what the spec reads: `stubs: {TextField: false, FormField: false, FormError: false}`.
 A form takes only its own action's 422, so a spec that checks a refusal makes the save itself reject with one.
+The frame's classes are stable and safe to select on: `.ui-field` (the frame, where a `data-test` on a bound
+`FormField` lands), `.ui-hint` and `.ui-error` (the message). A bound control's `data-test` lands on the control,
+whose `error` prop carries the message.
 
 Set an app's texts once with `createUiForm({texts})`: `placeholder`, `emptyText`, `optionsLabel`, `removeLabel`,
 `requiredLabel`, `clearButtonLabel`, `showPasswordLabel`, `hidePasswordLabel` and `capsLockText`. It hands out

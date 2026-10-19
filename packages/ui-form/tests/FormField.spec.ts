@@ -117,7 +117,8 @@ describe('FormField', () => {
             },
         });
 
-        expect(aria).toEqual({id: 'laws'});
+        // absent, not undefined: an aria-labelledby of your own then holds wherever it sits next to v-bind="aria"
+        expect(Object.keys(aria)).toEqual(['id']);
     });
 
     it('renders no hint when the slot is left out conditionally, and names none', () => {

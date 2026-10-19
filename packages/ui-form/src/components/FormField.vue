@@ -77,11 +77,16 @@ const field = computed<FieldBinding>(() => {
     return {id: own, invalid: Boolean(message.value), describedby: describedby || undefined, error: message.value};
 });
 
-// A <label for> names only a form control; a native element is named by aria-labelledby instead.
-const aria = computed<FieldAria>(() => ({
-    id: field.value.id,
-    'aria-labelledby': label ? labelId(field.value.id) : undefined,
-    'aria-invalid': field.value.invalid ? 'true' : undefined,
-    'aria-describedby': field.value.describedby,
-}));
+// A <label for> names only a form control; a native element is named by aria-labelledby instead. An attribute
+// that does not apply is left out, not set undefined, so one the consumer adds holds in any binding order.
+const aria = computed<FieldAria>(() => {
+    const {id: own, invalid, describedby} = field.value;
+
+    return {
+        id: own,
+        ...(label ? {'aria-labelledby': labelId(own)} : {}),
+        ...(invalid ? {'aria-invalid': 'true' as const} : {}),
+        ...(describedby ? {'aria-describedby': describedby} : {}),
+    };
+});
 </script>
