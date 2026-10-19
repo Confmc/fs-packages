@@ -1,8 +1,9 @@
 <template>
     <input
+        ref="input"
         :id="controlId"
         type="number"
-        class="ui-control ui-input"
+        class="ui-control ui-input ui-number"
         :class="{'is-invalid': marked}"
         :value="model"
         :placeholder="placeholder"
@@ -18,12 +19,13 @@
 </template>
 
 <script setup lang="ts">
-import {computed, useId} from 'vue';
+import {computed, onMounted, useId, useTemplateRef} from 'vue';
 
 const {
     id,
     invalid = undefined,
     error,
+    autofocus = false,
 } = defineProps<{
     /** stable id, pairing the control with its label and error; omit it and the control generates one with `useId()`. */
     id?: string;
@@ -43,10 +45,17 @@ const {
     invalid?: boolean;
     /** id of the paired error element for `aria-describedby`. */
     describedby?: string;
+    /** focus the input when it mounts; in script, since the native attribute only acts on page load. */
+    autofocus?: boolean;
 }>();
 
 // The mark: `invalid` when given, otherwise whether there is a message.
 const marked = computed(() => invalid ?? Boolean(error));
+
+const input = useTemplateRef<HTMLInputElement>('input');
+onMounted(() => {
+    if (autofocus) input.value?.focus();
+});
 
 const ownId = useId();
 const controlId = computed(() => id ?? ownId);

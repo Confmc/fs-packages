@@ -65,3 +65,24 @@ describe('NumberInput', () => {
         expect(wrapper.find('input').attributes('disabled')).toBeDefined();
     });
 });
+
+describe('NumberInput autofocus and class', () => {
+    it('focuses the input when it mounts with autofocus, and only then', () => {
+        const focused = mount(NumberInput, {props: {modelValue: null, autofocus: true}, attachTo: document.body});
+        expect(document.activeElement).toBe(focused.find('input').element);
+        focused.unmount();
+
+        const plain = mount(NumberInput, {props: {modelValue: null}, attachTo: document.body});
+        expect(document.activeElement).not.toBe(plain.find('input').element);
+        expect(plain.find('input').attributes()).not.toHaveProperty('autofocus');
+        plain.unmount();
+    });
+
+    it('carries ui-number, the hook its spin-button styling keys on', () => {
+        expect(
+            mount(NumberInput, {props: {modelValue: null}})
+                .find('input')
+                .classes(),
+        ).toContain('ui-number');
+    });
+});

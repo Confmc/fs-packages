@@ -319,6 +319,18 @@
        with the text kept clear of it. Keyed on .ui-input-wrap, which only ui-form's TextInput
        renders: during the migration this sheet also styles ui-inputs 0.17 controls, whose invalid
        TextInput has no icon and must keep its own padding. */
+    /* NumberInput hides the browser's spin buttons. Keyed on .ui-number, which only ui-form's
+       NumberInput renders, so a ui-inputs 0.17 number input keeps its own. */
+    .ui-number::-webkit-outer-spin-button,
+    .ui-number::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+    .ui-number {
+        -moz-appearance: textfield;
+        appearance: textfield;
+    }
+
     .ui-input-wrap {
         position: relative;
         display: block;

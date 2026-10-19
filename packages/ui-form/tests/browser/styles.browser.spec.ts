@@ -1063,3 +1063,21 @@ describe('styles.css — TextInput error icon padding, scoped to ui-form markup'
         expect(getComputedStyle(invalidInput(false)).paddingRight).toBe('14px');
     });
 });
+
+describe('styles.css — NumberInput spin buttons, scoped to ui-form markup', () => {
+    const numberInput = (className: string): HTMLInputElement => {
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.className = className;
+        document.body.append(input);
+        cleanupTargets.push(input);
+        return input;
+    };
+
+    it("hides the spin buttons on ui-form's NumberInput and leaves a ui-inputs 0.17 one alone", () => {
+        addStyle(uiCss);
+
+        expect(getComputedStyle(numberInput('ui-control ui-input ui-number')).appearance).toBe('textfield');
+        expect(getComputedStyle(numberInput('ui-control ui-input')).appearance).not.toBe('textfield');
+    });
+});
