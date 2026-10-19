@@ -1,6 +1,6 @@
 # Handoff: ui-form experiment (fs-packages side)
 
-> **Read the last section first** ("State at 2026-10-19"): it supersedes "Open" and "Next steps" below,
+> At home or on another machine, start with `HOME-HANDOFF.md`. **Read the last section first** ("State at 2026-10-19"): it supersedes "Open" and "Next steps" below,
 > which are from 2026-10-09. `EXPERIMENT-REPORT.md` is the 10-09 report and is not kept current.
 
 Written 2026-10-09, end of day, for a fresh session on another machine. Read this first, then
