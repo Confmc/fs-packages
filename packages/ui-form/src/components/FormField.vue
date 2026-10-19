@@ -2,19 +2,20 @@
     <div class="ui-field" :class="{'is-horizontal': orientation === 'horizontal' && Boolean(label)}">
         <!-- with an aside the label shares a row with it; without one the label stays a direct child, as in 0.17 -->
         <div v-if="label && $slots.aside" class="ui-field__head">
-            <FormLabel :html-for="field.id" :required="required">
+            <FormLabel :id="labelId(field.id)" :html-for="field.id" :required="required">
                 {{ label }}<template #after><slot name="label-after" /></template>
             </FormLabel>
             <slot name="aside" :field="field" />
         </div>
-        <FormLabel v-else-if="label" :html-for="field.id" :required="required">
+        <FormLabel v-else-if="label" :id="labelId(field.id)" :html-for="field.id" :required="required">
             {{ label }}<template #after><slot name="label-after" /></template>
         </FormLabel>
         <!-- the slot receives `field`, whose keys are the control's own prop names, so one
-             `v-bind="field"` wires the control; the wrapper keeps multi-node slot content in one
-             grid cell when horizontal (display: contents otherwise) -->
+             `v-bind="field"` wires the control, and `aria`, the same wiring as attributes for a native
+             element; the wrapper keeps multi-node slot content in one grid cell when horizontal
+             (display: contents otherwise) -->
         <div class="ui-field__control">
-            <slot :field="field" />
+            <slot :field="field" :aria="aria" />
         </div>
         <div v-if="$slots.hint" :id="hintId(field.id)" class="ui-hint"><slot name="hint" /></div>
         <FormError v-if="message" :error="message" :id="errorId" />
@@ -24,9 +25,9 @@
 <script setup lang="ts">
 import {computed, useId, useSlots} from 'vue';
 
-import type {FieldBinding} from '../types';
+import type {FieldAria, FieldBinding} from '../types';
 
-import {hintId, messageId} from '../form/field';
+import {hintId, labelId, messageId} from '../form/field';
 import FormError from './FormError.vue';
 import FormLabel from './FormLabel.vue';
 
@@ -54,7 +55,8 @@ const {
 }>();
 
 defineSlots<{
-    default?: (scope: {field: FieldBinding}) => unknown;
+    /** `field` for a control of this package, `aria` for a native element (a `role="group"` div). */
+    default?: (scope: {field: FieldBinding; aria: FieldAria}) => unknown;
     /** inside the label, after its text and required mark: a tooltip. */
     'label-after'?: () => unknown;
     /** at the far end of the label's row, e.g. a switch that belongs to the field. */
@@ -74,4 +76,12 @@ const field = computed<FieldBinding>(() => {
 
     return {id: own, invalid: Boolean(message.value), describedby: describedby || undefined, error: message.value};
 });
+
+// A <label for> names only a form control; a native element is named by aria-labelledby instead.
+const aria = computed<FieldAria>(() => ({
+    id: field.value.id,
+    'aria-labelledby': label ? labelId(field.value.id) : undefined,
+    'aria-invalid': field.value.invalid ? 'true' : undefined,
+    'aria-describedby': field.value.describedby,
+}));
 </script>

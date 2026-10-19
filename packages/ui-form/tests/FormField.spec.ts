@@ -82,6 +82,54 @@ describe('FormField', () => {
         expect(plain.text()).toContain('db:undefined');
     });
 
+    it('hands a native element the same wiring as aria attributes, named by the label', () => {
+        let aria!: Record<string, unknown>;
+        const wrapper = mount(FormField, {
+            props: {label: 'Laws', id: 'laws', error: 'Pick one'},
+            slots: {
+                default: (scope: {aria: Record<string, unknown>}) => {
+                    aria = scope.aria;
+                    return h('div', {role: 'group', ...scope.aria});
+                },
+                hint: 'Any that apply',
+            },
+        });
+
+        expect(wrapper.find('label').attributes('id')).toBe('laws-label');
+        expect(aria).toEqual({
+            id: 'laws',
+            'aria-labelledby': 'laws-label',
+            'aria-invalid': 'true',
+            'aria-describedby': 'laws-error laws-hint',
+        });
+        expect(wrapper.find('[role="group"]').attributes()).not.toHaveProperty('invalid');
+    });
+
+    it('leaves aria-invalid and aria-labelledby off while there is no message and no label', () => {
+        let aria!: Record<string, unknown>;
+        mount(FormField, {
+            props: {id: 'laws'},
+            slots: {
+                default: (scope: {aria: Record<string, unknown>}) => {
+                    aria = scope.aria;
+                    return h('div');
+                },
+            },
+        });
+
+        expect(aria).toEqual({id: 'laws'});
+    });
+
+    it('renders no hint when the slot is left out conditionally, and names none', () => {
+        // what `<template v-if="hint" #hint>` and the bound controls hand over: a hint slot that is undefined
+        const wrapper = mount(() =>
+            h(FormField, {label: 'Email', id: 'email'}, {default: wiringSlot, hint: undefined}),
+        );
+
+        expect(wrapper.find('.ui-hint').exists()).toBe(false);
+        expect(wrapper.text()).toContain('db:undefined');
+    });
+
     it('keeps the label a direct child of the field without an aside', () => {
         const wrapper = mount(FormField, {props: {label: 'Email', id: 'email'}, slots: {default: wiringSlot}});
 

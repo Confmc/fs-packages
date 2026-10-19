@@ -46,4 +46,4 @@ export type {FormDraft} from './form/draft';
 export type {BoundControls, UiTexts} from './form/kit';
 export type {PathsOf} from './form/path';
 
-export type {FieldBinding, SelectItem, LabelKey} from './types';
+export type {FieldAria, FieldBinding, SelectItem, LabelKey} from './types';

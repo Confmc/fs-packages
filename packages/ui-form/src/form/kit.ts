@@ -2,7 +2,7 @@ import type {Component, DefineSetupFnComponent, SlotsType, VNode} from 'vue';
 
 import {defineComponent, h} from 'vue';
 
-import type {FieldBinding, LabelKey, SelectItem} from '../types';
+import type {FieldAria, FieldBinding, LabelKey, SelectItem} from '../types';
 import type {Path, PathsOf} from './path';
 
 import Checkbox from '../components/Checkbox.vue';
@@ -185,7 +185,7 @@ export interface BoundControls<D> {
 
 /** The slots of the field frame: the control gets the wiring; the label, its row and the hint get content. */
 type FrameSlots = SlotsType<{
-    default: (scope: {field: FieldBinding}) => VNode[];
+    default: (scope: {field: FieldBinding; aria: FieldAria}) => VNode[];
     'label-after'?: () => VNode[];
     aside?: (scope: {field: FieldBinding}) => VNode[];
     hint?: () => VNode[];
