@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-First release of `@script-development/ui-form`: `@script-development/fs-form` and `@script-development/ui-inputs` as one package. Both stay published and unchanged, so a consumer can run old and new side by side and migrate form by form. The version, the date and the final wording are set when the package is cut.
+First release of `@script-development/ui-form`: `@script-development/fs-form` and `@script-development/ui-inputs` as one package. Both stay published and unchanged, so a consumer can run old and new side by side and migrate a page at a time. The version, the date and the final wording are set when the package is cut.
 
 ### Added
 
@@ -51,7 +51,7 @@ First release of `@script-development/ui-form`: `@script-development/fs-form` an
 
 ### Migrating
 
-ui-form runs next to fs-form and ui-inputs, so one form can move at a time. Load only ui-form's stylesheet once any form uses it: it styles ui-inputs' markup too.
+ui-form runs next to fs-form and ui-inputs, so one page can move at a time, not one form: fs-form's middleware on the shared HTTP service fills every mounted fs-form form on any 422, so a ui-form dialog's refusal would also light up an fs-form page under it: move a page together with every dialog it opens. Load only ui-form's stylesheet once any form uses it: it styles ui-inputs' markup too.
 
 | From                                                                                                         | To                                                                                                                 |
 | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |

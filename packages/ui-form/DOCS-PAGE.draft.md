@@ -12,7 +12,7 @@
 Form state and form controls in one package: `useForm` with a field's whole wiring by name, and the
 headless, themeable Vue 3 controls it wires. It brings [fs-form](/packages/form) and
 [ui-inputs](/packages/ui-inputs) together; both stay published, so a consumer can run old and new
-side by side and migrate one form at a time.
+side by side and migrate one page at a time.
 
 ```bash
 npm install @script-development/ui-form
@@ -240,7 +240,7 @@ lists every changed default with its old value, so a theme can keep the old look
 
 ## Migrating from fs-form and ui-inputs
 
-ui-form runs next to fs-form and ui-inputs, so one form can move at a time. Load only ui-form's stylesheet once
+ui-form runs next to fs-form and ui-inputs, so one page can move at a time, not one form: fs-form's middleware on the shared HTTP service fills every mounted fs-form form on any 422, so a ui-form dialog's refusal would also light up an fs-form page under it: move a page together with every dialog it opens. Load only ui-form's stylesheet once
 any form uses it: it styles ui-inputs' markup too. The
 [CHANGELOG's migration table](https://github.com/script-development/fs-packages/blob/main/packages/ui-form/CHANGELOG.md#migrating)
 maps every old call to its new one; the larger moves are:
