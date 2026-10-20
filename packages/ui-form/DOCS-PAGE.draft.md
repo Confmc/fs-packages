@@ -10,7 +10,7 @@
 # ui-form
 
 Form state and form controls in one package: `useForm` with a field's whole wiring by name, and the
-headless, themeable Vue 3 controls it wires. It brings [fs-form](/packages/form) and
+Vue 3 controls it wires, themeable through `--ui-*` tokens and with a default look. It brings [fs-form](/packages/form) and
 [ui-inputs](/packages/ui-inputs) together; both stay published, so a consumer can run old and new
 side by side and migrate one page at a time.
 
@@ -69,9 +69,11 @@ const {TextField, NumberField, SingleSelectField, handleSubmit} = useForm({draft
 </template>
 ```
 
-On a draft form `name` takes only a path holding that control's value type: a `NumberField` refuses a string
-path, and a select's id type comes from its `options`. Every other prop passes through to the control and wins
-over the wiring, so `:invalid="false"` at the call site overrides the form's.
+On a draft form `name` takes only a path the control fits: it can read the value there, and the path's type holds
+what the control writes. A `NumberField` refuses a string path, a `DateField` binds `string` as well as
+`string | null`, and a select's id type comes from its `options`. `class` and `style` land on the field frame;
+every other prop and attribute passes through to the control and wins over the wiring, so `:invalid="false"` at
+the call site overrides the form's.
 
 | Bound control                                                                  | Control                                                    | Notes                                         |
 | ------------------------------------------------------------------------------ | ---------------------------------------------------------- | --------------------------------------------- |
@@ -90,10 +92,13 @@ Each bound control has a stable component name, so a spec finds it with `findAll
 or by the control inside.
 
 For a control the kit has no bound version of, `useForm` hands out a `FormField` bound by name:
-`<FormField name="municipalityId" label="Municipality" v-slot="{field}">` draws the label, hint and message with
+`<FormField name="municipalityId" label="Municipality" v-slot="{field: wiring}">` draws the label, hint and message with
 the form's ids, and its slot gets the wiring without the value, so the control keeps its own `v-model`; a native
 element of your own (a `<div role="group">`) takes the slot's `aria` instead, the same wiring as attributes. The
-frame's `#hint` slot renders under the control, above the message, and is read with the field.
+frame's `#hint` slot renders under the control, above the message, and is read with the field. The slot prop
+`field` shadows `useForm`'s `field()` inside the slot, so rename it (`{field: wiring}`) where the template also
+calls `field('x')`. Bound to your own control, `v-bind="field('x')"` types the written value exactly: a control
+that writes `string | null` does not fit a `string` path, so give it a handler or type the path `| null`.
 
 ### Your app's texts
 
@@ -144,7 +149,7 @@ export const {useForm, SingleSelect, MultiSelect} = createUiForm({
 | `clientErrors`   | `Readonly<Ref<ValidationErrors<T>>>`              | The refusals the form made itself                                                                         |
 | `refuse`         | `(field, message) => void`                        | Refuse one field from the client                                                                          |
 | `setRefusals`    | `(bag) => boolean`                                | Replace every client refusal at once; `true` when it refused anything                                     |
-| `withdraw`       | `(...fields) => void`                             | Drop these fields' messages now instead of at the next submit                                             |
+| `withdraw`       | `(...fields) => void`                             | Drop these fields' messages now, and every message under them (`withdraw('goals')` drops `goals.*`)       |
 | `clearClient`    | `() => void`                                      | Withdraw every client refusal                                                                             |
 | `clearErrors`    | `() => void`                                      | Empty the bag and reset the refusal                                                                       |
 | `refused`        | `Readonly<Ref<boolean>>`                          | A 422 was taken since the last clear                                                                      |
@@ -234,13 +239,30 @@ before the package's, at the very top of your first stylesheet:
 The `--ui-*` custom properties stay outside the layer, as in [ui-inputs](/packages/ui-inputs#theming-the-ui-contract).
 
 The defaults of the control look changed, and there are new tokens: `--ui-control-border-color-hover`,
-`--ui-danger-ring-focus`, `--ui-addon-bg`, `--ui-addon-text`, `--ui-warning-text` and `--ui-label-required-color`. The
+`--ui-danger-ring-focus`, `--ui-addon-bg`, `--ui-addon-text`, `--ui-warning-text`, `--ui-label-required-color`,
+`--ui-hint-text` and `--ui-hint-size`. To match your own field design, set the frame's tokens once on a container:
+`--ui-label-size`, `--ui-label-weight`, `--ui-label-color`, `--ui-label-required-color` and `--ui-field-gap`. The
 [CHANGELOG](https://github.com/script-development/fs-packages/blob/main/packages/ui-form/CHANGELOG.md#migrating)
 lists every changed default with its old value, so a theme can keep the old look.
 
+## Testing
+
+- Build a real form in plain test code with a fixed `idPrefix` and pass it as the `form` prop:
+  `useForm({draft: ref<Contract>({...}), idPrefix: 'test'})`. Without `idPrefix` its ids come from Vue's `useId()`,
+  which needs a component's `setup()`.
+- A form takes only its own action's 422, so a spec that checks a refusal makes the save itself reject with one.
+- A shallow mount stubs the bound controls, `FormField`, `FormLabel`, `FormError` and `InputGroup`: un-stub what
+  the spec reads. A stub shows the props it declares through `props()`; what it passes on, such as a select's
+  `options`, is on `vm.$attrs`.
+- `.ui-field`, `.ui-hint` and `.ui-error` are stable to select on.
+
+See the [README's testing notes](https://github.com/script-development/fs-packages/blob/main/packages/ui-form/README.md#forms-and-their-errors) for more.
+
 ## Migrating from fs-form and ui-inputs
 
-ui-form runs next to fs-form and ui-inputs, so one page can move at a time, not one form: fs-form's middleware on the shared HTTP service fills every mounted fs-form form on any 422, so a ui-form dialog's refusal would also light up an fs-form page under it: move a page together with every dialog it opens. Load only ui-form's stylesheet once
+ui-form runs next to fs-form and ui-inputs, so a consumer migrates one page at a time, together with every dialog
+it opens. Not one form at a time: fs-form's middleware on the shared HTTP service fills every mounted fs-form form
+on any 422, so a ui-form dialog's refusal would also light up an fs-form page under it. Load only ui-form's stylesheet once
 any form uses it: it styles ui-inputs' markup too. The
 [CHANGELOG's migration table](https://github.com/script-development/fs-packages/blob/main/packages/ui-form/CHANGELOG.md#migrating)
 maps every old call to its new one; the larger moves are:

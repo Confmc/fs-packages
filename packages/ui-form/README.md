@@ -1,6 +1,6 @@
 # @script-development/ui-form
 
-Headless, themeable Vue 3 form components and the form state behind them — **form inputs**, **`useForm`**
+Themeable Vue 3 form components with a default look, and the form state behind them — **form inputs**, **`useForm`**
 (422 validation errors, client refusals, double-submit guard) plus the **interactive controls that carry no
 value** (`Pressable`, `Disclosure`) — styled entirely through `--ui-*` CSS custom properties.
 
@@ -12,7 +12,7 @@ Part of the Armory `ui-*` family. Every rule reads a `--ui-*` custom property an
 npm install @script-development/ui-form
 ```
 
-Peer dependency: `vue@^3.5`. Import the stylesheet once (e.g. in your entry):
+Peer dependency: `vue@^3.5.43`. Import the stylesheet once (e.g. in your entry):
 
 ```ts
 import '@script-development/ui-form/style.css';
