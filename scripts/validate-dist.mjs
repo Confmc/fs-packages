@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Dist-validation gate — every file a workspace package's manifest promises consumers
-// must ship in its tarball, present and non-empty.
+// must ship in its tarball, present and non-empty, and the tarball must carry no source
+// map and no source comment.
 //
 // RULE: the required set is derived from each packages/*/package.json — every `exports`
 //   target (all conditions, nested objects, subpath maps, string shorthand, fallback
@@ -10,21 +11,29 @@
 //   test, not a CSS parser). A target the derivation cannot resolve to one file (a `*`
 //   pattern, a folder, a path outside `./`) fails the gate rather than being skipped.
 //   Zero packages, or zero required files in any package, fails too.
-//   Derivation and verdict live in validate-dist.core.mjs, exercised by
+//
+// CONTENTS: the tarball is public, so no file in it may be a `*.map` and no text file may
+//   name a `sourceMappingURL`. Every `.mjs`/`.cjs`/`.js` is parsed (TypeScript's parser, a
+//   root devDependency as in lint-pkg.mjs) and may carry only `#region`/`#endregion`
+//   markers, exact `@__PURE__`/`#__PURE__`/`@__NO_SIDE_EFFECTS__` annotations, exact
+//   v8/c8/istanbul ignore directives, and legal comments (`/*!`, `//!`, `@license`,
+//   `@preserve`). The type files keep their JSDoc: it is the consumer-facing API docs.
+//   A package with no JavaScript file in its tarball fails, and so does a run that read none.
+//   Derivation and verdicts live in validate-dist.core.mjs, exercised by
 //   validate-dist.test.mjs.
 //
 // One script, two callers: ci.yml runs it at PR time after `npm run build`, publish.yml
 //   before `changeset publish` — so an empty or missing artifact (the fs-http 0.1.1 /
-//   0.1.2 empty-tarball class) reds a PR, not a release.
+//   0.1.2 empty-tarball class) or a leaking one reds a PR, not a release.
 //
-// SCOPE: presence and non-emptiness only. Artifact contents and type correctness are
-//   attw's and publint's (lint:pkg).
+// SCOPE: presence, non-emptiness and the contents rule above. Type correctness is attw's
+//   and publint's (lint:pkg).
 
 import {spawnSync} from 'node:child_process';
 import {readdirSync, readFileSync, statSync} from 'node:fs';
 import path from 'node:path';
 
-import {checkPackage, requiredPaths} from './validate-dist.core.mjs';
+import {checkContents, checkPackage, requiredPaths} from './validate-dist.core.mjs';
 
 const PACKAGES_DIR = 'packages';
 
@@ -92,6 +101,7 @@ const main = () => {
     const failures = [];
 
     const counts = [];
+    let jsFilesRead = 0;
 
     for (const dir of dirs) {
         const manifest = readManifest(dir);
@@ -114,16 +124,17 @@ const main = () => {
             continue;
         }
 
-        const verdict = checkPackage({
-            name,
-            required,
-            files,
-            readText: (file) => readFileSync(path.join(dir, file), 'utf8'),
-        });
+        const readText = (file) => readFileSync(path.join(dir, file), 'utf8');
+        const verdict = checkPackage({name, required, files, readText});
         for (const pass of verdict.passes) {
             process.stdout.write(`  ${pass}\n`);
         }
-        for (const msg of verdict.failures) {
+        const contents = checkContents({name, files, readText});
+        jsFilesRead += contents.jsFilesRead;
+        process.stdout.write(
+            `  contents: ${contents.jsFilesRead} JavaScript files read for comments and source maps\n`,
+        );
+        for (const msg of [...verdict.failures, ...contents.failures]) {
             process.stdout.write(`::error::${msg}\n`);
             failures.push(msg);
         }
@@ -131,8 +142,14 @@ const main = () => {
 
     process.stdout.write(`\nrequired files per package: ${counts.join(', ')}\n`);
 
+    if (jsFilesRead === 0) {
+        failures.push('0 JavaScript files read across all packages — the contents rule checked nothing');
+    }
+
     if (failures.length > 0) {
-        process.stderr.write(`\nDist validation FAILED (${failures.length}). Refusing empty or incomplete tarballs:\n`);
+        process.stderr.write(
+            `\nDist validation FAILED (${failures.length}). Refusing empty, incomplete or leaking tarballs:\n`,
+        );
         for (const f of failures) {
             process.stderr.write(`  - ${f}\n`);
         }
@@ -140,7 +157,7 @@ const main = () => {
     }
 
     process.stdout.write(
-        `\nvalidate:dist gate PASS — ${dirs.length} packages: every manifest-promised file present and non-empty.\n`,
+        `\nvalidate:dist gate PASS — ${dirs.length} packages: every manifest-promised file present and non-empty; ${jsFilesRead} JavaScript files carry no source comment and no tarball ships a source map.\n`,
     );
 };
 
