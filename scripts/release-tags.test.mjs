@@ -6,11 +6,15 @@
 import {describe, expect, it} from 'vitest';
 
 import {
+    awaitRegistry,
     decideAll,
     decidePackage,
     interpretVersionDoc,
+    minimumTagsJobMinutes,
     parseRemoteTags,
     planTags,
+    REGISTRY_POLL_MS,
+    REGISTRY_WAIT_MS,
     releaseTag,
     SCAN_NAME,
 } from './release-tags.core.mjs';
@@ -149,10 +153,13 @@ describe('decideAll', () => {
         const verdicts = decideAll({
             dirs: ['a', 'b'],
             readManifest: (dir) => ({name: `@script-development/${dir}`, version: '1.0.0'}),
-            lookupVersion: (spec) => ({
-                published: true,
-                gitHead: spec.startsWith('@script-development/a@') ? HEAD : OTHER,
-            }),
+            lookupAll: (specs) =>
+                new Map(
+                    specs.map((spec) => [
+                        spec,
+                        {published: true, gitHead: spec.startsWith('@script-development/a@') ? HEAD : OTHER},
+                    ]),
+                ),
             head: HEAD,
             publishResult: 'success',
         });
@@ -163,10 +170,162 @@ describe('decideAll', () => {
         ['an unreadable packages directory', {dirs: null, scanError: 'EACCES'}, 'could not be read (EACCES)'],
         ['an empty packages directory', {dirs: []}, 'contains no package directories'],
     ])('fails on %s instead of reporting nothing owed', (_label, scan, why) => {
-        const verdicts = decideAll({...scan, readManifest: never, lookupVersion: never, head: HEAD});
+        const verdicts = decideAll({...scan, readManifest: never, lookupAll: never, head: HEAD});
         expect(verdicts).toHaveLength(1);
         expect(verdicts[0].name).toBe(SCAN_NAME);
         expect(verdicts[0].error).toContain(why);
+    });
+});
+
+describe('awaitRegistry', () => {
+    const A = '@script-development/a@1.0.0';
+    const B = '@script-development/b@1.0.0';
+
+    /** A fake clock that `sleep` advances, and a lookup that shows each spec from its Nth call on. */
+    const harness = (visibleFromCall) => {
+        let clock = 0;
+        const sleeps = [];
+        const calls = new Map();
+        const lookupOnce = (spec) => {
+            const call = (calls.get(spec) ?? 0) + 1;
+            calls.set(spec, call);
+            return call >= visibleFromCall[spec] ? {published: true, gitHead: HEAD} : {published: false};
+        };
+        const sleep = (ms) => {
+            sleeps.push(ms);
+            clock += ms;
+        };
+        return {lookupOnce, sleep, now: () => clock, sleeps, calls};
+    };
+
+    it('waits for a version that appears on the third poll, and tags it', () => {
+        const h = harness({[A]: 3});
+        const verdicts = decideAll({
+            dirs: ['a'],
+            readManifest: () => ({name: '@script-development/a', version: '1.0.0'}),
+            lookupAll: (specs) => awaitRegistry({specs, publishResult: 'success', ...h}),
+            head: HEAD,
+            publishResult: 'success',
+        });
+        expect(verdicts).toEqual([{name: '@script-development/a', owed: A}]);
+        expect(h.calls.get(A)).toBe(3);
+        expect(h.sleeps).toEqual([REGISTRY_POLL_MS, REGISTRY_POLL_MS]);
+    });
+
+    it('fails a version that never appears once the deadline has passed, with the usual message', () => {
+        const h = harness({[A]: Infinity});
+        const verdicts = decideAll({
+            dirs: ['a'],
+            readManifest: () => ({name: '@script-development/a', version: '1.0.0'}),
+            lookupAll: (specs) => awaitRegistry({specs, publishResult: 'success', ...h}),
+            head: HEAD,
+            publishResult: 'success',
+        });
+        expect(verdicts[0].error).toContain("not on the registry although 'publish' succeeded");
+        expect(h.now()).toBe(REGISTRY_WAIT_MS);
+        expect(h.calls.get(A)).toBe(1 + REGISTRY_WAIT_MS / REGISTRY_POLL_MS);
+    });
+
+    it.each(['skipped', 'failure', 'cancelled'])('never waits when publish ended %s', (publishResult) => {
+        const h = harness({[A]: Infinity});
+        const sleep = () => {
+            throw new Error('sleep must not be called when publish did not succeed');
+        };
+        const results = awaitRegistry({specs: [A], publishResult, ...h, sleep});
+        expect(results.get(A)).toEqual({published: false});
+        expect(h.calls.get(A)).toBe(1);
+    });
+
+    it('does not wait when every version is already visible', () => {
+        const h = harness({[A]: 1, [B]: 1});
+        awaitRegistry({specs: [A, B], publishResult: 'success', ...h});
+        expect(h.sleeps).toEqual([]);
+        expect([...h.calls.values()]).toEqual([1, 1]);
+    });
+
+    it('re-polls only the specs that are still pending', () => {
+        const h = harness({[A]: 1, [B]: 4});
+        const results = awaitRegistry({specs: [A, B], publishResult: 'success', ...h});
+        expect(h.calls.get(A)).toBe(1);
+        expect(h.calls.get(B)).toBe(4);
+        expect(results.get(B).published).toBe(true);
+    });
+
+    it('shares one deadline between lagging packages instead of waiting it out once per package', () => {
+        const h = harness({[A]: Infinity, [B]: Infinity});
+        awaitRegistry({specs: [A, B], publishResult: 'success', ...h});
+        const slept = h.sleeps.reduce((sum, ms) => sum + ms, 0);
+        expect(slept).toBeLessThanOrEqual(REGISTRY_WAIT_MS + REGISTRY_POLL_MS);
+        expect(slept).toBeGreaterThanOrEqual(REGISTRY_WAIT_MS);
+    });
+
+    it('does not count an errored lookup as pending, so a registry fault is not waited on', () => {
+        const sleep = () => {
+            throw new Error('sleep must not be called for a lookup error');
+        };
+        const results = awaitRegistry({
+            specs: [A],
+            lookupOnce: () => ({error: 'registry lookup failed: E403'}),
+            publishResult: 'success',
+            sleep,
+            now: () => 0,
+        });
+        expect(results.get(A).error).toContain('E403');
+    });
+
+    /** Specs `0..count-1`, a clock every lookup advances by `lookupMs`, and a lookup that shows each spec from its Nth call on. */
+    const slowHarness = ({count, lookupMs, visibleFromCall}) => {
+        let clock = 0;
+        const sleeps = [];
+        const calls = new Map();
+        const specs = Array.from({length: count}, (_, index) => `@script-development/p${index}@1.0.0`);
+        const lookupOnce = (spec) => {
+            clock += lookupMs;
+            const call = (calls.get(spec) ?? 0) + 1;
+            calls.set(spec, call);
+            return call >= (visibleFromCall[spec] ?? 1) ? {published: true, gitHead: HEAD} : {published: false};
+        };
+        const sleep = (ms) => {
+            sleeps.push(ms);
+            clock += ms;
+        };
+        return {specs, lookupOnce, sleep, now: () => clock, sleeps, calls};
+    };
+
+    it('re-checks a version that went missing early in a first pass slower than the whole window', () => {
+        // 15 lookups at 30 s each outlast the deadline before any wait has happened.
+        const first = '@script-development/p0@1.0.0';
+        const h = slowHarness({count: 15, lookupMs: 30_000, visibleFromCall: {[first]: 2}});
+        expect(15 * 30_000).toBeGreaterThan(REGISTRY_WAIT_MS);
+        const results = awaitRegistry({specs: h.specs, publishResult: 'success', ...h});
+        expect(results.get(first).published).toBe(true);
+        expect(h.calls.get(first)).toBe(2);
+    });
+
+    it('re-polls a never-visible version a bounded number of times after a slow first pass', () => {
+        const missing = '@script-development/p0@1.0.0';
+        const h = slowHarness({count: 15, lookupMs: 30_000, visibleFromCall: {[missing]: Infinity}});
+        const results = awaitRegistry({specs: h.specs, publishResult: 'success', ...h});
+        expect(results.get(missing)).toEqual({published: false});
+        const slept = h.sleeps.reduce((sum, ms) => sum + ms, 0);
+        expect(slept).toBeLessThanOrEqual(REGISTRY_WAIT_MS + REGISTRY_POLL_MS);
+        expect(h.calls.get(missing)).toBeGreaterThan(1);
+        expect(h.calls.get(missing)).toBeLessThanOrEqual(1 + REGISTRY_WAIT_MS / REGISTRY_POLL_MS + 1);
+        for (const spec of h.specs.slice(1)) expect(h.calls.get(spec)).toBe(1);
+    });
+
+    it('tells the log what it is waiting for and how long is left', () => {
+        const h = harness({[A]: 2});
+        const heard = [];
+        awaitRegistry({specs: [A], publishResult: 'success', ...h, log: (entry) => heard.push(entry)});
+        expect(heard).toEqual([{pending: [A], leftMs: REGISTRY_WAIT_MS}]);
+    });
+});
+
+describe('minimumTagsJobMinutes', () => {
+    it('covers the first pass, the wait, one more pass at the command bound, and the overhead', () => {
+        expect(minimumTagsJobMinutes(15)).toBe(15 + 6 + 15 + 3);
+        expect(minimumTagsJobMinutes(0)).toBe(6 + 3);
     });
 });
 

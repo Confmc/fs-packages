@@ -17,16 +17,21 @@ import {execFileSync} from 'node:child_process';
 import {readdirSync, readFileSync} from 'node:fs';
 import path from 'node:path';
 
-import {decideAll, interpretVersionDoc, parseRemoteTags, planTags, SCAN_NAME} from './release-tags.core.mjs';
+import {
+    awaitRegistry,
+    COMMAND_TIMEOUT_MS,
+    decideAll,
+    interpretVersionDoc,
+    parseRemoteTags,
+    planTags,
+    SCAN_NAME,
+} from './release-tags.core.mjs';
 
 const PACKAGES_DIR = 'packages';
 const PUBLISH_RESULT = process.env.PUBLISH_RESULT ?? 'unknown';
-// npm can take a moment to show a version it has just accepted.
-const LOOKUP_ATTEMPTS = 4;
-const RETRY_MS = 15_000;
 
 const run = (command, args) =>
-    execFileSync(command, args, {encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 60_000});
+    execFileSync(command, args, {encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: COMMAND_TIMEOUT_MS});
 
 const sleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 
@@ -46,14 +51,18 @@ const lookupOnce = (spec) => {
     }
 };
 
-const lookupVersion = (spec) => {
-    for (let attempt = 1; ; attempt += 1) {
-        const result = lookupOnce(spec);
-        if (result.published !== false || PUBLISH_RESULT !== 'success' || attempt === LOOKUP_ATTEMPTS) return result;
-        console.log(`  ${spec} is not on the registry yet (attempt ${attempt}/${LOOKUP_ATTEMPTS}), retrying`);
-        sleep(RETRY_MS);
-    }
-};
+const lookupAll = (specs) =>
+    awaitRegistry({
+        specs,
+        lookupOnce,
+        publishResult: PUBLISH_RESULT,
+        sleep,
+        now: Date.now,
+        log: ({pending, leftMs}) =>
+            console.log(
+                `  waiting for npm to show ${pending.join(', ')} (${Math.ceil(leftMs / 1000)} s left before failing)`,
+            ),
+    });
 
 let dirs = null;
 let scanError;
@@ -67,7 +76,7 @@ try {
 }
 
 const head = run('git', ['rev-parse', 'HEAD']).trim();
-const verdicts = decideAll({dirs, scanError, readManifest, lookupVersion, head, publishResult: PUBLISH_RESULT});
+const verdicts = decideAll({dirs, scanError, readManifest, lookupAll, head, publishResult: PUBLISH_RESULT});
 const owed = verdicts.filter((verdict) => verdict.owed).map((verdict) => verdict.owed);
 const errors = verdicts.filter((verdict) => verdict.error);
 const scanned = verdicts.filter((verdict) => verdict.name !== SCAN_NAME).length;

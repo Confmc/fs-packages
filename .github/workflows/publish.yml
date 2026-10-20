@@ -164,7 +164,7 @@ jobs:
         needs: [publish]
         if: ${{ !cancelled() }}
         runs-on: ubuntu-latest
-        timeout-minutes: 10
+        timeout-minutes: 40
         permissions:
             contents: write
         steps:
