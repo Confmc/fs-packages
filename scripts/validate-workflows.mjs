@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 /**
- * Release-pipeline invariant gate.
+ * Workflow invariant gate: each leg below asserts one property a red check or a silent
+ * skip would otherwise hide, and names the defect it closes.
  *
- * Guards ONE class of defect: coupling the publish pipeline's *artifact* clock to
- * its *human-approval* clock. `publish` sits behind the `npm-publish` deployment
+ * The first leg guards coupling the publish pipeline's *artifact* clock to its
+ * *human-approval* clock. `publish` sits behind the `npm-publish` deployment
  * environment, whose approval is wall-clock unbounded; build artifacts expire on a
  * fixed timer. When the second is shorter than the first, a release that waits too
  * long for approval becomes unpublishable on that run — and the error it produces
@@ -14,8 +15,7 @@
  * WCAG fix sat undelivered, and the obvious recovery ("Re-run failed jobs") re-runs
  * `publish` alone against the same absent artifact and fails identically.
  *
- * Deliberately narrow. This is NOT a general workflow linter — it asserts the three
- * properties that make the coupling impossible, and nothing else.
+ * Not a general workflow linter: a property earns a leg only when its failure is silent.
  *
  * Zero dependencies by design: this repo mints the fleet's npm publish credentials
  * via OIDC, so a guard on release convenience does not justify a new dependency in
