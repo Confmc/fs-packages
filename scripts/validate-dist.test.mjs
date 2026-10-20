@@ -2,7 +2,16 @@ import {readdirSync, readFileSync} from 'node:fs';
 import path from 'node:path';
 import {describe, expect, it} from 'vitest';
 
-import {checkPackage, cssHasNoRules, requiredPaths} from './validate-dist.core.mjs';
+import {
+    allowedCommentKind,
+    checkContents,
+    checkPackage,
+    cssHasNoRules,
+    listComments,
+    listTemplateComments,
+    requiredPaths,
+    TEMPLATE_COMMENT_PLACEHOLDERS,
+} from './validate-dist.core.mjs';
 
 const DUAL = {
     main: './dist/index.cjs',
@@ -215,5 +224,213 @@ describe('the workspace manifests', () => {
     it('derive the ui-inputs stylesheet', () => {
         const uiInputs = manifests.find((manifest) => manifest.name === '@script-development/ui-inputs');
         expect(requiredPaths(uiInputs).paths).toContain('styles.css');
+    });
+});
+
+describe('allowedCommentKind', () => {
+    it('allows region markers', () => {
+        expect(allowedCommentKind('//#region src/http.ts')).toBe('region');
+        expect(allowedCommentKind('//#endregion')).toBe('region');
+    });
+
+    it('allows exact annotations, with or without padding', () => {
+        expect(allowedCommentKind('/* @__PURE__ */')).toBe('annotation');
+        expect(allowedCommentKind('/*@__PURE__*/')).toBe('annotation');
+        expect(allowedCommentKind('/*#__PURE__*/')).toBe('annotation');
+        expect(allowedCommentKind('/* @__NO_SIDE_EFFECTS__ */')).toBe('annotation');
+        expect(allowedCommentKind('/* #__NO_SIDE_EFFECTS__ */')).toBe('annotation');
+    });
+
+    it('allows exact coverage directives', () => {
+        expect(allowedCommentKind('// v8 ignore next')).toBe('coverage');
+        expect(allowedCommentKind('// c8 ignore start')).toBe('coverage');
+        expect(allowedCommentKind('// istanbul ignore else')).toBe('coverage');
+    });
+
+    it('rejects legal comments, whatever they say', () => {
+        expect(allowedCommentKind('/*! MIT */')).toBeNull();
+        expect(allowedCommentKind('//! MIT')).toBeNull();
+        expect(allowedCommentKind('// internal source note @license')).toBeNull();
+        expect(allowedCommentKind('/* @preserve */')).toBeNull();
+        expect(allowedCommentKind('/** @license MIT */')).toBeNull();
+    });
+
+    it('rejects plain line, block and JSDoc comments', () => {
+        expect(allowedCommentKind('// the consumer needs this')).toBeNull();
+        expect(allowedCommentKind('/* the consumer needs this */')).toBeNull();
+        expect(allowedCommentKind('/** the consumer needs this */')).toBeNull();
+    });
+
+    it('rejects an allowed kind carrying prose', () => {
+        expect(allowedCommentKind('/* @__PURE__ the consumer needs this */')).toBeNull();
+        expect(allowedCommentKind('// v8 ignore next -- the consumer needs this')).toBeNull();
+        expect(allowedCommentKind('//#regional note')).toBeNull();
+        expect(allowedCommentKind('// #region')).toBeNull();
+    });
+});
+
+describe('listComments', () => {
+    it('finds line, block and JSDoc comments with their line', () => {
+        const text = 'const a = 1; // one\n/* two */\n/** three */\nconst b = 2;\n// four';
+        expect(listComments(text, 'x.mjs')).toEqual([
+            {line: 1, text: '// one'},
+            {line: 2, text: '/* two */'},
+            {line: 3, text: '/** three */'},
+            {line: 5, text: '// four'},
+        ]);
+    });
+
+    it('finds a comment at the start of the file and inside a template expression', () => {
+        const text = '// first\nconst t = `a${/* inner */ 1}b`;';
+        expect(listComments(text, 'x.mjs').map((comment) => comment.text)).toEqual(['// first', '/* inner */']);
+    });
+
+    it('does not read a comment out of a string, a template or a regex', () => {
+        const text = [
+            'const url = "https://example.test/* not */";',
+            "const single = '// not';",
+            'const t = `// not ${url} /* not */`;',
+            'const re = /\\/\\/ not/;',
+        ].join('\n');
+        expect(listComments(text, 'x.mjs')).toEqual([]);
+    });
+
+    it('throws on a file that does not parse', () => {
+        expect(() => listComments('const = ;', 'x.mjs')).toThrow('x.mjs does not parse');
+    });
+});
+
+describe('checkContents', () => {
+    const tarball = (texts) => ({
+        files: Object.keys(texts).map((file) => ({path: file, size: 1})),
+        readText: (file) => texts[file],
+    });
+
+    it('passes allowed comments and counts the JavaScript files it read', () => {
+        const {files, readText} = tarball({
+            'dist/index.mjs':
+                '//#region src/a.ts\nconst a = /* @__PURE__ */ f();\n//#endregion\nconst u = "https://x";',
+            'dist/index.cjs':
+                '//#region src/b.ts\nmodule.exports = /* #__PURE__ */ f();\n// v8 ignore next\n//#endregion',
+            'dist/index.d.mts': '/** API documentation */\nexport declare const a: number;',
+            'package.json': '{}',
+        });
+        expect(checkContents({name: 'p', files, readText})).toEqual({failures: [], jsFilesRead: 2});
+    });
+
+    it('fails a plain comment, naming the file, line and comment', () => {
+        const {files, readText} = tarball({'dist/index.mjs': 'const a = 1;\n// planted\n/* second */'});
+        expect(checkContents({name: 'p', files, readText}).failures).toEqual([
+            'p dist/index.mjs:2 ships 2 source comment(s), first: // planted',
+        ]);
+    });
+
+    it('fails a legal comment', () => {
+        const {files, readText} = tarball({'dist/index.mjs': 'export const a = 1; // note @license\n/*! x */'});
+        expect(checkContents({name: 'p', files, readText}).failures).toEqual([
+            'p dist/index.mjs:1 ships 2 source comment(s), first: // note @license',
+        ]);
+    });
+
+    it('fails a JSDoc block in JavaScript', () => {
+        const {files, readText} = tarball({'dist/index.cjs': '/** private note */\nmodule.exports = 1;'});
+        expect(checkContents({name: 'p', files, readText}).failures).toEqual([
+            'p dist/index.cjs:1 ships 1 source comment(s), first: /** private note */',
+        ]);
+    });
+
+    it('shortens a long comment in the message', () => {
+        const {files, readText} = tarball({'dist/index.mjs': `// ${'x'.repeat(100)}`});
+        const [failure] = checkContents({name: 'p', files, readText}).failures;
+        expect(failure).toBe(`p dist/index.mjs:1 ships 1 source comment(s), first: // ${'x'.repeat(74)}...`);
+    });
+
+    it('fails a source map file without reading it', () => {
+        const {files, readText} = tarball({'dist/index.mjs': 'export {};', 'dist/index.mjs.map': undefined});
+        expect(checkContents({name: 'p', files, readText}).failures).toEqual(['p ships source map dist/index.mjs.map']);
+    });
+
+    it('fails a sourceMappingURL in JavaScript, type files and stylesheets', () => {
+        const {files, readText} = tarball({
+            'dist/index.mjs': 'export {};\n//# sourceMappingURL=index.mjs.map',
+            'dist/index.d.mts': 'export {};\n//# sourceMappingURL=index.d.mts.map',
+            'styles.css': '.a{}\n/*# sourceMappingURL=styles.css.map */',
+        });
+        expect(checkContents({name: 'p', files, readText}).failures).toEqual([
+            'p dist/index.mjs references a source map (sourceMappingURL)',
+            'p dist/index.mjs:2 ships 1 source comment(s), first: //# sourceMappingURL=index.mjs.map',
+            'p dist/index.d.mts references a source map (sourceMappingURL)',
+            'p styles.css references a source map (sourceMappingURL)',
+        ]);
+    });
+
+    it('fails a JavaScript file that does not parse', () => {
+        const {files, readText} = tarball({'dist/index.mjs': 'const = ;'});
+        expect(checkContents({name: 'p', files, readText}).failures[0]).toMatch(/^p dist\/index\.mjs does not parse/);
+    });
+
+    it('fails a tarball with no JavaScript file', () => {
+        const {files, readText} = tarball({'dist/index.d.mts': 'export {};', 'package.json': '{}'});
+        expect(checkContents({name: 'p', files, readText})).toEqual({
+            failures: ['p: tarball holds 0 JavaScript files — no comment was checked'],
+            jsFilesRead: 0,
+        });
+    });
+
+    it('fails an empty tarball', () => {
+        expect(checkContents({name: 'p', files: [], readText: () => ''}).failures).toEqual([
+            'p: tarball holds 0 JavaScript files — no comment was checked',
+        ]);
+    });
+});
+
+describe('listTemplateComments', () => {
+    it('finds a prose string in every callee shape the compiler emits', () => {
+        const text = [
+            'createCommentVNode(" bare ");',
+            '_createCommentVNode(" underscored ");',
+            '(0, vue.createCommentVNode)(" cjs ");',
+            'vue.createCommentVNode(`template`);',
+        ].join('\n');
+        expect(listTemplateComments(text, 'x.mjs')).toEqual([
+            {line: 1, text: ' bare '},
+            {line: 2, text: ' underscored '},
+            {line: 3, text: ' cjs '},
+            {line: 4, text: 'template'},
+        ]);
+    });
+
+    it('passes the v-if placeholder, a non-literal argument and no argument', () => {
+        const text = [
+            'createCommentVNode("v-if", true);',
+            '(0, vue.createCommentVNode)("v-if", true);',
+            'createCommentVNode(label);',
+            'createCommentVNode(`a${b}`);',
+            'createCommentVNode();',
+        ].join('\n');
+        expect(listTemplateComments(text, 'x.mjs')).toEqual([]);
+    });
+
+    it('ignores other calls carrying a string', () => {
+        expect(listTemplateComments('createTextVNode(" text "); notCreateCommentVNodeAtAll;', 'x.mjs')).toEqual([]);
+    });
+
+    it('holds exactly the placeholder the compiler emits', () => {
+        expect([...TEMPLATE_COMMENT_PLACEHOLDERS]).toEqual(['v-if']);
+    });
+});
+
+describe('checkContents on template comments', () => {
+    it('fails a prose createCommentVNode string, naming file, line and excerpt', () => {
+        const readText = () => 'const a = 1;\n(0, vue.createCommentVNode)(" a note ");\ncreateCommentVNode(" b ");';
+        const verdict = checkContents({name: 'p', files: [{path: 'dist/index.cjs', size: 1}], readText});
+        expect(verdict.failures).toEqual([
+            'p dist/index.cjs:2 ships 2 template comment string(s) (createCommentVNode), first: " a note "',
+        ]);
+    });
+
+    it('passes the v-if placeholder', () => {
+        const readText = () => 'createCommentVNode("v-if", true);';
+        expect(checkContents({name: 'p', files: [{path: 'dist/index.mjs', size: 1}], readText}).failures).toEqual([]);
     });
 });
