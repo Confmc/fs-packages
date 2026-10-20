@@ -13,6 +13,58 @@
  * values, and the caller owns every syscall, so every branch runs on every PR.
  */
 
+/**
+ * How long to wait for npm to show what `publish` just published. npm answers E404 for
+ * minutes after `changeset publish` reports success, 4.5 min at the slowest measured, so
+ * six minutes covers it with room. One deadline is shared by every package, so several
+ * lagging ones cost no more than one.
+ */
+export const REGISTRY_WAIT_MS = 6 * 60_000;
+export const REGISTRY_POLL_MS = 30_000;
+/** The bound on each `npm view` (and every other command) the shell runs. */
+export const COMMAND_TIMEOUT_MS = 60_000;
+/** Checkout, setup-node, `git ls-remote` and the tag push, on top of the lookups. */
+export const TAGS_JOB_OVERHEAD_MINUTES = 3;
+
+/**
+ * The least `timeout-minutes` the `tags` job needs to reach its own verdict: the wait,
+ * plus one more pass over `lookups` packages at the command bound each (a pass started
+ * just before the deadline runs to its end), plus the overhead.
+ */
+export const minimumTagsJobMinutes = (lookups) =>
+    Math.ceil((REGISTRY_WAIT_MS + lookups * COMMAND_TIMEOUT_MS) / 60_000) + TAGS_JOB_OVERHEAD_MINUTES;
+
+/**
+ * Look up every spec once, then, only when `publish` succeeded, re-look-up the ones the
+ * registry does not show yet until all are visible or the deadline has passed. Returns
+ * the last answer per spec as a `Map`; judging it is `decidePackage`'s job.
+ *
+ * `lookupOnce`, `sleep` and `now` are the caller's, so a test drives the clock. `log`
+ * hears each wait as `{pending, leftMs}`.
+ */
+export const awaitRegistry = ({
+    specs,
+    lookupOnce,
+    publishResult,
+    sleep,
+    now,
+    log = () => {},
+    deadlineMs = REGISTRY_WAIT_MS,
+    intervalMs = REGISTRY_POLL_MS,
+}) => {
+    const deadline = now() + deadlineMs;
+    const results = new Map(specs.map((spec) => [spec, lookupOnce(spec)]));
+    if (publishResult !== 'success') return results;
+    for (;;) {
+        const pending = [...results].filter(([, result]) => result.published === false).map(([spec]) => spec);
+        const leftMs = deadline - now();
+        if (pending.length === 0 || leftMs <= 0) return results;
+        log({pending, leftMs});
+        sleep(Math.min(intervalMs, leftMs));
+        for (const spec of pending) results.set(spec, lookupOnce(spec));
+    }
+};
+
 /** The name used for the scan-level error, so callers can tell it from a package. */
 export const SCAN_NAME = '(scan)';
 
@@ -77,11 +129,18 @@ export const decidePackage = ({dir, manifest, lookupVersion, head, publishResult
           };
 };
 
+/** Whether `decidePackage` asks the registry about this manifest. */
+const asksRegistry = (manifest) =>
+    !manifest.__unreadable && manifest.private !== true && Boolean(manifest.name && manifest.version);
+
 /**
  * Every verdict for a scan. An empty or unreadable package directory is an error, not
  * "nothing owed": a broken scan and a commit that released nothing look the same here.
+ *
+ * `lookupAll` gets every spec to ask about in one call and returns a `Map` of answers,
+ * so one wait covers all of them (`awaitRegistry`).
  */
-export const decideAll = ({dirs, scanError, readManifest, lookupVersion, head, publishResult}) => {
+export const decideAll = ({dirs, scanError, readManifest, lookupAll, head, publishResult}) => {
     if (dirs === null || dirs === undefined || dirs.length === 0) {
         const why =
             dirs === null || dirs === undefined
@@ -89,7 +148,12 @@ export const decideAll = ({dirs, scanError, readManifest, lookupVersion, head, p
                 : 'it contains no package directories';
         return [{name: SCAN_NAME, error: `${why}, so this scan proves nothing about which tags are owed`}];
     }
-    return dirs.map((dir) => decidePackage({dir, manifest: readManifest(dir), lookupVersion, head, publishResult}));
+    const manifests = dirs.map((dir) => ({dir, manifest: readManifest(dir)}));
+    const answers = lookupAll(
+        manifests.filter(({manifest}) => asksRegistry(manifest)).map(({manifest}) => releaseTag(manifest)),
+    );
+    const lookupVersion = (spec) => answers.get(spec) ?? {error: 'the registry lookup returned no answer'};
+    return manifests.map(({dir, manifest}) => decidePackage({dir, manifest, lookupVersion, head, publishResult}));
 };
 
 /**
