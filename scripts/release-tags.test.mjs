@@ -273,6 +273,47 @@ describe('awaitRegistry', () => {
         expect(results.get(A).error).toContain('E403');
     });
 
+    /** Specs `0..count-1`, a clock every lookup advances by `lookupMs`, and a lookup that shows each spec from its Nth call on. */
+    const slowHarness = ({count, lookupMs, visibleFromCall}) => {
+        let clock = 0;
+        const sleeps = [];
+        const calls = new Map();
+        const specs = Array.from({length: count}, (_, index) => `@script-development/p${index}@1.0.0`);
+        const lookupOnce = (spec) => {
+            clock += lookupMs;
+            const call = (calls.get(spec) ?? 0) + 1;
+            calls.set(spec, call);
+            return call >= (visibleFromCall[spec] ?? 1) ? {published: true, gitHead: HEAD} : {published: false};
+        };
+        const sleep = (ms) => {
+            sleeps.push(ms);
+            clock += ms;
+        };
+        return {specs, lookupOnce, sleep, now: () => clock, sleeps, calls};
+    };
+
+    it('re-checks a version that went missing early in a first pass slower than the whole window', () => {
+        // 15 lookups at 30 s each outlast the deadline before any wait has happened.
+        const first = '@script-development/p0@1.0.0';
+        const h = slowHarness({count: 15, lookupMs: 30_000, visibleFromCall: {[first]: 2}});
+        expect(15 * 30_000).toBeGreaterThan(REGISTRY_WAIT_MS);
+        const results = awaitRegistry({specs: h.specs, publishResult: 'success', ...h});
+        expect(results.get(first).published).toBe(true);
+        expect(h.calls.get(first)).toBe(2);
+    });
+
+    it('re-polls a never-visible version a bounded number of times after a slow first pass', () => {
+        const missing = '@script-development/p0@1.0.0';
+        const h = slowHarness({count: 15, lookupMs: 30_000, visibleFromCall: {[missing]: Infinity}});
+        const results = awaitRegistry({specs: h.specs, publishResult: 'success', ...h});
+        expect(results.get(missing)).toEqual({published: false});
+        const slept = h.sleeps.reduce((sum, ms) => sum + ms, 0);
+        expect(slept).toBeLessThanOrEqual(REGISTRY_WAIT_MS + REGISTRY_POLL_MS);
+        expect(h.calls.get(missing)).toBeGreaterThan(1);
+        expect(h.calls.get(missing)).toBeLessThanOrEqual(1 + REGISTRY_WAIT_MS / REGISTRY_POLL_MS + 1);
+        for (const spec of h.specs.slice(1)) expect(h.calls.get(spec)).toBe(1);
+    });
+
     it('tells the log what it is waiting for and how long is left', () => {
         const h = harness({[A]: 2});
         const heard = [];
@@ -282,8 +323,8 @@ describe('awaitRegistry', () => {
 });
 
 describe('minimumTagsJobMinutes', () => {
-    it('covers the wait, one more pass at the command bound, and the overhead', () => {
-        expect(minimumTagsJobMinutes(15)).toBe(6 + 15 + 3);
+    it('covers the first pass, the wait, one more pass at the command bound, and the overhead', () => {
+        expect(minimumTagsJobMinutes(15)).toBe(15 + 6 + 15 + 3);
         expect(minimumTagsJobMinutes(0)).toBe(6 + 3);
     });
 });
