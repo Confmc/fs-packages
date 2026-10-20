@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 /**
- * Release-pipeline invariant gate.
+ * Workflow invariant gate: each leg below asserts one property a red check or a silent
+ * skip would otherwise hide, and names the defect it closes.
  *
- * Guards ONE class of defect: coupling the publish pipeline's *artifact* clock to
- * its *human-approval* clock. `publish` sits behind the `npm-publish` deployment
+ * The first leg guards coupling the publish pipeline's *artifact* clock to its
+ * *human-approval* clock. `publish` sits behind the `npm-publish` deployment
  * environment, whose approval is wall-clock unbounded; build artifacts expire on a
  * fixed timer. When the second is shorter than the first, a release that waits too
  * long for approval becomes unpublishable on that run — and the error it produces
@@ -14,8 +15,7 @@
  * WCAG fix sat undelivered, and the obvious recovery ("Re-run failed jobs") re-runs
  * `publish` alone against the same absent artifact and fails identically.
  *
- * Deliberately narrow. This is NOT a general workflow linter — it asserts the three
- * properties that make the coupling impossible, and nothing else.
+ * Not a general workflow linter: a property earns a leg only when its failure is silent.
  *
  * Zero dependencies by design: this repo mints the fleet's npm publish credentials
  * via OIDC, so a guard on release convenience does not justify a new dependency in
@@ -23,6 +23,8 @@
  * file this small and fails loudly (not silently) if the shape ever changes.
  */
 import {existsSync, readdirSync, readFileSync} from 'node:fs';
+
+import {expressionOf, fanInGaps, readNeeds, statusFunctions, topLevelConjuncts} from './validate-workflows.core.mjs';
 
 const WORKFLOW = '.github/workflows/publish.yml';
 
@@ -109,6 +111,63 @@ const jobBlock = (name) => {
 
 /** One of a job's own top-level keys, ignoring identically-named keys inside its steps. */
 const jobKey = (job, key) => new RegExp(`^ {${job.keyIndent}}${key}:\\s*(.+)$`, 'm').exec(job.text);
+
+/**
+ * Job conditions are asserted by what they guarantee: each required term must be a
+ * top-level conjunct, because a term inside a disjunct, a negation or a parenthesised
+ * sub-expression can be false while the job still runs (crit, PR #221 round 2). Terms
+ * are compared whitespace-free (see `canonical` in the core).
+ */
+const NOT_CANCELLED = '!cancelled()';
+const BUILD_SUCCEEDED = "needs.build.result=='success'";
+const PUBLISHABLE = "needs.detect.outputs.publishable!='false'";
+
+const notConjunct = (job, term, found) =>
+    `the '${job}' job's 'if:' mentions "${term}" but not as a top-level '&&' term (found: ${found}). Inside a ` +
+    `disjunct, a negation or a parenthesised sub-expression it can be false while the job still runs, so the ` +
+    `condition guarantees nothing about it.`;
+
+/**
+ * A job's condition as conjuncts, or null after recording why it cannot be read. Also
+ * rejects every status function but '!cancelled()': 'always()' runs the job after a
+ * cancel, and 'success()' / 'failure()' put back a needs-result gate the condition is
+ * there to replace.
+ */
+const conditionOf = (job, condition) => {
+    if (!condition) {
+        failures.push(
+            `the '${job}' job has no 'if:' of its own, so none of the terms this gate requires of its condition ` +
+                `is there, '!cancelled()' included.`,
+        );
+        return null;
+    }
+    const found = condition[1].trim();
+    const expression = expressionOf(condition[1]);
+    const parsed = expression === null ? {error: 'not a single-line expression'} : topLevelConjuncts(expression);
+    if (parsed.error) {
+        failures.push(
+            `the '${job}' job's 'if:' could not be read as an expression (${parsed.error}; found: ${found}).`,
+        );
+        return null;
+    }
+    if (parsed.disjunction) {
+        failures.push(
+            `the '${job}' job's 'if:' has a top-level '||' (found: ${found}), so no term in it is required: ` +
+                `the job runs whenever either side holds. Every term this gate requires must be joined with '&&'.`,
+        );
+        return null;
+    }
+    const banned = statusFunctions(expression).filter((name) => name !== 'cancelled');
+    if (banned.length > 0) {
+        failures.push(
+            `the '${job}' job's 'if:' calls ${banned.map((name) => `'${name}()'`).join(', ')} (found: ${found}). ` +
+                `'always()' runs the job after the run is cancelled; 'success()' and 'failure()' re-impose a gate on ` +
+                `every needed job's result, and 'success()' is exactly the implicit gate '!cancelled()' replaces. ` +
+                `The only status function allowed here is '!cancelled()'.`,
+        );
+    }
+    return parsed;
+};
 
 // 1. Retention must outlive a plausible approval wait.
 const retentions = [...source.matchAll(/^\s*retention-days:\s*(\d+)/gm)];
@@ -204,27 +263,47 @@ if (!publishJob) {
     // whole file, so the condition passed wherever it appeared — including on another
     // job, or orphaned in a comment while 'publish' ran unconditioned (crit, PR #221).
     const condition = jobKey(publishJob, 'if');
-    if (!condition || !/needs\.detect\.outputs\.publishable/.test(condition[1])) {
+    const found = condition ? condition[1].trim() : 'no if: at all';
+    const parsed = conditionOf('publish', condition);
+    const mentions = (pattern) => condition !== null && pattern.test(condition[1]);
+    if (parsed && !parsed.conjuncts.includes(PUBLISHABLE)) {
+        if (!mentions(/needs\.detect\.outputs\.publishable/)) {
+            failures.push(
+                `the 'publish' job's own 'if:' does not branch on 'needs.detect.outputs.publishable' ` +
+                    `(found: ${found}). Depending on 'detect' without branching on its output runs the check and ` +
+                    `then ignores it — the approval request is raised regardless.`,
+            );
+        } else if (!mentions(/needs\.detect\.outputs\.publishable\s*!=\s*'false'/)) {
+            // The direction is the guarantee, not a style choice. `== 'true'` reads every
+            // way of NOT hearing an answer — detect crashing, its output write throwing —
+            // as "nothing to publish", which is the one error this pipeline may never make.
+            failures.push(
+                `the 'publish' job branches on the release signal in the fail-OPEN direction ` +
+                    `(found: ${found}). It must be "needs.detect.outputs.publishable != 'false'": only a ` +
+                    `POSITIVE "nothing to publish" may suppress the job, because "== 'true'" also suppresses it when ` +
+                    `'detect' failed or never wrote its output — silently dropping a real release and reporting success.`,
+            );
+        } else {
+            failures.push(notConjunct('publish', "needs.detect.outputs.publishable != 'false'", found));
+        }
+    }
+    if (parsed && !parsed.conjuncts.includes(BUILD_SUCCEEDED)) {
         failures.push(
-            `the 'publish' job's own 'if:' does not branch on 'needs.detect.outputs.publishable' ` +
-                `(found: ${condition ? condition[1].trim() : 'no if: at all'}). Depending on 'detect' without ` +
-                `branching on its output runs the check and then ignores it — the approval request is raised regardless.`,
+            mentions(/needs\.build\.result\s*==\s*'success'/)
+                ? notConjunct('publish', "needs.build.result == 'success'", found)
+                : `the 'publish' job's 'if:' overrides the implicit needs-gate (found: ${found}) without ` +
+                      `re-asserting "needs.build.result == 'success'". An '!cancelled()'-style condition lets 'publish' ` +
+                      `run on a FAILED build, which is a different release defect than the one being fixed.`,
         );
-    } else if (!/needs\.detect\.outputs\.publishable\s*!=\s*'false'/.test(condition[1])) {
-        // The direction is the guarantee, not a style choice. `== 'true'` reads every
-        // way of NOT hearing an answer — detect crashing, its output write throwing —
-        // as "nothing to publish", which is the one error this pipeline may never make.
+    }
+    if (parsed && !parsed.conjuncts.includes(NOT_CANCELLED)) {
         failures.push(
-            `the 'publish' job branches on the release signal in the fail-OPEN direction ` +
-                `(found: ${condition[1].trim()}). It must be "needs.detect.outputs.publishable != 'false'": only a ` +
-                `POSITIVE "nothing to publish" may suppress the job, because "== 'true'" also suppresses it when ` +
-                `'detect' failed or never wrote its output — silently dropping a real release and reporting success.`,
-        );
-    } else if (!/needs\.build\.result\s*==\s*'success'/.test(condition[1])) {
-        failures.push(
-            `the 'publish' job's 'if:' overrides the implicit needs-gate (found: ${condition[1].trim()}) without ` +
-                `re-asserting "needs.build.result == 'success'". An '!cancelled()'-style condition lets 'publish' ` +
-                `run on a FAILED build, which is a different release defect than the one being fixed.`,
+            mentions(/!\s*cancelled\s*\(\s*\)/)
+                ? notConjunct('publish', '!cancelled()', found)
+                : `the 'publish' job's 'if:' carries no '!cancelled()' (found: ${found}). Without a status-check ` +
+                      `function GitHub prepends an implicit 'success()', so a failed 'detect' skips 'publish' before ` +
+                      `its condition is read — the release is dropped on that run, which is the outcome the ` +
+                      `"!= 'false'" direction exists to prevent.`,
         );
     }
 }
@@ -282,11 +361,13 @@ if (!tagsJob) {
         );
     }
     const tagsCondition = jobKey(tagsJob, 'if');
-    if (!tagsCondition || !/!\s*cancelled\(\)/.test(tagsCondition[1])) {
+    const tagsParsed = conditionOf('tags', tagsCondition);
+    if (tagsParsed && !tagsParsed.conjuncts.includes(NOT_CANCELLED)) {
         failures.push(
-            `the 'tags' job's own 'if:' is not '!cancelled()' (found: ${tagsCondition ? tagsCondition[1].trim() : 'no if: at all'}). ` +
-                `"Re-run all jobs" after a failed tag push skips 'publish', and without '!cancelled()' this job is ` +
-                `skipped with it, so the re-run finishes green with the tags still missing.`,
+            `the 'tags' job's own 'if:' does not require '!cancelled()' as a top-level term ` +
+                `(found: ${tagsCondition[1].trim()}). "Re-run all jobs" after a failed tag push skips 'publish', and ` +
+                `without '!cancelled()' this job is skipped with it, so the re-run finishes green with the tags ` +
+                `still missing.`,
         );
     }
     if (!/^\s*(- )?run:\s*node scripts\/release-tags\.mjs\s*$/m.test(tagsJob.text)) {
@@ -324,10 +405,17 @@ const workflowJobs = (file) => {
         if (indent === 0) break;
         jobIndent ??= indent;
         if (indent === jobIndent) {
-            current = {name: match[2].replace(/:\s*$/, ''), line: jobsAt + offset + 2, keyIndent: null, keys: []};
+            current = {
+                name: match[2].replace(/:\s*$/, ''),
+                line: jobsAt + offset + 2,
+                keyIndent: null,
+                keys: [],
+                body: [],
+            };
             jobs.push(current);
             continue;
         }
+        current.body.push(line);
         current.keyIndent ??= indent;
         if (indent === current.keyIndent) current.keys.push(match[2]);
     }
@@ -356,6 +444,29 @@ for (const file of workflowFiles) {
     }
 }
 
+/**
+ * Sixth leg: every `ci.yml` job is in `ci-passed`'s `needs`.
+ *
+ * `ci-passed` is `main`'s only required check and its `needs` is written by hand, so a
+ * job added later is born outside the merge gate: it can go red and nothing blocks.
+ */
+const CI_WORKFLOW = 'ci.yml';
+const ROLLUP = 'ci-passed';
+const ciJobs = workflowJobs(CI_WORKFLOW).map((job) => ({name: job.name, needs: readNeeds(job.body, job.keyIndent)}));
+const fanIn = fanInGaps(ciJobs, ROLLUP);
+if (fanIn.error) {
+    failures.push(
+        `${WORKFLOW_DIR}/${CI_WORKFLOW}: ${fanIn.error}. '${ROLLUP}' is the only required check on 'main'; ` +
+            `without a readable fan-in, no lane's failure is known to block a merge.`,
+    );
+} else if (fanIn.missing.length > 0) {
+    failures.push(
+        `${WORKFLOW_DIR}/${CI_WORKFLOW}: job(s) ${fanIn.missing.map((name) => `'${name}'`).join(', ')} are not in ` +
+            `'${ROLLUP}'s 'needs'. '${ROLLUP}' is the only required check on 'main', so a red there would not ` +
+            `block a merge.`,
+    );
+}
+
 if (failures.length > 0) {
     console.error(`validate:workflows gate FAIL:\n`);
     for (const failure of failures) console.error(`  - ${failure}\n`);
@@ -366,6 +477,8 @@ console.log(
     `validate:workflows gate PASS — ${WORKFLOW}: artifact retention >= ${MIN_RETENTION_DAYS}d, ` +
         `download is soft, rebuild fallback present and loud, the OIDC approval is gated on a real release signal ` +
         `in the fail-closed direction, and that signal's decision logic is exercised at PR time; the 'tags' job ` +
-        `runs after 'publish' on every non-cancelled run and its logic is tested; ` +
-        `${boundedJobs} job(s) across ${workflowFiles.length} workflow(s) each declare timeout-minutes.`,
+        `runs after 'publish' on every non-cancelled run and its logic is tested; both conditions hold their ` +
+        `required terms as top-level conjuncts; ` +
+        `${boundedJobs} job(s) across ${workflowFiles.length} workflow(s) each declare timeout-minutes; ` +
+        `'${ROLLUP}' needs all ${fanIn.population} other job(s) in ${CI_WORKFLOW}.`,
 );
