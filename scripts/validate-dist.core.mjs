@@ -143,11 +143,16 @@ const isJsDocNode = (node) => node.kind >= ts.SyntaxKind.FirstJSDocNode && node.
  * string, template or regex is not a comment. Throws when the file does not parse, because a
  * misparsed file would hide its comments.
  */
-export const listComments = (text, fileName) => {
+const parseJs = (text, fileName) => {
     const source = ts.createSourceFile(fileName, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
     if (source.parseDiagnostics.length > 0) {
         throw new Error(`${fileName} does not parse: ${source.parseDiagnostics[0].messageText}`);
     }
+    return source;
+};
+
+export const listComments = (text, fileName) => {
+    const source = parseJs(text, fileName);
     const found = new Map();
     const collect = (position) => {
         const ranges = [
@@ -173,6 +178,52 @@ export const listComments = (text, fileName) => {
         .map(([position, comment]) => ({line: source.getLineAndCharacterOfPosition(position).line + 1, text: comment}));
 };
 
+/**
+ * The placeholders Vue's template compiler emits with its `comments` option off: the empty
+ * branch of a `v-if`. Any other string is a template comment the compiler turned into
+ * runtime text, which renders in the consumer's DOM.
+ */
+export const TEMPLATE_COMMENT_PLACEHOLDERS = new Set(['v-if']);
+
+const calleeName = (expression) => {
+    if (ts.isParenthesizedExpression(expression)) {
+        return calleeName(expression.expression);
+    }
+    if (ts.isBinaryExpression(expression) && expression.operatorToken.kind === ts.SyntaxKind.CommaToken) {
+        return calleeName(expression.right);
+    }
+    if (ts.isPropertyAccessExpression(expression)) {
+        return expression.name.text;
+    }
+    return ts.isIdentifier(expression) ? expression.text : '';
+};
+
+/**
+ * Every string a `createCommentVNode` call carries outside the placeholder set, read from
+ * the parsed call expressions. A call with no argument or a non-literal first argument
+ * carries no source text.
+ */
+export const listTemplateComments = (text, fileName) => {
+    const source = parseJs(text, fileName);
+    const found = [];
+    const visit = (node) => {
+        if (ts.isCallExpression(node) && calleeName(node.expression).endsWith('createCommentVNode')) {
+            const [first] = node.arguments;
+            const literal =
+                first !== undefined && (ts.isStringLiteral(first) || ts.isNoSubstitutionTemplateLiteral(first));
+            if (literal && !TEMPLATE_COMMENT_PLACEHOLDERS.has(first.text)) {
+                found.push({
+                    line: source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1,
+                    text: first.text,
+                });
+            }
+        }
+        ts.forEachChild(node, visit);
+    };
+    visit(source);
+    return found;
+};
+
 const excerpt = (comment) => {
     const flat = comment.replaceAll(/\s+/g, ' ');
     return flat.length > 80 ? `${flat.slice(0, 77)}...` : flat;
@@ -180,8 +231,9 @@ const excerpt = (comment) => {
 
 /**
  * The verdict on what a package's tarball would publish beyond its promised files: no
- * source map, no `sourceMappingURL` pointing at one, and no comment in a JavaScript file
- * other than the kinds `allowedCommentKind` names. A tarball with no JavaScript file fails,
+ * source map, no `sourceMappingURL` pointing at one, no comment in a JavaScript file
+ * other than the kinds `allowedCommentKind` names, and no template comment compiled into a
+ * `createCommentVNode` string. A tarball with no JavaScript file fails,
  * because nothing was read.
  */
 export const checkContents = ({name, files, readText}) => {
@@ -205,8 +257,10 @@ export const checkContents = ({name, files, readText}) => {
         }
         jsFilesRead += 1;
         let comments;
+        let templateComments;
         try {
             comments = listComments(text, file);
+            templateComments = listTemplateComments(text, file);
         } catch (error) {
             failures.push(`${name} ${error.message}`);
             continue;
@@ -215,6 +269,12 @@ export const checkContents = ({name, files, readText}) => {
         if (prose.length > 0) {
             failures.push(
                 `${name} ${file}:${prose[0].line} ships ${prose.length} source comment(s), first: ${excerpt(prose[0].text)}`,
+            );
+        }
+        if (templateComments.length > 0) {
+            const [first] = templateComments;
+            failures.push(
+                `${name} ${file}:${first.line} ships ${templateComments.length} template comment string(s) (createCommentVNode), first: ${excerpt(JSON.stringify(first.text))}`,
             );
         }
     }

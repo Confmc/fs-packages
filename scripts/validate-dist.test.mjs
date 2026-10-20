@@ -8,7 +8,9 @@ import {
     checkPackage,
     cssHasNoRules,
     listComments,
+    listTemplateComments,
     requiredPaths,
+    TEMPLATE_COMMENT_PLACEHOLDERS,
 } from './validate-dist.core.mjs';
 
 const DUAL = {
@@ -370,5 +372,56 @@ describe('checkContents', () => {
         expect(checkContents({name: 'p', files: [], readText: () => ''}).failures).toEqual([
             'p: tarball holds 0 JavaScript files — no comment was checked',
         ]);
+    });
+});
+
+describe('listTemplateComments', () => {
+    it('finds a prose string in every callee shape the compiler emits', () => {
+        const text = [
+            'createCommentVNode(" bare ");',
+            '_createCommentVNode(" underscored ");',
+            '(0, vue.createCommentVNode)(" cjs ");',
+            'vue.createCommentVNode(`template`);',
+        ].join('\n');
+        expect(listTemplateComments(text, 'x.mjs')).toEqual([
+            {line: 1, text: ' bare '},
+            {line: 2, text: ' underscored '},
+            {line: 3, text: ' cjs '},
+            {line: 4, text: 'template'},
+        ]);
+    });
+
+    it('passes the v-if placeholder, a non-literal argument and no argument', () => {
+        const text = [
+            'createCommentVNode("v-if", true);',
+            '(0, vue.createCommentVNode)("v-if", true);',
+            'createCommentVNode(label);',
+            'createCommentVNode(`a${b}`);',
+            'createCommentVNode();',
+        ].join('\n');
+        expect(listTemplateComments(text, 'x.mjs')).toEqual([]);
+    });
+
+    it('ignores other calls carrying a string', () => {
+        expect(listTemplateComments('createTextVNode(" text "); notCreateCommentVNodeAtAll;', 'x.mjs')).toEqual([]);
+    });
+
+    it('holds exactly the placeholder the compiler emits', () => {
+        expect([...TEMPLATE_COMMENT_PLACEHOLDERS]).toEqual(['v-if']);
+    });
+});
+
+describe('checkContents on template comments', () => {
+    it('fails a prose createCommentVNode string, naming file, line and excerpt', () => {
+        const readText = () => 'const a = 1;\n(0, vue.createCommentVNode)(" a note ");\ncreateCommentVNode(" b ");';
+        const verdict = checkContents({name: 'p', files: [{path: 'dist/index.cjs', size: 1}], readText});
+        expect(verdict.failures).toEqual([
+            'p dist/index.cjs:2 ships 2 template comment string(s) (createCommentVNode), first: " a note "',
+        ]);
+    });
+
+    it('passes the v-if placeholder', () => {
+        const readText = () => 'createCommentVNode("v-if", true);';
+        expect(checkContents({name: 'p', files: [{path: 'dist/index.mjs', size: 1}], readText}).failures).toEqual([]);
     });
 });

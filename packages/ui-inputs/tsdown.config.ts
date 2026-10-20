@@ -8,4 +8,8 @@ import {baseConfig} from '../../tsdown.base.ts';
 // validate:dist enforces still holds; unplugin-vue teaches it to compile `.vue`.
 // tsdown auto-externalises dependencies + peerDependencies, so `vue` and the
 // `@floating-ui/vue` runtime dep are left unbundled without an explicit list.
-export default defineConfig({...baseConfig, dts: {...baseConfig.dts, vue: true}, plugins: [Vue({isProduction: true})]});
+export default defineConfig({
+    ...baseConfig,
+    dts: {...baseConfig.dts, vue: true},
+    plugins: [Vue({isProduction: true, template: {compilerOptions: {comments: false}}})],
+});
