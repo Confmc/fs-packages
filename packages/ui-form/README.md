@@ -86,7 +86,7 @@ shape at that fixed breakpoint (a custom property cannot drive a media query, so
 </FormField>
 ```
 
-`FormField` hands its slot `field` (`{id, invalid, describedby}`), so one `v-bind` wires the control it wraps.
+`FormField` hands its slot `field` (`{id, invalid, describedby, error}`), so one `v-bind` wires the control it wraps.
 
 ### More in the label row
 
@@ -108,6 +108,18 @@ a direct child of `.ui-field`. The bound controls hand both slots to their field
 `.ui-hint` with the id `${id}-hint`, and the slot's `describedby` names it after the message, so a screen reader
 reads it with the field. In the horizontal layout the hint and the message sit under the control. The bound
 controls forward it. Styled by `--ui-hint-text` and `--ui-hint-size`.
+
+**Matching your own field design.** The frame reads `--ui-label-size`, `--ui-label-weight`, `--ui-label-color`,
+`--ui-label-required-color` and `--ui-field-gap` (the space between label, control, hint and message). Set them
+once on a container to give its fields another look, a drawer's compact labels for instance:
+
+```css
+.drawer-fields {
+    --ui-label-size: 0.8125rem;
+    --ui-label-weight: 600;
+    --ui-field-gap: 0.375rem;
+}
+```
 
 ### The text-like controls' extras
 
@@ -658,8 +670,9 @@ const {TextField, NumberField, SingleSelectField, handleSubmit} = useForm({draft
 `DateField`, `TimeField`, `PasswordField`, `CheckboxField`, `SwitchField`, `RadioGroupField`, `CheckboxGroupField`,
 `SingleSelectField`, `ComboboxField`, `MultiSelectField`, `MultiComboboxField`, `GroupSelectField` and
 `GroupComboboxField`. Each draws the label, the control and the message, wired by the field's name; on a draft
-form the name must be a path the control fits, checked by vue-tsc (see [Typing the draft](#typing-the-draft)). Every other prop passes
-through to the control and wins over the wiring. `TextField`, `NumberField`, `DateField` and `TimeField` also take
+form the name must be a path the control fits, checked by vue-tsc (see [Typing the draft](#typing-the-draft)). `class` and `style` land on the
+field frame; every other prop and attribute passes through to the control and wins over the wiring (an
+attributify utility such as `w-full` is an attribute, so it lands on the control). `TextField`, `NumberField`, `DateField` and `TimeField` also take
 `prepend` / `append` (an `InputGroup` around the control). `RadioGroupField` and `CheckboxGroupField` require
 `label`, their legend. Each has a stable component name, so a spec finds it with
 `findAllComponents({name: 'TextField'})`.
@@ -670,13 +683,18 @@ hint and message with the form's ids, so a refused submit still scrolls to it, a
 wiring without the value, `field(name)` minus `modelValue`, so the control keeps its own `v-model`:
 
 ```vue
-<FormField name="municipalityId" label="Municipality" v-slot="{field}">
-    <Combobox v-bind="field" v-model="municipality" :options="municipalities" option-label="name" />
+<FormField name="municipalityId" label="Municipality" v-slot="{field: wiring}">
+    <Combobox v-bind="wiring" v-model="municipality" :options="municipalities" option-label="name" />
 </FormField>
 ```
 
+The slot prop `field` shadows `useForm`'s `field()` inside the slot, so a template that also calls `field('x')`
+renames it, as above.
+
 For a value the draft holds, bind it yourself (`v-model="draft.startDate"`) or use `v-bind="field(name)"`,
-which carries the value too.
+which carries the value too. Its `onUpdate:modelValue` takes exactly the path's type, so your control's model
+must match it: a control that writes `string | null` does not fit a `startDate: string` path; give it a handler
+that writes only strings, or type the path `| null`.
 
 `field` suits this package's controls, whose props have those names. A native element of your own, such as a
 `<div role="group">` of chips, takes the slot's `aria` instead: `v-bind="aria"` gives it the id,
@@ -703,8 +721,8 @@ reads addon texts un-stubs `InputGroup`. A stubbed bound control shows the props
 `vm.$attrs`.
 A form takes only its own action's 422, so a spec that checks a refusal makes the save itself reject with one.
 The frame's classes are stable and safe to select on: `.ui-field` (the frame, where a `data-test` on a bound
-`FormField` lands), `.ui-hint` and `.ui-error` (the message). A bound control's `data-test` lands on the control,
-whose `error` prop carries the message.
+`FormField` lands), `.ui-hint` and `.ui-error` (the message). An un-stubbed bound control's `data-test` lands on
+the control, whose `error` prop carries the message; on a stub it stays on the stub, which has no `error`.
 
 Set an app's texts once with `createUiForm({texts})`: `placeholder`, `emptyText`, `optionsLabel`, `removeLabel`,
 `requiredLabel`, `clearButtonLabel`, `showPasswordLabel`, `hidePasswordLabel` and `capsLockText`. It hands out
@@ -721,7 +739,8 @@ included. A host that builds the form for its child (a dialog host, say) passes 
 
 `handleSubmit(action, {validate})` takes the 422 its own action rejected with, so a form holds exactly its own
 requests' refusals; another form's request never lands in it. It resolves to `'sent'`, `'refused'` or
-`'ignored'` (a call while one is in flight), runs `validate` first when given (a refusal skips the action), and on
+`'ignored'` (a call while one is in flight); any other rejection propagates out of `handleSubmit`, so a caller
+that reports a failed save catches it (`handleSubmit(save).catch(reportFailure)`). It runs `validate` first when given (a refusal skips the action), and on
 `'refused'` scrolls the first refused field into view. An action that catches its own 422 must rethrow it or pass
 it to `take(error)`, which binds a 422 caught anywhere (a lookup outside a submit) and says whether it was one.
 Messages stay until the next submit; `withdraw(name)` drops one sooner.
@@ -731,7 +750,7 @@ one, its message would sit on another row, so the code that changes the list wit
 `withdraw('goals')` drops `goals` and every `goals.*` message.
 
 **In a spec**, give the form a fixed `idPrefix` and build it in plain test code, no host component needed:
-`const form = useForm({draft, idPrefix: 'test'})`, then pass it as the `form` prop. Without `idPrefix`, `useForm`
+`const form = useForm({draft: ref<Contract>({...}), idPrefix: 'test'})`, then pass it as the `form` prop. Without `idPrefix`, `useForm`
 takes its ids from Vue's `useId()`, which only works inside a component's `setup()`.
 
 With `useForm({draft})` (the component's own `Ref`), every name is a path into the draft
