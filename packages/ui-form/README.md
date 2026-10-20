@@ -698,7 +698,9 @@ out, the field renders no hint and names none.
 **Testing.** A shallow mount stubs the bound controls, `FormField` and `FormError`, so a field's message does not
 render in such a spec. Un-stub what the spec reads: `stubs: {TextField: false, FormField: false, FormError: false}`.
 `#label-after` content renders inside the label, so a spec that reads it un-stubs `FormLabel` too, and one that
-reads addon texts un-stubs `InputGroup`.
+reads addon texts un-stubs `InputGroup`. A stubbed bound control shows the props it declares (`name`, `label`,
+`required`, …) through `props()`; what it passes on to its control, such as a select's `options`, is on
+`vm.$attrs`.
 A form takes only its own action's 422, so a spec that checks a refusal makes the save itself reject with one.
 The frame's classes are stable and safe to select on: `.ui-field` (the frame, where a `data-test` on a bound
 `FormField` lands), `.ui-hint` and `.ui-error` (the message). A bound control's `data-test` lands on the control,
