@@ -86,3 +86,30 @@ describe('NumberInput autofocus and class', () => {
         ).toContain('ui-number');
     });
 });
+
+describe('NumberInput error icon and attributes', () => {
+    it('shows the in-input error icon only while marked, hidden from assistive tech', async () => {
+        const wrapper = mount(NumberInput, {props: {modelValue: null}});
+        expect(wrapper.find('.ui-input__icon').exists()).toBe(false);
+
+        await wrapper.setProps({error: 'Fill in an amount'});
+        expect(wrapper.find('.ui-input__icon').attributes('aria-hidden')).toBe('true');
+
+        await wrapper.setProps({invalid: false});
+        expect(wrapper.find('.ui-input__icon').exists()).toBe(false);
+    });
+
+    it('puts class and style on the wrapper and every other attribute on the input', () => {
+        const wrapper = mount(NumberInput, {
+            props: {modelValue: null},
+            attrs: {class: 'w-40', style: 'margin: 1px', 'data-test': 'amount', inputmode: 'decimal'},
+        });
+        const input = wrapper.find('input');
+
+        expect(wrapper.classes()).toEqual(expect.arrayContaining(['ui-input-wrap', 'w-40']));
+        expect(wrapper.attributes('style')).toBe('margin: 1px;');
+        expect(input.attributes('data-test')).toBe('amount');
+        expect(input.attributes('inputmode')).toBe('decimal');
+        expect(input.classes()).not.toContain('w-40');
+    });
+});

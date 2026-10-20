@@ -1,25 +1,35 @@
 <template>
-    <input
-        ref="input"
-        :id="controlId"
-        type="number"
-        class="ui-control ui-input ui-number"
-        :class="{'is-invalid': marked}"
-        :value="model"
-        :placeholder="placeholder"
-        :disabled="disabled"
-        :min="min"
-        :max="max"
-        :step="step"
-        :aria-required="required || undefined"
-        :aria-invalid="marked || undefined"
-        :aria-describedby="describedby"
-        @input="onInput"
-    />
+    <span v-bind="rootAttrs($attrs)" class="ui-input-wrap">
+        <!-- class/style style the whole control (this root); everything else lands on the <input>, as on TextInput -->
+        <input
+            v-bind="controlAttrs($attrs)"
+            ref="input"
+            :id="controlId"
+            type="number"
+            class="ui-control ui-input ui-number"
+            :class="{'is-invalid': marked}"
+            :value="model"
+            :placeholder="placeholder"
+            :disabled="disabled"
+            :min="min"
+            :max="max"
+            :step="step"
+            :aria-required="required || undefined"
+            :aria-invalid="marked || undefined"
+            :aria-describedby="describedby"
+            @input="onInput"
+        />
+        <ErrorIcon v-if="marked" />
+    </span>
 </template>
 
 <script setup lang="ts">
 import {computed, onMounted, useId, useTemplateRef} from 'vue';
+
+import {controlAttrs, rootAttrs} from '../internal/split-attrs';
+import ErrorIcon from './ErrorIcon.vue';
+
+defineOptions({inheritAttrs: false});
 
 const {
     id,
