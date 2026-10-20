@@ -16,8 +16,8 @@
 //   name a `sourceMappingURL`. Every `.mjs`/`.cjs`/`.js` is parsed (TypeScript's parser, a
 //   root devDependency as in lint-pkg.mjs) and may carry only `#region`/`#endregion`
 //   markers, exact `@__PURE__`/`#__PURE__`/`@__NO_SIDE_EFFECTS__` annotations, exact
-//   v8/c8/istanbul ignore directives, and legal comments (`/*!`, `//!`, `@license`,
-//   `@preserve`). A Vue template comment compiles to a `createCommentVNode("…")`
+//   v8/c8/istanbul ignore directives. A legal comment (`/*!`, `//!`, `@license`,
+//   `@preserve`) is prose like any other: the build drops them. A Vue template comment compiles to a `createCommentVNode("…")`
 //   string that renders in the consumer's DOM, so any such call whose first argument is a
 //   string literal other than the `v-if` placeholder fails too. The type files keep their JSDoc: it is the consumer-facing API docs.
 //   A package with no JavaScript file in its tarball fails, and so does a run that read none.

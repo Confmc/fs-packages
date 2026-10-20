@@ -247,11 +247,12 @@ describe('allowedCommentKind', () => {
         expect(allowedCommentKind('// istanbul ignore else')).toBe('coverage');
     });
 
-    it('allows legal comments', () => {
-        expect(allowedCommentKind('/*! MIT */')).toBe('legal');
-        expect(allowedCommentKind('//! MIT')).toBe('legal');
-        expect(allowedCommentKind('/** @license MIT */')).toBe('legal');
-        expect(allowedCommentKind('/* @preserve keep */')).toBe('legal');
+    it('rejects legal comments, whatever they say', () => {
+        expect(allowedCommentKind('/*! MIT */')).toBeNull();
+        expect(allowedCommentKind('//! MIT')).toBeNull();
+        expect(allowedCommentKind('// internal source note @license')).toBeNull();
+        expect(allowedCommentKind('/* @preserve */')).toBeNull();
+        expect(allowedCommentKind('/** @license MIT */')).toBeNull();
     });
 
     it('rejects plain line, block and JSDoc comments', () => {
@@ -309,7 +310,8 @@ describe('checkContents', () => {
         const {files, readText} = tarball({
             'dist/index.mjs':
                 '//#region src/a.ts\nconst a = /* @__PURE__ */ f();\n//#endregion\nconst u = "https://x";',
-            'dist/index.cjs': '/*! MIT */\nmodule.exports = 1;',
+            'dist/index.cjs':
+                '//#region src/b.ts\nmodule.exports = /* #__PURE__ */ f();\n// v8 ignore next\n//#endregion',
             'dist/index.d.mts': '/** API documentation */\nexport declare const a: number;',
             'package.json': '{}',
         });
@@ -320,6 +322,13 @@ describe('checkContents', () => {
         const {files, readText} = tarball({'dist/index.mjs': 'const a = 1;\n// planted\n/* second */'});
         expect(checkContents({name: 'p', files, readText}).failures).toEqual([
             'p dist/index.mjs:2 ships 2 source comment(s), first: // planted',
+        ]);
+    });
+
+    it('fails a legal comment', () => {
+        const {files, readText} = tarball({'dist/index.mjs': 'export const a = 1; // note @license\n/*! x */'});
+        expect(checkContents({name: 'p', files, readText}).failures).toEqual([
+            'p dist/index.mjs:1 ships 2 source comment(s), first: // note @license',
         ]);
     });
 

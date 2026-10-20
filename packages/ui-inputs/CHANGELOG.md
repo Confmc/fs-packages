@@ -4,7 +4,7 @@
 
 ### Patch Changes
 
-- **`dist` no longer ships source maps or source comments.** The tarball carried a `.map` beside every bundle, each holding the full source text in `sourcesContent`, and the bundled JavaScript kept the source comments. Both are gone: the JavaScript keeps only the comments a bundler or coverage tool reads (region markers, `@__PURE__` annotations, coverage-ignore directives, legal comments), and the type files keep their JSDoc. The components' template comments are no longer compiled in either: each one used to render as an HTML comment node in the consumer's DOM. Behaviour and types are otherwise unchanged. A debugger stepping into this package now shows the bundled JavaScript instead of the TypeScript source.
+- **`dist` no longer ships source maps or source comments.** The tarball carried a `.map` beside every bundle, each holding the full source text in `sourcesContent`, and the bundled JavaScript kept the source comments. Both are gone: the JavaScript keeps only the comments a bundler or coverage tool reads (region markers, `@__PURE__` annotations, coverage-ignore directives), and the type files keep their JSDoc. The components' template comments are no longer compiled in either: each one used to render as an HTML comment node in the consumer's DOM. Behaviour and types are otherwise unchanged. A debugger stepping into this package now shows the bundled JavaScript instead of the TypeScript source.
 
 ## 0.17.1 — 2026-10-17
 

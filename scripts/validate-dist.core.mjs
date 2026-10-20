@@ -113,17 +113,13 @@ const TEXT_FILE = /\.(?:mjs|cjs|js|d\.mts|d\.cts|d\.ts|css)$/;
 const ANNOTATIONS = new Set(['@__PURE__', '#__PURE__', '@__NO_SIDE_EFFECTS__', '#__NO_SIDE_EFFECTS__']);
 const REGION_MARKER = /^\/\/#(?:region|endregion)(?: \S.*)?$/;
 const COVERAGE_DIRECTIVE = /^\/\/ (?:v8|c8|istanbul) ignore (?:next|start|stop|if|else|file)$/;
-const LEGAL = /^(?:\/\*!|\/\/!)|@license|@preserve/;
 
 /**
  * The kind of an emitted comment a published bundle may carry, or null when it is source
- * prose. A legal comment passes whatever else it says; every other kind must be the whole
- * comment, so `/* @__PURE__ note *\/` is prose.
+ * prose. Each kind must be the whole comment, so `/* @__PURE__ note *\/` is prose, and a
+ * legal comment (`/*!`, `@license`, `@preserve`) is prose too: the marker says nothing about the rest.
  */
 export const allowedCommentKind = (text) => {
-    if (LEGAL.test(text)) {
-        return 'legal';
-    }
     if (REGION_MARKER.test(text)) {
         return 'region';
     }
