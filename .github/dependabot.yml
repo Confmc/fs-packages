@@ -23,6 +23,9 @@ updates:
           - dependency-name: '@types/node'
             update-types:
                 - 'version-update:semver-major'
+          # 3.3.12/3.3.13 carry the codegen regression vuejs/language-tools#6237 (fix #6238 unmerged; WR-2176).
+          - dependency-name: 'vue-component-type-helpers'
+            versions: ['3.3.12', '3.3.13']
       open-pull-requests-limit: 10
 
     - package-ecosystem: github-actions
