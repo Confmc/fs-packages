@@ -24,6 +24,7 @@
  */
 import {existsSync, readdirSync, readFileSync} from 'node:fs';
 
+import {minimumTagsJobMinutes} from './release-tags.core.mjs';
 import {expressionOf, fanInGaps, readNeeds, statusFunctions, topLevelConjuncts} from './validate-workflows.core.mjs';
 
 const WORKFLOW = '.github/workflows/publish.yml';
@@ -373,6 +374,19 @@ if (!tagsJob) {
     if (!/^\s*(- )?run:\s*node scripts\/release-tags\.mjs\s*$/m.test(tagsJob.text)) {
         failures.push(`the 'tags' job does not run 'node scripts/release-tags.mjs'.`);
     }
+    // Cut off by its own timeout while waiting for npm, the job ends 'cancelled' with no
+    // verdict, instead of naming the version that never appeared.
+    const packageDirs = readdirSync('packages', {withFileTypes: true}).filter((entry) => entry.isDirectory()).length;
+    const needed = minimumTagsJobMinutes(packageDirs);
+    const tagsTimeout = jobKey(tagsJob, 'timeout-minutes');
+    const declared = tagsTimeout ? Number.parseInt(tagsTimeout[1], 10) : Number.NaN;
+    if (packageDirs === 0 || !(declared >= needed)) {
+        failures.push(
+            `the 'tags' job's timeout-minutes (found: ${tagsTimeout ? tagsTimeout[1].trim() : 'none'}) is below ` +
+                `the ${needed} minutes its registry wait needs for ${packageDirs} package(s) ` +
+                `(minimumTagsJobMinutes in scripts/release-tags.core.mjs).`,
+        );
+    }
 }
 const TAGS_TEST = 'scripts/release-tags.test.mjs';
 if (!existsSync(TAGS_TEST)) {
@@ -477,7 +491,7 @@ console.log(
     `validate:workflows gate PASS — ${WORKFLOW}: artifact retention >= ${MIN_RETENTION_DAYS}d, ` +
         `download is soft, rebuild fallback present and loud, the OIDC approval is gated on a real release signal ` +
         `in the fail-closed direction, and that signal's decision logic is exercised at PR time; the 'tags' job ` +
-        `runs after 'publish' on every non-cancelled run and its logic is tested; both conditions hold their ` +
+        `runs after 'publish' on every non-cancelled run, its timeout covers its registry wait and its logic is tested; both conditions hold their ` +
         `required terms as top-level conjuncts; ` +
         `${boundedJobs} job(s) across ${workflowFiles.length} workflow(s) each declare timeout-minutes; ` +
         `'${ROLLUP}' needs all ${fanIn.population} other job(s) in ${CI_WORKFLOW}.`,
