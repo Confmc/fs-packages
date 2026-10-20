@@ -96,7 +96,7 @@ shape at that fixed breakpoint (a custom property cannot drive a media query, so
 Two slots extend the label without replacing it. `#label-after` renders inside the `<label>`, after its text and
 required mark, for a tooltip. `#aside` renders at the far end of the label's row (a
 `.ui-field__head` flex row; in the horizontal layout it takes the label column), for a control that belongs to
-the field, such as a switch; it receives the same `field` as the default slot. Without an aside the label stays
+the field, such as a switch; it takes no wiring, since the field's id belongs to the control the label names, so give a switch there its own id. Without an aside the label stays
 a direct child of `.ui-field`. The bound controls hand both slots to their field. The required mark's colour is
 `--ui-label-required-color` (default `var(--ui-danger-text)`).
 

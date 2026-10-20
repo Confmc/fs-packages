@@ -43,18 +43,35 @@ describe('FormField', () => {
         expect(label.element.lastElementChild?.className).toBe('note');
     });
 
-    it('puts aside at the end of the label row, with the field wiring', () => {
+    // The aside gets no wiring: the field's id belongs to the control the label names, never to the aside.
+    it('puts aside at the end of the label row, without the field wiring', () => {
+        let scope!: Record<string, unknown>;
         const wrapper = mount(FormField, {
             props: {label: 'Email', id: 'email'},
             slots: {
                 default: wiringSlot,
-                aside: ({field}: {field: {id: string}}) => h('span', {class: 'toggle'}, field.id),
+                aside: (props: Record<string, unknown>) => {
+                    scope = props;
+                    return h('span', {class: 'toggle'}, 'on');
+                },
             },
         });
 
         const head = wrapper.find('.ui-field > .ui-field__head');
         expect(head.find('label.ui-label').text()).toBe('Email');
-        expect(head.element.lastElementChild?.outerHTML).toBe('<span class="toggle">email</span>');
+        expect(head.element.lastElementChild?.outerHTML).toBe('<span class="toggle">on</span>');
+        expect(scope).toEqual({});
+    });
+
+    it('separates label-after content from the label text, so the accessible name reads as words', () => {
+        const wrapper = mount(FormField, {
+            props: {label: 'Email', id: 'email'},
+            slots: {default: wiringSlot, 'label-after': '<span>(work)</span>'},
+        });
+        const plain = mount(FormField, {props: {label: 'Email', id: 'email'}, slots: {default: wiringSlot}});
+
+        expect(wrapper.find('label').element.textContent?.replace(/\s+/g, ' ').trim()).toBe('Email (work)');
+        expect(plain.find('label').element.textContent).toBe('Email');
     });
 
     it('renders a hint between the control and the message, read with the field after the message', () => {

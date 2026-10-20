@@ -197,7 +197,7 @@ export interface BoundControls<D> {
 type FrameSlots = SlotsType<{
     default: (scope: {field: FieldBinding; aria: FieldAria}) => VNode[];
     'label-after'?: () => VNode[];
-    aside?: (scope: {field: FieldBinding}) => VNode[];
+    aside?: () => VNode[];
     hint?: () => VNode[];
 }>;
 
