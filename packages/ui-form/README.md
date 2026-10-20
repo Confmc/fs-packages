@@ -18,6 +18,9 @@ Peer dependency: `vue@^3.5.43`. Import the stylesheet once (e.g. in your entry):
 import '@script-development/ui-form/style.css';
 ```
 
+It replaces ui-inputs' stylesheet; never load both. ui-form's sheet also styles ui-inputs' markup, while an
+unlayered ui-inputs rule next to it would beat ui-form's layered ones.
+
 If your app has an element base (`input { font-size: inherit }`, `p { margin-bottom: 1rem }`), put it in a layer declared before
 the package's, at the top of your first stylesheet, or it beats the package's rules: `@layer base, ui-form;` then
 `@layer base { … }`.

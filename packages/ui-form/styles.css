@@ -195,8 +195,8 @@
     --ui-danger-shadow: none;
     --ui-error-size: 0.8125rem;
     --ui-error-weight: 400;
-    /* a field's hint (FormField #hint): the message's size, in the control text. */
-    --ui-hint-text: var(--ui-control-text);
+    /* a field's hint (FormField #hint): the message's size, in the muted control text like an addon. */
+    --ui-hint-text: var(--ui-control-text-muted);
     --ui-hint-size: var(--ui-error-size);
     /* a warning beside a field that is not an error (PasswordInput's Caps Lock notice) */
     --ui-warning-text: #b45309;

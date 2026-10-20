@@ -262,8 +262,7 @@ See the [README's testing notes](https://github.com/script-development/fs-packag
 
 ui-form runs next to fs-form and ui-inputs, so a consumer migrates one page at a time, together with every dialog
 it opens. Not one form at a time: fs-form's middleware on the shared HTTP service fills every mounted fs-form form
-on any 422, so a ui-form dialog's refusal would also light up an fs-form page under it. Load only ui-form's stylesheet once
-any form uses it: it styles ui-inputs' markup too. The
+on any 422, so a ui-form dialog's refusal would also light up an fs-form page under it. Load only ui-form's stylesheet, never both: it styles ui-inputs' markup too, and next to it an unlayered ui-inputs rule always beats ui-form's layered ones (a horizontal field's hint and message overlap). The
 [CHANGELOG's migration table](https://github.com/script-development/fs-packages/blob/main/packages/ui-form/CHANGELOG.md#migrating)
 maps every old call to its new one; the larger moves are:
 
