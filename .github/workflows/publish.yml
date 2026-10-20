@@ -148,7 +148,33 @@ jobs:
             # assertions cannot drift. Refuses to publish empty or incomplete tarballs
             # (fs-http 0.1.1/0.1.2 empty-tarball class).
             - run: npm run validate:dist
+            # Its git tags stay in this runner's clone. The `tags` job below makes the
+            # remote ones.
             - run: npx changeset publish
               env:
                   NPM_CONFIG_PROVENANCE: 'true'
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    # One annotated `<name>@<version>` tag per version the registry records as published
+    # from this commit (scripts/release-tags.mjs). A job of its own so that every re-run
+    # reaches it: "Re-run all jobs" after a failed tag push skips `publish`, because
+    # `detect` then finds every version on the registry, and this job still runs. It
+    # needs no approval and no id-token: it reads the registry and pushes tags.
+    tags:
+        needs: [publish]
+        if: ${{ !cancelled() }}
+        runs-on: ubuntu-latest
+        timeout-minutes: 10
+        permissions:
+            contents: write
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+              with:
+                  node-version: 24
+            - name: Push release tags
+              run: node scripts/release-tags.mjs
+              env:
+                  PUBLISH_RESULT: ${{ needs.publish.result }}
+                  GIT_COMMITTER_NAME: 'github-actions[bot]'
+                  GIT_COMMITTER_EMAIL: '41898282+github-actions[bot]@users.noreply.github.com'

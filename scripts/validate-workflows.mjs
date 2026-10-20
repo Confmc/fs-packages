@@ -262,6 +262,46 @@ if (!/scripts\/\*\*\/\*\.test\.mjs/.test(vitestConfig)) {
 }
 
 /**
+ * Release tags (PR #313). `changeset publish` tags only in its runner's clone, so the
+ * `tags` job makes them from the registry. Each leg below is one way it could still
+ * report success with the tags missing: not running after `publish`, running before
+ * it, being skipped with it on a re-run, or running logic no PR test executes.
+ */
+const tagsJob = jobBlock('tags');
+if (!tagsJob) {
+    failures.push(
+        `no 'tags' job in ${WORKFLOW}. 'changeset publish' leaves its tags in the publish runner's clone, ` +
+            `so without this job every release ships with no tag on the remote.`,
+    );
+} else {
+    const tagsNeeds = jobKey(tagsJob, 'needs');
+    if (!tagsNeeds || !/\bpublish\b/.test(tagsNeeds[1])) {
+        failures.push(
+            `the 'tags' job does not list 'publish' in its needs (found: ${tagsNeeds ? tagsNeeds[1].trim() : 'none'}). ` +
+                `Run before 'publish', it finds nothing published yet, owes no tags and reports success.`,
+        );
+    }
+    const tagsCondition = jobKey(tagsJob, 'if');
+    if (!tagsCondition || !/!\s*cancelled\(\)/.test(tagsCondition[1])) {
+        failures.push(
+            `the 'tags' job's own 'if:' is not '!cancelled()' (found: ${tagsCondition ? tagsCondition[1].trim() : 'no if: at all'}). ` +
+                `"Re-run all jobs" after a failed tag push skips 'publish', and without '!cancelled()' this job is ` +
+                `skipped with it, so the re-run finishes green with the tags still missing.`,
+        );
+    }
+    if (!/^\s*(- )?run:\s*node scripts\/release-tags\.mjs\s*$/m.test(tagsJob.text)) {
+        failures.push(`the 'tags' job does not run 'node scripts/release-tags.mjs'.`);
+    }
+}
+const TAGS_TEST = 'scripts/release-tags.test.mjs';
+if (!existsSync(TAGS_TEST)) {
+    failures.push(
+        `${TAGS_TEST} is missing. The release-tag logic runs only on push to 'main', so its branches would ` +
+            `first run after a release.`,
+    );
+}
+
+/**
  * Fifth leg, every workflow: each job declares its own `timeout-minutes`.
  *
  * An unbounded job inherits GitHub's 360-minute default, so a hung step holds a runner
@@ -325,6 +365,7 @@ if (failures.length > 0) {
 console.log(
     `validate:workflows gate PASS — ${WORKFLOW}: artifact retention >= ${MIN_RETENTION_DAYS}d, ` +
         `download is soft, rebuild fallback present and loud, the OIDC approval is gated on a real release signal ` +
-        `in the fail-closed direction, and that signal's decision logic is exercised at PR time; ` +
+        `in the fail-closed direction, and that signal's decision logic is exercised at PR time; the 'tags' job ` +
+        `runs after 'publish' on every non-cancelled run and its logic is tested; ` +
         `${boundedJobs} job(s) across ${workflowFiles.length} workflow(s) each declare timeout-minutes.`,
 );
