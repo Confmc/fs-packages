@@ -192,7 +192,7 @@ Decided since the 10-09 notes (emmie-2 now leads the emmie + package line; my si
 --ignore-scripts`, build, `npm pack --pack-destination ../../.experiment-packs`, commit, push to `fork`.
 - Scope: fix what this work owns; don't chase issues merely noticed elsewhere.
 
-## State at 2026-10-19 evening (control.29, home machine)
+## State at 2026-10-19 evening (control.29, home machine; superseded: see the last section)
 
 This side leads the package until the package PR; the emmie side is the test bed and tests what it is asked.
 Packs bump `0.1.0-control.N` (a pre-release counter, never published); commits stay local and go to `fork`
@@ -232,3 +232,92 @@ Gates: unit 851, browser 196 + 3 new axe audits, typecheck, lint, coverage 100% 
 format:check, validate:dist and lint:pkg fail for every package (CRLF checkout artefacts; spawnSync('npm')
 without a shell); publint and attw pass for ui-form run directly. Playwright wanted headless shell 1243: a
 junction to the installed 1234 in %LOCALAPPDATA%\ms-playwright.
+
+## State at 2026-10-21 (control.34; read this section first)
+
+### Two branches, both on `fork` (Confmc/fs-packages)
+
+- `experiment/ui-form-control`: where the work happens. All history, these notes, the packs. Tip carries
+  this handoff.
+- `feat/ui-form`: the PR branch, made 2026-10-20 off `main` (`e3588d4`). ONE commit (`b11246f`): the package
+  at control.34 with version `0.1.0`, `"private"` removed, CHANGELOG `## 0.1.0 — 2026-10-20`, plus the three
+  root files (`package.json` test:browser, `vitest.config.ts` PACKAGE_THRESHOLDS, the lockfile entry). It
+  leaves behind HANDOFF.md, HOME-HANDOFF.md, EXPERIMENT-REPORT.md, ADR-0043-AMENDMENT.draft.md and
+  DOCS-PAGE.draft.md. fs-form and ui-inputs are untouched. NO PR exists. Files to review:
+  https://github.com/script-development/fs-packages/compare/main...Confmc:fs-packages:feat/ui-form
+- Until the open items below are done, keep working on the experiment branch (packs need the
+  `control.N` counter). To refresh `feat/ui-form`: `git checkout experiment/ui-form-control --
+packages/ui-form`, `git rm --cached` the five notes above, version `0.1.0`, no `"private"`, then commit.
+
+### Not ready to merge: what is open
+
+1. Two shapes never run on a real emmie form (Marcel's go pending): `withdraw('list')` on a real list form
+   (the misattribution itself was confirmed on a probe), and one form whose 422 is indexed by the sent list
+   (rooms: a draft-less `useForm` with free names).
+2. Still to do on `feat/ui-form` before a PR: move DOCS-PAGE.draft.md to `docs/packages/ui-form.md` (drop its
+   header comment and the "not yet released" box) plus the three listings its header names; `validate:docs`
+   fails until then, now that `"private"` is gone. Add a ui-form row to CLAUDE.md's Packages table. Fix the
+   CHANGELOG date at merge.
+3. CI mutation gate: CI runs Stryker at 90% and ui-form is in it. The last full run (2026-10-19, 91.27%) was
+   before kit.ts, FormField and withdraw changed. Mutation is parked by Marcel, but run it once before a PR
+   or CI may go red.
+4. Publishing (not this work, but it bites): a new package cannot be published by CI. Hand-publish 0.1.0
+   and wire the Trusted Publisher first (CLAUDE.md, Adding a Package, step 7). If ui-form merges first, the
+   publish workflow raises an approval that 404s and turns the publish step red for every package.
+5. Never verified here: `format:check`, `validate:dist`, `lint:pkg` fail on the Windows home machine for
+   EVERY package (CRLF checkout artefacts; `spawnSync('npm')` without a shell). publint and attw (with
+   `--exclude-entrypoints style.css`) pass for ui-form run directly. CI will be their first real run.
+6. ADR-0043 amendment: a reviewed draft in ADR-0043-AMENDMENT.draft.md; not submitted.
+7. fs-form and ui-inputs: deprecate after ui-form's first publish, remove from the repo in a separate PR.
+   Not started; not part of the ui-form PR.
+8. The fork is public, and the experiment branch's commit messages and these notes name people and emmie.
+
+### Done since the 10-19 evening section (all tested on emmie, browser pass included)
+
+- A bound control's `name` follows what the control reads and writes (`PathsFor`): text/date/password
+  fields and a select without `clearLabel` bind never-empty paths. Type the draft as the honest model;
+  `FormDraft<T>` is the escape hatch.
+- `UseForm` / `UseDraftForm` include the bound controls (a child's `form` prop is `UseDraftForm<D>`). The
+  draft-less overload refuses `draft`; in a helper generic over its draft, `useForm<D>({draft})`.
+- `UseFormCall` exported (TS4023 on `export const {useForm} = createUiForm(...)`); typecheck runs a
+  declaration check on that re-export.
+- FormField `#hint` (between control and message, `${id}-hint`, in describedby after the message), a
+  `FormField` bound by name from `useForm`, `aria` in its slot for a native element (`aria-labelledby` to the
+  label's `${id}-label`; attributes that do not apply are left out). One type, `FieldBinding` with `error`.
+- `#aside` gets no wiring (the field's id is the control's); `#label-after` is spaced from the label text.
+- `withdraw(path)` also drops every message under the path (a list whose rows moved).
+- NumberInput: a `span.ui-input-wrap` root and the in-input error icon, like TextInput.
+- The hint is muted by default (`--ui-control-text-muted`). Load ui-form's stylesheet INSTEAD of
+  ui-inputs', never both: an unlayered ui-inputs rule beats ui-form's layered ones.
+- Specs: `useForm({draft: ref(...), idPrefix: 'test'})` builds a real form in plain test code.
+- Migration is per page tree (a page and every dialog it opens), not per form: fs-form's middleware fills
+  every mounted fs-form bag on any 422. README, docs page, CHANGELOG and the ADR draft say so.
+- Decided against: an optional-field note (`required` is the one signal; emmie drops its "optioneel"
+  notes), format/parse on bound fields, a RadioGroup option slot, `asDraft`, a package test fake, a
+  visual "selected" mark on SingleSelect, the icon on selects, props on bound selects for stubs.
+
+### The emmie side
+
+Branch `error-keys-raw` on emmie, ALL UNCOMMITTED: ContractFormDrawer, FinancingFormDrawer (in part),
+PersonRouteBudgetFields, the dialog host `createDraftFormModal` + WaitlistClientFormModal, specs (892 green on
+control.34), `@layer base, ui-form;` in app.scss, ui-form's stylesheet only. Packs live in
+`.experiment-packs/` on the HOME machine only (git-excluded): at work, rebuild the pack before emmie needs it.
+
+### Working rules (Marcel's; at home they sat in an uncommitted CLAUDE.local.md)
+
+- Decide package questions on the package's merits. Consumers pin their version; migration cost is a cost
+  to weigh, never a veto.
+- We own all of fs-packages here, fs-form, ui-inputs and ADR amendments included. Gerard's code on main is a
+  strong style hint, not a ruling.
+- Readable over clever, every time: the plainest code that does the job (plain `if`s, a predicate and two
+  filters), never complicated to match other code.
+- Get the API right first; no mutation runs until asked. Add only what the emmie test bed needs; template
+  exceptions get refactored away, not supported by a new feature.
+- Packs: bump `0.1.0-control.N` per pack (a fake pre-release; the published version is 0.1.0). Commit
+  locally; push to `fork` only when asked or before stopping for the day.
+- Say what is NOT done before acting on a request that implies it is (a PR, "ready"). Ask before outward
+  steps (push, PR); a draft PR is not a review vehicle when a compare link does the job.
+- Switching a branch is just `git switch`; never reinstall unasked (`npm ci` dies on locked language-server
+  binaries on Windows).
+- The emmie session leads nothing now: this side leads the package until the PR; emmie tests on request
+  (pack, what to check, what counts as a pass) and pushes back.
