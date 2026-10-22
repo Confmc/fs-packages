@@ -10,6 +10,10 @@
             />
         </svg>
         <input
+            @input="onInput"
+            @compositionstart="onCompositionstart"
+            @compositionend="onCompositionend"
+            @change="onChange"
             v-bind="controlAttrs($attrs)"
             ref="input"
             :id="controlId"
@@ -22,10 +26,6 @@
             :aria-required="required || undefined"
             :aria-invalid="marked || undefined"
             :aria-describedby="describedby"
-            @input="onInput"
-            @compositionstart="onCompositionstart"
-            @compositionend="onCompositionend"
-            @change="onChange"
         />
         <!-- mousedown is prevented so the click keeps focus on the input -->
         <button

@@ -3,6 +3,12 @@
         <!-- class/style style the whole control (this root); everything else lands on the <input>. -->
         <span class="ui-input-wrap">
             <input
+                @input="onInput"
+                @compositionstart="onCompositionstart"
+                @compositionend="onCompositionend"
+                @change="onChange"
+                @keydown="checkCapsLock"
+                @keyup="checkCapsLock"
                 v-bind="controlAttrs($attrs)"
                 ref="input"
                 :id="controlId"
@@ -16,12 +22,6 @@
                 :aria-required="required || undefined"
                 :aria-invalid="marked || undefined"
                 :aria-describedby="describedbyWithCaps"
-                @input="onInput"
-                @compositionstart="onCompositionstart"
-                @compositionend="onCompositionend"
-                @change="onChange"
-                @keydown="checkCapsLock"
-                @keyup="checkCapsLock"
             />
             <button
                 type="button"

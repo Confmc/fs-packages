@@ -34,6 +34,10 @@
                  committed label to snap to, so Combobox's commit-snaps-query→label and
                  closed-state label re-sync are deliberately NOT ported. -->
             <input
+                @input="onInput"
+                @click="onOpen"
+                @focus="onOpen"
+                @keydown="onInputKey"
                 v-bind="controlAttrs($attrs)"
                 :id="controlId"
                 ref="input"
@@ -51,10 +55,6 @@
                 :placeholder="model.length ? undefined : placeholder"
                 :disabled="disabled"
                 :value="query"
-                @input="onInput"
-                @click="onOpen"
-                @focus="onOpen"
-                @keydown="onInputKey"
             />
         </div>
 
