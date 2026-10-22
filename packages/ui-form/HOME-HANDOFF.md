@@ -2,7 +2,7 @@
 
 For a fresh session on a machine without the work machine's local state (no Claude memories, no
 `.experiment-packs/`, no emmie-2 peer session). Read this, then the last section of `HANDOFF.md`
-("State at 2026-10-21"). Like `HANDOFF.md`, this file stays behind when the package PR is made.
+("State at 2026-10-22"). Like `HANDOFF.md`, this file stays behind when the package PR is made.
 
 ## Get going
 
@@ -57,7 +57,7 @@ Sent to the emmie side on 2026-10-19: four corrections to `PLAN.md` (check they 
 
 ## Where the package is, and what is next
 
-See `HANDOFF.md` § "State at 2026-10-21": two branches (`experiment/ui-form-control` for work and packs,
+See `HANDOFF.md` § "State at 2026-10-22": two branches (`experiment/ui-form-control` for work and packs,
 `feat/ui-form` for the PR), the open list, and what was done since control.21.
 
 ## Gotchas

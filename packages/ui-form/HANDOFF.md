@@ -1,6 +1,6 @@
 # Handoff: ui-form experiment (fs-packages side)
 
-> At home or on another machine, start with `HOME-HANDOFF.md`. **Read the last section first** ("State at 2026-10-19"): it supersedes "Open" and "Next steps" below,
+> At home or on another machine, start with `HOME-HANDOFF.md`. **Read the last section first** ("State at 2026-10-22"): it supersedes "Open" and "Next steps" below,
 > which are from 2026-10-09. `EXPERIMENT-REPORT.md` is the 10-09 report and is not kept current.
 
 Written 2026-10-09, end of day, for a fresh session on another machine. Read this first, then
@@ -233,7 +233,7 @@ format:check, validate:dist and lint:pkg fail for every package (CRLF checkout a
 without a shell); publint and attw pass for ui-form run directly. Playwright wanted headless shell 1243: a
 junction to the installed 1234 in %LOCALAPPDATA%\ms-playwright.
 
-## State at 2026-10-21 (control.34; read this section first)
+## State at 2026-10-21 (control.34; superseded by the last section, its working rules still hold)
 
 ### Two branches, both on `fork` (Confmc/fs-packages)
 
@@ -329,3 +329,51 @@ control.34), `@layer base, ui-form;` in app.scss, ui-form's stylesheet only. Pac
   binaries on Windows).
 - The emmie session leads nothing now: this side leads the package until the PR; emmie tests on request
   (pack, what to check, what counts as a pass) and pushes back.
+
+## State at 2026-10-22 (control.36; read this section first)
+
+### Branches, both pushed to `fork`
+
+- `experiment/ui-form-control`: work, packs, these notes. Last pack `0.1.0-control.36`.
+- `feat/ui-form`: the PR branch, kept in step by copying each change over (one commit per point). It now
+  carries the docs page in `docs/packages/ui-form.md` with its three listings (`validate:docs` passes), the
+  ui-form row in CLAUDE.md's Packages table, and every package change below. NO PR exists. Review:
+  https://github.com/script-development/fs-packages/compare/main...Confmc:fs-packages:feat/ui-form
+
+### Done 2026-10-22 (each tested on emmie: rooms, care plan create/edit, contract drawer)
+
+- emmie's two open shapes pass: `withdraw('list')` where rows are removed or reordered (appending needs
+  nothing), and a form whose 422 is indexed by the sent list (draft-less form, one `keyMapper`).
+- A control's own listeners run before a consumer's (own `@…` before `v-bind` of `$attrs` in 13 controls), so a
+  consumer's `@input` reads the new value. Pinned by `tests/listener-order.spec.ts`.
+- `handleSubmit`: messages stand until the submit settles. Resolved: cleared (`'sent'`); 422: replaced
+  (`'refused'`); resolved `false`: nothing sent, messages stay (`'cancelled'`, new); other rejection: rethrown,
+  messages stay. The action type is `() => Promise<unknown>`; only a literal `false` cancels.
+- The bound `FormField` declares only `name` (the rest falls through). Kit specs build `createUiForm` per test:
+  a factory that throws at collection fails the file with no test run, which Stryker counts as survived.
+- Docs (README, docs page, CHANGELOG): lists, a form over loaded data (the page loads, renders the form
+  component `v-if` with the record; a shared create/edit form types its draft as the state both edit), testing
+  notes (un-stub bound controls, find by `form.field(name).id`, `form.take` for a child, assert on the draft),
+  an action that goes on after the save returns its answer on every path (`noImplicitReturns`), decide on the
+  outcome and not on whether messages show.
+- Decided against: `Ref<D | undefined>` drafts, a subtree form type, distinct names for the bound
+  frame/message, a test-friendly bound-control shape, `cancel()` or a `sent` callback on `handleSubmit`.
+- Checked: unit 868, browser 199, typecheck, lint, `format:check`, `lint:pkg`, `validate:dist`,
+  `validate:docs`. Full Stryker run 94.24%, then 95.05% (`kit.ts` 98.5%, `form.ts`/`form-submit.ts` 100%;
+  `useListbox.ts` 89.5%, carried over from ui-inputs). The one survivor left in `kit.ts` is false (a
+  module-level mutant the vitest runner cannot activate; applied by hand, 8 specs fail).
+- Two one-off local unit failures today, not reproduced in 10 reruns: the known load-only select flake.
+
+### Open before a PR
+
+1. CHANGELOG date at merge.
+2. A full CI run on `feat/ui-form` (only CI runs every gate together).
+
+Not part of the PR: publishing (hand-publish 0.1.0 and attach the Trusted Publisher before CI publishes), the
+ADR-0043 amendment (draft written, goes through the war room), retiring fs-form and ui-inputs (separate PR
+after the publish), and the public fork's experiment history naming people and emmie.
+
+### The emmie side
+
+`error-keys-raw`: local commits on top of 8a3e30f810 (rooms, care plan as one `CarePlanForm` with two loaders,
+the contract drawer toast deciding on the outcome, specs), not pushed. The test-bed list is closed on both sides.
