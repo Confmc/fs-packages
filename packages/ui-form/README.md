@@ -726,6 +726,13 @@ A form takes only its own action's 422, so a spec that checks a refusal makes th
 The frame's classes are stable and safe to select on: `.ui-field` (the frame, where a `data-test` on a bound
 `FormField` lands), `.ui-hint` and `.ui-error` (the message). An un-stubbed bound control's `data-test` lands on
 the control, whose `error` prop carries the message; on a stub it stays on the stub, which has no `error`.
+A stubbed bound control is inert: the value and its write-back live inside it, so a spec that types into a field
+or reads its message un-stubs it. Stubs match by component name, and the bound frame and message keep the old
+names, so while ui-inputs runs next to ui-form, `FormField: false` un-stubs both packages' frames.
+Find a field's elements by the form's own ids rather than rebuilding them: `#${form.field('goals.0.title').id}`,
+and its message at that id plus `-error`. A child that takes the form as a prop has no submit; its spec puts a 422
+in with `form.take(error)`. A control bound to the draft edits it in place and emits nothing to the spec, so
+assert on the draft, not on `emitted()`.
 
 Set an app's texts once with `createUiForm({texts})`: `placeholder`, `emptyText`, `optionsLabel`, `removeLabel`,
 `requiredLabel`, `clearButtonLabel`, `showPasswordLabel`, `hidePasswordLabel` and `capsLockText`. It hands out
@@ -746,7 +753,8 @@ requests' refusals; another form's request never lands in it. It resolves to `'s
 that reports a failed save catches it (`handleSubmit(save).catch(reportFailure)`). It runs `validate` first when given (a refusal skips the action), and on
 `'refused'` scrolls the first refused field into view. An action that catches its own 422 must rethrow it or pass
 it to `take(error)`, which binds a 422 caught anywhere (a lookup outside a submit) and says whether it was one.
-Messages stay until the next submit; `withdraw(name)` drops one sooner.
+Messages stay until the next submit; `withdraw(name)` drops one sooner. A submit clears them when it starts, so
+ask a confirmation ("overwrite?") before calling `handleSubmit`: a "no" then leaves the messages standing.
 
 A message is keyed by its path, index included (`goals.1.title`). When rows are added or removed before a refused
 one, its message would sit on another row, so the code that changes the list withdraws what was said about it:
