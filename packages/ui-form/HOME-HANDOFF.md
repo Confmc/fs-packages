@@ -2,7 +2,7 @@
 
 For a fresh session on a machine without the work machine's local state (no Claude memories, no
 `.experiment-packs/`, no emmie-2 peer session). Read this, then the last section of `HANDOFF.md`
-("State at 2026-10-19"). Like `HANDOFF.md`, this file stays behind when the package PR is made.
+("State at 2026-10-21"). Like `HANDOFF.md`, this file stays behind when the package PR is made.
 
 ## Get going
 
@@ -12,7 +12,7 @@ npm ci --ignore-scripts && npm run build
 ```
 
 - Packs (only when emmie needs a new one): bump `packages/ui-form/package.json` to the next
-  `0.1.0-control.N` (last: `control.21`), `npm install --ignore-scripts`, build, then
+  `0.1.0-control.N` (see `package.json`), `npm install --ignore-scripts`, build, then
   `cd packages/ui-form && npm pack --pack-destination ../../.experiment-packs`. Commit the bump, push to `fork`.
   `.experiment-packs/` is git-excluded; create it.
 - Browser tests and Playwright: never download Chromium. A launch error naming a missing
@@ -55,27 +55,10 @@ Sent to the emmie side on 2026-10-19: four corrections to `PLAN.md` (check they 
    doesn't declare it gets a stray attribute.
 4. Lead with `<TextField name>` in the wording; `field()` stays for compound fields.
 
-## Where the package is
+## Where the package is, and what is next
 
-At `control.21` (all pushed; later commits are docs only):
-
-- `useForm(options)` takes no http service; `handleSubmit(action, {validate})` → `'sent' | 'refused' |
-'ignored'`; `take(error)` for a 422 outside a submit; messages stay until the next submit.
-- It hands out the bound controls (`TextField` … `GroupComboboxField`, `TimeField`, `PasswordField`), typed
-  by `PathsOf` on `FormDraft<T>` drafts; `field()` stays public. `createUiForm({texts})` sets an app's texts.
-- New controls since the kit: `TimeInput`, `SearchInput`, `PasswordInput`, `InputGroup` (`prepend`/`append`).
-
-## Next, in order
-
-1. GroupSelect/GroupCombobox `alphabeticalSort` (the last parity item before the date picker).
-2. The date picker (emmie wires its own through `field()` meanwhile).
-3. Reject `prepend`/`append` in the types of the non-text bound fields (they are wrapped in `InputGroup` at
-   runtime today).
-4. Stryker over `src/form`, `src/composables`, `src/internal`: `kit.ts`, `draft.ts`, `path.ts` never ran.
-   Move `.stryker-incremental.json` aside for a full run.
-5. README for the new controls and the kit; fill the API sections of `DOCS-PAGE.draft.md`.
-6. The package PR from a fresh branch off `main` (`HANDOFF.md` § Release sequence, step 1). Publishing is not
-   part of this work.
+See `HANDOFF.md` § "State at 2026-10-21": two branches (`experiment/ui-form-control` for work and packs,
+`feat/ui-form` for the PR), the open list, and what was done since control.21.
 
 ## Gotchas
 

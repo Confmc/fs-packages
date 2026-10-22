@@ -249,9 +249,17 @@ junction to the installed 1234 in %LOCALAPPDATA%\ms-playwright.
   `control.N` counter). To refresh `feat/ui-form`: `git checkout experiment/ui-form-control --
 packages/ui-form`, `git rm --cached` the five notes above, version `0.1.0`, no `"private"`, then commit.
 
+### Checked at work, 2026-10-22
+
+Linux run of the experiment branch at control.34: unit 855, typecheck (incl. the declaration check),
+`format:check`, `lint:pkg`, `validate:dist` all pass. That closes item 5 below for the package's own files;
+`feat/ui-form` still gets its first full run in CI. The pack is rebuilt in `.experiment-packs/` here, and
+`~/script-development` links to `~/github/script-development`, so emmie's committed pack path resolves on both
+machines.
+
 ### Not ready to merge: what is open
 
-1. Two shapes never run on a real emmie form (Marcel's go pending): `withdraw('list')` on a real list form
+1. Two shapes never run on a real emmie form (running on the emmie side since 2026-10-22, at work): `withdraw('list')` on a real list form
    (the misattribution itself was confirmed on a probe), and one form whose 422 is indexed by the sent list
    (rooms: a draft-less `useForm` with free names).
 2. Still to do on `feat/ui-form` before a PR: move DOCS-PAGE.draft.md to `docs/packages/ui-form.md` (drop its
@@ -259,7 +267,7 @@ packages/ui-form`, `git rm --cached` the five notes above, version `0.1.0`, no `
    fails until then, now that `"private"` is gone. Add a ui-form row to CLAUDE.md's Packages table. Fix the
    CHANGELOG date at merge.
 3. CI mutation gate: CI runs Stryker at 90% and ui-form is in it. The last full run (2026-10-19, 91.27%) was
-   before kit.ts, FormField and withdraw changed. Mutation is parked by Marcel, but run it once before a PR
+   before kit.ts, FormField and withdraw changed. Mutation is parked, but run it once before a PR
    or CI may go red.
 4. Publishing (not this work, but it bites): a new package cannot be published by CI. Hand-publish 0.1.0
    and wire the Trusted Publisher first (CLAUDE.md, Adding a Package, step 7). If ui-form merges first, the
@@ -303,11 +311,11 @@ PersonRouteBudgetFields, the dialog host `createDraftFormModal` + WaitlistClient
 control.34), `@layer base, ui-form;` in app.scss, ui-form's stylesheet only. Packs live in
 `.experiment-packs/` on the HOME machine only (git-excluded): at work, rebuild the pack before emmie needs it.
 
-### Working rules (Marcel's; at home they sat in an uncommitted CLAUDE.local.md)
+### Working rules (at home they sat in an uncommitted CLAUDE.local.md)
 
 - Decide package questions on the package's merits. Consumers pin their version; migration cost is a cost
   to weigh, never a veto.
-- We own all of fs-packages here, fs-form, ui-inputs and ADR amendments included. Gerard's code on main is a
+- We own all of fs-packages here, fs-form, ui-inputs and ADR amendments included. The existing code on main is a
   strong style hint, not a ruling.
 - Readable over clever, every time: the plainest code that does the job (plain `if`s, a predicate and two
   filters), never complicated to match other code.
