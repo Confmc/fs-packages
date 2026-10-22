@@ -755,7 +755,10 @@ that reports a failed save catches it (`handleSubmit(save).catch(reportFailure)`
 it to `take(error)`, which binds a 422 caught anywhere (a lookup outside a submit) and says whether it was one.
 Messages stay until the next submit settles: a sent save clears them, a 422 replaces them, and a declined one
 leaves them, so a question inside the save needs nothing else (`if (!(await confirmOverwrite())) return false;`).
-`withdraw(name)` drops one sooner.
+An action that goes on after the save returns the save's answer, on every path (`noImplicitReturns` holds):
+`const id = await save(); if (id !== false) open(id); return id;`. Decide what to do next on the outcome, not on
+whether messages show: after a 422, a later failed request leaves that message standing. `withdraw(name)` drops
+one sooner.
 
 A message is keyed by its path, index included (`goals.1.title`). When rows are added or removed before a refused
 one, its message would sit on another row, so the code that changes the list withdraws what was said about it:

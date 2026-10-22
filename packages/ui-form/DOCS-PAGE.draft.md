@@ -184,7 +184,17 @@ const save = async () => {
     if (!(await confirmOverwrite())) return false; // 'cancelled': the messages stay
     await store.update(draft.value);
 };
+
+// going on after the save: return its answer on every path
+await handleSubmit(async () => {
+    const id = await createPlan(draft.value); // a new id, or false when the user declined
+    if (id !== false) await router.push(`/plans/${id}`);
+    return id;
+});
 ```
+
+Decide what to do next on the outcome, not on whether messages show: after a 422, a later failed request leaves
+that message standing.
 
 **A 422 outside a submit.** An action that catches its own 422 must rethrow it or pass it on, and so must a
 request outside a submit, such as a lookup:

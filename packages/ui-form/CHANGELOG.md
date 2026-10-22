@@ -77,6 +77,7 @@ ui-form runs next to fs-form and ui-inputs, so one page can move at a time, not 
 | a model with a sentinel for "none" (an id of `0`)                                                            | type that field nullable (`number \| null`); `FormDraft<T>` is the escape hatch while you cannot                                       |
 | a list whose rows are added or removed                                                                       | `withdraw('<list>')` in those handlers, so no message stays on a moved row                                                             |
 | a store or composable that catches a 422 itself                                                              | rethrow it, or pass it to `form.take(error)`                                                                                           |
+| code that reads the messages to decide what a submit did (a failure toast skipped while a message shows)     | decide on `handleSubmit`'s outcome: messages now stand until a submit settles, so an old one survives a later failure                  |
 | a spec that fires a 422 through fs-form's captured middleware                                                | make the save itself reject with the 422, and build the form with `useForm({draft: ref(…), idPrefix: 'test'})`                         |
 
 Token defaults that changed (set the old value in your theme to keep the old look):
