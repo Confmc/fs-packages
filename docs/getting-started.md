@@ -34,6 +34,7 @@ npm install @script-development/fs-cached-adapter-store
 npm install @script-development/fs-router
 
 # UI Components (Vue required)
+npm install @script-development/ui-form
 npm install @script-development/ui-inputs
 ```
 
