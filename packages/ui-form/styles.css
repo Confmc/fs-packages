@@ -35,6 +35,8 @@
     --ui-label-weight: 500;
     --ui-label-transform: none;
     --ui-label-tracking: normal;
+    /* the required mark; defaults to the danger colour it always had. */
+    --ui-label-required-color: var(--ui-danger-text);
 
     /* control (input + select trigger) */
     --ui-control-bg: #ffffff;
@@ -186,6 +188,9 @@
     --ui-danger-shadow: 0 0 0 3px rgba(220, 38, 38, 0.2);
     --ui-error-size: 0.8125rem;
     --ui-error-weight: 400;
+    /* a field's hint (FormField #hint): the message's size, in the muted control text like an addon. */
+    --ui-hint-text: var(--ui-control-text-muted);
+    --ui-hint-size: var(--ui-error-size);
 }
 
 @layer ui-form {
@@ -216,7 +221,8 @@
             grid-template-columns: var(--ui-field-label-width) minmax(0, 1fr);
             align-items: start;
         }
-        .ui-field.is-horizontal > .ui-label {
+        .ui-field.is-horizontal > .ui-label,
+        .ui-field.is-horizontal > .ui-field__head {
             grid-column: 1;
             grid-row: 1;
             align-self: var(--ui-field-label-align);
@@ -229,10 +235,23 @@
             grid-row: 1;
             min-width: 0;
         }
+        /* the hint and the message sit under the control; with a hint, the message one row lower */
+        .ui-field.is-horizontal > .ui-hint,
         .ui-field.is-horizontal > .ui-error {
             grid-column: 2;
             grid-row: 2;
         }
+        .ui-field.is-horizontal > .ui-hint ~ .ui-error {
+            grid-row: 3;
+        }
+    }
+
+    /* The label row a field gets when it has an aside: the label at the start, the aside at the far end. */
+    .ui-field__head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: var(--ui-field-gap);
     }
 
     .ui-label {
@@ -243,7 +262,7 @@
         letter-spacing: var(--ui-label-tracking);
     }
     .ui-label__req {
-        color: var(--ui-danger-text);
+        color: var(--ui-label-required-color);
         margin-left: 2px;
     }
 
@@ -823,6 +842,11 @@
     .ui-check-group .ui-check + .ui-check,
     .ui-radio-group .ui-check + .ui-check {
         margin-top: var(--ui-check-item-gap);
+    }
+
+    .ui-hint {
+        color: var(--ui-hint-text);
+        font-size: var(--ui-hint-size);
     }
 
     .ui-error {
