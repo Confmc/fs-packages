@@ -330,7 +330,7 @@ control.34), `@layer base, ui-form;` in app.scss, ui-form's stylesheet only. Pac
 - The emmie session leads nothing now: this side leads the package until the PR; emmie tests on request
   (pack, what to check, what counts as a pass) and pushes back.
 
-## State at 2026-10-22 (control.36; read this section first)
+## State at 2026-10-22 (control.36; superseded by the last section for how the package lands)
 
 ### Branches, both pushed to `fork`
 
@@ -386,3 +386,70 @@ after the publish), and the public fork's experiment history naming people and e
 
 `error-keys-raw`: local commits on top of 8a3e30f810 (rooms, care plan as one `CarePlanForm` with two loaders,
 the contract drawer toast deciding on the outcome, specs), not pushed. The test-bed list is closed on both sides.
+
+## State at 2026-10-22 evening: landing ui-form in small PRs (read this section first)
+
+### What changed
+
+The one-package PR (#323, still a draft, kept for its compare link until it goes stale) is too large to
+review. Two attempts were closed: #325 (a full verbatim copy) and #326 (the layer wrap stacked on it from
+the fork, which drags #325's diff along). The package now lands per component, each PR a verbatim copy
+commit from ui-inputs or fs-form followed by the change commits, so every change reads as a diff.
+
+### Open: #328, waiting on review
+
+https://github.com/script-development/fs-packages/pull/328, branch `ui-form/01-scaffold` (pushed to `fork`):
+the scaffold plus TextInput, four commits (copy, wiring, `@layer ui-form`, TextInput's changes), about 290
+lines to read. ui-form is `private` at 0.0.0, so nothing publishes and the docs gate skips it. Two
+questions are with the reviewer: is this size acceptable, and stacked PRs or not.
+
+**Stacking needs push rights upstream.** The account has `push: false` on script-development/fs-packages.
+A PR's base must be a branch in that repo, so from the fork every PR targets `main`, and a PR built on
+another unmerged one shows both diffs. Without push rights: one PR at a time, and independent components
+side by side, each opened once its base has merged. With push rights: push the branches upstream and
+point each PR at the branch it is built on.
+
+### Local branches, NOT pushed (only on the work machine)
+
+Each is built on its real dependency, which fits either answer above. Every gate passes on each
+(coverage 100%, browser suite green, Stryker 100% where `.ts` under `src/form`/`src/internal` changes).
+
+| Branch | Built on | Lines to read (excl. copy) |
+|---|---|---|
+| `ui-form/02-form-field` | 01 | ~600: FormField/FormLabel/FormError, the id helpers in `src/form/field.ts`, the browser suite (layer tests, axe harness with TextInput and field-frame cases) |
+| `ui-form/03-number-input` | 02 | +141/−22 |
+| `ui-form/03-date-input` | 02 | +31/−9 |
+| `ui-form/03-textarea` | 02 | +194/−12 (autogrow; puts Textarea's rows back in composition.spec) |
+
+The 03 branches change the same lines of `index.ts` and the shared spec tables: once one merges, merge
+main into the others (never rebase).
+
+### The plan from here (reviewed against the code)
+
+1. #328 scaffold + TextInput. 2. FormField family + browser suite (`02`).
+3. 3a side by side: NumberInput, DateInput, Textarea (done locally), InputGroup, Checkbox+Switch (brings
+   the internals accessible-name, dev-warning, reactivity, disabled-guard with their specs, renames
+   `[ui-inputs]` to `[ui-form]` in them, and forced-colors-paint.browser.spec). 3b after Checkbox+Switch:
+   CheckboxGroup+RadioGroup (CheckboxGroup imports Checkbox), Pressable, Disclosure.
+4. PasswordInput, SearchInput, TimeInput (need TextInput's chrome); the listbox core (useListbox,
+   OptionList, ListboxOption, group-rows) with a NEW direct `OptionList.spec` (nothing else covers
+   OptionList's grouped branch before GroupSelect), and without `listbox-open-owner.spec` (it asserts the
+   exact six-host list).
+5. The six selects, one PR each.
+6. Form, one at a time: validation errors, submit, useForm, typed paths and draft, `field()` with the
+   bound FormLabel/FormError, the kit last (it imports every control).
+7. The look (token values), then the release (docs page, CLAUDE.md row, README, `private` off).
+
+Sizes to watch: Pressable (~2,100 with its browser parts) and the Multi/Group selects (~2,000 each): put
+their browser specs in a follow-up PR. Reference for each component's changes: the old full-copy-based
+branches `split/03-text-input` … `split/15-input-group` (their spec-table hunks don't apply to the new
+base; take the rows, drop rows for components not yet on the branch, and take `field-slot` rows and axe
+cases from `review/ui-form-vs-sources`).
+
+### Next steps
+
+1. Read the reviewer's answer on #328 (size, stacking).
+2. If push rights: push 01/02/03 upstream and open stacked PRs. If not: wait for #328 to merge, then open
+   02, then the 03 branches side by side.
+3. Continue preparing locally: `03-input-group` (reference `de022a7`, plus its axe case), then
+   `03-checkbox-switch` (reference `f56c1eb`).
