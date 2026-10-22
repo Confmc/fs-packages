@@ -70,7 +70,7 @@ Higher-level packages for domain-driven application architecture.
 
 ### UI Components
 
-Headless, themeable Vue components (the `ui-*` family) — behaviour and accessibility in the package, all styling through a CSS custom-property contract you map your design tokens onto.
+Themeable Vue components (the `ui-*` family) — behaviour and accessibility in the package, all styling through a CSS custom-property contract you map your design tokens onto. ui-inputs is headless; ui-form ships a default look on that contract.
 
 | Package                          | Description                                                                                                                                                                                                                       |
 | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
