@@ -150,7 +150,6 @@ export const {useForm, SingleSelect, MultiSelect} = createUiForm({
 | `refuse`         | `(field, message) => void`                        | Refuse one field from the client                                                                          |
 | `setRefusals`    | `(bag) => boolean`                                | Replace every client refusal at once; `true` when it refused anything                                     |
 | `withdraw`       | `(...fields) => void`                             | Drop these fields' messages now, and every message under them (`withdraw('goals')` drops `goals.*`)       |
-| `clearClient`    | `() => void`                                      | Withdraw every client refusal                                                                             |
 | `clearErrors`    | `() => void`                                      | Empty the bag and reset the refusal                                                                       |
 | `refused`        | `Readonly<Ref<boolean>>`                          | A 422 was taken since the last clear                                                                      |
 | `refusedUnnamed` | `Readonly<Ref<boolean>>`                          | The last 422 named no field this form holds                                                               |
@@ -209,8 +208,8 @@ try {
 
 **Refusals from the client.** `validate` is the usual place for a check before sending: its bag becomes the
 client refusals. Outside a submit, `refuse(field, message)` refuses one field, `setRefusals(bag)` replaces them all
-(so a field fixed since the last check is no longer refused), `withdraw(...fields)` drops a field's messages, and
-`clearClient()` drops every client refusal. Where a field has both, the client's message shows.
+(so a field fixed since the last check is no longer refused; `setRefusals({})` drops them all), and
+`withdraw(...fields)` drops a field's messages. Where a field has both, the client's message shows.
 
 **Lists.** A message is keyed by its path, index included (`goals.1.title`). When a row is removed or the list is
 reordered, a refused row's message would sit on another row, so the code that changes the list withdraws what was

@@ -740,7 +740,7 @@ Set an app's texts once with `createUiForm({texts})`: `placeholder`, `emptyText`
 at the call site still wins.
 
 `useForm(options)` needs no HTTP service. It returns the error bag, `handleSubmit` with its double-submit guard,
-`submitting`, the refusal signal, client refusals (`refuse`, `setRefusals`, `withdraw`, `clearClient`) and the
+`submitting`, the refusal signal, client refusals (`refuse`, `setRefusals`, `withdraw`) and the
 field wiring (`field`, `FormLabel`, `FormError`). A child component that renders fields takes the form as a prop,
 typed `UseDraftForm<D>` (or `UseForm` without a draft): both are everything `useForm` returns, the bound controls
 included. A host that builds the form for its child (a dialog host, say) passes it the same way and keeps
