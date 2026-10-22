@@ -20,7 +20,7 @@ export interface UseValidationErrors<T extends string = string> {
      * `catch (error) { if (!form.take(error)) throw error; }`.
      */
     take: (error: unknown) => boolean;
-    /** `true` once a 422 has been taken, until `clearErrors` (which `handleSubmit` calls first). */
+    /** `true` once a 422 has been taken, until `clearErrors` (which a `'sent'` submit calls). */
     refused: Readonly<Ref<boolean>>;
     /**
      * The mapped keys of the last accepted 422 that `errors` does not hold: not named by
@@ -54,18 +54,20 @@ export interface UseValidationErrorsOptions<T extends string = string> {
 
 /**
  * How a `handleSubmit` call ended: the action ran to the end (`'sent'`), the server refused it with a
- * 422 (`'refused'`), or it never ran because a submit was already in flight (`'ignored'`).
+ * 422 (`'refused'`), the action resolved `false` because it sent nothing, such as a save the user
+ * declined (`'cancelled'`), or it never ran because a submit was already in flight (`'ignored'`).
  */
-export type SubmitOutcome = 'sent' | 'refused' | 'ignored';
+export type SubmitOutcome = 'sent' | 'refused' | 'cancelled' | 'ignored';
 
 /** Form-submit helper returned by `useFormSubmit`. */
 export interface UseFormSubmit {
     /**
      * Run a submit action with double-submit prevention. A 422 (validation) rejection is
      * taken into the form's bag and swallowed, so the form is preserved; any other rejection
-     * is re-thrown to the caller / error boundary.
+     * is re-thrown to the caller / error boundary. An action that resolves `false` sent
+     * nothing: the messages stay. The previous messages stand until the action settles.
      */
-    handleSubmit: (action: () => Promise<void>) => Promise<SubmitOutcome>;
+    handleSubmit: (action: () => Promise<unknown>) => Promise<SubmitOutcome>;
     /** `true` while a submit action is in flight — the form's loading state. */
     submitting: Ref<boolean>;
 }
@@ -102,7 +104,7 @@ type FormCore<T extends string = string> = UseValidationErrors<T> &
          * refused field scrolls into view, unless `scrollToError` is off.
          */
         handleSubmit: (
-            action: () => Promise<void>,
+            action: () => Promise<unknown>,
             options?: {validate?: () => ValidationErrors<T>},
         ) => Promise<SubmitOutcome>;
     };

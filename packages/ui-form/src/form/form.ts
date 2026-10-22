@@ -131,7 +131,7 @@ const useFormBody = <T extends string = string>(
     };
 
     const handleSubmit = async (
-        action: () => Promise<void>,
+        action: () => Promise<unknown>,
         {validate}: {validate?: () => ValidationErrors<T>} = {},
     ): Promise<SubmitOutcome> => {
         if (submit.submitting.value) return 'ignored';
