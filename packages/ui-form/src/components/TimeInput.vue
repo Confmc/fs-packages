@@ -18,12 +18,12 @@
             :id="controlId"
             type="time"
             class="ui-control ui-input ui-time has-lead"
-            :class="{'is-invalid': marked, 'has-button': showClear}"
+            :class="{'is-invalid': isInvalid, 'has-button': showClear}"
             :value="model ?? ''"
             :step="step === undefined ? undefined : step * 60"
             :disabled="disabled"
             :aria-required="required || undefined"
-            :aria-invalid="marked || undefined"
+            :aria-invalid="isInvalid || undefined"
             :aria-describedby="describedby"
         />
         <!-- mousedown is prevented so the click keeps focus on the input -->
@@ -40,7 +40,7 @@
                 <path stroke="currentColor" stroke-width="1.75" stroke-linecap="round" d="M4.5 4.5l7 7m0-7l-7 7" />
             </svg>
         </button>
-        <ErrorIcon v-if="marked" />
+        <ErrorIcon v-if="isInvalid" />
     </span>
 </template>
 
@@ -87,7 +87,7 @@ const {
 defineOptions({inheritAttrs: false});
 
 // The mark: `invalid` when given, otherwise whether there is a message.
-const marked = computed(() => invalid ?? Boolean(error));
+const isInvalid = computed(() => invalid ?? Boolean(error));
 
 const ownId = useId();
 const controlId = computed(() => id ?? ownId);

@@ -139,8 +139,6 @@ export interface UseFormClient<T extends string = string> {
      * when picking a value answers what the message said. Nothing calls it for you.
      */
     withdraw: (...fields: T[]) => void;
-    /** Withdraw every client refusal, e.g. when an editor opens or closes. */
-    clearClient: () => void;
 }
 
 /** What `field(name)` adds when the form has a draft: the value at that path, and the write back into it. */

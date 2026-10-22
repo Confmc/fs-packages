@@ -2,7 +2,7 @@
     <div ref="root" v-bind="rootAttrs($attrs)" class="ui-multiselect">
         <div
             class="ui-control ui-multiselect__box"
-            :class="{'is-open': open, 'has-value': model.length > 0, 'is-invalid': marked, 'is-disabled': disabled}"
+            :class="{'is-open': open, 'has-value': model.length > 0, 'is-invalid': isInvalid, 'is-disabled': disabled}"
         >
             <!-- Chips are OUTSIDE the trigger button (a button may not nest a button), inside
                  the flex box that carries the control chrome. Removing must not open the menu:
@@ -41,7 +41,7 @@
                 aria-haspopup="listbox"
                 :aria-expanded="open"
                 :aria-required="required || undefined"
-                :aria-invalid="marked || undefined"
+                :aria-invalid="isInvalid || undefined"
                 :aria-describedby="describedby"
                 :aria-controls="open ? listboxId : undefined"
                 :aria-activedescendant="activeDescendant"
@@ -172,7 +172,7 @@ const {
 }>();
 
 // The mark: `invalid` when given, otherwise whether there is a message.
-const marked = computed(() => invalid ?? Boolean(error));
+const isInvalid = computed(() => invalid ?? Boolean(error));
 
 const ownId = useId();
 const controlId = computed(() => id ?? ownId);

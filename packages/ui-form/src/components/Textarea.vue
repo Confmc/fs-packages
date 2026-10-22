@@ -3,13 +3,13 @@
         ref="textarea"
         :id="controlId"
         class="ui-control ui-textarea"
-        :class="{'is-invalid': marked, 'is-autogrow': autogrow}"
+        :class="{'is-invalid': isInvalid, 'is-autogrow': autogrow}"
         :value="shown"
         :placeholder="placeholder"
         :disabled="disabled"
         :rows="rows"
         :aria-required="required || undefined"
-        :aria-invalid="marked || undefined"
+        :aria-invalid="isInvalid || undefined"
         :aria-describedby="describedby"
         @input="onInput"
         @compositionstart="onCompositionstart"
@@ -53,7 +53,7 @@ const {
 }>();
 
 // The mark: `invalid` when given, otherwise whether there is a message.
-const marked = computed(() => invalid ?? Boolean(error));
+const isInvalid = computed(() => invalid ?? Boolean(error));
 
 const ownId = useId();
 const controlId = computed(() => id ?? ownId);

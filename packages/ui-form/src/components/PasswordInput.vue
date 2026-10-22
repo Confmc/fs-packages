@@ -14,13 +14,13 @@
                 :id="controlId"
                 :type="shown ? 'text' : 'password'"
                 class="ui-control ui-input has-button"
-                :class="{'is-invalid': marked}"
+                :class="{'is-invalid': isInvalid}"
                 :value="text"
                 :placeholder="placeholder"
                 :disabled="disabled"
                 :autocomplete="autocomplete"
                 :aria-required="required || undefined"
-                :aria-invalid="marked || undefined"
+                :aria-invalid="isInvalid || undefined"
                 :aria-describedby="describedbyWithCaps"
             />
             <button
@@ -48,7 +48,7 @@
                     />
                 </svg>
             </button>
-            <ErrorIcon v-if="marked" />
+            <ErrorIcon v-if="isInvalid" />
         </span>
         <span v-if="capsLock" :id="capsId" class="ui-password__caps" role="status">{{ capsLockText }}</span>
     </span>
@@ -103,7 +103,7 @@ const {
 defineOptions({inheritAttrs: false});
 
 // The mark: `invalid` when given, otherwise whether there is a message.
-const marked = computed(() => invalid ?? Boolean(error));
+const isInvalid = computed(() => invalid ?? Boolean(error));
 
 const ownId = useId();
 const controlId = computed(() => id ?? ownId);
