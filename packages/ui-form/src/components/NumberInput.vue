@@ -8,7 +8,7 @@
             :id="controlId"
             type="number"
             class="ui-control ui-input ui-number"
-            :class="{'is-invalid': marked}"
+            :class="{'is-invalid': isInvalid}"
             :value="model"
             :placeholder="placeholder"
             :disabled="disabled"
@@ -16,10 +16,10 @@
             :max="max"
             :step="step"
             :aria-required="required || undefined"
-            :aria-invalid="marked || undefined"
+            :aria-invalid="isInvalid || undefined"
             :aria-describedby="describedby"
         />
-        <ErrorIcon v-if="marked" />
+        <ErrorIcon v-if="isInvalid" />
     </span>
 </template>
 
@@ -60,7 +60,7 @@ const {
 }>();
 
 // The mark: `invalid` when given, otherwise whether there is a message.
-const marked = computed(() => invalid ?? Boolean(error));
+const isInvalid = computed(() => invalid ?? Boolean(error));
 
 const input = useTemplateRef<HTMLInputElement>('input');
 onMounted(() => {

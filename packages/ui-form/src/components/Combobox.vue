@@ -8,13 +8,13 @@
             ref="input"
             type="text"
             class="ui-control ui-combobox__input"
-            :class="{'is-open': open, 'is-invalid': marked}"
+            :class="{'is-open': open, 'is-invalid': isInvalid}"
             role="combobox"
             aria-autocomplete="list"
             aria-haspopup="listbox"
             :aria-expanded="open"
             :aria-required="required || undefined"
-            :aria-invalid="marked || undefined"
+            :aria-invalid="isInvalid || undefined"
             :aria-describedby="describedby"
             :aria-controls="open ? listboxId : undefined"
             :aria-activedescendant="activeDescendant"
@@ -141,7 +141,7 @@ const {
 }>();
 
 // The mark: `invalid` when given, otherwise whether there is a message.
-const marked = computed(() => invalid ?? Boolean(error));
+const isInvalid = computed(() => invalid ?? Boolean(error));
 
 const ownId = useId();
 const controlId = computed(() => id ?? ownId);

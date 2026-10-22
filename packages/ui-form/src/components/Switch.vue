@@ -13,11 +13,11 @@
                 type="checkbox"
                 role="switch"
                 class="ui-switch__input"
-                :class="{'is-invalid': marked}"
+                :class="{'is-invalid': isInvalid}"
                 :checked="model"
                 :disabled="disabled"
                 :aria-required="required || undefined"
-                :aria-invalid="marked || undefined"
+                :aria-invalid="isInvalid || undefined"
                 :aria-describedby="describedby"
             />
             <span class="ui-switch__thumb" aria-hidden="true"></span>
@@ -75,7 +75,7 @@ const {
 }>();
 
 // The mark: `invalid` when given, otherwise whether there is a message.
-const marked = computed(() => invalid ?? Boolean(error));
+const isInvalid = computed(() => invalid ?? Boolean(error));
 
 const ownId = useId();
 const controlId = computed(() => id ?? ownId);

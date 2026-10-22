@@ -12,7 +12,7 @@
         ref="group"
         v-guard-while-disabled="disabled"
         class="ui-check-group"
-        :aria-invalid="marked || undefined"
+        :aria-invalid="isInvalid || undefined"
         :aria-describedby="describedby"
     >
         <legend class="ui-label ui-check-group__legend">
@@ -26,7 +26,7 @@
             :key="String(option.id)"
             :label="labelOf(option)"
             :disabled="disabled"
-            :invalid="marked"
+            :invalid="isInvalid"
             :model-value="model.includes(option.id)"
             @update:model-value="toggle(option.id)"
         />
@@ -86,7 +86,7 @@ const {
 }>();
 
 // The mark: `invalid` when given, otherwise whether there is a message.
-const marked = computed(() => invalid ?? Boolean(error));
+const isInvalid = computed(() => invalid ?? Boolean(error));
 
 /** The committed membership: an array of option ids, kept in OPTIONS order. */
 const ownId = useId();
