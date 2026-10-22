@@ -172,7 +172,8 @@ composes them itself.
 It takes the 422 **its own action** rejected with, so a form holds exactly its own requests' refusals; another
 form's request never lands in it, and the form needs no HTTP service. Any other rejection is thrown on. On
 `'refused'` the first refused field scrolls into view unless `scrollToError` is off. Messages stay until the next
-submit.
+submit, which clears them when it starts: ask a confirmation ("overwrite?") before calling `handleSubmit`, so a
+"no" leaves them standing.
 
 ```typescript
 const outcome = await handleSubmit(() => save(draft.value), {validate: () => checkDates(draft.value)});
@@ -270,7 +271,13 @@ lists every changed default with its old value, so a theme can keep the old look
 - A form takes only its own action's 422, so a spec that checks a refusal makes the save itself reject with one.
 - A shallow mount stubs the bound controls, `FormField`, `FormLabel`, `FormError` and `InputGroup`: un-stub what
   the spec reads. A stub shows the props it declares through `props()`; what it passes on, such as a select's
-  `options`, is on `vm.$attrs`.
+  `options`, is on `vm.$attrs`. A stubbed bound control is inert (the value and its write-back live inside it), so
+  a spec that types into a field or reads its message un-stubs it. Stubs match by name, so while ui-inputs runs
+  next to ui-form, `FormField: false` un-stubs both packages' frames.
+- Find a field by the form's own ids, `#${form.field('goals.0.title').id}` (its message: that id plus `-error`),
+  rather than rebuilding them.
+- A child that takes the form as a prop has no submit: put a 422 in with `form.take(error)`.
+- A control bound to the draft edits it in place and emits nothing: assert on the draft, not on `emitted()`.
 - `.ui-field`, `.ui-hint` and `.ui-error` are stable to select on.
 
 See the [README's testing notes](https://github.com/script-development/fs-packages/blob/main/packages/ui-form/README.md#forms-and-their-errors) for more.
