@@ -117,10 +117,6 @@ const useFormBody = <T extends string = string>(
         };
     };
 
-    const clearClient = (): void => {
-        client.value = {};
-    };
-
     const refused = async (): Promise<SubmitOutcome> => {
         if (scrollToError) {
             await nextTick();
@@ -156,7 +152,6 @@ const useFormBody = <T extends string = string>(
         refuse,
         setRefusals,
         withdraw,
-        clearClient,
     };
 };
 

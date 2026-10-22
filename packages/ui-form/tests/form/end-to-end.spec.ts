@@ -266,7 +266,7 @@ describe('client refusals share the bag', () => {
         expect(form.clientErrors.value).toEqual({kvkNumber: 'Ongeldig KvK-nummer'});
         expect(wrapper.findAll('.ui-error')).toHaveLength(1);
 
-        form.clearClient();
+        form.setRefusals({});
         await nextTick();
 
         expect(wrapper.findAll('.ui-error')).toHaveLength(0);
