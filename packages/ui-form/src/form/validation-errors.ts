@@ -1,12 +1,10 @@
-import type {HttpService} from '@script-development/fs-http';
 import type {Ref} from 'vue';
 
-import {guarded} from '@script-development/fs-http';
-import {computed, onUnmounted, readonly, ref} from 'vue';
+import {readonly, ref} from 'vue';
 
 import type {UseValidationErrors, UseValidationErrorsOptions, ValidationErrors} from './types';
 
-const HTTP_UNPROCESSABLE_ENTITY = 422;
+import {isValidationRefusal} from './http-contract';
 
 const toFieldErrorMap = (data: unknown): Record<string, unknown> => {
     const errors = (data as {errors?: unknown} | null | undefined)?.errors;
@@ -24,78 +22,70 @@ const firstMessage = (messages: unknown): string | undefined =>
 const identity = (key: string): string => key;
 
 /**
- * Register a 422-only response-error middleware on `httpService` that binds
- * backend validation errors into a reactive field-error bag, keyed to the first
- * message per field. Automatically unregisters on component unmount, so call it
- * in a page or component `setup()` — never in a module-level store, where the
- * middleware is never unregistered and outlives every screen.
+ * A reactive field-error bag that takes a 422 from the error the caller caught: `take(error)` binds the
+ * backend's validation errors, keyed to the first message per field, and returns whether it was one.
+ * Nothing is registered on a service, so a form holds exactly the refusals of the requests it handed
+ * to `take` — `useFormSubmit` hands it its own submit's error.
  *
- * Every accepted 422 raises `refused`, before the body is parsed, so a refusal
- * the bag cannot hold still reads as one (`refusedUnnamed`). A key is left out
- * of `errors` and listed in `unmapped` when `fields` does not name it or when
- * its value is not a list whose first entry is a string.
+ * Every taken 422 raises `refused`, before the body is parsed, so a refusal the bag cannot hold still
+ * reads as one (`refusedUnnamed`). A key is left out of `errors` and listed in `unmapped` when `fields`
+ * does not name it or when its value is not a list whose first entry is a string.
  *
- * The middleware body is wrapped with fs-http's `guarded()` so a throwing
- * `keyMapper` (or any parse hiccup) cannot reject a resolved request nor mask
- * the real API error — fs-form is a well-behaved fs-http consumer per the
- * Middleware Sync Contract (Architectural Principle #8). A throw leaves
- * `refused` true and `errors` / `unmapped` as they were.
- *
- * @param httpService the fs-http service whose error responses to observe.
- * @param options     `keyMapper` remaps raw backend field keys (default identity);
- *                    `fields` allow-lists the bag by mapped name (default every key);
- *                    `acceptWhen` gates which 422s are taken at all (default every one).
+ * @param options `keyMapper` remaps raw backend field keys (default identity);
+ *                `fields` allow-lists the bag by mapped name (default every key).
  */
 export const useValidationErrors = <T extends string = string>(
-    httpService: HttpService,
     options: UseValidationErrorsOptions<T> = {},
 ): UseValidationErrors<T> => {
-    const {keyMapper = identity, fields, acceptWhen} = options;
+    const {keyMapper = identity, fields} = options;
     const allowed = fields === undefined ? undefined : new Set<string>(fields);
     const errors = ref<ValidationErrors<T>>({}) as Ref<ValidationErrors<T>>;
     const refused = ref(false);
     const unmapped = ref<readonly string[]>([]);
+    // Decided when the 422 is taken, not read off the bag: a message the form later drops (the user
+    // fixing that field) must not turn a refusal that named fields into one that named none.
+    const unnamed = ref(false);
 
     const clearErrors = (): void => {
         errors.value = {};
         refused.value = false;
         unmapped.value = [];
+        unnamed.value = false;
     };
 
-    const unregister = httpService.registerResponseErrorMiddleware(
-        guarded((error) => {
-            const response = error.response;
-            if (response?.status !== HTTP_UNPROCESSABLE_ENTITY) return;
-            if (acceptWhen && !acceptWhen()) return;
+    const take = (error: unknown): boolean => {
+        if (!isValidationRefusal(error)) return false;
 
-            refused.value = true;
+        refused.value = true;
+        unnamed.value = true;
 
-            const kept: [string, string][] = [];
-            const dropped: string[] = [];
+        const kept: [string, string][] = [];
+        const dropped: string[] = [];
 
-            for (const [key, messages] of Object.entries(toFieldErrorMap(response.data))) {
-                const field = keyMapper(key);
-                const message = firstMessage(messages);
+        for (const [key, messages] of Object.entries(toFieldErrorMap(error.response.data))) {
+            const field = keyMapper(key);
+            const message = firstMessage(messages);
 
-                if (message === undefined || (allowed && !allowed.has(field))) dropped.push(field);
-                else kept.push([field, message]);
-            }
+            if (message === undefined || (allowed && !allowed.has(field))) dropped.push(field);
+            else kept.push([field, message]);
+        }
 
-            // fromEntries defines own properties; an assignment would hit the `__proto__` setter.
-            const bag = Object.fromEntries(kept);
+        // fromEntries defines own properties; an assignment would hit the `__proto__` setter.
+        const bag = Object.fromEntries(kept);
 
-            errors.value = bag as ValidationErrors<T>;
-            unmapped.value = [...new Set(dropped)].filter((field) => !Object.hasOwn(bag, field));
-        }),
-    );
+        errors.value = bag as ValidationErrors<T>;
+        unmapped.value = [...new Set(dropped)].filter((field) => !Object.hasOwn(bag, field));
+        unnamed.value = kept.length === 0;
 
-    onUnmounted(unregister);
+        return true;
+    };
 
     return {
         errors,
         clearErrors,
+        take,
         refused: readonly(refused),
         unmapped: readonly(unmapped),
-        refusedUnnamed: computed(() => refused.value && Object.keys(errors.value).length === 0),
+        refusedUnnamed: readonly(unnamed),
     };
 };

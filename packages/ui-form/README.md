@@ -1,32 +1,44 @@
-# @script-development/ui-inputs
+# @script-development/ui-form
 
-Headless, themeable Vue 3 UI components — **form inputs** plus the **interactive controls that carry no value**
-(`Pressable`, `Disclosure`) — styled entirely through `--ui-*` CSS custom properties.
+Themeable Vue 3 form components with a default look, and the form state behind them — **form inputs**, **`useForm`**
+(422 validation errors, client refusals, double-submit guard) plus the **interactive controls that carry no
+value** (`Pressable`, `Disclosure`) — styled entirely through `--ui-*` CSS custom properties.
 
-Part of the Armory `ui-*` family. The components ship **no token vocabulary and no colour literal** — you map your design tokens onto the `--ui-*` contract once, and every component follows. Soft or brutalist, light or dark, from one component set.
+Part of the Armory `ui-*` family. Every rule reads a `--ui-*` custom property and the package ships a default value for each — you map your design tokens onto the `--ui-*` contract once, and every component follows. Soft or brutalist, light or dark, from one component set. The component rules sit in the `ui-form` cascade layer, so your own CSS (utility classes included) always overrides them.
 
 ## Install
 
 ```sh
-npm install @script-development/ui-inputs
+npm install @script-development/ui-form
 ```
 
-Peer dependency: `vue@^3.5`. Import the stylesheet once (e.g. in your entry):
+Peer dependency: `vue@^3.5.43`. Import the stylesheet once (e.g. in your entry):
 
 ```ts
-import '@script-development/ui-inputs/style.css';
+import '@script-development/ui-form/style.css';
 ```
+
+It replaces ui-inputs' stylesheet; never load both. ui-form's sheet also styles ui-inputs' markup, while an
+unlayered ui-inputs rule next to it would beat ui-form's layered ones.
+
+If your app has an element base (`input { font-size: inherit }`, `p { margin-bottom: 1rem }`), put it in a layer declared before
+the package's, at the top of your first stylesheet, or it beats the package's rules: `@layer base, ui-form;` then
+`@layer base { … }`.
 
 ## Components
 
 | Component                 | Purpose                                                                                                                                                                             |
 | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `FormField`               | Label + error + required-marker composition wrapper (error-as-prop)                                                                                                                 |
-| `FormLabel` / `FormError` | The atoms `FormField` composes                                                                                                                                                      |
+| `FormLabel` / `FormError` | Bound to a form by `useForm`: the label and the message of one field, by its name (`FormField` uses the unbound ones internally)                                                    |
 | `TextInput`               | Native `text` / `email` / `password` / `search` / `tel` / `url` input                                                                                                               |
 | `NumberInput`             | Native `number` input; owns the `NaN`→`null` empty-value guard                                                                                                                      |
 | `DateInput`               | Native `date` input                                                                                                                                                                 |
-| `Textarea`                | Native `textarea` with `rows`                                                                                                                                                       |
+| `TimeInput`               | Native `time` input modelling `HH:MM` or `null`, with a clock glyph, a clear button and a minute `step`                                                                             |
+| `SearchInput`             | `type="search"` input with a magnifier and a clear button                                                                                                                           |
+| `PasswordInput`           | Password input with a show/hide toggle (`aria-pressed`) and a Caps Lock notice read with the field                                                                                  |
+| `InputGroup`              | Addon texts joined to a control (`prepend="€"`, `append="days"`), named in the control's `aria-describedby`                                                                         |
+| `Textarea`                | Native `textarea` with `rows`; `autogrow` follows the text up to `maxRows` lines                                                                                                    |
 | `Checkbox`                | Native checkbox, visually restyled; non-nullable `boolean` model, `indeterminate` as a visual prop                                                                                  |
 | `CheckboxGroup`           | Fieldset/legend group of checkboxes — models an array of option ids in **options order**                                                                                            |
 | `Switch`                  | The checkbox chassis with `role="switch"` — an on/off toggle with a themeable track + thumb                                                                                         |
@@ -41,10 +53,24 @@ import '@script-development/ui-inputs/style.css';
 | `Disclosure`              | Show/hide a region from a real `<button>` carrying `aria-expanded` + `aria-controls`; optionally wrapped in a real heading — the replacement for `<h2 @click>`                      |
 
 ```vue
-<FormField id="fruit" label="Fruit" :error="errors.fruit" #default="{controlId, describedby, invalid}">
-    <SingleSelect :id="controlId" v-model="fruit" :options="fruits" label="name" :invalid="invalid" :describedby="describedby" />
-</FormField>
+<script setup lang="ts">
+import {SingleSelect, useForm} from '@script-development/ui-form';
+
+const {field, FormLabel, FormError, handleSubmit} = useForm();
+</script>
+
+<template>
+    <FormLabel name="fruit" label="Fruit" required />
+    <SingleSelect v-bind="field('fruit')" v-model="fruit" :options="fruits" option-label="name" required />
+    <FormError name="fruit" />
+</template>
 ```
+
+`field(name)` is a field's whole wiring, `{id, invalid, describedby, error}`, whose keys are the control's own
+props, so one `v-bind` links the control to the form's `FormLabel` and `FormError` of the same name. Every control
+takes `error`: it marks the control unless `invalid` says otherwise (`:invalid="false"` shows a message without the
+mark). `required` is not in `field`; pass it to the control and the label yourself. Examples below bind `field(name)` from a `useForm` the same way. To draw the label and the message around a
+control instead, wrap it in `FormField` (next section).
 
 ### Horizontal field layout
 
@@ -58,16 +84,96 @@ renders vertical** — the label column has no room on a phone, so the sheet col
 shape at that fixed breakpoint (a custom property cannot drive a media query, so it is not a `--ui-*` var):
 
 ```vue
-<FormField
-    id="fruit"
-    label="Fruit"
-    orientation="horizontal"
-    :error="errors.fruit"
-    #default="{controlId, describedby, invalid}"
->
-    <SingleSelect :id="controlId" v-model="fruit" :options="fruits" label="name" :invalid="invalid" :describedby="describedby" />
+<FormField label="Fruit" :error="errors.fruit" orientation="horizontal" v-slot="{field}">
+    <SingleSelect v-bind="field" v-model="fruit" :options="fruits" option-label="name" />
 </FormField>
 ```
+
+`FormField` hands its slot `field` (`{id, invalid, describedby, error}`), so one `v-bind` wires the control it wraps.
+
+### More in the label row
+
+Two slots extend the label without replacing it. `#label-after` renders inside the `<label>`, after its text and
+required mark, for a tooltip. `#aside` renders at the far end of the label's row (a
+`.ui-field__head` flex row; in the horizontal layout it takes the label column), for a control that belongs to
+the field, such as a switch; it takes no wiring, since the field's id belongs to the control the label names, so give a switch there its own id. Without an aside the label stays
+a direct child of `.ui-field`. The bound controls hand both slots to their field. The required mark's colour is
+`--ui-label-required-color` (default `var(--ui-danger-text)`).
+
+```vue
+<TextField name="email" label="E-mail">
+    <template #label-after><HelpTip text="Where we send the invoice" /></template>
+    <template #aside><Switch id="notify" v-model="notify" aria-label="Send updates" /></template>
+</TextField>
+```
+
+**A hint under the control.** `#hint` renders what the field expects between the control and the message, as
+`.ui-hint` with the id `${id}-hint`, and the slot's `describedby` names it after the message, so a screen reader
+reads it with the field. In the horizontal layout the hint and the message sit under the control. The bound
+controls forward it. Styled by `--ui-hint-text` and `--ui-hint-size`.
+
+**Matching your own field design.** The frame reads `--ui-label-size`, `--ui-label-weight`, `--ui-label-color`,
+`--ui-label-required-color` and `--ui-field-gap` (the space between label, control, hint and message). Set them
+once on a container to give its fields another look, a drawer's compact labels for instance:
+
+```css
+.drawer-fields {
+    --ui-label-size: 0.8125rem;
+    --ui-label-weight: 600;
+    --ui-field-gap: 0.375rem;
+}
+```
+
+### The text-like controls' extras
+
+**`autofocus`** on `TextInput`, `NumberInput`, `TimeInput`, `SearchInput` and `PasswordInput` focuses the input
+when it mounts. It runs in script, not as the native attribute, because the native one acts only on page load:
+a control in a dialog that opens later would never get focus.
+
+**`Textarea` `autogrow`** grows the box with its text instead of scrolling, from `rows` upward, on mount and on
+every change. `maxRows` stops the growth at that many lines; from there it scrolls.
+
+**`InputGroup`** joins addon texts to a control — a currency before an amount, a unit after a count. Each addon
+gets an id from the control's (`${id}-prepend`, `${id}-append`); add those to the control's `describedby` so a
+screen reader reads them with the field. The form-bound `TextField`, `NumberField`, `DateField` and `TimeField`
+take `prepend` / `append` and do that wiring themselves; the other bound fields refuse them in their types.
+
+```vue
+<InputGroup id="price" prepend="€">
+    <NumberInput id="price" v-model="price" describedby="price-prepend" />
+</InputGroup>
+```
+
+Inside a form's `FormField`, where the field already names its message and hint, add the addon ids after them:
+
+```vue
+<FormField name="budgetCents" label="Budget" v-slot="{field}">
+    <InputGroup :id="field.id" prepend="€">
+        <NumberInput
+            v-bind="field"
+            :describedby="[field.describedby, `${field.id}-prepend`].filter(Boolean).join(' ')"
+            :model-value="euros"
+            @update:model-value="setEuros"
+        />
+    </InputGroup>
+</FormField>
+```
+
+**`TimeInput`** models `HH:MM` or `null`, like `NumberInput` an honest empty value: clearing it emits `null`,
+because `''` is no time. `step` is in minutes (`15` for quarter hours) and sets both the picker and the arrow
+keys. A click on the input opens the browser's picker. The clear button shows while there is a time; set
+`clearable` to `false` for a time that must always be set.
+
+**`SearchInput`** is a `type="search"` box with a magnifier and a clear button (`clearable`, on by default);
+clearing emits `''`, like the other string inputs.
+
+**`PasswordInput`** has a show/hide toggle, a real button carrying `aria-pressed`, and a Caps Lock notice that
+appears while Caps Lock is on and is read with the field. `autocomplete` is `'current-password'` by default;
+pass `'new-password'` on a form that sets one.
+
+The clear buttons' and the toggle's accessible names and the Caps Lock text are props (`clearButtonLabel`,
+`showPasswordLabel`, `hidePasswordLabel`, `capsLockText`), so an app sets its language once through
+`createUiForm({texts})` (see [Forms and their errors](#forms-and-their-errors)).
 
 ### The select family's shared extras
 
@@ -85,7 +191,7 @@ typed against your option type `T`. Highlight and selection chrome (`.is-active`
 re-creates them:
 
 ```vue
-<SingleSelect id="label" v-model="labelId" :options="labels" label="name">
+<SingleSelect id="label" v-model="labelId" :options="labels" option-label="name">
     <template #option="{option}">
         <span class="swatch" :style="{background: option.color}" /> {{ option.name }}
     </template>
@@ -147,7 +253,7 @@ input. The entry is danger-toned by default (`--ui-clear-text`, chains to
     id="sprint"
     v-model="sprintId"
     :options="sprints"
-    label="name"
+    option-label="name"
     clear-label="No sprint"
     empty-display-value="No sprint (backlog)"
 />
@@ -155,7 +261,7 @@ input. The entry is danger-toned by default (`--ui-clear-text`, chains to
 
 ### Combobox
 
-`Combobox` shares `SingleSelect`'s generic contract (`:options`, `label`, `v-model`, `alphabeticalSort`,
+`Combobox` shares `SingleSelect`'s generic contract (`:options`, `optionLabel`, `v-model`, `alphabeticalSort`,
 `optionsLabel`, `emptyText`, `invalid`, `describedby`, `required`) but the trigger is a text `<input>`.
 As the user types, the listbox filters to options whose label contains the query
 (`labelOf(o).toLowerCase().includes(query)`), then the same optional alphabetical sort applies; an empty
@@ -169,9 +275,7 @@ full list, and the committed label sits fully selected so the first keystroke re
 a fresh filter. The filter engages only once the query diverges from the committed rendering.
 
 ```vue
-<FormField id="city" label="City" :error="errors.city" #default="{controlId, describedby, invalid}">
-    <Combobox ref="cityBox" :id="controlId" v-model="city" :options="cities" label="name" :invalid="invalid" :describedby="describedby" />
-</FormField>
+<Combobox ref="cityBox" v-bind="field('city')" v-model="city" :options="cities" option-label="name" />
 ```
 
 **Imperative focus handle.** `Combobox` exposes `focus()` via `defineExpose`, so a parent can move DOM
@@ -180,7 +284,7 @@ integration needs.
 
 ### MultiSelect
 
-`MultiSelect` shares the family's generic contract (`:options`, `label`, `alphabeticalSort`,
+`MultiSelect` shares the family's generic contract (`:options`, `optionLabel`, `alphabeticalSort`,
 `optionsLabel`, `emptyText`, `invalid`, `describedby`, `required`) but models **an array of option
 ids** (`v-model="tagIds"`). Committing an option — Enter or click — **toggles its membership and the
 listbox stays open**, so picking several values is one open/close cycle, not five. The committed
@@ -190,9 +294,7 @@ territories can localise it, like `optionsLabel`), and **Backspace on the focuse
 last committed value**. There is no text input and no filtering — that stays `Combobox`'s job.
 
 ```vue
-<FormField id="tags" label="Tags" :error="errors.tags" #default="{controlId, describedby, invalid}">
-    <MultiSelect :id="controlId" v-model="tagIds" :options="tags" label="name" :invalid="invalid" :describedby="describedby" />
-</FormField>
+<MultiSelect v-bind="field('tags')" v-model="tagIds" :options="tags" option-label="name" />
 ```
 
 The listbox is marked `aria-multiselectable="true"`; `aria-selected` marks committed **membership**
@@ -223,9 +325,7 @@ the query, the committed selection is additionally conveyed to assistive tech th
 `aria-describedby` summary (the input-as-trigger analogue of MultiSelect's hidden value span).
 
 ```vue
-<FormField id="tags" label="Tags" :error="errors.tags" #default="{controlId, describedby, invalid}">
-    <MultiCombobox :id="controlId" v-model="tagIds" :options="tags" label="name" :invalid="invalid" :describedby="describedby" />
-</FormField>
+<MultiCombobox v-bind="field('tags')" v-model="tagIds" :options="tags" option-label="name" />
 ```
 
 Like `Combobox` it exposes an imperative `focus()` handle. `clearLabel` / `emptyDisplayValue`
@@ -246,9 +346,9 @@ groups: {options: T[]; text: string; header?: boolean}[];
 ```
 
 Each group carries its own `options`, a header `text`, and an optional `header` flag. Groups
-render in **caller order** — there is no `alphabeticalSort`, because the partition _is_ the
-order — and the flat option index runs through them in sequence, so a single `v-model` selects
-across the whole set.
+render in **caller order** — the partition _is_ the order — and the flat option index runs
+through them in sequence, so a single `v-model` selects across the whole set. `alphabeticalSort`
+sorts the options **within** each group; it never reorders the groups.
 
 - A **named** group renders `text` as a `role="group"` header labelling its options for
   assistive tech.
@@ -259,19 +359,15 @@ across the whole set.
   also covers a group the filter drains to nothing: a header never outlives its options.
 
 ```vue
-<FormField id="fruit" label="Fruit" :error="errors.fruit" #default="{controlId, describedby, invalid}">
-    <GroupSelect
-        :id="controlId"
-        v-model="fruit"
-        :groups="[
-            {text: 'Tropical', options: tropical},
-            {text: 'Stone', options: stone},
-        ]"
-        label="name"
-        :invalid="invalid"
-        :describedby="describedby"
-    />
-</FormField>
+<GroupSelect
+    v-bind="field('fruit')"
+    v-model="fruit"
+    :groups="[
+        {text: 'Tropical', options: tropical},
+        {text: 'Stone', options: stone},
+    ]"
+    option-label="name"
+/>
 ```
 
 ### Checkbox family
@@ -539,7 +635,7 @@ option — the anchor grows with it, so the popup stays on-screen.
 
 ## Nullable values
 
-Every text-like input (`TextInput`, `DateInput`, `Textarea`) models `string | null`, and `NumberInput` models `number | null`. A `null` from a nullable backend column binds directly — the control renders empty, no `?? ''` at the call site. When the user clears the field, the string inputs emit `''` (the raw native value); a Laravel backend's `ConvertEmptyStringsToNull` middleware maps that back to `null` on submit. `NumberInput` is the one exception: an empty number input emits `null` (not `NaN`, not `''`), since a `number` model can never hold `''` honestly — so it round-trips to `null` without relying on the middleware.
+Every text-like input (`TextInput`, `DateInput`, `Textarea`, `SearchInput`, `PasswordInput`, `TimeInput`) models `string | null`, and `NumberInput` models `number | null`. A `null` from a nullable backend column binds directly — the control renders empty, no `?? ''` at the call site. When the user clears the field, the string inputs emit `''` (the raw native value); a Laravel backend's `ConvertEmptyStringsToNull` middleware maps that back to `null` on submit. `NumberInput` is the one exception: an empty number input emits `null` (not `NaN`, not `''`), since a `number` model can never hold `''` honestly — so it round-trips to `null` without relying on the middleware. `TimeInput` does the same for the same reason: `''` is no time.
 
 **IME input.** `TextInput` and `Textarea` follow Vue's own `v-model` on a text field: while an input method (Japanese, Chinese, Korean, …) is composing, the candidate `input` events emit nothing, and the composed value is emitted once on `compositionend`. Swapping a native `v-model` for one of these controls does not hand you every candidate.
 
@@ -556,6 +652,153 @@ mouse. Keyboard/hover focus is visual (`.is-active`) plus `aria-activedescendant
 moves on Enter or click. Because the IDREF is position-derived, a non-unique or
 whitespace-containing `option.id` never breaks the `aria-activedescendant` linkage.
 
-## Errors are a prop, never a service
+## Forms and their errors
 
-The components never import an error service. Resolve the message in your app and pass `error` (to `FormField`) or `invalid` + `describedby` (to the inputs). That keeps the package agnostic to how your territory produces validation errors.
+```vue
+<script setup lang="ts">
+import {useForm} from '@script-development/ui-form';
+
+const draft = ref<Contract>(initial);
+const {TextField, NumberField, SingleSelectField, handleSubmit} = useForm({draft});
+</script>
+
+<template>
+    <TextField name="name" label="Name" required />
+    <NumberField name="contractNumber" label="Number" />
+    <SingleSelectField name="debtorId" label="Debtor" :options="debtors" option-label="name" />
+</template>
+```
+
+`useForm` hands out a bound version of the value controls: `TextField`, `TextareaField`, `NumberField`,
+`DateField`, `TimeField`, `PasswordField`, `CheckboxField`, `SwitchField`, `RadioGroupField`, `CheckboxGroupField`,
+`SingleSelectField`, `ComboboxField`, `MultiSelectField`, `MultiComboboxField`, `GroupSelectField` and
+`GroupComboboxField`. Each draws the label, the control and the message, wired by the field's name; on a draft
+form the name must be a path the control fits, checked by vue-tsc (see [Typing the draft](#typing-the-draft)). `class` and `style` land on the
+field frame; every other prop and attribute passes through to the control and wins over the wiring (an
+attributify utility such as `w-full` is an attribute, so it lands on the control). `TextField`, `NumberField`, `DateField` and `TimeField` also take
+`prepend` / `append` (an `InputGroup` around the control). `RadioGroupField` and `CheckboxGroupField` require
+`label`, their legend. Each has a stable component name, so a spec finds it with
+`findAllComponents({name: 'TextField'})`.
+
+For a control the kit has no bound version of (your own editor, a control that edits a derived value, a field
+that swaps its control for a link), `useForm` also hands out a `FormField` bound by name. It draws the label,
+hint and message with the form's ids, so a refused submit still scrolls to it, and its slot gets the field's
+wiring without the value, `field(name)` minus `modelValue`, so the control keeps its own `v-model`:
+
+```vue
+<FormField name="municipalityId" label="Municipality" v-slot="{field: wiring}">
+    <Combobox v-bind="wiring" v-model="municipality" :options="municipalities" option-label="name" />
+</FormField>
+```
+
+The slot prop `field` shadows `useForm`'s `field()` inside the slot, so a template that also calls `field('x')`
+renames it, as above.
+
+For a value the draft holds, bind it yourself (`v-model="draft.startDate"`) or use `v-bind="field(name)"`,
+which carries the value too. Its `onUpdate:modelValue` takes exactly the path's type, so your control's model
+must match it: a control that writes `string | null` does not fit a `startDate: string` path; give it a handler
+that writes only strings, or type the path `| null`.
+
+`field` suits this package's controls, whose props have those names. A native element of your own, such as a
+`<div role="group">` of chips, takes the slot's `aria` instead: `v-bind="aria"` gives it the id,
+`aria-labelledby` (a `<label for>` names only a form control, so the label gets the id `${id}-label`),
+`aria-invalid` while there is a message, and `aria-describedby`:
+
+```vue
+<FormField name="lawIds" label="Laws" v-slot="{aria}">
+    <div role="group" v-bind="aria"><LawChip v-for="law in laws" :key="law.id" :law /></div>
+</FormField>
+```
+
+A field without a label whose name comes from elsewhere (a step title) adds its own `aria-labelledby` next to
+`v-bind="aria"`; `aria` leaves out every attribute that does not apply, so yours holds in either order.
+
+A hint that is not always there is a conditional slot, `<template v-if="hint" #hint>{{ hint }}</template>`: left
+out, the field renders no hint and names none.
+
+**Testing.** A shallow mount stubs the bound controls, `FormField` and `FormError`, so a field's message does not
+render in such a spec. Un-stub what the spec reads: `stubs: {TextField: false, FormField: false, FormError: false}`.
+`#label-after` content renders inside the label, so a spec that reads it un-stubs `FormLabel` too, and one that
+reads addon texts un-stubs `InputGroup`. A stubbed bound control shows the props it declares (`name`, `label`,
+`required`, …) through `props()`; what it passes on to its control, such as a select's `options`, is on
+`vm.$attrs`.
+A form takes only its own action's 422, so a spec that checks a refusal makes the save itself reject with one.
+The frame's classes are stable and safe to select on: `.ui-field` (the frame, where a `data-test` on a bound
+`FormField` lands), `.ui-hint` and `.ui-error` (the message). An un-stubbed bound control's `data-test` lands on
+the control, whose `error` prop carries the message; on a stub it stays on the stub, which has no `error`.
+A stubbed bound control is inert: the value and its write-back live inside it, so a spec that types into a field
+or reads its message un-stubs it. Stubs match by component name, and the bound frame and message keep the old
+names, so while ui-inputs runs next to ui-form, `FormField: false` un-stubs both packages' frames.
+Find a field's elements by the form's own ids rather than rebuilding them: `#${form.field('goals.0.title').id}`,
+and its message at that id plus `-error`. A child that takes the form as a prop has no submit; its spec puts a 422
+in with `form.take(error)`. A control bound to the draft edits it in place and emits nothing to the spec, so
+assert on the draft, not on `emitted()`.
+
+Set an app's texts once with `createUiForm({texts})`: `placeholder`, `emptyText`, `optionsLabel`, `removeLabel`,
+`requiredLabel`, `clearButtonLabel`, `showPasswordLabel`, `hidePasswordLabel` and `capsLockText`. It hands out
+`useForm`, whose bound controls carry them, and the bare controls that take texts, with them as defaults; a prop
+at the call site still wins.
+
+`useForm(options)` needs no HTTP service. It returns the error bag, `handleSubmit` with its double-submit guard,
+`submitting`, the refusal signal, client refusals (`refuse`, `setRefusals`, `withdraw`, `clearClient`) and the
+field wiring (`field`, `FormLabel`, `FormError`). A child component that renders fields takes the form as a prop,
+typed `UseDraftForm<D>` (or `UseForm` without a draft): both are everything `useForm` returns, the bound controls
+included. A host that builds the form for its child (a dialog host, say) passes it the same way and keeps
+`handleSubmit` for the save. In a helper generic over its draft, name the type, `useForm<D>({draft})`: a generic
+`shallowRef(model)` hides its `Ref<D>` from TypeScript, and the call would not see the draft's paths.
+
+`handleSubmit(action, {validate})` takes the 422 its own action rejected with, so a form holds exactly its own
+requests' refusals; another form's request never lands in it. It resolves to `'sent'`, `'refused'`,
+`'cancelled'` (the action resolved `false`: it sent nothing) or `'ignored'` (a call while one is in flight); any other rejection propagates out of `handleSubmit`, so a caller
+that reports a failed save catches it (`handleSubmit(save).catch(reportFailure)`). It runs `validate` first when given (a refusal skips the action), and on
+`'refused'` scrolls the first refused field into view. An action that catches its own 422 must rethrow it or pass
+it to `take(error)`, which binds a 422 caught anywhere (a lookup outside a submit) and says whether it was one.
+Messages stay until the next submit settles: a sent save clears them, a 422 replaces them, and a declined one
+leaves them, so a question inside the save needs nothing else (`if (!(await confirmOverwrite())) return false;`).
+An action that goes on after the save returns the save's answer, on every path (`noImplicitReturns` holds):
+`const id = await save(); if (id !== false) open(id); return id;`. Decide what to do next on the outcome, not on
+whether messages show: after a 422, a later failed request leaves that message standing. `withdraw(name)` drops
+one sooner.
+
+A message is keyed by its path, index included (`goals.1.title`). When rows are added or removed before a refused
+one, its message would sit on another row, so the code that changes the list withdraws what was said about it:
+`withdraw('goals')` drops `goals` and every `goals.*` message. Withdraw where rows are removed or reordered;
+appending needs nothing, since the rows before it keep their index. The bound controls write the draft by index,
+so sort the draft's list itself, not a copy of it.
+
+**A form over loaded data.** The draft exists when `useForm` runs; there is no form over data still loading. The
+page loads the record, then renders the form component with `v-if`, passing the record as a prop; the form
+component builds its draft from it and calls `useForm` in its `setup()`. When create and edit share that
+component, type its draft as the state both edit (the record without what the server sets, such as its id); a
+loaded record is assignable to it, so neither page needs a cast.
+
+**In a spec**, give the form a fixed `idPrefix` and build it in plain test code, no host component needed:
+`const form = useForm({draft: ref<Contract>({...}), idPrefix: 'test'})`, then pass it as the `form` prop. Without `idPrefix`, `useForm`
+takes its ids from Vue's `useId()`, which only works inside a component's `setup()`.
+
+With `useForm({draft})` (the component's own `Ref`), every name is a path into the draft
+(`learningGoals.0.title`), checked by vue-tsc, and `field(name)` also carries the value at that path and writes
+changes back, so a control needs no `v-model`. A 422's field keys bind as the server sent them; pass `keyMapper`
+to map them.
+
+### Typing the draft
+
+Type the draft as your model, honestly: a field a control can empty is `| null`, a field that is never empty is
+not. A bound control takes a path when it can read the value there and the value's type holds everything the
+control writes:
+
+| Bound control                                                                  | Writes                                        | Binds a never-empty path  |
+| ------------------------------------------------------------------------------ | --------------------------------------------- | ------------------------- |
+| `TextField`, `TextareaField`, `DateField`, `PasswordField`                     | a string (`''` when cleared)                  | yes (`string`)            |
+| `RadioGroupField`                                                              | an option's id                                | yes                       |
+| `SingleSelectField`, `ComboboxField`, `GroupSelectField`, `GroupComboboxField` | an option's id; `null` only from `clearLabel` | yes, without `clearLabel` |
+| `NumberField`, `TimeField`                                                     | `null` when emptied                           | no: the path is `\| null` |
+| `CheckboxField`, `SwitchField`, the multi-selects, `CheckboxGroupField`        | a boolean or a list                           | (never null)              |
+
+`FormDraft<T>` is an escape hatch for a model you cannot make honest yet (an id with `0` for "none"): it makes
+every value a control can clear nullable, booleans, lists and nested objects keeping their shape. It widens
+fields that are never empty too, so code that reads the draft as the model needs null checks it would not
+otherwise.
+
+The components never import an error service, and nothing is provided or injected. Without a form, pass `error`
+to `FormField` and bind its `field` the same way.

@@ -21,13 +21,20 @@ import Disclosure from '../../src/components/Disclosure.vue';
 import FormField from '../../src/components/FormField.vue';
 import GroupCombobox from '../../src/components/GroupCombobox.vue';
 import GroupSelect from '../../src/components/GroupSelect.vue';
+import InputGroup from '../../src/components/InputGroup.vue';
 import MultiCombobox from '../../src/components/MultiCombobox.vue';
 import MultiSelect from '../../src/components/MultiSelect.vue';
+import NumberInput from '../../src/components/NumberInput.vue';
+import PasswordInput from '../../src/components/PasswordInput.vue';
 import Pressable from '../../src/components/Pressable.vue';
 import RadioGroup from '../../src/components/RadioGroup.vue';
+import SearchInput from '../../src/components/SearchInput.vue';
 import SingleSelect from '../../src/components/SingleSelect.vue';
 import Switch from '../../src/components/Switch.vue';
+import Textarea from '../../src/components/Textarea.vue';
 import TextInput from '../../src/components/TextInput.vue';
+import TimeInput from '../../src/components/TimeInput.vue';
+import {useForm} from '../../src/form/form';
 import '../../styles.css';
 
 interface Fruit {
@@ -52,12 +59,11 @@ const FRUIT_GROUPS: {options: Fruit[]; text: string}[] = [
     {text: 'Stone', options: [{id: 3, name: 'Apricot'}]},
 ];
 
+// What FormField's slot hands the control (`field`), plus the `required` the consumer passes
+// itself (it is not in `field`: a control that does not declare it would take it as an attribute).
 interface FieldSlot {
-    controlId: string;
-    errorId: string;
+    field: {id: string; invalid: boolean; describedby: string | undefined};
     required: boolean;
-    invalid: boolean;
-    describedby?: string;
 }
 
 /** Compose a control inside FormField — the documented consuming shape (label + error wiring). */
@@ -71,7 +77,14 @@ const renderInField = async (make: (slot: FieldSlot) => VNode, fieldProps: Recor
                 h('main', [
                     h('h1', 'Test form'),
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFC in a render-fn host
-                    h(FormField as any, {label: 'Fruit', id: 'fruit', ...fieldProps}, {default: make}),
+                    h(
+                        FormField as any,
+                        {label: 'Fruit', id: 'fruit', ...fieldProps},
+                        {
+                            default: ({field}: Pick<FieldSlot, 'field'>) =>
+                                make({field, required: Boolean(fieldProps.required)}),
+                        },
+                    ),
                 ]),
         ),
     );
@@ -91,21 +104,17 @@ const noop = () => undefined;
 // Shared select-control prop bag (id/aria wiring threaded from the field slot).
 const selectProps = (slot: FieldSlot) => ({
     options: FRUITS,
-    label: 'name',
-    id: slot.controlId,
+    optionLabel: 'name',
+    ...slot.field,
     required: slot.required,
-    invalid: slot.invalid,
-    describedby: slot.describedby,
 });
 
 // Shared grouped-select prop bag.
 const groupSelectProps = (slot: FieldSlot) => ({
     groups: FRUIT_GROUPS,
-    label: 'name',
-    id: slot.controlId,
+    optionLabel: 'name',
+    ...slot.field,
     required: slot.required,
-    invalid: slot.invalid,
-    describedby: slot.describedby,
 });
 
 describe('axe-core audits — zero violations, closed and open', () => {
@@ -113,12 +122,10 @@ describe('axe-core audits — zero violations, closed and open', () => {
         const screen = await renderInField((slot) =>
             // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFC in a render-fn host
             h(TextInput as any, {
-                id: slot.controlId,
+                ...slot.field,
                 modelValue: '',
                 'onUpdate:modelValue': noop,
                 required: slot.required,
-                invalid: slot.invalid,
-                describedby: slot.describedby,
                 placeholder: 'Type a fruit',
             }),
         );
@@ -130,14 +137,62 @@ describe('axe-core audits — zero violations, closed and open', () => {
             (slot) =>
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFC in a render-fn host
                 h(TextInput as any, {
-                    id: slot.controlId,
+                    ...slot.field,
                     modelValue: '',
                     'onUpdate:modelValue': noop,
                     required: slot.required,
-                    invalid: slot.invalid,
-                    describedby: slot.describedby,
                 }),
             {required: true, error: 'Fruit is required'},
+        );
+        await expectNoViolations(screen.container);
+    });
+
+    it('FormField + TimeInput with a time: clock glyph and clear button', async () => {
+        const screen = await renderInField((slot) =>
+            h(TimeInput, {...slot.field, modelValue: '09:30', 'onUpdate:modelValue': noop, required: slot.required}),
+        );
+        await expectNoViolations(screen.container);
+    });
+
+    it('FormField + TimeInput with an error: the error icon beside the clear button', async () => {
+        const screen = await renderInField(
+            (slot) =>
+                h(TimeInput, {
+                    ...slot.field,
+                    modelValue: '09:30',
+                    'onUpdate:modelValue': noop,
+                    required: slot.required,
+                }),
+            {required: true, error: 'Vul een tijd in'},
+        );
+        await expectNoViolations(screen.container);
+    });
+
+    it('a labelled SearchInput with text: magnifier and clear button', async () => {
+        const screen = await renderInField((slot) =>
+            h(SearchInput, {...slot.field, modelValue: 'appel', 'onUpdate:modelValue': noop}),
+        );
+        await expectNoViolations(screen.container);
+    });
+
+    it('FormField + InputGroup around a NumberInput, the addons named in its describedby', async () => {
+        const screen = await renderInField((slot) =>
+            h(InputGroup, {id: slot.field.id, prepend: '€', append: 'per uur'}, () =>
+                h(NumberInput, {
+                    ...slot.field,
+                    describedby: `${slot.field.id}-prepend ${slot.field.id}-append`,
+                    modelValue: 12,
+                    'onUpdate:modelValue': noop,
+                }),
+            ),
+        );
+        await expectNoViolations(screen.container);
+    });
+
+    it('FormField + PasswordInput with an error: toggle button and error icon', async () => {
+        const screen = await renderInField(
+            (slot) => h(PasswordInput, {...slot.field, modelValue: 'geheim', 'onUpdate:modelValue': noop}),
+            {error: 'Onjuist wachtwoord'},
         );
         await expectNoViolations(screen.container);
     });
@@ -331,13 +386,11 @@ describe('axe-core audits — checkbox family, zero violations', () => {
             (slot) =>
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFC in a render-fn host
                 h(Checkbox as any, {
-                    id: slot.controlId,
+                    ...slot.field,
                     label: 'Accept the terms',
                     modelValue: false,
                     'onUpdate:modelValue': noop,
                     required: slot.required,
-                    invalid: slot.invalid,
-                    describedby: slot.describedby,
                 }),
             // The checkbox brings its own inline label — FormField contributes error wiring only.
             {label: undefined, required: true, error: 'You must accept the terms'},
@@ -373,15 +426,13 @@ describe('axe-core audits — checkbox family, zero violations', () => {
             (slot) =>
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFC in a render-fn host
                 h(CheckboxGroup as any, {
-                    id: slot.controlId,
+                    ...slot.field,
                     options: FRUITS,
                     optionLabel: 'name',
                     label: 'Fruits',
                     modelValue: [2],
                     'onUpdate:modelValue': noop,
                     required: slot.required,
-                    invalid: slot.invalid,
-                    describedby: slot.describedby,
                 }),
             // The group self-labels via its legend — FormField contributes error wiring only.
             // This composition also proves the aria-required-free fieldset passes
@@ -519,5 +570,146 @@ describe('axe-core audits — interactive non-form controls, zero violations', (
         // The IDREF resolves in the collapsed state, in a real document. This assertion — not the
         // green axe run above — is what goes red if the panel ever becomes a v-if (teeth-proven).
         expect(document.getElementById(trigger.getAttribute('aria-controls') as string)).not.toBeNull();
+    });
+});
+
+describe('axe-core audits — fields linked by field(name), zero violations', () => {
+    it("bare controls and a FormField both resolve label, mark and message from the form's field()", async () => {
+        let form!: ReturnType<typeof useForm>;
+        const screen = await render(
+            defineComponent({
+                setup: () => {
+                    form = useForm();
+
+                    return () => {
+                        const title = form.field('learningGoals.0.title');
+                        const remarks = form.field('remarks');
+
+                        return h('main', [
+                            h('h1', 'Test form'),
+                            // bare layer: the template places label and message itself
+                            h(form.FormLabel, {name: 'learningGoals.0.title', label: 'Title', required: true}),
+                            h(TextInput, {...title, required: true, modelValue: ''}),
+                            h(form.FormError, {name: 'learningGoals.0.title'}),
+                            // field-control layer: FormField draws label and message
+                            h(
+                                FormField,
+                                {id: remarks.id, error: remarks.error, label: 'Remarks'},
+                                {default: ({field}: {field: object}) => h(Textarea, {...field, modelValue: ''})},
+                            ),
+                            h(CheckboxGroup, {
+                                ...form.field('goals'),
+                                options: FRUITS,
+                                optionLabel: 'name',
+                                label: 'Goals',
+                                modelValue: [],
+                            }),
+                            h(form.FormError, {name: 'goals'}),
+                        ]);
+                    };
+                },
+            }),
+        );
+        await expectNoViolations(screen.container);
+
+        form.setRefusals({'learningGoals.0.title': 'Vul een titel in', remarks: 'Te lang', goals: 'Kies een doel'});
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+
+        for (const control of screen.container.querySelectorAll('input[type="text"], textarea, fieldset')) {
+            expect(control.getAttribute('aria-invalid')).toBe('true');
+            expect(document.getElementById(control.getAttribute('aria-describedby') as string)?.textContent).toMatch(
+                /\S/,
+            );
+        }
+        await expectNoViolations(screen.container);
+    });
+});
+
+describe('axe-core audits — the field frame: hint, label row and native groups', () => {
+    it('a field with a hint, a label-after tooltip and an aside switch, while it shows a message', async () => {
+        const notify = ref(false);
+        const screen = await render(
+            defineComponent(
+                () => () =>
+                    h('main', [
+                        h('h1', 'Test form'),
+                        h(
+                            FormField,
+                            {label: 'Budget', id: 'budget', error: 'Fill in a budget', required: true},
+                            {
+                                default: ({field}: {field: object}) =>
+                                    h(NumberInput, {...field, required: true, modelValue: null}),
+                                'label-after': () => h('span', {title: 'Per year'}, '?'),
+                                aside: () =>
+                                    h(Switch, {
+                                        id: 'budget-hours',
+                                        label: 'In hours',
+                                        modelValue: notify.value,
+                                        'onUpdate:modelValue': (next: boolean) => (notify.value = next),
+                                    }),
+                                hint: () => 'The amount awarded for the whole period',
+                            },
+                        ),
+                    ]),
+            ),
+        );
+        await expectNoViolations(screen.container);
+    });
+
+    it('a native group wired by the slot aria is named by the label and described by message and hint', async () => {
+        const screen = await render(
+            defineComponent(
+                () => () =>
+                    h('main', [
+                        h('h1', 'Test form'),
+                        h(
+                            FormField,
+                            {label: 'Laws', id: 'laws', error: 'Pick at least one'},
+                            {
+                                default: ({aria}: {aria: object}) =>
+                                    h('div', {role: 'group', ...aria}, [
+                                        h('button', {type: 'button', 'aria-pressed': 'false'}, 'Wlz'),
+                                        h('button', {type: 'button', 'aria-pressed': 'true'}, 'Zvw'),
+                                    ]),
+                                hint: () => 'Any that apply',
+                            },
+                        ),
+                    ]),
+            ),
+        );
+        await expectNoViolations(screen.container);
+
+        const group = screen.container.querySelector('[role="group"]') as HTMLElement;
+        const label = document.getElementById(group.getAttribute('aria-labelledby') as string);
+        expect(label?.textContent?.trim()).toBe('Laws');
+        expect(group.getAttribute('aria-describedby')).toBe('laws-error laws-hint');
+    });
+
+    it("the bound FormField after a refusal: the form's ids, and no violation", async () => {
+        let form!: ReturnType<typeof useForm>;
+        const screen = await render(
+            defineComponent({
+                setup: () => {
+                    form = useForm();
+                    return () =>
+                        h('main', [
+                            h('h1', 'Test form'),
+                            h(
+                                form.FormField,
+                                {name: 'municipality', label: 'Municipality'},
+                                {
+                                    default: ({field}: {field: object}) => h(TextInput, {...field, modelValue: ''}),
+                                    hint: () => 'Where the client lives',
+                                },
+                            ),
+                        ]);
+                },
+            }),
+        );
+        form.refuse('municipality', 'Pick a municipality');
+        await new Promise((resolve) => setTimeout(resolve));
+
+        await expectNoViolations(screen.container);
+        expect(screen.container.querySelector('input')?.id).toBe(form.field('municipality').id);
     });
 });

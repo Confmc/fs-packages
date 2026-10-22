@@ -2,7 +2,7 @@
     <div ref="root" v-bind="rootAttrs($attrs)" class="ui-multiselect">
         <div
             class="ui-control ui-multiselect__box"
-            :class="{'is-open': open, 'has-value': model.length > 0, 'is-invalid': invalid, 'is-disabled': disabled}"
+            :class="{'is-open': open, 'has-value': model.length > 0, 'is-invalid': marked, 'is-disabled': disabled}"
         >
             <!-- Chips are OUTSIDE the trigger button (a button may not nest a button), inside
                  the flex box that carries the control chrome. Removing must not open the menu:
@@ -29,8 +29,10 @@
                  root, and Enter on one must remove the chip — never leak into the listbox
                  skeleton and open the menu. -->
             <button
+                @click="toggle"
+                @keydown="onTriggerKey"
                 v-bind="controlAttrs($attrs)"
-                :id="id"
+                :id="controlId"
                 ref="reference"
                 type="button"
                 class="ui-multiselect__trigger"
@@ -39,12 +41,10 @@
                 aria-haspopup="listbox"
                 :aria-expanded="open"
                 :aria-required="required || undefined"
-                :aria-invalid="invalid || undefined"
+                :aria-invalid="marked || undefined"
                 :aria-describedby="describedby"
                 :aria-controls="open ? listboxId : undefined"
                 :aria-activedescendant="activeDescendant"
-                @click="toggle"
-                @keydown="onTriggerKey"
             >
                 <span v-if="!model.length" class="ui-multiselect__placeholder">{{ placeholder }}</span>
                 <!-- The trigger's accessible VALUE (WCAG 4.1.2): the chips render OUTSIDE this
@@ -107,7 +107,9 @@
 </template>
 
 <script setup lang="ts" generic="T extends SelectItem">
-import {computed, useTemplateRef} from 'vue';
+import type {Placement} from '@floating-ui/vue';
+
+import {computed, useId, useTemplateRef} from 'vue';
 
 import type {GroupRow} from '../internal/group-rows';
 import type {LabelKey, SelectItem} from '../types';
@@ -121,30 +123,38 @@ defineOptions({inheritAttrs: false});
 
 const {
     options,
-    label,
+    optionLabel,
     id,
     placeholder = 'Select…',
     disabled = false,
     alphabeticalSort = false,
     required = false,
-    invalid = false,
+    invalid = undefined,
+    error,
     describedby,
     emptyText = 'No options',
     optionsLabel = 'Options',
     removeLabel = 'Remove',
     mutedOptions,
+    placement,
 } = defineProps<{
     options: T[];
     /** property name or getter for an option's display string. */
-    label: LabelKey<T>;
-    /** stable id — required so the trigger can pair with a label/error. */
-    id: string;
+    optionLabel: LabelKey<T>;
+    /** stable id, pairing the control with its label and error; omit it and the control generates one with `useId()`. */
+    id?: string;
     placeholder?: string;
     disabled?: boolean;
     /** sort the rendered options by display string — off by default, so the caller's order is kept. */
     alphabeticalSort?: boolean;
     /** conveys the required state to assistive tech via `aria-required`. */
     required?: boolean;
+    /**
+     * the field's message (`field(name)` passes it). It marks the control invalid unless `invalid`
+     * says otherwise: `invalid: false` shows a message without the mark.
+     */
+    error?: string;
+    /** overrides the mark `error` sets; omitted, the mark follows `error`. */
     invalid?: boolean;
     describedby?: string;
     emptyText?: string;
@@ -157,7 +167,15 @@ const {
     removeLabel?: string;
     /** ids rendered visually muted (`.is-muted`) — still committable, still in the keyboard path. */
     mutedOptions?: T['id'][];
+    /** where the list opens against the box (default `'bottom-start'`; it still flips when there is no room). Read once. */
+    placement?: Placement;
 }>();
+
+// The mark: `invalid` when given, otherwise whether there is a message.
+const marked = computed(() => invalid ?? Boolean(error));
+
+const ownId = useId();
+const controlId = computed(() => id ?? ownId);
 
 defineSlots<{
     /**
@@ -170,11 +188,11 @@ defineSlots<{
 /** The committed membership: an array of option ids, in selection order. */
 const model = defineModel<T['id'][]>({required: true});
 
-/** Resolve an option's display string from the `label` prop (property name or getter). */
+/** Resolve an option's display string from the `optionLabel` prop (property name or getter). */
 const labelOf = (option: T): string =>
-    typeof label === 'function'
-        ? label(option)
-        : String((option as Record<PropertyKey, unknown>)[label as PropertyKey]);
+    typeof optionLabel === 'function'
+        ? optionLabel(option)
+        : String((option as Record<PropertyKey, unknown>)[optionLabel as PropertyKey]);
 
 const sorted = computed(() =>
     alphabeticalSort ? [...options].sort((a, b) => labelOf(a).localeCompare(labelOf(b))) : options,
@@ -211,11 +229,17 @@ const reference = useTemplateRef<HTMLElement>('reference');
 // the box click-outside treats as inside. The <ul> inside it is positioned by nothing.
 const floating = useTemplateRef<HTMLElement>('floating');
 
-/** Toggle an id's membership — add when absent, drop when present. Always emits a fresh array. */
+/**
+ * Toggle an id's membership — add when absent, drop when present. Always emits a fresh array, kept in
+ * the order the options are shown in, so the model reads the same however it was picked. An id with no
+ * option yet (options still loading) keeps its place at the end.
+ */
 const toggleValue = (value: T['id']): void => {
-    model.value = model.value.includes(value)
+    const next = model.value.includes(value)
         ? model.value.filter((member) => member !== value)
         : [...model.value, value];
+    const shown = sorted.value.map((option) => option.id).filter((id) => next.includes(id));
+    model.value = [...shown, ...next.filter((id) => !shown.includes(id))];
 };
 
 // Both keyboard (Enter via useListbox) and pointer (OptionList `commit`) funnel through this
@@ -235,7 +259,7 @@ const {open, pointer, listboxId, optionId, activeDescendant, floatingStyles, onK
     root,
     reference,
     floating,
-    id: () => id,
+    id: () => controlId.value,
     disabled: () => disabled,
     listLength: () => sorted.value.length,
     // A closed MultiSelect opens on Enter, ArrowDown, or Space — the SingleSelect skeleton.
@@ -244,6 +268,7 @@ const {open, pointer, listboxId, optionId, activeDescendant, floatingStyles, onK
     onDismiss: () => close(),
     onOutside: () => close(),
     typeaheadLabels: () => optionLabels.value,
+    floatingOptions: {placement},
 });
 
 /** Per-chip remove — drops one committed id; never touches `open`. */

@@ -3,7 +3,7 @@
         <div
             ref="box"
             class="ui-control ui-multicombobox__box"
-            :class="{'is-open': open, 'has-value': model.length > 0, 'is-invalid': invalid, 'is-disabled': disabled}"
+            :class="{'is-open': open, 'has-value': model.length > 0, 'is-invalid': marked, 'is-disabled': disabled}"
         >
             <!-- Chips render the committed values around the input (the APG editor-combobox
                  layout, stolen from our own MultiSelect). Removing must not open the menu:
@@ -24,7 +24,7 @@
                 </button>
             </span>
 
-            <!-- The INPUT is the trigger (kendo's searchable choreography; the APG-canonical
+            <!-- The INPUT is the trigger (a consumer's searchable choreography; the APG-canonical
                  combobox — an in-popup search input has an awkward focus/activedescendant
                  story). It flexes over all remaining space, so clicking the empty part of
                  the chip bar is clicking the input. Keyboard listens HERE (not on the root,
@@ -34,8 +34,12 @@
                  committed label to snap to, so Combobox's commit-snaps-query→label and
                  closed-state label re-sync are deliberately NOT ported. -->
             <input
+                @input="onInput"
+                @click="onOpen"
+                @focus="onOpen"
+                @keydown="onInputKey"
                 v-bind="controlAttrs($attrs)"
-                :id="id"
+                :id="controlId"
                 ref="input"
                 type="text"
                 class="ui-multicombobox__input"
@@ -44,17 +48,13 @@
                 aria-haspopup="listbox"
                 :aria-expanded="open"
                 :aria-required="required || undefined"
-                :aria-invalid="invalid || undefined"
+                :aria-invalid="marked || undefined"
                 :aria-describedby="describedbyWithSelection"
                 :aria-controls="open ? listboxId : undefined"
                 :aria-activedescendant="activeDescendant"
                 :placeholder="model.length ? undefined : placeholder"
                 :disabled="disabled"
                 :value="query"
-                @input="onInput"
-                @click="onOpen"
-                @focus="onOpen"
-                @keydown="onInputKey"
             />
         </div>
 
@@ -111,7 +111,7 @@
 </template>
 
 <script setup lang="ts" generic="T extends SelectItem">
-import {computed, ref, useTemplateRef} from 'vue';
+import {computed, ref, useId, useTemplateRef} from 'vue';
 
 import type {GroupRow} from '../internal/group-rows';
 import type {LabelKey, SelectItem} from '../types';
@@ -126,13 +126,14 @@ defineOptions({inheritAttrs: false});
 
 const {
     options,
-    label,
+    optionLabel,
     id,
     placeholder = 'Select…',
     disabled = false,
     alphabeticalSort = false,
     required = false,
-    invalid = false,
+    invalid = undefined,
+    error,
     describedby,
     emptyText = 'No options',
     optionsLabel = 'Options',
@@ -141,9 +142,9 @@ const {
 } = defineProps<{
     options: T[];
     /** property name or getter for an option's display string. */
-    label: LabelKey<T>;
-    /** stable id — required so the input can pair with a label/error. */
-    id: string;
+    optionLabel: LabelKey<T>;
+    /** stable id, pairing the control with its label and error; omit it and the control generates one with `useId()`. */
+    id?: string;
     /** shown only while nothing is committed — chips replace it, like MultiSelect. */
     placeholder?: string;
     disabled?: boolean;
@@ -151,6 +152,12 @@ const {
     alphabeticalSort?: boolean;
     /** conveys the required state to assistive tech via `aria-required`. */
     required?: boolean;
+    /**
+     * the field's message (`field(name)` passes it). It marks the control invalid unless `invalid`
+     * says otherwise: `invalid: false` shows a message without the mark.
+     */
+    error?: string;
+    /** overrides the mark `error` sets; omitted, the mark follows `error`. */
     invalid?: boolean;
     describedby?: string;
     emptyText?: string;
@@ -165,6 +172,12 @@ const {
     mutedOptions?: T['id'][];
 }>();
 
+// The mark: `invalid` when given, otherwise whether there is a message.
+const marked = computed(() => invalid ?? Boolean(error));
+
+const ownId = useId();
+const controlId = computed(() => id ?? ownId);
+
 defineSlots<{
     /**
      * Per-option content (swatches, icons, rich labels). Highlight/selection chrome stays
@@ -176,11 +189,11 @@ defineSlots<{
 /** The committed membership: an array of option ids, in selection order. */
 const model = defineModel<T['id'][]>({required: true});
 
-/** Resolve an option's display string from the `label` prop (property name or getter). */
+/** Resolve an option's display string from the `optionLabel` prop (property name or getter). */
 const labelOf = (option: T): string =>
-    typeof label === 'function'
-        ? label(option)
-        : String((option as Record<PropertyKey, unknown>)[label as PropertyKey]);
+    typeof optionLabel === 'function'
+        ? optionLabel(option)
+        : String((option as Record<PropertyKey, unknown>)[optionLabel as PropertyKey]);
 
 // The input's text is LOCAL filter state — never a mirror of any committed label (there is
 // no single one). It rests empty, follows the user's typing while open, and clears on every
@@ -190,10 +203,13 @@ const query = ref('');
 // The visible list = filter by the trimmed, case-folded query (empty query ⇒ all),
 // then the same optional alphabetical pass the siblings apply. Both aria-activedescendant
 // and Enter index into THIS filtered list, not the raw `options`.
+// Every option in display order; the model keeps this order whatever the query shows.
+const ordered = computed(() =>
+    alphabeticalSort ? [...options].sort((a, b) => labelOf(a).localeCompare(labelOf(b))) : options,
+);
 const filtered = computed(() => {
     const needle = query.value.trim().toLowerCase();
-    const matched = needle ? options.filter((option) => labelOf(option).toLowerCase().includes(needle)) : options;
-    return alphabeticalSort ? [...matched].sort((a, b) => labelOf(a).localeCompare(labelOf(b))) : matched;
+    return needle ? ordered.value.filter((option) => labelOf(option).toLowerCase().includes(needle)) : ordered.value;
 });
 
 // The chip bar renders the committed values in selection order. An id whose option has not
@@ -208,7 +224,7 @@ const chips = computed(() =>
 
 /** The committed labels, selection-ordered — the aria-describedby selection surface. */
 const selectedSummary = computed(() => chips.value.map(labelOf).join(', '));
-const selectionId = computed(() => `${id}-selection`);
+const selectionId = computed(() => `${controlId.value}-selection`);
 const describedbyWithSelection = computed(() =>
     describedby === undefined ? selectionId.value : `${describedby} ${selectionId.value}`,
 );
@@ -236,16 +252,22 @@ const input = useTemplateRef<HTMLInputElement>('input');
 // the box click-outside treats as inside. The <ul> inside it is positioned by nothing.
 const floating = useTemplateRef<HTMLElement>('floating');
 
-/** Toggle an id's membership — add when absent, drop when present. Always emits a fresh array. */
+/**
+ * Toggle an id's membership — add when absent, drop when present. Always emits a fresh array, kept in
+ * the order of the whole option list (not the filtered one, so the query never reorders it); an id
+ * with no option yet keeps its place at the end. As MultiSelect.
+ */
 const toggleValue = (value: T['id']): void => {
-    model.value = model.value.includes(value)
+    const next = model.value.includes(value)
         ? model.value.filter((member) => member !== value)
         : [...model.value, value];
+    const shown = ordered.value.map((option) => option.id).filter((id) => next.includes(id));
+    model.value = [...shown, ...next.filter((id) => !shown.includes(id))];
 };
 
 // Both keyboard (Enter via useListbox) and pointer (OptionList `commit`) funnel through this
 // one guard. Toggle-in-place: a commit flips membership and the menu STAYS OPEN. The
-// multi-combobox choreography on top (kendo's searchable mode): the query clears so the
+// multi-combobox choreography on top (the searchable mode consumers ship): the query clears so the
 // full list is re-offered, and DOM focus returns to the input (a pointer commit lands on a
 // non-focusable <li> and would otherwise drop focus to the body). The highlight resets only
 // when clearing the query actually changed the list — an unfiltered keyboard walk keeps its
@@ -270,7 +292,7 @@ const {open, pointer, listboxId, optionId, activeDescendant, floatingStyles, onK
         root,
         reference: box,
         floating,
-        id: () => id,
+        id: () => controlId.value,
         disabled: () => disabled,
         listLength: () => filtered.value.length,
         // Only ArrowDown opens a closed list — a printable key must fall through to the input so
@@ -325,7 +347,7 @@ const onInput = (event: Event) => {
     openList();
     resetHighlight();
 };
-// Focusing or clicking the (enabled) input opens the list (kendo's searchable choreography —
+// Focusing or clicking the (enabled) input opens the list (the searchable choreography consumers ship —
 // focus is managed into the input, and the list is its context). A disabled input never
 // dispatches either event.
 const onOpen = openList;

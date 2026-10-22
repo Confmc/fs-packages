@@ -21,7 +21,7 @@ const FRUITS: Fruit[] = [
 const mountCombobox = (props: Record<string, unknown>, slots?: Record<string, unknown>) =>
     mount(Combobox as any, {
         // Sorted on purpose: the cases below index the sorted order (the default is caller order).
-        props: {options: FRUITS, label: 'name', id: 'fruit', modelValue: null, alphabeticalSort: true, ...props},
+        props: {options: FRUITS, optionLabel: 'name', id: 'fruit', modelValue: null, alphabeticalSort: true, ...props},
         slots,
         attachTo: document.body,
     });
@@ -99,7 +99,7 @@ describe('Combobox', () => {
     });
 
     it('resolves the display value via a getter label', () => {
-        const wrapper = mountCombobox({label: (o: Fruit) => `${o.name}!`, modelValue: 2});
+        const wrapper = mountCombobox({optionLabel: (o: Fruit) => `${o.name}!`, modelValue: 2});
         expect(wrapper.find('input').element.value).toBe('Apricot!');
     });
 

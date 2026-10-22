@@ -54,7 +54,14 @@ export default defineConfig({
                         {text: 'fs-router', link: '/packages/router'},
                     ],
                 },
-                {text: 'UI Components', collapsed: false, items: [{text: 'ui-inputs', link: '/packages/ui-inputs'}]},
+                {
+                    text: 'UI Components',
+                    collapsed: false,
+                    items: [
+                        {text: 'ui-form', link: '/packages/ui-form'},
+                        {text: 'ui-inputs', link: '/packages/ui-inputs'},
+                    ],
+                },
                 {
                     text: 'Integrations',
                     collapsed: false,

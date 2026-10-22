@@ -2,20 +2,20 @@
     <label class="ui-check" :class="{'is-disabled': disabled}">
         <span class="ui-check__control">
             <input
-                :id="id"
+                :id="controlId"
                 ref="input"
                 v-guard-while-disabled="disabled"
+                @change="onChange"
                 v-bind="$attrs"
                 type="checkbox"
                 class="ui-check__input"
-                :class="{'is-invalid': invalid}"
+                :class="{'is-invalid': marked}"
                 :checked="model"
                 :indeterminate="indeterminate"
                 :disabled="disabled"
                 :aria-required="required || undefined"
-                :aria-invalid="invalid || undefined"
+                :aria-invalid="marked || undefined"
                 :aria-describedby="describedby"
-                @change="onChange"
             />
             <svg class="ui-check__icon" viewBox="0 0 20 20" aria-hidden="true">
                 <path
@@ -35,7 +35,7 @@
 </template>
 
 <script setup lang="ts">
-import {nextTick, onMounted, useTemplateRef} from 'vue';
+import {computed, nextTick, onMounted, useId, useTemplateRef} from 'vue';
 
 import {warnWhenUnnamed} from '../internal/accessible-name';
 import {vGuardWhileDisabled} from '../internal/disabled-guard';
@@ -57,21 +57,28 @@ onMounted(() => {
 });
 
 const {
+    id,
     label,
     disabled = false,
     required = false,
-    invalid = false,
+    invalid = undefined,
+    error,
     indeterminate = false,
     describedby,
 } = defineProps<{
-    /** stable id — required so the control can pair with an external label/error. */
-    id: string;
+    /** stable id, pairing the control with its label and error; omit it and the control generates one with `useId()`. */
+    id?: string;
     /** label text rendered beside the box; the default slot overrides it. */
     label?: string;
     disabled?: boolean;
     /** conveys the required state to assistive tech via `aria-required`. */
     required?: boolean;
-    /** invalid styling + aria; drive it from the field's error. */
+    /**
+     * the field's message (`field(name)` passes it). It marks the control invalid unless `invalid`
+     * says otherwise: `invalid: false` shows a message without the mark.
+     */
+    error?: string;
+    /** overrides the mark `error` sets; omitted, the mark follows `error`. */
     invalid?: boolean;
     /** id of the paired error element for `aria-describedby`. */
     describedby?: string;
@@ -81,6 +88,12 @@ const {
      */
     indeterminate?: boolean;
 }>();
+
+// The mark: `invalid` when given, otherwise whether there is a message.
+const marked = computed(() => invalid ?? Boolean(error));
+
+const ownId = useId();
+const controlId = computed(() => id ?? ownId);
 
 // A checkbox is never "empty" — unchecked IS false, so the boolean model is non-nullable
 // (unlike the family's string/number inputs, which model a nullable backend column).

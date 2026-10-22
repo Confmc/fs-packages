@@ -21,7 +21,7 @@ const FRUITS: Fruit[] = [
 const mountMulti = (props: Record<string, unknown>, slots?: Record<string, unknown>) =>
     mount(MultiSelect as any, {
         // Sorted on purpose: the cases below index the sorted order (the default is caller order).
-        props: {options: FRUITS, label: 'name', id: 'fruit', modelValue: [], alphabeticalSort: true, ...props},
+        props: {options: FRUITS, optionLabel: 'name', id: 'fruit', modelValue: [], alphabeticalSort: true, ...props},
         slots,
         attachTo: document.body,
     });
@@ -111,7 +111,7 @@ describe('MultiSelect', () => {
         expect(menu(wrapper).exists()).toBe(true);
     });
 
-    it('toggles membership on click and stays open, adding to the end of the selection', async () => {
+    it('toggles membership on click and stays open, keeping the selection in the order the options are shown', async () => {
         const wrapper = mountMulti({modelValue: [3]}); // Mango committed
         await wrapper.find('.ui-multiselect__trigger').trigger('click');
 
@@ -120,7 +120,7 @@ describe('MultiSelect', () => {
         expect(apricot.classes()).toContain('is-active');
 
         await apricot.trigger('click');
-        expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[3, 2]]); // appended
+        expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[2, 3]]); // in display order, not the order picked
         expect(menu(wrapper).exists()).toBe(true); // stays open
     });
 
@@ -255,7 +255,11 @@ describe('MultiSelect', () => {
             {id: 'b', title: 'beta'},
             {id: 'a', title: 'alpha'},
         ];
-        const wrapper = mountMulti({options: tags, label: (tag: Tag) => tag.title.toUpperCase(), modelValue: ['a']});
+        const wrapper = mountMulti({
+            options: tags,
+            optionLabel: (tag: Tag) => tag.title.toUpperCase(),
+            modelValue: ['a'],
+        });
 
         expect(wrapper.findAll('.ui-multiselect__chip').map((chip) => chip.text())).toEqual(['ALPHA']);
 
@@ -370,7 +374,7 @@ describe('MultiSelect', () => {
 
         // Slotted content toggles exactly like the plain text — and the menu stays open.
         await menu(wrapper).findAll('.ui-multiselect__option')[0].trigger('click');
-        expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[3, 2]]); // + Apricot
+        expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[2, 3]]); // + Apricot, in display order
         expect(menu(wrapper).exists()).toBe(true);
     });
 
@@ -384,5 +388,38 @@ describe('MultiSelect', () => {
         // Muted ≠ disabled: a muted option still toggles membership.
         await options[0].trigger('click');
         expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[2]]);
+    });
+});
+
+describe('MultiSelect model order and placement', () => {
+    const fruits = [
+        {id: 1, name: 'Banana'},
+        {id: 2, name: 'Apple'},
+        {id: 3, name: 'Cherry'},
+    ];
+
+    it('keeps the model in the alphabetical display order when alphabeticalSort is on', async () => {
+        const wrapper = mount(MultiSelect, {
+            props: {options: fruits, optionLabel: 'name', modelValue: [3], alphabeticalSort: true},
+            attachTo: document.body,
+        });
+        await wrapper.find('.ui-multiselect__trigger').trigger('click');
+        // shown as Apple, Banana, Cherry: picking Banana with Cherry committed gives [Banana, Cherry]
+        await menu(wrapper).findAll('li[role="option"]')[1]!.trigger('click');
+
+        expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[1, 3]]);
+        wrapper.unmount();
+    });
+
+    it('keeps an id with no option yet (still loading) at the end', async () => {
+        const wrapper = mount(MultiSelect, {
+            props: {options: fruits, optionLabel: 'name', modelValue: [99]},
+            attachTo: document.body,
+        });
+        await wrapper.find('.ui-multiselect__trigger').trigger('click');
+        await menu(wrapper).findAll('li[role="option"]')[0]!.trigger('click');
+
+        expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[1, 99]]);
+        wrapper.unmount();
     });
 });

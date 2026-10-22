@@ -68,7 +68,7 @@ const renderControlled = async <V>(component: any, initial: V, props: Record<str
             () => () =>
                 h(component, {
                     options: FRUITS,
-                    label: 'name',
+                    optionLabel: 'name',
                     id: 'fruit',
                     ...props,
                     modelValue: model.value,
@@ -94,7 +94,7 @@ const renderControlledGroups = <V>(component: any, initial: V, props: Record<str
             () => () =>
                 h(component, {
                     groups: FRUIT_GROUPS,
-                    label: 'name',
+                    optionLabel: 'name',
                     id: 'fruit',
                     ...props,
                     modelValue: model.value,
@@ -213,7 +213,7 @@ describe('disabled controls genuinely receive no events', () => {
     it('a disabled TextInput receives no typed input', async () => {
         const model = await renderControlled<string | null>(TextInput, 'untouched', {
             options: undefined,
-            label: undefined,
+            optionLabel: undefined,
             disabled: true,
         });
         const input = document.getElementById('fruit') as HTMLInputElement;
@@ -348,7 +348,7 @@ describe('MultiCombobox — input-as-trigger, real focus choreography', () => {
 
         await userEvent.tab();
         expect(document.activeElement).toBe(input);
-        expect(menu()).not.toBeNull(); // kendo's searchable choreography — focus is the context
+        expect(menu()).not.toBeNull(); // the searchable choreography — focus is the context
     });
 
     it('a real click commit toggles membership, STAYS open, clears the query, and REFOCUSES the input', async () => {

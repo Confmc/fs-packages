@@ -1,96 +1,26 @@
 // @vitest-environment happy-dom
-import type {AxiosResponseError, HttpService, ResponseErrorMiddlewareFunc} from '@script-development/fs-http';
 import type {AxiosError} from 'axios';
 
 import {mount} from '@vue/test-utils';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
-import {defineComponent, h, nextTick, ref} from 'vue';
+import {defineComponent, h, nextTick} from 'vue';
 
-import type {UseForm, UseFormOptions} from '../src';
+import type {UseForm, UseFormOptions} from '../../src';
 
-import {useForm} from '../src';
+import {TextInput, useForm} from '../../src';
 
-const createMockHttpService = () => {
-    const errorMiddlewares: ResponseErrorMiddlewareFunc[] = [];
+// A caught request error the way axios (fs-http's transport) shapes it.
+const refusal = (status: number, data: unknown) => ({isAxiosError: true, response: {status, data}});
 
-    const triggerError = (status: number, data: unknown): void => {
-        const error = {isAxiosError: true, response: {status, data}} as AxiosError<AxiosResponseError>;
-        for (const middleware of errorMiddlewares) middleware(error);
-    };
-
-    const httpService = {
-        getRequest: vi.fn(),
-        postRequest: vi.fn(),
-        putRequest: vi.fn(),
-        patchRequest: vi.fn(),
-        deleteRequest: vi.fn(),
-        downloadRequest: vi.fn(),
-        previewRequest: vi.fn(),
-        registerRequestMiddleware: vi.fn(() => () => {}),
-        registerResponseMiddleware: vi.fn(() => () => {}),
-        registerResponseErrorMiddleware: vi.fn((fn: ResponseErrorMiddlewareFunc) => {
-            errorMiddlewares.push(fn);
-            return () => {
-                const index = errorMiddlewares.indexOf(fn);
-                if (index > -1) errorMiddlewares.splice(index, 1);
-            };
-        }),
-    } as unknown as HttpService;
-
-    return {httpService, triggerError, errorMiddlewares};
-};
-
-const mountForm = <T extends string = string>(httpService: HttpService, options?: UseFormOptions) => {
+const mountForm = <T extends string = string>(options: UseFormOptions = {}) => {
     let result!: UseForm<T>;
     const wrapper = mount(
         defineComponent({
             setup() {
-                result = useForm<T>(httpService, options);
+                result = useForm<T>(options);
                 return () => null;
             },
         }),
-    );
-    return {wrapper, result: () => result};
-};
-
-// Mounts (attached to the document) a form that renders one field marked `aria-invalid`
-// while the error bag is non-empty — the shape the scroll watcher queries for.
-const mountFieldForm = (httpService: HttpService, options?: UseFormOptions, markInvalid = true) => {
-    let result!: UseForm;
-    const wrapper = mount(
-        defineComponent({
-            setup() {
-                // The scroll is opt-in; these cases are about what it does once asked for.
-                result = useForm(httpService, {scrollToError: true, ...options});
-                return () =>
-                    h('input', {
-                        'aria-invalid': markInvalid && Object.keys(result.errors.value).length > 0 ? 'true' : 'false',
-                    });
-            },
-        }),
-        {attachTo: document.body},
-    );
-    return {wrapper, result: () => result};
-};
-
-// Mounts (attached) a form whose invalid field sits inside (or outside) a `scrollRoot` element,
-// to prove the query is scoped to that root's subtree.
-const mountScopedForm = (httpService: HttpService, fieldInsideRoot: boolean) => {
-    const scrollRoot = ref<HTMLElement | null>(null);
-    let result!: UseForm;
-    const wrapper = mount(
-        defineComponent({
-            setup() {
-                result = useForm(httpService, {scrollToError: true, scrollRoot});
-                const marked = () => (Object.keys(result.errors.value).length > 0 ? 'true' : 'false');
-                return () =>
-                    h('div', [
-                        h('div', {ref: scrollRoot}, [fieldInsideRoot ? h('input', {'aria-invalid': marked()}) : null]),
-                        fieldInsideRoot ? null : h('input', {'aria-invalid': marked()}),
-                    ]);
-            },
-        }),
-        {attachTo: document.body},
     );
     return {wrapper, result: () => result};
 };
@@ -112,8 +42,7 @@ afterEach(() => {
 
 describe('useForm', () => {
     it('exposes the validation bag, clearErrors, handleSubmit and submitting from one call', () => {
-        const {httpService} = createMockHttpService();
-        const {result} = mountForm(httpService);
+        const {result} = mountForm();
 
         expect(result().errors.value).toEqual({});
         expect(result().submitting.value).toBe(false);
@@ -121,28 +50,25 @@ describe('useForm', () => {
         expect(typeof result().handleSubmit).toBe('function');
     });
 
-    it('binds a 422 into the error bag via the internal middleware', () => {
-        const {httpService, triggerError} = createMockHttpService();
-        const {result} = mountForm<'email'>(httpService);
+    it('binds a 422 it is handed into the error bag', () => {
+        const {result} = mountForm<'email'>();
 
-        triggerError(422, {errors: {email: ['Taken']}});
+        result().take(refusal(422, {errors: {email: ['Taken']}}));
 
         expect(result().errors.value).toEqual({email: 'Taken'});
     });
 
     it('passes keyMapper through to the internal validation layer', () => {
-        const {httpService, triggerError} = createMockHttpService();
         const camel = (key: string) => key.replace(/_(\w)/g, (_, c: string) => c.toUpperCase());
-        const {result} = mountForm(httpService, {keyMapper: camel});
+        const {result} = mountForm({keyMapper: camel});
 
-        triggerError(422, {errors: {street_name: ['Required']}});
+        result().take(refusal(422, {errors: {street_name: ['Required']}}));
 
         expect(result().errors.value).toEqual({streetName: 'Required'});
     });
 
     it('toggles submitting around handleSubmit and swallows a 422', async () => {
-        const {httpService} = createMockHttpService();
-        const {result} = mountForm(httpService);
+        const {result} = mountForm();
         const gate = deferred();
 
         const inFlight = result().handleSubmit(() => gate.promise);
@@ -156,12 +82,11 @@ describe('useForm', () => {
             result().handleSubmit(async () => {
                 throw makeAxiosError(422);
             }),
-        ).resolves.toBeUndefined();
+        ).resolves.toBe('refused');
     });
 
     it('re-throws a non-422 rejection through handleSubmit', async () => {
-        const {httpService} = createMockHttpService();
-        const {result} = mountForm(httpService);
+        const {result} = mountForm();
         const error = makeAxiosError(500);
 
         await expect(
@@ -171,26 +96,30 @@ describe('useForm', () => {
         ).rejects.toBe(error);
     });
 
-    it('clearErrors empties a populated bag', () => {
-        const {httpService, triggerError} = createMockHttpService();
-        const {result} = mountForm<'email'>(httpService);
+    it("keeps a refusal's messages through a declined save, and replaces them with the next 422", async () => {
+        const {result} = mountForm<'email' | 'name'>();
+        await result().handleSubmit(() => Promise.reject(refusal(422, {errors: {email: ['Taken']}})));
 
-        triggerError(422, {errors: {email: ['Taken']}});
+        await expect(result().handleSubmit(async () => false)).resolves.toBe('cancelled');
+        expect(result().errors.value).toEqual({email: 'Taken'});
+        expect(result().refused.value).toBe(true);
+
+        await result().handleSubmit(() => Promise.reject(refusal(422, {errors: {name: ['Required']}})));
+        expect(result().errors.value).toEqual({name: 'Required'});
+
+        await expect(result().handleSubmit(async () => {})).resolves.toBe('sent');
+        expect(result().errors.value).toEqual({});
+        expect(result().refused.value).toBe(false);
+    });
+
+    it('clearErrors empties a populated bag', () => {
+        const {result} = mountForm<'email'>();
+
+        result().take(refusal(422, {errors: {email: ['Taken']}}));
         expect(result().errors.value).toEqual({email: 'Taken'});
 
         result().clearErrors();
         expect(result().errors.value).toEqual({});
-    });
-
-    it('unregisters the internal middleware on unmount', () => {
-        const {httpService, errorMiddlewares} = createMockHttpService();
-        const {wrapper} = mountForm(httpService);
-
-        expect(errorMiddlewares).toHaveLength(1);
-
-        wrapper.unmount();
-
-        expect(errorMiddlewares).toHaveLength(0);
     });
 });
 
@@ -201,48 +130,102 @@ describe('useForm scroll-to-error', () => {
         scrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {});
     });
 
-    it('scrolls the first invalid field into view after a 422', async () => {
-        const {httpService, triggerError} = createMockHttpService();
-        const {wrapper} = mountFieldForm(httpService);
-
-        triggerError(422, {errors: {email: ['Taken']}});
-        await nextTick();
-
-        expect(scrollIntoView).toHaveBeenCalledWith({behavior: 'smooth', block: 'center'});
-        wrapper.unmount();
-    });
-
-    it('scrolls to the first invalid field in document order when several are marked', async () => {
-        const {httpService, triggerError} = createMockHttpService();
-        let result!: UseForm;
+    // A form rendering `names` as controls wired by field(), in that order, attached to the document.
+    const mountFields = (names: string[], options: UseFormOptions = {}, control = true) => {
+        let form!: UseForm;
         const wrapper = mount(
             defineComponent({
                 setup() {
-                    result = useForm(httpService, {scrollToError: true});
-                    const marked = () => (Object.keys(result.errors.value).length > 0 ? 'true' : 'false');
+                    form = useForm(options);
                     return () =>
-                        h('div', [h('input', {'aria-invalid': marked()}), h('input', {'aria-invalid': marked()})]);
+                        h(
+                            'div',
+                            names.map((name) =>
+                                control
+                                    ? h(TextInput, {...form.field(name), modelValue: ''})
+                                    : h(form.FormError, {name}),
+                            ),
+                        );
                 },
             }),
             {attachTo: document.body},
         );
+        return {wrapper, form: () => form};
+    };
 
-        triggerError(422, {errors: {email: ['Taken']}});
-        await nextTick();
+    it("scrolls to the control of the first refused field, by the form's own id, when a submit is refused", async () => {
+        const {wrapper, form} = mountFields(['email']);
 
-        const invalid = document.querySelectorAll('[aria-invalid="true"]');
-        expect(invalid).toHaveLength(2);
-        expect(scrollIntoView).toHaveBeenCalledTimes(1);
-        expect(scrollIntoView.mock.contexts[0]).toBe(invalid[0]);
+        await form().handleSubmit(() => Promise.reject(refusal(422, {errors: {email: ['Taken']}})));
+
+        expect(scrollIntoView).toHaveBeenCalledWith({behavior: 'smooth', block: 'center'});
+        expect(scrollIntoView.mock.contexts[0]).toBe(wrapper.find('input').element);
         wrapper.unmount();
     });
 
-    it('does not scroll unless the caller asks for it', async () => {
-        const {httpService, triggerError} = createMockHttpService();
-        // No `scrollToError`, so the default decides.
-        const {wrapper} = mountFieldForm(httpService, {scrollToError: undefined});
+    it('passes over a field whose message is empty', async () => {
+        const {wrapper, form} = mountFields(['first', 'second']);
 
-        triggerError(422, {errors: {email: ['Taken']}});
+        await form().handleSubmit(() => Promise.reject(refusal(422, {errors: {first: [''], second: ['Taken']}})));
+
+        expect(scrollIntoView.mock.contexts[0]).toBe(wrapper.findAll('input')[1].element);
+        wrapper.unmount();
+    });
+
+    it('takes the first in document order, not the order the bag lists the fields in', async () => {
+        const {wrapper, form} = mountFields(['first', 'second']);
+
+        await form().handleSubmit(async () => {}, {validate: () => ({second: 'Required', first: 'Required'})});
+
+        expect(scrollIntoView).toHaveBeenCalledOnce();
+        expect(scrollIntoView.mock.contexts[0]).toBe(wrapper.findAll('input')[0]!.element);
+        wrapper.unmount();
+    });
+
+    it("falls back to the field's message element when no control carries the id", async () => {
+        const {wrapper, form} = mountFields(['email'], {}, false);
+
+        await form().handleSubmit(() => Promise.reject(refusal(422, {errors: {email: ['Taken']}})));
+
+        expect(scrollIntoView.mock.contexts[0]).toBe(wrapper.find('p.ui-error').element);
+        wrapper.unmount();
+    });
+
+    it('never scrolls to another form on the page that refused the same name', async () => {
+        // one page is one app, so useId keeps the two forms' ids apart
+        const forms: UseForm[] = [];
+        const Block = defineComponent({
+            setup() {
+                const form = useForm();
+                forms.push(form);
+                return () => h(TextInput, {...form.field('email'), modelValue: ''});
+            },
+        });
+        const wrapper = mount(defineComponent({setup: () => () => h('div', [h(Block), h(Block)])}), {
+            attachTo: document.body,
+        });
+
+        await forms[1]!.handleSubmit(() => Promise.reject(refusal(422, {errors: {email: ['Taken']}})));
+
+        expect(scrollIntoView).toHaveBeenCalledOnce();
+        expect(scrollIntoView.mock.contexts[0]).toBe(wrapper.findAll('input')[1]!.element);
+        wrapper.unmount();
+    });
+
+    it('does nothing for a refusal it renders no element for, or an empty message', async () => {
+        const {wrapper, form} = mountFields(['email']);
+
+        await form().handleSubmit(async () => {}, {validate: () => ({elsewhere: 'Not rendered', email: ''})});
+
+        expect(scrollIntoView).not.toHaveBeenCalled();
+        wrapper.unmount();
+    });
+
+    it('never scrolls on refuse or setRefusals alone, so typing never jumps the page', async () => {
+        const {wrapper, form} = mountFields(['email']);
+
+        form().refuse('email', 'Taken');
+        form().setRefusals({email: 'Required'});
         await nextTick();
 
         expect(scrollIntoView).not.toHaveBeenCalled();
@@ -250,273 +233,311 @@ describe('useForm scroll-to-error', () => {
     });
 
     it('does not scroll when scrollToError is false', async () => {
-        const {httpService, triggerError} = createMockHttpService();
-        const {wrapper} = mountFieldForm(httpService, {scrollToError: false});
+        const {wrapper, form} = mountFields(['email'], {scrollToError: false});
 
-        triggerError(422, {errors: {email: ['Taken']}});
-        await nextTick();
+        await form().handleSubmit(() => Promise.reject(refusal(422, {errors: {email: ['Taken']}})));
 
         expect(scrollIntoView).not.toHaveBeenCalled();
         wrapper.unmount();
     });
 
-    it('does not scroll again once the error bag is cleared', async () => {
-        const {httpService, triggerError} = createMockHttpService();
-        const {wrapper, result} = mountFieldForm(httpService);
+    it('scrolls without animation under prefers-reduced-motion', async () => {
+        vi.stubGlobal('matchMedia', (query: string) => ({matches: query === '(prefers-reduced-motion: reduce)'}));
+        const {wrapper, form} = mountFields(['email']);
 
-        triggerError(422, {errors: {email: ['Taken']}});
-        await nextTick();
-        expect(scrollIntoView).toHaveBeenCalledTimes(1);
-
-        result().clearErrors();
-        await nextTick();
-        expect(scrollIntoView).toHaveBeenCalledTimes(1);
-        wrapper.unmount();
-    });
-
-    it('does not scroll to an independently invalid field when the bag is cleared', async () => {
-        const {httpService, triggerError} = createMockHttpService();
-        let result!: UseForm;
-        const wrapper = mount(
-            defineComponent({
-                setup() {
-                    result = useForm(httpService, {scrollToError: true});
-                    // This form's own field is marked only while its bag holds errors; the sibling
-                    // stays invalid on its own, unrelated to this form's bag.
-                    const marked = () => (Object.keys(result.errors.value).length > 0 ? 'true' : 'false');
-                    return () =>
-                        h('div', [h('input', {'aria-invalid': marked()}), h('input', {'aria-invalid': 'true'})]);
-                },
-            }),
-            {attachTo: document.body},
-        );
-
-        triggerError(422, {errors: {email: ['Taken']}});
-        await nextTick();
-        expect(scrollIntoView).toHaveBeenCalledTimes(1);
-
-        result.clearErrors();
-        await nextTick();
-        expect(scrollIntoView).toHaveBeenCalledTimes(1);
-        wrapper.unmount();
-    });
-
-    it('no-ops when a 422 marks no field invalid', async () => {
-        const {httpService, triggerError} = createMockHttpService();
-        const {wrapper} = mountFieldForm(httpService, undefined, false);
-
-        triggerError(422, {errors: {email: ['Taken']}});
-        await nextTick();
-
-        expect(scrollIntoView).not.toHaveBeenCalled();
-        wrapper.unmount();
-    });
-
-    it('scopes the scroll to scrollRoot when provided', async () => {
-        const {httpService, triggerError} = createMockHttpService();
-        const {wrapper} = mountScopedForm(httpService, true);
-
-        triggerError(422, {errors: {email: ['Taken']}});
-        await nextTick();
-
-        expect(scrollIntoView).toHaveBeenCalledWith({behavior: 'smooth', block: 'center'});
-        wrapper.unmount();
-    });
-
-    it('does not scroll to an invalid field outside scrollRoot', async () => {
-        const {httpService, triggerError} = createMockHttpService();
-        const {wrapper} = mountScopedForm(httpService, false);
-
-        triggerError(422, {errors: {email: ['Taken']}});
-        await nextTick();
-
-        expect(scrollIntoView).not.toHaveBeenCalled();
-        wrapper.unmount();
-    });
-
-    it('does not fall back to the document when scrollRoot is null', async () => {
-        const {httpService, triggerError} = createMockHttpService();
-        const scrollRoot = ref<HTMLElement | null>(null); // passed but never bound -> stays null
-        const {wrapper} = mountFieldForm(httpService, {scrollRoot});
-
-        triggerError(422, {errors: {email: ['Taken']}});
-        await nextTick();
-
-        expect(scrollIntoView).not.toHaveBeenCalled();
-        wrapper.unmount();
-    });
-
-    it('scrolls with auto behavior under prefers-reduced-motion', async () => {
-        const {httpService, triggerError} = createMockHttpService();
-        vi.spyOn(window, 'matchMedia').mockReturnValue({matches: true} as MediaQueryList);
-        const {wrapper} = mountFieldForm(httpService);
-
-        triggerError(422, {errors: {email: ['Taken']}});
-        await nextTick();
+        await form().handleSubmit(() => Promise.reject(refusal(422, {errors: {email: ['Taken']}})));
 
         expect(scrollIntoView).toHaveBeenCalledWith({behavior: 'auto', block: 'center'});
         wrapper.unmount();
     });
 
     it('scrolls with smooth behavior when the runtime has no matchMedia', async () => {
-        const {httpService, triggerError} = createMockHttpService();
         vi.stubGlobal('matchMedia', undefined);
-        const {wrapper} = mountFieldForm(httpService);
+        const {wrapper, form} = mountFields(['email']);
 
-        triggerError(422, {errors: {email: ['Taken']}});
-        await nextTick();
+        await form().handleSubmit(() => Promise.reject(refusal(422, {errors: {email: ['Taken']}})));
 
         expect(scrollIntoView).toHaveBeenCalledWith({behavior: 'smooth', block: 'center'});
         wrapper.unmount();
     });
-
-    it('scrolls after a child paints the mark from a prop (flush: post across the boundary)', async () => {
-        const {httpService, triggerError} = createMockHttpService();
-        const Field = defineComponent({
-            props: {invalid: {type: Boolean, required: true}},
-            setup: (props) => () => h('input', {'aria-invalid': props.invalid ? 'true' : 'false'}),
-        });
-        const wrapper = mount(
-            defineComponent({
-                setup() {
-                    const {errors} = useForm(httpService, {scrollToError: true});
-                    return () => h(Field, {invalid: Object.keys(errors.value).length > 0});
-                },
-            }),
-            {attachTo: document.body},
-        );
-
-        triggerError(422, {errors: {email: ['Taken']}});
-        await nextTick();
-
-        expect(scrollIntoView).toHaveBeenCalledTimes(1);
-        wrapper.unmount();
-    });
-
-    it('targets a custom scrollTarget selector instead of aria-invalid', async () => {
-        const {httpService, triggerError} = createMockHttpService();
-        let result!: UseForm;
-        const wrapper = mount(
-            defineComponent({
-                setup() {
-                    result = useForm(httpService, {scrollToError: true, scrollTarget: '.field-error'});
-                    return () => h('input', {class: Object.keys(result.errors.value).length > 0 ? 'field-error' : ''});
-                },
-            }),
-            {attachTo: document.body},
-        );
-
-        triggerError(422, {errors: {email: ['Taken']}});
-        await nextTick();
-
-        expect(scrollIntoView).toHaveBeenCalledTimes(1);
-        wrapper.unmount();
-    });
 });
 
-describe('useForm submit window and refusal signal', () => {
-    // A request double that behaves like fs-http: the response-error middleware runs
-    // synchronously inside the interceptor, then the promise rejects.
-    const refusingRequest = (triggerError: (status: number, data: unknown) => void, data: unknown) => () => {
-        triggerError(422, data);
-        return Promise.reject(makeAxiosError(422));
-    };
-
+describe("useForm takes its own request's 422", () => {
     it('passes the fields allow-list through to the validation layer', () => {
-        const {httpService, triggerError} = createMockHttpService();
-        const {result} = mountForm(httpService, {fields: ['email']});
+        const {result} = mountForm({fields: ['email']});
 
-        triggerError(422, {errors: {email: ['Taken'], token: ['Expired']}});
+        result().take(refusal(422, {errors: {email: ['Taken'], token: ['Expired']}}));
 
         expect(result().errors.value).toEqual({email: 'Taken'});
         expect(result().unmapped.value).toEqual(['token']);
     });
 
-    it('binds a 422 that arrives while the form is idle when onlyWhileSubmitting is off', () => {
-        const {httpService, triggerError} = createMockHttpService();
-        const {result} = mountForm(httpService);
+    it('binds the 422 its own submit rejected with', async () => {
+        const {result} = mountForm();
 
-        triggerError(422, {errors: {email: ['Taken']}});
-
-        expect(result().errors.value).toEqual({email: 'Taken'});
-        expect(result().refused.value).toBe(true);
-    });
-
-    it('leaves the bag untouched for a 422 that arrives while the form is idle under onlyWhileSubmitting', () => {
-        const {httpService, triggerError} = createMockHttpService();
-        const {result} = mountForm(httpService, {onlyWhileSubmitting: true});
-
-        triggerError(422, {errors: {email: ['Taken']}});
-
-        expect(result().errors.value).toEqual({});
-        expect(result().refused.value).toBe(false);
-    });
-
-    it('binds a 422 raised inside its own handleSubmit under onlyWhileSubmitting', async () => {
-        const {httpService, triggerError} = createMockHttpService();
-        const {result} = mountForm(httpService, {onlyWhileSubmitting: true});
-
-        await result().handleSubmit(refusingRequest(triggerError, {errors: {email: ['Taken']}}));
+        await expect(
+            result().handleSubmit(() => Promise.reject(refusal(422, {errors: {email: ['Taken']}}))),
+        ).resolves.toBe('refused');
 
         expect(result().errors.value).toEqual({email: 'Taken'});
         expect(result().refused.value).toBe(true);
     });
 
-    it('ignores a late 422 after its own submit settled under onlyWhileSubmitting', async () => {
-        const {httpService, triggerError} = createMockHttpService();
-        const {result} = mountForm(httpService, {onlyWhileSubmitting: true});
-
-        await result().handleSubmit(async () => {});
-        triggerError(422, {errors: {email: ['Taken']}});
-
-        expect(result().errors.value).toEqual({});
-        expect(result().refused.value).toBe(false);
-    });
-
-    // Regression pin for DECISIONS D1 (WR-1992): the gate is a time window. Real request
-    // identity would turn this red on purpose — read D1 before changing it.
-    it('accepts a foreign 422 that lands while its submit is in flight under onlyWhileSubmitting', async () => {
-        const {httpService, triggerError} = createMockHttpService();
-        const {result} = mountForm(httpService, {onlyWhileSubmitting: true});
+    // Supersedes DECISIONS D1: identity is the submit's own rejection, so no time window is left.
+    it("never sees another request's 422, not even one that lands while its own submit is in flight", async () => {
+        const page = mountForm();
+        const dialog = mountForm();
         const gate = deferred();
 
-        const inFlight = result().handleSubmit(() => gate.promise);
-        triggerError(422, {errors: {email: ['Taken in another form']}});
+        const pageSubmit = page.result().handleSubmit(() => gate.promise);
+        await dialog.result().handleSubmit(() => Promise.reject(refusal(422, {errors: {email: ['Taken']}})));
 
-        expect(result().errors.value).toEqual({email: 'Taken in another form'});
-        expect(result().refused.value).toBe(true);
+        expect(page.result().errors.value).toEqual({});
+        expect(page.result().refused.value).toBe(false);
 
         gate.resolve();
-        await inFlight;
+        await expect(pageSubmit).resolves.toBe('sent');
     });
 
-    it('signals a refusal to a consumer whose action catches and classifies the 422 itself', async () => {
-        const {httpService, triggerError} = createMockHttpService();
-        const {result} = mountForm(httpService, {fields: ['password'], onlyWhileSubmitting: true});
-        const request = refusingRequest(triggerError, {errors: {token: ['Expired']}});
-        let outcome = 'unsent';
+    it('takes a 422 caught outside a submit through take, and hands anything else back', () => {
+        const {result} = mountForm();
+        const lookup = (error: unknown) => {
+            if (!result().take(error)) throw error;
+        };
 
-        await result().handleSubmit(async () => {
-            outcome = await request().then(
-                () => 'saved',
-                () => 'refused',
-            );
+        lookup(refusal(422, {errors: {zipcode: ['Onbekende postcode']}}));
+        expect(result().errors.value).toEqual({zipcode: 'Onbekende postcode'});
+        expect(() => lookup(refusal(500, {}))).toThrow();
+    });
+
+    it('misses a 422 its action catches itself: the action must let it reject, or take it', async () => {
+        const {result} = mountForm();
+
+        const outcome = await result().handleSubmit(async () => {
+            await Promise.reject(refusal(422, {errors: {email: ['Taken']}})).catch(() => undefined);
         });
 
-        expect(outcome).toBe('refused');
-        expect(result().refused.value).toBe(true);
+        expect(outcome).toBe('sent');
+        expect(result().refused.value).toBe(false);
+    });
+
+    it('says whether the refusal named nothing it can show, for a one-line toast after the outcome', async () => {
+        const {result} = mountForm({fields: ['email']});
+
+        await result().handleSubmit(() => Promise.reject(refusal(422, {errors: {token: ['Expired']}})));
         expect(result().refusedUnnamed.value).toBe(true);
-        expect(result().unmapped.value).toEqual(['token']);
+
+        await result().handleSubmit(() => Promise.reject(refusal(422, {errors: {email: ['Taken']}})));
+        expect(result().refusedUnnamed.value).toBe(false);
     });
 
     it('drops the previous refusal when a new submit starts', async () => {
-        const {httpService, triggerError} = createMockHttpService();
-        const {result} = mountForm(httpService, {onlyWhileSubmitting: true});
+        const {result} = mountForm();
 
-        await result().handleSubmit(refusingRequest(triggerError, {errors: {email: ['Taken']}}));
+        await result().handleSubmit(() => Promise.reject(refusal(422, {errors: {email: ['Taken']}})));
         await result().handleSubmit(async () => {});
 
         expect(result().errors.value).toEqual({});
         expect(result().refused.value).toBe(false);
+    });
+});
+
+describe('useForm handleSubmit validate', () => {
+    it('refuses without running the action when validate names a field', async () => {
+        const {result} = mountForm<'email'>();
+        const action = vi.fn(async () => {});
+
+        await expect(result().handleSubmit(action, {validate: () => ({email: 'Required'})})).resolves.toBe('refused');
+
+        expect(action).not.toHaveBeenCalled();
+        expect(result().clientErrors.value).toEqual({email: 'Required'});
+        expect(result().fieldErrors.value).toEqual({email: 'Required'});
+    });
+
+    it('clears the client refusals and runs the action when validate finds nothing', async () => {
+        const {result} = mountForm<'email'>();
+        result().refuse('email', 'Required');
+        const action = vi.fn(async () => {});
+
+        await expect(result().handleSubmit(action, {validate: () => ({email: ''})})).resolves.toBe('sent');
+
+        expect(action).toHaveBeenCalledOnce();
+        expect(result().clientErrors.value).toEqual({});
+    });
+
+    it('ignores a call while a submit is in flight, before validating', async () => {
+        const {result} = mountForm<'email'>();
+        const gate = deferred();
+        const validate = vi.fn(() => ({}));
+
+        const first = result().handleSubmit(() => gate.promise);
+        await expect(result().handleSubmit(async () => {}, {validate})).resolves.toBe('ignored');
+        expect(validate).not.toHaveBeenCalled();
+
+        gate.resolve();
+        await first;
+    });
+});
+
+describe('useForm field()', () => {
+    it('links a control to the form: an id from the name, and the message with its mark and describedby', () => {
+        const {result} = mountForm<'email' | 'name' | 'learningGoals.0.title'>({
+            idPrefix: 'f',
+            onlyWhileSubmitting: false,
+        });
+
+        expect(result().field('email')).toEqual({
+            id: 'f-email',
+            invalid: false,
+            describedby: undefined,
+            error: undefined,
+        });
+
+        result().take(refusal(422, {errors: {email: ['Taken'], name: ['Required']}}));
+        result().refuse('name', 'Too short');
+
+        expect(result().field('email')).toEqual({
+            id: 'f-email',
+            invalid: true,
+            describedby: 'f-email-error',
+            error: 'Taken',
+        });
+        expect(result().field('name').error).toBe('Too short');
+        expect(result().field('learningGoals.0.title').id).toBe('f-learningGoals-0-title');
+    });
+
+    it("puts the name first and appends each form's own part from useId, so same-named fields never share an id", () => {
+        const ids: string[] = [];
+        const Block = defineComponent({
+            setup() {
+                ids.push(useForm<'email'>().field('email').id);
+                return () => null;
+            },
+        });
+        // one page (one app), two blocks that both have an `email`
+        mount(defineComponent({setup: () => () => h('div', [h(Block), h(Block)])}));
+
+        expect(ids[0]).toMatch(/^email-v-\S+$/);
+        expect(ids[1]).toMatch(/^email-v-\S+$/);
+        expect(ids[0]).not.toBe(ids[1]);
+    });
+
+    it('lets idPrefix replace the generated prefix, for an id something outside the form must know', () => {
+        const {result} = mountForm<'email'>({idPrefix: 'invoice'});
+
+        expect(result().field('email').id).toBe('invoice-email');
+    });
+});
+
+describe('useForm FormLabel and FormError (form-bound)', () => {
+    const mountRow = (options?: UseFormOptions) => {
+        let form!: UseForm<'firstName'>;
+        const wrapper = mount(
+            defineComponent({
+                setup() {
+                    form = useForm<'firstName'>(options);
+                    return () =>
+                        h('div', [
+                            h(form.FormLabel, {name: 'firstName', label: 'Voornaam', required: true, class: 'w-40'}),
+                            h(TextInput, {...form.field('firstName'), modelValue: ''}),
+                            h(form.FormError, {name: 'firstName'}),
+                        ]);
+                },
+            }),
+        );
+        return {wrapper, form: () => form};
+    };
+
+    it("labels the control field() wires, and fills the message the control's describedby names", async () => {
+        const {wrapper, form} = mountRow({idPrefix: 'client'});
+        const label = wrapper.find('label');
+
+        expect(label.attributes('for')).toBe('client-firstName');
+        expect(label.text()).toContain('Voornaam');
+        expect(label.find('.ui-label__req').exists()).toBe(true);
+        expect(label.classes()).toContain('w-40');
+
+        form().take(refusal(422, {errors: {firstName: ['Vul een voornaam in']}}));
+        await nextTick();
+
+        const message = wrapper.find(`#${wrapper.find('input').attributes('aria-describedby')}`);
+        expect(message.text()).toBe('Vul een voornaam in');
+        expect(message.attributes('role')).toBe('alert');
+    });
+
+    it('renders its slot after the label text and the required mark, inside the label', () => {
+        const wrapper = mount(
+            defineComponent({
+                setup() {
+                    const {FormLabel} = useForm<'actions'>();
+                    return () =>
+                        h(FormLabel, {name: 'actions', label: 'Acties', required: true}, () =>
+                            h('span', {class: 'note'}, 'optioneel'),
+                        );
+                },
+            }),
+        );
+        const label = wrapper.find('label');
+
+        expect(label.text()).toBe('Acties*optioneel');
+        expect(label.find('.ui-label__req + .note').exists()).toBe(true);
+    });
+
+    it("keeps the message's element in place, empty, while the field is clean", () => {
+        const {wrapper} = mountRow({idPrefix: 'client'});
+        const message = wrapper.find('p.ui-error');
+
+        expect(message.exists()).toBe(true);
+        expect(message.attributes('id')).toBe('client-firstName-error');
+        expect(message.text()).toBe('');
+    });
+});
+
+describe('useForm withdraw', () => {
+    it('leaves both bags untouched when the field has nothing to withdraw, so a keystroke costs no re-render', () => {
+        const {result} = mountForm<'email' | 'name'>();
+        result().take(refusal(422, {errors: {email: ['Taken']}}));
+        result().refuse('email', 'Too short');
+        const errors = result().errors.value;
+        const client = result().clientErrors.value;
+
+        result().withdraw('name');
+
+        expect(result().errors.value).toBe(errors);
+        expect(result().clientErrors.value).toBe(client);
+    });
+
+    it('replaces only the bag that held the field', () => {
+        const {result} = mountForm<'email' | 'name'>();
+        result().take(refusal(422, {errors: {email: ['Taken']}}));
+        result().refuse('name', 'Required');
+        const errors = result().errors.value;
+
+        result().withdraw('name');
+
+        expect(result().errors.value).toBe(errors);
+        expect(result().clientErrors.value).toEqual({});
+    });
+
+    // A message is keyed by its path, index included: after a row is added or removed before it, it would
+    // sit on another row. The component that changes the list withdraws what was said about it.
+    it('withdraws everything under a path: the list itself and every row, nothing that merely shares the prefix', () => {
+        const {result} = mountForm<string>();
+        result().take(
+            refusal(422, {
+                errors: {
+                    goals: ['Add a goal'],
+                    'goals.1.title': ['Fill in a title'],
+                    'goals.2.end': ['Too early'],
+                    goalsNote: ['Too long'],
+                },
+            }),
+        );
+        result().refuse('goals.0.title', 'Too short');
+
+        result().withdraw('goals');
+
+        expect(result().errors.value).toEqual({goalsNote: 'Too long'});
+        expect(result().clientErrors.value).toEqual({});
     });
 });

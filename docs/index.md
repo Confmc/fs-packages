@@ -70,11 +70,12 @@ Higher-level packages for domain-driven application architecture.
 
 ### UI Components
 
-Headless, themeable Vue components (the `ui-*` family) — behaviour and accessibility in the package, all styling through a CSS custom-property contract you map your design tokens onto.
+Themeable Vue components (the `ui-*` family) — behaviour and accessibility in the package, all styling through a CSS custom-property contract you map your design tokens onto. ui-inputs is headless; ui-form ships a default look on that contract.
 
-| Package                          | Description                                                                                                                                                                                                        |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| [ui-inputs](/packages/ui-inputs) | Headless UI components — field/label/error, text/number/date/textarea, checkbox/switch/radio, select/combobox/multi-select, plus the valueless controls `Pressable` / `Disclosure` — themed via `--ui-*` variables |
+| Package                          | Description                                                                                                                                                                                                                       |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [ui-form](/packages/ui-form)     | Form state and form controls in one package: `useForm` hands out controls bound to the form by name (`<TextField name>`), typed against the draft, plus the ui-inputs controls with a default look, themed via `--ui-*` variables |
+| [ui-inputs](/packages/ui-inputs) | Headless UI components — field/label/error, text/number/date/textarea, checkbox/switch/radio, select/combobox/multi-select, plus the valueless controls `Pressable` / `Disclosure` — themed via `--ui-*` variables                |
 
 ### Integrations
 

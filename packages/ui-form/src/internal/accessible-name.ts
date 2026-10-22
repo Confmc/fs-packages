@@ -55,7 +55,7 @@ export const warnWhenUnnamed = (
     if (NAME_ATTRIBUTES.some((name) => trimmedAttribute(element, name) !== '')) return;
 
     console.warn(
-        `[ui-inputs] <${component}> has no accessible name, so assistive technology announces an ` +
+        `[ui-form] <${component}> has no accessible name, so assistive technology announces an ` +
             `unnamed control (WCAG 4.1.2, Level A). Give it one of: ${contentRoutes}, \`aria-label\`, ` +
             '`aria-labelledby` or `title`.',
     );

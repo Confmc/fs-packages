@@ -31,7 +31,7 @@ const GROUPS = [
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFC + VTU mount inference
 const mountGroupCombobox = (props: Record<string, unknown>, slots?: Record<string, unknown>) =>
     mount(GroupCombobox as any, {
-        props: {groups: GROUPS, label: 'name', id: 'fruit', modelValue: null, ...props},
+        props: {groups: GROUPS, optionLabel: 'name', id: 'fruit', modelValue: null, ...props},
         slots,
         attachTo: document.body,
     });
@@ -360,7 +360,7 @@ describe('GroupCombobox', () => {
     });
 
     it('resolves the display string via a getter label function', () => {
-        const wrapper = mountGroupCombobox({label: (o: Fruit) => `${o.name}!`, modelValue: 1});
+        const wrapper = mountGroupCombobox({optionLabel: (o: Fruit) => `${o.name}!`, modelValue: 1});
         expect(wrapper.find('input').element.value).toBe('Mango!');
     });
 

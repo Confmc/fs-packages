@@ -1,22 +1,22 @@
 <template>
     <div ref="root" v-bind="rootAttrs($attrs)" class="ui-select" @keydown="onKey">
         <button
+            @click="toggle"
             v-bind="controlAttrs($attrs)"
-            :id="id"
+            :id="controlId"
             ref="reference"
             type="button"
             class="ui-control ui-select__trigger"
-            :class="{'is-open': open, 'has-value': selected !== undefined, 'is-invalid': invalid}"
+            :class="{'is-open': open, 'has-value': selected !== undefined, 'is-invalid': marked}"
             :disabled="disabled"
             role="combobox"
             aria-haspopup="listbox"
             :aria-expanded="open"
             :aria-required="required || undefined"
-            :aria-invalid="invalid || undefined"
+            :aria-invalid="marked || undefined"
             :aria-describedby="describedby"
             :aria-controls="open ? listboxId : undefined"
             :aria-activedescendant="activeDescendant"
-            @click="toggle"
         >
             <span v-if="selected === undefined && emptyDisplayValue === undefined" class="ui-select__placeholder">{{
                 placeholder
@@ -84,7 +84,7 @@
 </template>
 
 <script setup lang="ts" generic="T extends SelectItem">
-import {computed, useTemplateRef} from 'vue';
+import {computed, useId, useTemplateRef} from 'vue';
 
 import type {GroupRow} from '../internal/group-rows';
 import type {LabelKey, SelectItem} from '../types';
@@ -98,13 +98,14 @@ defineOptions({inheritAttrs: false});
 
 const {
     options,
-    label,
+    optionLabel,
     id,
     placeholder = 'Select…',
     disabled = false,
     alphabeticalSort = false,
     required = false,
-    invalid = false,
+    invalid = undefined,
+    error,
     describedby,
     emptyText = 'No options',
     optionsLabel = 'Options',
@@ -114,15 +115,21 @@ const {
 } = defineProps<{
     options: T[];
     /** property name or getter for an option's display string. */
-    label: LabelKey<T>;
-    /** stable id — required so the trigger can pair with a label/error. */
-    id: string;
+    optionLabel: LabelKey<T>;
+    /** stable id, pairing the control with its label and error; omit it and the control generates one with `useId()`. */
+    id?: string;
     placeholder?: string;
     disabled?: boolean;
     /** sort the rendered options by display string — off by default, so the caller's order is kept. */
     alphabeticalSort?: boolean;
     /** conveys the required state to assistive tech via `aria-required`. */
     required?: boolean;
+    /**
+     * the field's message (`field(name)` passes it). It marks the control invalid unless `invalid`
+     * says otherwise: `invalid: false` shows a message without the mark.
+     */
+    error?: string;
+    /** overrides the mark `error` sets; omitted, the mark follows `error`. */
     invalid?: boolean;
     describedby?: string;
     emptyText?: string;
@@ -140,6 +147,12 @@ const {
     emptyDisplayValue?: string;
 }>();
 
+// The mark: `invalid` when given, otherwise whether there is a message.
+const marked = computed(() => invalid ?? Boolean(error));
+
+const ownId = useId();
+const controlId = computed(() => id ?? ownId);
+
 defineSlots<{
     /**
      * Per-option content (swatches, icons, rich labels). Highlight/selection chrome stays
@@ -150,11 +163,11 @@ defineSlots<{
 
 const model = defineModel<T['id'] | null>({required: true});
 
-/** Resolve an option's display string from the `label` prop (property name or getter). */
+/** Resolve an option's display string from the `optionLabel` prop (property name or getter). */
 const labelOf = (option: T): string =>
-    typeof label === 'function'
-        ? label(option)
-        : String((option as Record<PropertyKey, unknown>)[label as PropertyKey]);
+    typeof optionLabel === 'function'
+        ? optionLabel(option)
+        : String((option as Record<PropertyKey, unknown>)[optionLabel as PropertyKey]);
 
 const selected = computed(() => options.find((option) => option.id === model.value));
 const sorted = computed(() =>
@@ -215,7 +228,7 @@ const {
     root,
     reference,
     floating,
-    id: () => id,
+    id: () => controlId.value,
     disabled: () => disabled,
     listLength: () => sorted.value.length,
     // A closed SingleSelect opens on Enter, ArrowDown, or Space.

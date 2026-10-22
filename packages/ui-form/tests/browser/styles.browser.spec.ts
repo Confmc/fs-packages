@@ -47,10 +47,10 @@ describe('styles.css — resting defaults', () => {
         const computed = getComputedStyle(control);
 
         expect(computed.backgroundColor).toBe('rgb(255, 255, 255)'); // --ui-control-bg
-        expect(computed.color).toBe('rgb(17, 24, 39)'); // --ui-control-text
+        expect(computed.color).toBe('rgb(0, 0, 0)'); // --ui-control-text
         expect(computed.borderTopWidth).toBe('1px'); // --ui-control-border-width
-        expect(computed.borderTopColor).toBe('rgb(209, 213, 219)'); // --ui-control-border-color
-        expect(computed.borderTopLeftRadius).toBe('8px'); // --ui-control-radius
+        expect(computed.borderTopColor).toBe('rgb(225, 218, 206)'); // --ui-control-border-color
+        expect(computed.borderTopLeftRadius).toBe('12px'); // --ui-control-radius
         expect(computed.boxShadow).toBe('none'); // --ui-control-shadow
     });
 
@@ -148,7 +148,7 @@ describe('styles.css — :root overrides (the --ui-* contract)', () => {
 
     it("keeps a territory's max(100%, 240px) floor working, and grows the anchor with it", () => {
         addStyle(uiCss);
-        // kendo's shipped override, verbatim (shared/styles/ui-inputs.css).
+        // a consumer's shipped override, verbatim.
         document.documentElement.style.setProperty('--ui-menu-min-width', 'max(100%, 240px)');
         const {anchor, menu} = addAnchoredMenu('180px');
 
@@ -213,22 +213,47 @@ describe('styles.css — group header (--ui-group-header-*)', () => {
 });
 
 describe('styles.css — WR-0512 font-size source-order regression pins', () => {
-    it('the default reproduces the historical `font: inherit` (control text follows the parent)', () => {
+    it('the default is 14px; `--ui-control-font-size: inherit` restores following the parent', () => {
         addStyle(uiCss);
         const control = addControl('font-size: 18px');
+        expect(getComputedStyle(control).fontSize).toBe('14px');
+
+        document.documentElement.style.setProperty('--ui-control-font-size', 'inherit');
         expect(getComputedStyle(control).fontSize).toBe('18px');
     });
 
-    it('pins the trap: a declaration utility EARLIER in source order silently loses to the package sheet', () => {
-        // Utility first, package sheet last — the arrangement WR-0512 documented: both
-        // selectors are one class (0,1,0), so the later sheet wins the tie and the
-        // utility's font-size silently vanishes under the package's font reset.
+    it('a utility wins even EARLIER in source order: the package rules sit in the ui-form layer', () => {
+        // WR-0512's trap, closed: utility first, package sheet last used to tie at (0,1,0) and lose
+        // on order. Unlayered consumer CSS now beats every layered package rule.
         addStyle('.text-sm { font-size: 13px; }');
         addStyle(uiCss);
         const control = addControl('font-size: 18px');
         control.classList.add('text-sm');
 
-        expect(getComputedStyle(control).fontSize).toBe('18px');
+        expect(getComputedStyle(control).fontSize).toBe('13px');
+    });
+
+    it("an attributify utility beats the package's width:100%, the <TextInput w-40> case", () => {
+        addStyle(uiCss);
+        addStyle('[w-40] { width: 10rem; }');
+        const control = addControl();
+        control.setAttribute('w-40', '');
+
+        expect(getComputedStyle(control).width).toBe('160px');
+    });
+
+    it('an unlayered element base also beats the package; declaring its layer first restores the package', () => {
+        addStyle(uiCss);
+        addStyle('input { font-size: 20px; }');
+        const control = addControl();
+        expect(getComputedStyle(control).fontSize).toBe('20px');
+
+        // the documented consumer setup: order declared first, the element base in the earlier layer
+        for (const el of cleanupTargets.splice(0)) el.remove();
+        addStyle('@layer base, ui-form;');
+        addStyle('@layer base { input { font-size: 20px; } }');
+        addStyle(uiCss);
+        expect(getComputedStyle(addControl()).fontSize).toBe('14px');
     });
 
     it('the --ui-control-font-size var wins by contract, regardless of source order', () => {
@@ -310,7 +335,7 @@ describe('styles.css — state-variant hooks on real states', () => {
 
         const focused = getComputedStyle(control);
         expect(focused.backgroundColor).toBe('rgb(255, 255, 255)'); // --ui-control-bg-focus → --ui-control-bg
-        expect(focused.color).toBe('rgb(17, 24, 39)'); // --ui-control-text-focus → --ui-control-text
+        expect(focused.color).toBe('rgb(0, 0, 0)'); // --ui-control-text-focus → --ui-control-text
         expect(focused.borderTopWidth).toBe('1px'); // --ui-control-border-width-focus → resting width
     });
 
@@ -333,7 +358,7 @@ describe('styles.css — state-variant hooks on real states', () => {
         const control = addControl();
         control.disabled = true;
 
-        expect(getComputedStyle(control).backgroundColor).toBe('rgb(243, 244, 246)'); // --ui-control-bg-disabled
+        expect(getComputedStyle(control).backgroundColor).toBe('rgb(251, 248, 242)'); // --ui-control-bg-disabled
         expect(getComputedStyle(control).color).toBe('rgb(107, 114, 128)'); // --ui-control-text-muted
         expect(getComputedStyle(control).cursor).toBe('not-allowed');
     });
@@ -365,7 +390,7 @@ describe('styles.css — checkbox family (--ui-check-* / --ui-switch-*)', () => 
         expect(computed.width).toBe('18px'); // --ui-check-size 1.125rem
         expect(computed.height).toBe('18px');
         expect(computed.borderTopWidth).toBe('1px'); // --ui-check-border-width → --ui-control-border-width
-        expect(computed.borderTopColor).toBe('rgb(209, 213, 219)'); // → --ui-control-border-color
+        expect(computed.borderTopColor).toBe('rgb(225, 218, 206)'); // → --ui-control-border-color
         expect(computed.borderTopLeftRadius).toBe('4px'); // --ui-check-radius
         expect(computed.backgroundColor).toBe('rgb(255, 255, 255)'); // --ui-check-bg → --ui-control-bg
 
@@ -413,7 +438,7 @@ describe('styles.css — checkbox family (--ui-check-* / --ui-switch-*)', () => 
         const track = getComputedStyle(input);
         expect(track.width).toBe('36px'); // --ui-switch-track-width 2.25rem
         expect(track.height).toBe('20px'); // --ui-switch-track-height 1.25rem
-        expect(track.backgroundColor).toBe('rgb(209, 213, 219)'); // --ui-switch-track-bg → border-color token
+        expect(track.backgroundColor).toBe('rgb(225, 218, 206)'); // --ui-switch-track-bg → border-color token
 
         // Resting thumb: 14px (--ui-switch-thumb-size 0.875rem), vertically centred.
         expect(getComputedStyle(thumb).width).toBe('14px');
@@ -1010,5 +1035,108 @@ describe('styles.css — FormField orientation layout', () => {
         // And the grid comes back the moment there is room for it.
         await page.viewport(1024, 768);
         expect(getComputedStyle(field).display).toBe('grid');
+    });
+});
+
+describe('styles.css — TextInput error icon padding, scoped to ui-form markup', () => {
+    const invalidInput = (wrapped: boolean): HTMLInputElement => {
+        const input = document.createElement('input');
+        input.className = 'ui-control ui-input is-invalid';
+        const parent = document.createElement(wrapped ? 'span' : 'div');
+        if (wrapped) parent.className = 'ui-input-wrap';
+        parent.append(input);
+        document.body.append(parent);
+        cleanupTargets.push(parent);
+        return input;
+    };
+
+    it("pads room for the icon on ui-form's wrapped TextInput", () => {
+        addStyle(uiCss);
+
+        // 2 × --ui-control-pad-x (0.875rem = 14px) + 1em (the 14px control font size)
+        expect(getComputedStyle(invalidInput(true)).paddingRight).toBe('42px');
+    });
+
+    it('leaves an invalid ui-inputs 0.17 TextInput (no wrap, no icon) on the plain control padding', () => {
+        addStyle(uiCss);
+
+        expect(getComputedStyle(invalidInput(false)).paddingRight).toBe('14px');
+    });
+});
+
+describe('styles.css — NumberInput spin buttons, scoped to ui-form markup', () => {
+    const numberInput = (className: string): HTMLInputElement => {
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.className = className;
+        document.body.append(input);
+        cleanupTargets.push(input);
+        return input;
+    };
+
+    it("hides the spin buttons on ui-form's NumberInput and leaves a ui-inputs 0.17 one alone", () => {
+        addStyle(uiCss);
+
+        expect(getComputedStyle(numberInput('ui-control ui-input ui-number')).appearance).toBe('textfield');
+        expect(getComputedStyle(numberInput('ui-control ui-input')).appearance).not.toBe('textfield');
+    });
+});
+
+describe('styles.css — TimeInput layout', () => {
+    it('keeps the text clear of the clock and the clear button, and moves the clear button beside the error icon', () => {
+        addStyle(uiCss);
+        const wrap = document.createElement('span');
+        wrap.className = 'ui-input-wrap';
+        wrap.style.width = '200px';
+        wrap.innerHTML =
+            '<svg class="ui-input__lead"></svg><input type="time" class="ui-control ui-input ui-time has-lead has-button">' +
+            '<button class="ui-input__button"></button>';
+        document.body.append(wrap);
+        cleanupTargets.push(wrap);
+        const input = wrap.querySelector('input') as HTMLInputElement;
+        const icon = wrap.querySelector('.ui-input__lead') as HTMLElement;
+        const clear = wrap.querySelector('.ui-input__button') as HTMLElement;
+        const box = input.getBoundingClientRect();
+        const style = getComputedStyle(input);
+
+        expect(box.left + Number.parseFloat(style.paddingLeft)).toBeGreaterThanOrEqual(
+            icon.getBoundingClientRect().right,
+        );
+        expect(box.right - Number.parseFloat(style.paddingRight)).toBeLessThanOrEqual(
+            clear.getBoundingClientRect().left,
+        );
+
+        const valid = clear.getBoundingClientRect().right;
+        input.classList.add('is-invalid');
+        const invalid = clear.getBoundingClientRect().right;
+
+        // the error icon takes the edge, so the clear button moves in by about one icon and a gap
+        expect(valid - invalid).toBeGreaterThan(20);
+        expect(box.right - Number.parseFloat(getComputedStyle(input).paddingRight)).toBeLessThanOrEqual(
+            clear.getBoundingClientRect().left,
+        );
+    });
+});
+
+describe('styles.css — InputGroup', () => {
+    it('reads as one box: the addons stretch to the control, and the touching sides lose their rounding', () => {
+        addStyle(uiCss);
+        const group = document.createElement('span');
+        group.className = 'ui-input-group';
+        group.style.width = '240px';
+        group.innerHTML =
+            '<span class="ui-input-group__addon is-start">€</span><input class="ui-control ui-input">' +
+            '<span class="ui-input-group__addon is-end">per uur</span>';
+        document.body.append(group);
+        cleanupTargets.push(group);
+        const input = group.querySelector('input') as HTMLInputElement;
+        const [start, end] = group.querySelectorAll('.ui-input-group__addon');
+
+        expect(start!.getBoundingClientRect().height).toBe(input.getBoundingClientRect().height);
+        expect(getComputedStyle(input).borderTopLeftRadius).toBe('0px');
+        expect(getComputedStyle(input).borderTopRightRadius).toBe('0px');
+        expect(getComputedStyle(start!).borderTopLeftRadius).toBe('12px');
+        expect(getComputedStyle(end!).borderTopRightRadius).toBe('12px');
+        expect(start!.getBoundingClientRect().right).toBe(input.getBoundingClientRect().left);
     });
 });

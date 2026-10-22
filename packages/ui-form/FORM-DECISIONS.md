@@ -6,6 +6,11 @@ nobody dates.
 
 ## D1 — The submit gate is a time window, not request identity
 
+> **Superseded (control.9 experiment, 2026-10-09).** The form no longer listens on the service at
+> all: `handleSubmit` takes the 422 its own action rejected with, and `take(error)` takes one caught
+> elsewhere. That is request identity without a token — the cost is that an action which catches its
+> own 422 must rethrow it or hand it to `take`. `onlyWhileSubmitting` and `acceptWhen` are gone.
+
 _2026-10-03, fix round 3 on #283. Crit finding `d62f26db84c6`; follow-up row WR-1992._
 
 `useForm`'s `onlyWhileSubmitting` takes a 422 only while the form's
