@@ -364,10 +364,19 @@ control.34), `@layer base, ui-form;` in app.scss, ui-form's stylesheet only. Pac
   module-level mutant the vitest runner cannot activate; applied by hand, 8 specs fail).
 - Two one-off local unit failures today, not reproduced in 10 reruns: the known load-only select flake.
 
-### Open before a PR
+### Draft PR #323 (opened 2026-10-22)
 
-1. CHANGELOG date at merge.
-2. A full CI run on `feat/ui-form` (only CI runs every gate together).
+https://github.com/script-development/fs-packages/pull/323, from `feat/ui-form`, no labels or reviewers: for the
+lead to look at the shape and critique it, not for merge. Its body carries the ADR-0043 amendment (ADR-0015 accepts
+a PR description as the proposal). `main` was merged in first; that needed ui-form on the shared `tsdown.base.ts`
+(no source maps or comments in the bundle), happy-dom/vue/vue-tsc on main's ranges, and the `tags` job's timeout
+at 41 minutes for 16 packages. The experiment branch does not have those yet: carry them over before the next pack.
+
+CI: `browser-tests` green. `check` stops at `npm audit`: vite 8.3.0 has new high advisories, a problem of `main`
+(dependabot #321 is red on it too) and left to main. The rest of `check` runs in CI once main is past it; locally
+every step passes on the merge.
+
+Before merge: the CHANGELOG date, and the hand-publish + Trusted Publisher order.
 
 Not part of the PR: publishing (hand-publish 0.1.0 and attach the Trusted Publisher before CI publishes), the
 ADR-0043 amendment (draft written, goes through the war room), retiring fs-form and ui-inputs (separate PR
