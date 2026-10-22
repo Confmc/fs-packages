@@ -2,14 +2,20 @@
 
 Draft text for the amendment to ADR-0043 (Headless + Themeable Shared Vue UI Components). It follows the
 ADR's own dated-section pattern ("Pilot outcome (…, 2026-07-16)"). Like `HANDOFF.md`, this file stays behind
-when the package PR is made; the text goes to the ADR site.
+when the package PR is made.
+
+How it lands (ADR-0015, ADR Governance): a territory drafts an amendment and proposes it in a plan document, a PR
+description or directly; the war room reviews it, integrates it into the canonical ADR and pushes the updated
+projections into every affected territory's CLAUDE.md. A territory edits neither the ADR nor its projections. So
+this text goes into the ui-form PR description, under its own heading.
 
 ---
 
 ## Amendment: ui-form (2026-10-20)
 
-**Status:** Proposed. Built against emmie (two drawers, one fully and one in part, and a dialog-hosted modal;
-vue-tsc and specs green, browser pass pending), 2026-10-19/20.
+**Status:** Proposed. Built against emmie: two drawers, a dialog-hosted modal, a list form (care plan goals,
+create and edit as one form) and a form whose 422 is indexed by the sent list (rooms). vue-tsc and their specs
+green, browser pass with intercepted 422s, 2026-10-19 to 2026-10-22.
 
 ### What changes
 
@@ -65,13 +71,22 @@ vue-tsc and specs green, browser pass pending), 2026-10-19/20.
 - **Negative:** a breaking migration for fs-form and ui-inputs consumers (`useForm` takes no HTTP service, the
   select family's `label` becomes `optionLabel`, a form takes only its own action's 422); the CHANGELOG
   carries the migration table. Code that catches a 422 itself (a store, a composable) must rethrow it or
-  pass it to `take()`, or the form never sees it: a cost per consumer, not only an API change. The default
-  look is one territory's taste.
+  pass it to `take()`, or the form never sees it: a cost per consumer, not only an API change. Messages stand
+  until a submit settles (a sent save clears them, a 422 replaces them, an action resolving `false` is
+  `'cancelled'` and leaves them), so code that read the message bag to decide what a submit did decides on its
+  outcome instead. The default look is one territory's taste.
 - **Risks:** while fs-form forms remain, fs-form's middleware on the shared HTTP service fills every mounted
   fs-form form on any 422, including one a ui-form form's save got; a ui-form modal over an fs-form page lights
   that page up. Migrate a page together with every dialog it opens. The form-bound layer is new API; it stays pre-1.0 until its build-tested consumer runs fully on
   it. Messages are keyed by path, index included, so a list whose rows move must `withdraw(path)` what was said
   about it.
+
+### Enforcement
+
+The package's own gates carry it: coverage at 100%, Stryker over the form code, the composables and the internal
+helpers (WR-0897 closed for this package), vue-tsc type tests of the bound controls' typing (`tests/types`), a
+declaration check on an app's re-export of `createUiForm`, and axe audits in the browser suite. In a consumer,
+an architecture test per migrated component that imports nothing from fs-form or ui-inputs.
 
 ### Graduation
 
