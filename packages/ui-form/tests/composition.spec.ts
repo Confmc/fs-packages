@@ -7,12 +7,11 @@
 import {mount} from '@vue/test-utils';
 import {describe, expect, it} from 'vitest';
 
-import Textarea from '../src/components/Textarea.vue';
 import TextInput from '../src/components/TextInput.vue';
 
 describe.each([
     ['TextInput', TextInput, 'input'],
-    ['Textarea', Textarea, 'textarea'],
+    // Textarea's row returns with Textarea.
 ] as const)('%s — IME composition', (_name, component, selector) => {
     const mountField = () =>
         // eslint-disable-next-line @typescript-eslint/no-explicit-any -- two SFCs through one mount
@@ -85,7 +84,7 @@ describe.each([
 
 describe.each([
     ['TextInput', TextInput, 'input'],
-    ['Textarea', Textarea, 'textarea'],
+    // Textarea's row returns with Textarea.
 ] as const)('%s — a re-render during composition', (_name, component, selector) => {
     it('keeps the candidate text in the field, then commits it on compositionend', async () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any -- two SFCs through one mount
