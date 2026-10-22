@@ -219,22 +219,42 @@ describe('styles.css — WR-0512 font-size source-order regression pins', () => 
         expect(getComputedStyle(control).fontSize).toBe('18px');
     });
 
-    it('pins the trap: a declaration utility EARLIER in source order silently loses to the package sheet', () => {
-        // Utility first, package sheet last — the arrangement WR-0512 documented: both
-        // selectors are one class (0,1,0), so the later sheet wins the tie and the
-        // utility's font-size silently vanishes under the package's font reset.
+    it('a utility wins even EARLIER in source order: the package rules sit in the ui-form layer', () => {
+        // WR-0512's trap, closed: utility first, package sheet last used to tie at (0,1,0) and lose
+        // on order. Unlayered consumer CSS now beats every layered package rule.
         addStyle('.text-sm { font-size: 13px; }');
         addStyle(uiCss);
         const control = addControl('font-size: 18px');
         control.classList.add('text-sm');
 
-        expect(getComputedStyle(control).fontSize).toBe('18px');
+        expect(getComputedStyle(control).fontSize).toBe('13px');
+    });
+
+    it("an attributify utility beats the package's width:100%, the <TextInput w-40> case", () => {
+        addStyle(uiCss);
+        addStyle('[w-40] { width: 10rem; }');
+        const control = addControl();
+        control.setAttribute('w-40', '');
+
+        expect(getComputedStyle(control).width).toBe('160px');
+    });
+
+    it('an unlayered element base also beats the package; declaring its layer first restores the package', () => {
+        addStyle(uiCss);
+        addStyle('input { font-size: 20px; }');
+        expect(getComputedStyle(addControl('font-size: 18px')).fontSize).toBe('20px');
+
+        // the documented consumer setup: order declared first, the element base in the earlier layer
+        for (const el of cleanupTargets.splice(0)) el.remove();
+        addStyle('@layer base, ui-form;');
+        addStyle('@layer base { input { font-size: 20px; } }');
+        addStyle(uiCss);
+        expect(getComputedStyle(addControl('font-size: 18px')).fontSize).toBe('18px');
     });
 
     it('the --ui-control-font-size var wins by contract, regardless of source order', () => {
         // The escape hatch WR-0511/WR-0512 shipped: the utility sets the VAR the package
-        // rule reads instead of fighting the declaration tie — so it survives even when the
-        // package sheet comes last (where a plain font-size utility loses, pinned above).
+        // rule reads, so it holds whatever the cascade order, layered or not.
         addStyle('.size-sm { --ui-control-font-size: 13px; }');
         addStyle(uiCss);
         const control = addControl('font-size: 18px');
@@ -243,7 +263,7 @@ describe('styles.css — WR-0512 font-size source-order regression pins', () => 
         expect(getComputedStyle(control).fontSize).toBe('13px');
     });
 
-    it('the same declaration utility LATER in source order wins — order-dependence is what makes the trap silent', () => {
+    it('the same declaration utility LATER in source order wins too', () => {
         addStyle(uiCss);
         addStyle('.text-sm { font-size: 13px; }');
         const control = addControl('font-size: 18px');
@@ -1010,5 +1030,31 @@ describe('styles.css — FormField orientation layout', () => {
         // And the grid comes back the moment there is room for it.
         await page.viewport(1024, 768);
         expect(getComputedStyle(field).display).toBe('grid');
+    });
+});
+
+describe('styles.css — TextInput error icon padding, scoped to ui-form markup', () => {
+    const invalidInput = (wrapped: boolean): HTMLInputElement => {
+        const input = document.createElement('input');
+        input.className = 'ui-control ui-input is-invalid';
+        const parent = document.createElement(wrapped ? 'span' : 'div');
+        if (wrapped) parent.className = 'ui-input-wrap';
+        parent.append(input);
+        document.body.append(parent);
+        cleanupTargets.push(parent);
+        return input;
+    };
+
+    it("pads room for the icon on ui-form's wrapped TextInput", () => {
+        addStyle(uiCss);
+
+        // 2 × --ui-control-pad-x (0.75rem = 12px) + 1em (the inherited 16px control font size)
+        expect(getComputedStyle(invalidInput(true)).paddingRight).toBe('40px');
+    });
+
+    it('leaves an invalid ui-inputs 0.17 TextInput (no wrap, no icon) on the plain control padding', () => {
+        addStyle(uiCss);
+
+        expect(getComputedStyle(invalidInput(false)).paddingRight).toBe('12px');
     });
 });
