@@ -29,6 +29,8 @@
                  root, and Enter on one must remove the chip — never leak into the listbox
                  skeleton and open the menu. -->
             <button
+                @click="toggle"
+                @keydown="onTriggerKey"
                 v-bind="controlAttrs($attrs)"
                 :id="controlId"
                 ref="reference"
@@ -43,8 +45,6 @@
                 :aria-describedby="describedby"
                 :aria-controls="open ? listboxId : undefined"
                 :aria-activedescendant="activeDescendant"
-                @click="toggle"
-                @keydown="onTriggerKey"
             >
                 <span v-if="!model.length" class="ui-multiselect__placeholder">{{ placeholder }}</span>
                 <!-- The trigger's accessible VALUE (WCAG 4.1.2): the chips render OUTSIDE this

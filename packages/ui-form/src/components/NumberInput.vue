@@ -2,6 +2,7 @@
     <span v-bind="rootAttrs($attrs)" class="ui-input-wrap">
         <!-- class/style style the whole control (this root); everything else lands on the <input>, as on TextInput -->
         <input
+            @input="onInput"
             v-bind="controlAttrs($attrs)"
             ref="input"
             :id="controlId"
@@ -17,7 +18,6 @@
             :aria-required="required || undefined"
             :aria-invalid="marked || undefined"
             :aria-describedby="describedby"
-            @input="onInput"
         />
         <ErrorIcon v-if="marked" />
     </span>

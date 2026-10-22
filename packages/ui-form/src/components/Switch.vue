@@ -8,6 +8,7 @@
                 :id="controlId"
                 ref="input"
                 v-guard-while-disabled="disabled"
+                @change="onChange"
                 v-bind="$attrs"
                 type="checkbox"
                 role="switch"
@@ -18,7 +19,6 @@
                 :aria-required="required || undefined"
                 :aria-invalid="marked || undefined"
                 :aria-describedby="describedby"
-                @change="onChange"
             />
             <span class="ui-switch__thumb" aria-hidden="true"></span>
         </span>

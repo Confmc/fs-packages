@@ -10,6 +10,9 @@
             />
         </svg>
         <input
+            @input="onInput"
+            @click="togglePicker"
+            @blur="pickerOpen = false"
             v-bind="controlAttrs($attrs)"
             ref="input"
             :id="controlId"
@@ -22,9 +25,6 @@
             :aria-required="required || undefined"
             :aria-invalid="marked || undefined"
             :aria-describedby="describedby"
-            @input="onInput"
-            @click="togglePicker"
-            @blur="pickerOpen = false"
         />
         <!-- mousedown is prevented so the click keeps focus on the input -->
         <button
