@@ -268,19 +268,18 @@ const bind = (field: Field, control: Component, name: string, labelOnControl: bo
         {name, inheritAttrs: false, props: ['name', 'label', 'required', 'orientation', 'prepend', 'append']},
     );
 
-/** The field frame by name: `FormField` with the form's id and message for that name; its slot gets the wiring. */
+/**
+ * The field frame by name: `FormField` with the form's id and message for that name; its slot gets the
+ * wiring. Everything but the name (label, required, orientation, class) falls through to `FormField`.
+ */
 const bindFrame = (field: Field) =>
     defineComponent(
-        (props: Shell<string>, {slots}) =>
+        (props: {name: string}, {slots}) =>
             () => {
                 const {id, error} = field(props.name);
-                return h(
-                    FormField,
-                    {id, error, label: props.label, required: props.required, orientation: props.orientation},
-                    slots,
-                );
+                return h(FormField, {id, error}, slots);
             },
-        {name: 'FormField', props: ['name', 'label', 'required', 'orientation']},
+        {name: 'FormField', props: ['name']},
     );
 
 /** The bound controls of one form. The casts: a setup-function component cannot carry these types. */

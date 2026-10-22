@@ -43,6 +43,7 @@ describe('form-bound controls', () => {
         expect(input.element.value).toBe('Ann');
         expect(input.attributes('placeholder')).toBe('Vul in');
         expect(input.attributes('aria-required')).toBe('true');
+        expect(wrapper.find('label .ui-label__req').exists()).toBe(true);
         expect(wrapper.find('.ui-field').classes()).toContain('w-40');
 
         await input.setValue('Bo');
@@ -134,6 +135,8 @@ describe('form-bound controls', () => {
         expect(wrapper.find('label').attributes('for')).toBe(id);
         expect(wrapper.find('.ui-field').classes()).toContain('w-40');
         expect(wrapper.find(`#${id}-error`).text()).toBe('Te kort');
+        expect(wrapper.find('label .ui-label__req').exists()).toBe(true);
+        expect(form().FormField.name).toBe('FormField');
         expect(scope).toEqual({id, invalid: true, describedby: `${id}-error ${id}-hint`, error: 'Te kort'});
     });
 
@@ -269,17 +272,19 @@ describe('form-bound controls', () => {
 });
 
 describe('createUiForm', () => {
-    const ui = createUiForm({
-        texts: {
-            placeholder: 'Kies…',
-            emptyText: 'Geen opties',
-            optionsLabel: 'Opties',
-            removeLabel: 'Verwijder',
-            requiredLabel: '(verplicht)',
-            clearButtonLabel: 'Wis',
-            showPasswordLabel: 'Toon wachtwoord',
-        },
-    });
+    // built per test: a factory that throws at collection would fail the file with no test run
+    const ui = () =>
+        createUiForm({
+            texts: {
+                placeholder: 'Kies…',
+                emptyText: 'Geen opties',
+                optionsLabel: 'Opties',
+                removeLabel: 'Verwijder',
+                requiredLabel: '(verplicht)',
+                clearButtonLabel: 'Wis',
+                showPasswordLabel: 'Toon wachtwoord',
+            },
+        });
 
     it('gives the bound selects the configured texts, and only the controls that declare them', () => {
         const {wrapper} = mountWith(
@@ -288,7 +293,7 @@ describe('createUiForm', () => {
                     h(SingleSelectField, {name: 'debtorId', options: debtors, optionLabel: 'name'}),
                     h(TextField, {name: 'name'}),
                 ]),
-            ui.useForm,
+            ui().useForm,
         );
 
         expect(wrapper.findComponent(SingleSelect).props('placeholder')).toBe('Kies…');
@@ -304,7 +309,7 @@ describe('createUiForm', () => {
                     h(MultiSelectField, {name: 'tagIds', options: debtors, optionLabel: 'name'}),
                     h(CheckboxGroupField, {name: 'tagIds', options: debtors, optionLabel: 'name', label: 'Tags'}),
                 ]),
-            ui.useForm,
+            ui().useForm,
         );
 
         expect(
@@ -319,8 +324,8 @@ describe('createUiForm', () => {
     });
 
     it('hands out the bare controls with those texts as defaults; the call site still wins', () => {
-        const defaulted = mount(ui.SingleSelect, {props: {options: debtors, optionLabel: 'name', modelValue: null}});
-        const overridden = mount(ui.SingleSelect, {
+        const defaulted = mount(ui().SingleSelect, {props: {options: debtors, optionLabel: 'name', modelValue: null}});
+        const overridden = mount(ui().SingleSelect, {
             props: {options: debtors, optionLabel: 'name', modelValue: null, placeholder: 'Eigen'},
         });
 
@@ -333,7 +338,7 @@ describe('createUiForm', () => {
         const wrapper = mount(
             defineComponent({
                 setup: () => {
-                    const {TimeField} = ui.useForm({draft});
+                    const {TimeField} = ui().useForm({draft});
                     return () => h(TimeField, {name: 'start', label: 'Start'});
                 },
             }),
@@ -343,7 +348,7 @@ describe('createUiForm', () => {
     });
 
     it('gives a bare SearchInput the configured clear button name', () => {
-        const wrapper = mount(ui.SearchInput, {props: {modelValue: 'appel'}});
+        const wrapper = mount(ui().SearchInput, {props: {modelValue: 'appel'}});
 
         expect(wrapper.find('.ui-input__button').attributes('aria-label')).toBe('Wis');
     });
@@ -353,7 +358,7 @@ describe('createUiForm', () => {
         const wrapper = mount(
             defineComponent({
                 setup: () => {
-                    const {PasswordField} = ui.useForm({draft});
+                    const {PasswordField} = ui().useForm({draft});
                     return () => h(PasswordField, {name: 'password', label: 'Wachtwoord'});
                 },
             }),
@@ -363,7 +368,7 @@ describe('createUiForm', () => {
     });
 
     it('keeps the control name on every bare control it wraps with texts', () => {
-        const wrapped = Object.entries(ui).filter(([key]) => key !== 'useForm');
+        const wrapped = Object.entries(ui()).filter(([key]) => key !== 'useForm');
 
         expect(wrapped.map(([key, control]) => [key, (control as {name?: string}).name])).toEqual(
             wrapped.map(([key]) => [key, key]),
