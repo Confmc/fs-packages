@@ -6,9 +6,9 @@ import {mount} from '@vue/test-utils';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {defineComponent, h, nextTick, ref} from 'vue';
 
-import type {UseForm, UseFormOptions} from '../src';
+import type {UseForm, UseFormOptions} from '../../src';
 
-import {useForm} from '../src';
+import {useForm} from '../../src';
 
 const createMockHttpService = () => {
     const errorMiddlewares: ResponseErrorMiddlewareFunc[] = [];
