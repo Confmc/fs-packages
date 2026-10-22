@@ -21,13 +21,42 @@ const deferred = () => {
 };
 
 describe('useFormSubmit', () => {
-    it('clears prior errors before running the action', async () => {
+    it('keeps prior errors while the action runs and clears them when it resolves', async () => {
+        const clearErrors = vi.fn();
+        const {handleSubmit} = useFormSubmit({clearErrors, take});
+        const gate = deferred();
+
+        const inFlight = handleSubmit(() => gate.promise);
+        expect(clearErrors).not.toHaveBeenCalled();
+
+        gate.resolve();
+        await expect(inFlight).resolves.toBe('sent');
+        expect(clearErrors).toHaveBeenCalledOnce();
+    });
+
+    it("reads an action that resolves false as 'cancelled': it sent nothing, so the errors stay", async () => {
+        const clearErrors = vi.fn();
+        const {handleSubmit, submitting} = useFormSubmit({clearErrors, take});
+
+        await expect(handleSubmit(async () => false)).resolves.toBe('cancelled');
+        expect(clearErrors).not.toHaveBeenCalled();
+        expect(submitting.value).toBe(false);
+    });
+
+    it('sends on any other resolved value, a saved id included', async () => {
         const clearErrors = vi.fn();
         const {handleSubmit} = useFormSubmit({clearErrors, take});
 
-        await handleSubmit(async () => {});
-
+        await expect(handleSubmit(async () => 0)).resolves.toBe('sent');
         expect(clearErrors).toHaveBeenCalledOnce();
+    });
+
+    it('leaves the errors as they were when the action fails with anything but a 422', async () => {
+        const clearErrors = vi.fn();
+        const {handleSubmit} = useFormSubmit({clearErrors, take});
+
+        await expect(handleSubmit(() => Promise.reject(makeAxiosError(500)))).rejects.toBeTruthy();
+        expect(clearErrors).not.toHaveBeenCalled();
     });
 
     it('toggles submitting true during the action and false after', async () => {

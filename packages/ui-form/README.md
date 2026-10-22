@@ -748,13 +748,14 @@ included. A host that builds the form for its child (a dialog host, say) passes 
 `shallowRef(model)` hides its `Ref<D>` from TypeScript, and the call would not see the draft's paths.
 
 `handleSubmit(action, {validate})` takes the 422 its own action rejected with, so a form holds exactly its own
-requests' refusals; another form's request never lands in it. It resolves to `'sent'`, `'refused'` or
-`'ignored'` (a call while one is in flight); any other rejection propagates out of `handleSubmit`, so a caller
+requests' refusals; another form's request never lands in it. It resolves to `'sent'`, `'refused'`,
+`'cancelled'` (the action resolved `false`: it sent nothing) or `'ignored'` (a call while one is in flight); any other rejection propagates out of `handleSubmit`, so a caller
 that reports a failed save catches it (`handleSubmit(save).catch(reportFailure)`). It runs `validate` first when given (a refusal skips the action), and on
 `'refused'` scrolls the first refused field into view. An action that catches its own 422 must rethrow it or pass
 it to `take(error)`, which binds a 422 caught anywhere (a lookup outside a submit) and says whether it was one.
-Messages stay until the next submit; `withdraw(name)` drops one sooner. A submit clears them when it starts, so
-ask a confirmation ("overwrite?") before calling `handleSubmit`: a "no" then leaves the messages standing.
+Messages stay until the next submit settles: a sent save clears them, a 422 replaces them, and a declined one
+leaves them, so a question inside the save needs nothing else (`if (!(await confirmOverwrite())) return false;`).
+`withdraw(name)` drops one sooner.
 
 A message is keyed by its path, index included (`goals.1.title`). When rows are added or removed before a refused
 one, its message would sit on another row, so the code that changes the list withdraws what was said about it:

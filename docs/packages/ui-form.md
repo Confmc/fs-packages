@@ -148,23 +148,29 @@ composes them itself.
 
 ## Submitting
 
-`handleSubmit(action, {validate})` guards against a double submit and ends in one of three outcomes:
+`handleSubmit(action, {validate})` guards against a double submit and ends in one of four outcomes:
 
-| Outcome     | When                                                                                      |
-| ----------- | ----------------------------------------------------------------------------------------- |
-| `'sent'`    | The action ran to the end                                                                 |
-| `'refused'` | The action rejected with a 422, or `validate` returned a message (the action did not run) |
-| `'ignored'` | A submit of this form was already in flight; the action did not run                       |
+| Outcome       | When                                                                                      |
+| ------------- | ----------------------------------------------------------------------------------------- |
+| `'sent'`      | The action ran to the end                                                                 |
+| `'refused'`   | The action rejected with a 422, or `validate` returned a message (the action did not run) |
+| `'cancelled'` | The action resolved `false`: it sent nothing, such as a save the user declined            |
+| `'ignored'`   | A submit of this form was already in flight; the action did not run                       |
 
 It takes the 422 **its own action** rejected with, so a form holds exactly its own requests' refusals; another
 form's request never lands in it, and the form needs no HTTP service. Any other rejection is thrown on. On
 `'refused'` the first refused field scrolls into view unless `scrollToError` is off. Messages stay until the next
-submit, which clears them when it starts: ask a confirmation ("overwrite?") before calling `handleSubmit`, so a
-"no" leaves them standing.
+submit settles: a sent save clears them, a 422 replaces them, and a cancelled one leaves them standing, so a
+question inside the save needs nothing else:
 
 ```typescript
 const outcome = await handleSubmit(() => save(draft.value), {validate: () => checkDates(draft.value)});
 if (outcome === 'sent') close();
+
+const save = async () => {
+    if (!(await confirmOverwrite())) return false; // 'cancelled': the messages stay
+    await store.update(draft.value);
+};
 ```
 
 **A 422 outside a submit.** An action that catches its own 422 must rethrow it or pass it on, and so must a

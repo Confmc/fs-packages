@@ -96,6 +96,22 @@ describe('useForm', () => {
         ).rejects.toBe(error);
     });
 
+    it("keeps a refusal's messages through a declined save, and replaces them with the next 422", async () => {
+        const {result} = mountForm<'email' | 'name'>();
+        await result().handleSubmit(() => Promise.reject(refusal(422, {errors: {email: ['Taken']}})));
+
+        await expect(result().handleSubmit(async () => false)).resolves.toBe('cancelled');
+        expect(result().errors.value).toEqual({email: 'Taken'});
+        expect(result().refused.value).toBe(true);
+
+        await result().handleSubmit(() => Promise.reject(refusal(422, {errors: {name: ['Required']}})));
+        expect(result().errors.value).toEqual({name: 'Required'});
+
+        await expect(result().handleSubmit(async () => {})).resolves.toBe('sent');
+        expect(result().errors.value).toEqual({});
+        expect(result().refused.value).toBe(false);
+    });
+
     it('clearErrors empties a populated bag', () => {
         const {result} = mountForm<'email'>();
 
