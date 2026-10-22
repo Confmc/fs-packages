@@ -750,7 +750,15 @@ Messages stay until the next submit; `withdraw(name)` drops one sooner.
 
 A message is keyed by its path, index included (`goals.1.title`). When rows are added or removed before a refused
 one, its message would sit on another row, so the code that changes the list withdraws what was said about it:
-`withdraw('goals')` drops `goals` and every `goals.*` message.
+`withdraw('goals')` drops `goals` and every `goals.*` message. Withdraw where rows are removed or reordered;
+appending needs nothing, since the rows before it keep their index. The bound controls write the draft by index,
+so sort the draft's list itself, not a copy of it.
+
+**A form over loaded data.** The draft exists when `useForm` runs; there is no form over data still loading. The
+page loads the record, then renders the form component with `v-if`, passing the record as a prop; the form
+component builds its draft from it and calls `useForm` in its `setup()`. When create and edit share that
+component, type its draft as the state both edit (the record without what the server sets, such as its id); a
+loaded record is assignable to it, so neither page needs a cast.
 
 **In a spec**, give the form a fixed `idPrefix` and build it in plain test code, no host component needed:
 `const form = useForm({draft: ref<Contract>({...}), idPrefix: 'test'})`, then pass it as the `form` prop. Without `idPrefix`, `useForm`

@@ -182,6 +182,23 @@ client refusals. Outside a submit, `refuse(field, message)` refuses one field, `
 (so a field fixed since the last check is no longer refused), `withdraw(...fields)` drops a field's messages, and
 `clearClient()` drops every client refusal. Where a field has both, the client's message shows.
 
+**Lists.** A message is keyed by its path, index included (`goals.1.title`). When a row is removed or the list is
+reordered, a refused row's message would sit on another row, so the code that changes the list withdraws what was
+said about it: `withdraw('goals')` drops `goals` and every `goals.*` message. Appending needs nothing. The bound
+controls write the draft by index, so sort the draft's list itself, not a copy of it.
+
+**A form over loaded data.** The draft exists when `useForm` runs; there is no form over data still loading. Load
+the record first, then render the form component with `v-if`, passing the record as a prop; the component builds
+its draft from it and calls `useForm` in its `setup()`:
+
+```vue
+<!-- the page -->
+<CarePlanForm v-if="plan" :plan="plan" :save="save" />
+```
+
+When create and edit share the form component, type its draft as the state both edit (the record without what
+the server sets, such as its id). A loaded record is assignable to it, so neither page needs a cast.
+
 ## Controls
 
 The controls are the ui-inputs set, plus `TimeInput`, `SearchInput`, `PasswordInput` and `InputGroup`; see the
