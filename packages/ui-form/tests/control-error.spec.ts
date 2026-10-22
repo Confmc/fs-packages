@@ -2,11 +2,12 @@
 import {mount} from '@vue/test-utils';
 import {describe, expect, it} from 'vitest';
 
-import {TextInput} from '../src';
+import {Textarea, TextInput} from '../src';
 
 // Every control, the props it needs to render, and the element that carries the mark.
 const CONTROLS: [string, unknown, Record<string, unknown>, string][] = [
     ['TextInput', TextInput, {modelValue: ''}, 'input'],
+    ['Textarea', Textarea, {modelValue: ''}, 'textarea'],
 ];
 
 const mark = (control: unknown, props: Record<string, unknown>, selector: string) =>

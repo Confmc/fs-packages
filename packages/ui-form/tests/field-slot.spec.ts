@@ -3,7 +3,7 @@ import {mount, shallowMount} from '@vue/test-utils';
 import {describe, expect, it} from 'vitest';
 import {defineComponent, h} from 'vue';
 
-import {FormField, TextInput} from '../src';
+import {FormField, Textarea, TextInput} from '../src';
 
 interface FieldScope {
     field: {id: string; invalid: boolean; describedby: string | undefined};
@@ -112,6 +112,7 @@ describe('FormField hands its control one object to bind', () => {
 
     it.each([
         ['TextInput', TextInput, {modelValue: ''}, 'input'],
+        ['Textarea', Textarea, {modelValue: ''}, 'textarea'],
         // each control adds its row
     ])('%s used outside a field gets its own id, and keeps one it was given', (_, control, props, selector) => {
         expect(
