@@ -3,13 +3,13 @@
         :id="controlId"
         type="date"
         class="ui-control ui-input"
-        :class="{'is-invalid': marked}"
+        :class="{'is-invalid': isInvalid}"
         :value="model"
         :disabled="disabled"
         :min="min"
         :max="max"
         :aria-required="required || undefined"
-        :aria-invalid="marked || undefined"
+        :aria-invalid="isInvalid || undefined"
         :aria-describedby="describedby"
         @input="model = ($event.target as HTMLInputElement).value"
     />
@@ -43,7 +43,7 @@ const {
 }>();
 
 // The mark: `invalid` when given, otherwise whether there is a message.
-const marked = computed(() => invalid ?? Boolean(error));
+const isInvalid = computed(() => invalid ?? Boolean(error));
 
 const ownId = useId();
 const controlId = computed(() => id ?? ownId);
