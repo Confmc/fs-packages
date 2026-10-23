@@ -243,7 +243,8 @@
             grid-template-columns: var(--ui-field-label-width) minmax(0, 1fr);
             align-items: start;
         }
-        .ui-field.is-horizontal > .ui-label {
+        .ui-field.is-horizontal > .ui-label,
+        .ui-field.is-horizontal > .ui-field__head {
             grid-column: 1;
             grid-row: 1;
             align-self: var(--ui-field-label-align);
@@ -260,6 +261,13 @@
             grid-column: 2;
             grid-row: 2;
         }
+    }
+
+    /* The label row a field gets when it has an aside: the label at the start, the aside at the far end. */
+    .ui-field__head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
     }
 
     .ui-label {

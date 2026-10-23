@@ -1,6 +1,11 @@
 <template>
     <div class="ui-field" :class="{'is-horizontal': orientation === 'horizontal' && Boolean(label)}">
-        <FormLabel v-if="label" :id="labelId(id)" :html-for="id" :required="required">{{ label }}</FormLabel>
+        <!-- with an aside the label shares a row with it; without one the label stays a direct child, as in ui-inputs -->
+        <div v-if="label && $slots.aside" class="ui-field__head">
+            <FormLabel :id="labelId(id)" :html-for="id" :required="required">{{ label }}</FormLabel>
+            <slot name="aside" />
+        </div>
+        <FormLabel v-else-if="label" :id="labelId(id)" :html-for="id" :required="required">{{ label }}</FormLabel>
         <!-- the slot receives `field`, whose keys are the control's own prop names, so one
              `v-bind="field"` wires the control, and `aria`, the same wiring as attributes for a native
              element; the wrapper keeps multi-node slot content in one grid cell when horizontal
@@ -47,6 +52,8 @@ const {
 defineSlots<{
     /** `field` for a control of this package, `aria` for a native element (a `role="group"` div). */
     default?: (scope: {field: FieldBinding; aria: FieldAria}) => unknown;
+    /** at the far end of the label's row, e.g. a switch that belongs to the field; it takes no wiring: the field's id is the control's. */
+    aside?: () => unknown;
 }>();
 
 const errorId = computed(() => messageId(id));
