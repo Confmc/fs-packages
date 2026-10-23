@@ -1,22 +1,23 @@
 <template>
     <div class="ui-field" :class="{'is-horizontal': orientation === 'horizontal' && Boolean(label)}">
-        <FormLabel v-if="label" :html-for="id" :required="required">{{ label }}</FormLabel>
-        <!-- the control slot receives the wiring it needs to stay accessible; the wrapper keeps
-             multi-node slot content in one grid cell when horizontal (display: contents otherwise) -->
+        <FormLabel v-if="label" :id="labelId(id)" :html-for="id" :required="required">{{ label }}</FormLabel>
+        <!-- the slot receives `field`, whose keys are the control's own prop names, so one
+             `v-bind="field"` wires the control, and `aria`, the same wiring as attributes for a native
+             element; the wrapper keeps multi-node slot content in one grid cell when horizontal
+             (display: contents otherwise) -->
         <div class="ui-field__control">
-            <slot
-                :control-id="id"
-                :error-id="errorId"
-                :required="required"
-                :invalid="Boolean(error)"
-                :describedby="error ? errorId : undefined"
-            />
+            <slot :field="field" :aria="aria" />
         </div>
-        <FormError v-if="error" :error="error" :id="errorId" />
+        <FormError v-if="message" :error="message" :id="errorId" />
     </div>
 </template>
 
 <script setup lang="ts">
+import {computed} from 'vue';
+
+import type {FieldAria, FieldBinding} from '../types';
+
+import {labelId, messageId} from '../form/field';
 import FormError from './FormError.vue';
 import FormLabel from './FormLabel.vue';
 
@@ -30,9 +31,9 @@ const {
     /** label text; omit for an unlabelled field. */
     label?: string;
     required?: boolean;
-    /** resolved error string, supplied by the consumer (error-as-prop). */
+    /** resolved error string, supplied by the consumer (error-as-prop); empty means no error. */
     error?: string;
-    /** stable control id — pass `useId()` at the call site if you have no natural one. */
+    /** the control's id; the label's `for` and the message's id follow from it. */
     id: string;
     /**
      * field layout. `'vertical'` (default) stacks the label above the control; `'horizontal'`
@@ -43,5 +44,30 @@ const {
     orientation?: 'vertical' | 'horizontal';
 }>();
 
-const errorId = `${id}-error`;
+defineSlots<{
+    /** `field` for a control of this package, `aria` for a native element (a `role="group"` div). */
+    default?: (scope: {field: FieldBinding; aria: FieldAria}) => unknown;
+}>();
+
+const errorId = computed(() => messageId(id));
+const message = computed(() => error || undefined);
+
+// The field decides the message; the control only learns whether it is invalid and where its message is.
+const field = computed<FieldBinding>(() => ({
+    id,
+    invalid: Boolean(message.value),
+    describedby: message.value && errorId.value,
+}));
+
+// A <label for> names only a form control; a native element is named by aria-labelledby instead. An attribute
+// that does not apply is left out, not set undefined, so one the consumer adds holds in any binding order.
+const aria = computed<FieldAria>(() => {
+    const {invalid, describedby} = field.value;
+    const attributes: FieldAria = {id};
+    if (label) attributes['aria-labelledby'] = labelId(id);
+    if (invalid) attributes['aria-invalid'] = 'true';
+    if (describedby) attributes['aria-describedby'] = describedby;
+
+    return attributes;
+});
 </script>
