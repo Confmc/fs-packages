@@ -5,6 +5,7 @@
                 :id="id"
                 ref="input"
                 v-guard-while-disabled="disabled"
+                @change="onChange"
                 v-bind="$attrs"
                 type="checkbox"
                 class="ui-check__input"
@@ -15,7 +16,6 @@
                 :aria-required="required || undefined"
                 :aria-invalid="invalid || undefined"
                 :aria-describedby="describedby"
-                @change="onChange"
             />
             <svg class="ui-check__icon" viewBox="0 0 20 20" aria-hidden="true">
                 <path
