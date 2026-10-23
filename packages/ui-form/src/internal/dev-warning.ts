@@ -9,7 +9,7 @@
 // like an absent `process` does (measured, both). The type says what the host may actually hand us,
 // not what node would.
 //
-// `import.meta.env` is NOT usable here: ui-inputs emits a CJS artifact too, where `import.meta` is
+// `import.meta.env` is NOT usable here: this package emits a CJS artifact too, where `import.meta` is
 // a syntax error — the same reason `.oxlintrc.json` disables `unicorn/prefer-import-meta-properties`.
 declare const process: {env?: {NODE_ENV?: string}};
 
