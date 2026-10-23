@@ -6,6 +6,7 @@ import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {defineComponent, h} from 'vue';
 
 import Checkbox from '../src/components/Checkbox.vue';
+import Pressable from '../src/components/Pressable.vue';
 import Switch from '../src/components/Switch.vue';
 import {warnWhenUnnamed} from '../src/internal/accessible-name';
 
@@ -21,7 +22,8 @@ import {warnWhenUnnamed} from '../src/internal/accessible-name';
  * attribute and no text — so a guard reading both routes off either single element fails one set.
  */
 const CONTROLS = [
-    // Pressable's and Disclosure's rows return with them.
+    {name: 'Pressable', component: Pressable as Component, props: {}, slot: 'default'},
+    // Disclosure's row returns with it.
     {name: 'Checkbox', component: Checkbox as Component, props: {id: 'agree', modelValue: false}, slot: 'default'},
     {name: 'Switch', component: Switch as Component, props: {id: 'alerts', modelValue: false}, slot: 'default'},
 ] as const;

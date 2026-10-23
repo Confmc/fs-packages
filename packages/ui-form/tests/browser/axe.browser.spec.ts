@@ -16,6 +16,7 @@ import {defineComponent, h, ref} from 'vue';
 
 import Checkbox from '../../src/components/Checkbox.vue';
 import FormField from '../../src/components/FormField.vue';
+import Pressable from '../../src/components/Pressable.vue';
 import Switch from '../../src/components/Switch.vue';
 import TextInput from '../../src/components/TextInput.vue';
 import '../../styles.css';
@@ -158,6 +159,57 @@ describe('axe-core audits — zero violations, closed and open', () => {
         await expectNoViolations(screen.container);
     });
     // each control adds its cases
+});
+
+describe('axe-core audits — interactive non-form controls, zero violations', () => {
+    it('Pressable — the native button, plain and in toggle mode', async () => {
+        const pressed = ref(false);
+        const screen = await render(
+            defineComponent(
+                () => () =>
+                    h('div', [
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFC in a render-fn host
+                        h(Pressable as any, {label: 'Show example'}),
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFC in a render-fn host
+                        h(Pressable as any, {
+                            label: 'Bold',
+                            pressed: pressed.value,
+                            'onUpdate:pressed': (value: boolean) => {
+                                pressed.value = value;
+                            },
+                        }),
+                    ]),
+            ),
+        );
+        await expectNoViolations(screen.container);
+
+        await userEvent.click(screen.container.querySelectorAll('button')[1] as HTMLElement);
+        expect(pressed.value).toBe(true);
+        await expectNoViolations(screen.container);
+    });
+
+    // HAND-WRITTEN semantic assertions — axe has no rule for "this control could have been a real
+    // button and is not", which is precisely the WCAG 2.1.1 / 4.1.2 defect class this component
+    // exists to close. A green axe run above must never be read as covering it.
+    it('Pressable renders a REAL button by default — the fallback is opt-in and complete', async () => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFC in a render-fn host
+        const screen = await render(defineComponent(() => () => h(Pressable as any, {label: 'Show example'})));
+        const control = screen.container.firstElementChild as HTMLElement;
+
+        expect(control.tagName).toBe('BUTTON');
+        expect(control.getAttribute('type')).toBe('button');
+        // Focusable with no author tabindex, because the platform supplies it.
+        expect(control.hasAttribute('tabindex')).toBe(false);
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFC in a render-fn host
+        const fallback = await render(defineComponent(() => () => h(Pressable as any, {as: 'div', label: 'Row'})));
+        const div = fallback.container.firstElementChild as HTMLElement;
+        expect(div.tagName).toBe('DIV');
+        expect(div.getAttribute('role')).toBe('button');
+        expect(div.getAttribute('tabindex')).toBe('0');
+        await expectNoViolations(fallback.container);
+    });
+    // Disclosure's cases return with it.
 });
 
 describe('axe-core audits — the field frame: hint, label row and native groups', () => {
