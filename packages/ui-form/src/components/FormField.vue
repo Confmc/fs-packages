@@ -1,6 +1,8 @@
 <template>
     <div class="ui-field" :class="{'is-horizontal': orientation === 'horizontal' && Boolean(label)}">
-        <FormLabel v-if="label" :id="labelId(id)" :html-for="id" :required="required">{{ label }}</FormLabel>
+        <FormLabel v-if="label" :id="labelId(id)" :html-for="id" :required="required">
+            {{ label }}<template v-if="$slots['label-after']" #after>{{ ' ' }}<slot name="label-after" /></template>
+        </FormLabel>
         <!-- the slot receives `field`, whose keys are the control's own prop names, so one
              `v-bind="field"` wires the control, and `aria`, the same wiring as attributes for a native
              element; the wrapper keeps multi-node slot content in one grid cell when horizontal
@@ -47,6 +49,8 @@ const {
 defineSlots<{
     /** `field` for a control of this package, `aria` for a native element (a `role="group"` div). */
     default?: (scope: {field: FieldBinding; aria: FieldAria}) => unknown;
+    /** inside the label, after its text and required mark: a tooltip. */
+    'label-after'?: () => unknown;
 }>();
 
 const errorId = computed(() => messageId(id));
