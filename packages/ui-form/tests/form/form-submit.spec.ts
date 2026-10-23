@@ -1,5 +1,4 @@
 // @vitest-environment happy-dom
-import type {AxiosError} from 'axios';
 
 import {describe, expect, it, vi} from 'vitest';
 
@@ -8,7 +7,13 @@ import {useFormSubmit, useValidationErrors} from '../../src';
 // The real taker: a 422 it takes, anything else it hands back.
 const {take} = useValidationErrors();
 
-const makeAxiosError = (status: number): AxiosError => ({isAxiosError: true, response: {status}}) as AxiosError;
+// The shape of an axios error that the form reads (see src/form/http-contract.ts); no axios import needed.
+interface RequestError {
+    isAxiosError: true;
+    response?: {status: number};
+}
+
+const makeAxiosError = (status: number): RequestError => ({isAxiosError: true, response: {status}});
 
 const deferred = () => {
     let resolve!: () => void;
@@ -114,7 +119,7 @@ describe('useFormSubmit', () => {
 
     it('re-throws an axios error that carries no response object', async () => {
         const {handleSubmit} = useFormSubmit({clearErrors: vi.fn(), take});
-        const error = {isAxiosError: true} as AxiosError;
+        const error: RequestError = {isAxiosError: true};
 
         await expect(
             handleSubmit(async () => {
