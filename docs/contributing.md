@@ -209,6 +209,7 @@ Write tests alongside your source code in the `tests/` directory. Use `describe`
 
 ```typescript
 import {describe, expect, it} from 'vitest';
+
 import {createExampleService} from '../src';
 
 describe('createExampleService', () => {
