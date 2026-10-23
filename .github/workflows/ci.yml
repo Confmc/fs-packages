@@ -14,16 +14,15 @@ jobs:
         timeout-minutes: 20
         steps:
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+            - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v6
               with:
                   node-version: 24
             - run: npm ci --ignore-scripts
-            # Scoped to HIGH+ per Commander disposition 2026-06-19: the unscoped
-            # gate fails RED on 13 residual MODERATE @changesets/* → js-yaml
-            # dev-chain advisories with no non-major fix (@changesets/cli v3 is a
-            # rejected breaking bump). --audit-level=high clears that unfixable
-            # moderate noise while preserving HIGH+ detection across prod + dev
-            # trees (a future form-data/vite-class HIGH still trips the gate).
+            # Any HIGH or CRITICAL advisory in the prod or dev tree fails this step;
+            # moderate and low do not.
+            # The advisory database changes without a commit, so this step can go
+            # red on an unchanged head, and then every PR is red until a lockfile
+            # change lands that clears ALL open highs at once.
             - run: npm audit --audit-level=high
             - run: npm run format:check
             - run: npm run lint
@@ -57,7 +56,7 @@ jobs:
             # report even when the break:90 gate fails (the score is the evidence).
             - name: Upload mutation reports
               if: always()
-              uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+              uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
               with:
                   name: mutation-reports
                   path: packages/*/reports/mutation/
@@ -77,7 +76,7 @@ jobs:
         timeout-minutes: 15
         steps:
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+            - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v6
               with:
                   node-version: 24
             - run: npm ci --ignore-scripts
@@ -109,7 +108,7 @@ jobs:
         if: always()
         steps:
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+            - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v6
               with:
                   node-version: 24
             - name: Verify every lane reported success
