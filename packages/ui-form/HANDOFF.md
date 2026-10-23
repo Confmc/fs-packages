@@ -391,7 +391,7 @@ the contract drawer toast deciding on the outcome, specs), not pushed. The test-
 
 ### What changed
 
-The one-package PR (#323, still a draft, kept for its compare link until it goes stale) is too large to
+The one-package PR (#323, a draft, CLOSED 2026-10-23; its branch `feat/ui-form` stays as reference) is too large to
 review. Two attempts were closed: #325 (a full verbatim copy) and #326 (the layer wrap stacked on it from
 the fork, which drags #325's diff along). The package now lands per component, each PR a verbatim copy
 commit from ui-inputs or fs-form followed by the change commits, so every change reads as a diff.
