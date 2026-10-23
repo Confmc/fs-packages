@@ -93,7 +93,28 @@ describe('axe-core audits — zero violations, closed and open', () => {
 });
 
 describe('axe-core audits — the field frame and native groups', () => {
-    it('a native group wired by the slot aria is named by the label and described by the message', async () => {
+    it('a field with a hint, while it shows a message', async () => {
+        const screen = await render(
+            defineComponent(
+                () => () =>
+                    h('main', [
+                        h('h1', 'Test form'),
+                        h(
+                            FormField,
+                            {label: 'Budget', id: 'budget', error: 'Fill in a budget', required: true},
+                            {
+                                default: ({field}: {field: object}) =>
+                                    h(TextInput, {...field, required: true, placeholder: '0', modelValue: ''}),
+                                hint: () => 'The amount awarded for the whole period',
+                            },
+                        ),
+                    ]),
+            ),
+        );
+        await expectNoViolations(screen.container);
+    });
+
+    it('a native group wired by the slot aria is named by the label and described by message and hint', async () => {
         const screen = await render(
             defineComponent(
                 () => () =>
@@ -108,6 +129,7 @@ describe('axe-core audits — the field frame and native groups', () => {
                                         h('button', {type: 'button', 'aria-pressed': 'false'}, 'Wlz'),
                                         h('button', {type: 'button', 'aria-pressed': 'true'}, 'Zvw'),
                                     ]),
+                                hint: () => 'Any that apply',
                             },
                         ),
                     ]),
@@ -118,6 +140,6 @@ describe('axe-core audits — the field frame and native groups', () => {
         const group = screen.container.querySelector('[role="group"]') as HTMLElement;
         const label = document.getElementById(group.getAttribute('aria-labelledby') as string);
         expect(label?.textContent?.trim()).toBe('Laws');
-        expect(group.getAttribute('aria-describedby')).toBe('laws-error');
+        expect(group.getAttribute('aria-describedby')).toBe('laws-error laws-hint');
     });
 });

@@ -3,3 +3,6 @@ export const messageId = (id: string): string => `${id}-error`;
 
 /** The id of a field's label, which a native element names in `aria-labelledby`. */
 export const labelId = (id: string): string => `${id}-label`;
+
+/** The id of a field's hint, which the control names in `aria-describedby` after the message. */
+export const hintId = (id: string): string => `${id}-hint`;
