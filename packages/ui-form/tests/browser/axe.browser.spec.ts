@@ -11,9 +11,12 @@ import type {VNode} from 'vue';
 import axe from 'axe-core';
 import {describe, expect, it} from 'vitest';
 import {render} from 'vitest-browser-vue';
-import {defineComponent, h} from 'vue';
+import {userEvent} from 'vitest/browser';
+import {defineComponent, h, ref} from 'vue';
 
+import Checkbox from '../../src/components/Checkbox.vue';
 import FormField from '../../src/components/FormField.vue';
+import Switch from '../../src/components/Switch.vue';
 import TextInput from '../../src/components/TextInput.vue';
 import '../../styles.css';
 
@@ -88,11 +91,78 @@ describe('axe-core audits — zero violations, closed and open', () => {
         );
         await expectNoViolations(screen.container);
     });
+
+    it('Checkbox — self-labelled, unchecked / checked / indeterminate', async () => {
+        const checked = ref(false);
+        const indeterminate = ref(true);
+        const screen = await render(
+            defineComponent(
+                () => () =>
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFC in a render-fn host
+                    h(Checkbox as any, {
+                        id: 'terms',
+                        label: 'Accept the terms',
+                        indeterminate: indeterminate.value,
+                        modelValue: checked.value,
+                        'onUpdate:modelValue': (value: boolean) => {
+                            checked.value = value;
+                        },
+                    }),
+            ),
+        );
+        await expectNoViolations(screen.container);
+
+        indeterminate.value = false;
+        await userEvent.click(document.getElementById('terms') as HTMLElement);
+        expect(checked.value).toBe(true);
+        await expectNoViolations(screen.container);
+    });
+
+    it('Checkbox — inside FormField (no field label; own label) with a rendered error', async () => {
+        const screen = await renderInField(
+            (slot) =>
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFC in a render-fn host
+                h(Checkbox as any, {
+                    ...slot.field,
+                    label: 'Accept the terms',
+                    modelValue: false,
+                    'onUpdate:modelValue': noop,
+                    required: slot.required,
+                }),
+            // The checkbox brings its own inline label — FormField contributes error wiring only.
+            {label: undefined, required: true, error: 'You must accept the terms'},
+        );
+        await expectNoViolations(screen.container);
+    });
+
+    it('Switch — role="switch" on the native checkbox, off and on', async () => {
+        const on = ref(false);
+        const screen = await render(
+            defineComponent(
+                () => () =>
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFC in a render-fn host
+                    h(Switch as any, {
+                        id: 'notify',
+                        label: 'Email notifications',
+                        modelValue: on.value,
+                        'onUpdate:modelValue': (value: boolean) => {
+                            on.value = value;
+                        },
+                    }),
+            ),
+        );
+        await expectNoViolations(screen.container);
+
+        await userEvent.click(document.getElementById('notify') as HTMLElement);
+        expect(on.value).toBe(true);
+        await expectNoViolations(screen.container);
+    });
     // each control adds its cases
 });
 
 describe('axe-core audits — the field frame: hint, label row and native groups', () => {
-    it('a field with a hint, a label-after tooltip and an aside checkbox, while it shows a message', async () => {
+    it('a field with a hint, a label-after tooltip and an aside switch, while it shows a message', async () => {
+        const notify = ref(false);
         const screen = await render(
             defineComponent(
                 () => () =>
@@ -106,7 +176,12 @@ describe('axe-core audits — the field frame: hint, label row and native groups
                                     h(TextInput, {...field, required: true, modelValue: ''}),
                                 'label-after': () => h('span', {title: 'Per year'}, '?'),
                                 aside: () =>
-                                    h('label', [h('input', {type: 'checkbox', id: 'budget-hours'}), ' In hours']),
+                                    h(Switch, {
+                                        id: 'budget-hours',
+                                        label: 'In hours',
+                                        modelValue: notify.value,
+                                        'onUpdate:modelValue': (next: boolean) => (notify.value = next),
+                                    }),
                                 hint: () => 'The amount awarded for the whole period',
                             },
                         ),
