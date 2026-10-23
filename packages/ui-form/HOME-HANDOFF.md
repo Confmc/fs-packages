@@ -2,7 +2,7 @@
 
 For a fresh session on a machine without the work machine's local state (no Claude memories, no
 `.experiment-packs/`, no emmie-2 peer session). Read this, then the last section of `HANDOFF.md`
-("State at 2026-10-22 evening"). Like `HANDOFF.md`, this file stays behind when the package PR is made.
+("State at 2026-10-23"). Like `HANDOFF.md`, this file stays behind when the package PR is made.
 
 ## Get going
 

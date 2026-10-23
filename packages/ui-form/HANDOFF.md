@@ -387,7 +387,7 @@ after the publish), and the public fork's experiment history naming people and e
 `error-keys-raw`: local commits on top of 8a3e30f810 (rooms, care plan as one `CarePlanForm` with two loaders,
 the contract drawer toast deciding on the outcome, specs), not pushed. The test-bed list is closed on both sides.
 
-## State at 2026-10-22 evening: landing ui-form in small PRs (read this section first)
+## State at 2026-10-22 evening: landing ui-form in small PRs (superseded by the last section)
 
 ### What changed
 
@@ -453,3 +453,85 @@ cases from `review/ui-form-vs-sources`).
    02, then the 03 branches side by side.
 3. Continue preparing locally: `03-input-group` (reference `de022a7`, plus its axe case), then
    `03-checkbox-switch` (reference `f56c1eb`).
+
+## State at 2026-10-23: first review round, new rules (read this section first)
+
+### Decided in review and by the reviewer, 2026-10-23
+
+- **PRs as small as possible**: one tiny component per PR where it can be; pairs only where the code forces it
+  (CheckboxGroup imports Checkbox). Each PR: a verbatim copy commit from ui-inputs or fs-form, then the change commits.
+- **No push rights upstream, and none coming**: no stacking. Every PR targets `main` and may contain only what is
+  already in main plus its own change. A PR that needs another unmerged one waits until that one merges.
+- **Style comes from emmie (option A).** The package keeps ui-inputs' own neutral token defaults (the stylesheet is
+  ui-inputs', verbatim). New hooks get defaults that change nothing or stay neutral. emmie's look becomes a `--ui-*`
+  token map in emmie. The "look" PR at the end of the old plan is gone.
+- **Control API**, matching ui-inputs' documented contracts (docs/packages/ui-inputs.md § Contracts, README § Errors are
+  a prop, never a service): `id` required (no `useId()` fallback); controls take only `invalid`, no `error` (FormField
+  decides the message); `FieldBinding` = `{id, invalid, describedby}`. TextInput: `placeholder` required, `type` without
+  `password`. Other inputs' placeholder: ask per component PR.
+- **`v-model` on the inner input** (TextInput, later Textarea): Vue's own IME handling, so ui-inputs' `composition.ts`
+  goes; `composition.spec` stays and pins the behaviour. (`composition.ts` came from the reviewer's own #285.)
+- Check every component PR against ui-inputs' documented contracts before opening. #328 deviates in one documented
+  place, on purpose and disclosed: TextInput puts `class`/`style` on its wrapper `span.ui-input-wrap`.
+- The FormField slot change (`{field, aria}` instead of `{controlId, errorId, required, invalid, describedby}`) is an
+  API change for its own PR to state explicitly.
+
+### #328 (scaffold + TextInput), open, waiting on re-review
+
+https://github.com/script-development/fs-packages/pull/328, branch `ui-form/01-scaffold` @ c2e98ba on `fork`. Review round
+handled one commit per comment (67262d2 id, a0e0934 placeholder, a0ce2c7 password, 780e976 invalid only, 1437ce4
+v-model), each answered in its thread; our own test review added 5467105 (parent-to-field model test), bfd7987 and
+e05c09b (comments). c2e98ba is an empty commit to re-run CI after `browser-tests` hung on the runner's Chromium system
+deps install (infra, not code; re-running needs admin rights we don't have). CI green. Review status still "changes
+requested" until the reviewer reviews again.
+
+The publish `tags` timeout 40 → 41 in #328 is REQUIRED: `validate:workflows` sizes it by the number of folders under
+`packages/` (2 × packages × 1 min + 6 + 3; 16 folders → 41). Setting it back fails `check`.
+
+### Prepared, pushed to `fork`, no PRs (all built on #328's earlier head 1437ce4)
+
+After #328 merges, merge main into each before opening (never rebase).
+
+| Branch | Stands on | To read (excl. copy) |
+|---|---|---|
+| `ui-form/p02-form-error` | #328 | +1: FormError copied unchanged + export |
+| `ui-form/n-form-label` | #328 | +1: FormLabel copied unchanged + export |
+| `ui-form/n-checkbox-switch` | #328 | +29/−158: Checkbox+Switch (ui-inputs already had id required and invalid only), the internals accessible-name, dev-warning, reactivity, disabled-guard with their specs (trimmed; cases return with their components); Stryker 94.7% |
+| `ui-form/n-form-submit` | #328 | +288/−356: first form step, useValidationErrors + useFormSubmit without HTTP (`take()`, settle-time outcomes, structural 422 contract in http-contract.ts); Stryker 100% |
+| `ui-form/p03-form-label` → `p04-form-field` → `p05-browser-suite` → `p06-field-hint` → `p07-field-label-after` → `p08-field-aside` | a chain on p02 | p04 +231/−25 (the `{field, aria}` slot, id required, field without error), p05 +179/−10 (browser suite, layer tests, axe with TextInput + FormField), p06 +88, p07 +39, p08 +58 |
+
+`p03-form-label` is superseded by `n-form-label` (same content, on #328 directly); when FormField's chain goes up,
+build it on main after FormError and FormLabel have merged.
+
+**Reference only, local, OLD rules (`error` prop, optional id), never open:** `ui-form/02-…`, `03-…`, `04-…`
+(2026-10-23 morning) and `split/*` (2026-10-22). They hold per-component changes to take from, not to merge.
+
+### The order from here
+
+1. #328 merges.
+2. Up together, each against main: FormError (`p02`), FormLabel (`n-form-label`), Checkbox+Switch
+   (`n-checkbox-switch`), the first form step (`n-form-submit`). Picked so two of the five carry real design risk
+   (non-text controls + internals; the no-HTTP submit) and feedback comes early. Then WAIT for review: it may affect
+   the rest.
+3. Then FormField and its chain (p04…p08 rebuilt on main), the browser suite, the remaining components one per PR
+   (NumberInput, DateInput, Textarea with v-model, InputGroup, CheckboxGroup+RadioGroup, Pressable, Disclosure,
+   Password/Search/TimeInput, the listbox core with a new direct OptionList.spec, the six selects), the form chain
+   (useForm, typed paths/draft, field() with bound FormLabel/FormError, the kit last), the release (docs page from
+   ui-inputs' page, CLAUDE.md row, README, `private` off).
+
+### emmie
+
+The test bed is session `error-keys-raw` in `~/worktrees/emmie-2` (branch `error-keys-raw`). Briefed 2026-10-23 on the
+new rules (style from emmie, invalid only, id required, TextInput placeholder/password, v-model). Its phase 3 plan
+(docs/plans/fs-packages-ui-form/PLAN.md § 3, d8cc8dba3e) got the package-side view: its token-map table is the full
+set (12 changed defaults + the new tokens), names stay as control.36's; required id stays (emmie writes ids, `useId()`
+at the call site; the fallback is the lead's call); the package lands as ~30 PRs with `private` off only in the last,
+the kit lands last, so the pilot waits for nearly all of it; FormField slot, field(), useForm and the kit are not yet
+reviewed in small-PR form. Development's EMMIE-2255 sends room workplaces keyed by id, so the old "Test B" (422 indexed
+by the sent list) is moot for emmie.
+
+### Next steps
+
+1. Watch #328 (a `gh` poll every 10 min was running at work). On review comments: one commit per comment, reply in
+   the thread, push. On merge: merge main into the four step-2 branches, run every gate, open them.
+2. While waiting, nothing else is to be built: the rest waits for the reviewer's feedback on the first five.
