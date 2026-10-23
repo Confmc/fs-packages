@@ -1058,3 +1058,26 @@ describe('styles.css — TextInput error icon padding, scoped to ui-form markup'
         expect(getComputedStyle(invalidInput(false)).paddingRight).toBe('12px');
     });
 });
+
+describe('styles.css — InputGroup', () => {
+    it('reads as one box: the addons stretch to the control, and the touching sides lose their rounding', () => {
+        addStyle(uiCss);
+        const group = document.createElement('span');
+        group.className = 'ui-input-group';
+        group.style.width = '240px';
+        group.innerHTML =
+            '<span class="ui-input-group__addon is-start">€</span><input class="ui-control ui-input">' +
+            '<span class="ui-input-group__addon is-end">per uur</span>';
+        document.body.append(group);
+        cleanupTargets.push(group);
+        const input = group.querySelector('input') as HTMLInputElement;
+        const [start, end] = group.querySelectorAll('.ui-input-group__addon');
+
+        expect(start!.getBoundingClientRect().height).toBe(input.getBoundingClientRect().height);
+        expect(getComputedStyle(input).borderTopLeftRadius).toBe('0px');
+        expect(getComputedStyle(input).borderTopRightRadius).toBe('0px');
+        expect(getComputedStyle(start!).borderTopLeftRadius).toBe('8px');
+        expect(getComputedStyle(end!).borderTopRightRadius).toBe('8px');
+        expect(start!.getBoundingClientRect().right).toBe(input.getBoundingClientRect().left);
+    });
+});

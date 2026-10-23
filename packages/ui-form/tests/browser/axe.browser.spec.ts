@@ -14,6 +14,7 @@ import {render} from 'vitest-browser-vue';
 import {defineComponent, h} from 'vue';
 
 import FormField from '../../src/components/FormField.vue';
+import InputGroup from '../../src/components/InputGroup.vue';
 import TextInput from '../../src/components/TextInput.vue';
 import '../../styles.css';
 
@@ -85,6 +86,19 @@ describe('axe-core audits — zero violations, closed and open', () => {
                     required: slot.required,
                 }),
             {required: true, error: 'Fruit is required'},
+        );
+        await expectNoViolations(screen.container);
+    });
+    it('FormField + InputGroup around a TextInput, the addons named in its describedby', async () => {
+        const screen = await renderInField((slot) =>
+            h(InputGroup, {id: slot.field.id, prepend: '€', append: 'per uur'}, () =>
+                h(TextInput, {
+                    ...slot.field,
+                    describedby: `${slot.field.id}-prepend ${slot.field.id}-append`,
+                    modelValue: '12',
+                    'onUpdate:modelValue': noop,
+                }),
+            ),
         );
         await expectNoViolations(screen.container);
     });
