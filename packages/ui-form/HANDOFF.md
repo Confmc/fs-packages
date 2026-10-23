@@ -503,8 +503,10 @@ After #328 merges, merge main into each before opening (never rebase).
 `p03-form-label` is superseded by `n-form-label` (same content, on #328 directly); when FormField's chain goes up,
 build it on main after FormError and FormLabel have merged.
 
-**Reference only, local, OLD rules (`error` prop, optional id), never open:** `ui-form/02-…`, `03-…`, `04-…`
-(2026-10-23 morning) and `split/*` (2026-10-22). They hold per-component changes to take from, not to merge.
+**Reference only, OLD rules (`error` prop, optional id), never open:** `ui-form/02-…`, `03-…`, `04-…` (2026-10-23
+morning; on `fork` as `reference/ui-form-*`) and `split/*` (2026-10-22, local only). They hold no code that is not in
+`review/ui-form-vs-sources`, only the assembly per component (which hunks, which spec cases cut out and restored, e.g.
+the checkbox family's interaction tests in `reference/ui-form-04-checkbox-radio-group`). Take from them, never merge.
 
 ### The order from here
 
