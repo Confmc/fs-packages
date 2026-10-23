@@ -3,17 +3,13 @@
         <!-- class/style style the whole control (this root); everything else, `data-*` and listeners
              included, lands on the <input>, as on the select family. -->
         <input
-            @input="onInput"
-            @compositionstart="onCompositionstart"
-            @compositionend="onCompositionend"
-            @change="onChange"
+            v-model="model"
             v-bind="controlAttrs($attrs)"
             ref="input"
             :id="id"
             :type="type"
             class="ui-control ui-input"
             :class="{'is-invalid': invalid}"
-            :value="shown"
             :placeholder="placeholder"
             :disabled="disabled"
             :aria-required="required || undefined"
@@ -27,7 +23,6 @@
 <script setup lang="ts">
 import {onMounted, useTemplateRef} from 'vue';
 
-import {commitOutsideComposition} from '../internal/composition';
 import {controlAttrs, rootAttrs} from '../internal/split-attrs';
 import ErrorIcon from './ErrorIcon.vue';
 
@@ -68,11 +63,4 @@ onMounted(() => {
 // an empty control); a cleared input emits '', which the fleet's
 // ConvertEmptyStringsToNull middleware converts back to null on submit.
 const model = defineModel<string | null>({required: true});
-
-const {shown, onInput, onCompositionstart, onCompositionend, onChange} = commitOutsideComposition(
-    () => model.value,
-    (value) => {
-        model.value = value;
-    },
-);
 </script>
