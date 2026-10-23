@@ -6,7 +6,7 @@ import {TextInput} from '../src';
 
 // Every control, the props it needs to render, and the element that carries the mark.
 const CONTROLS: [string, unknown, Record<string, unknown>, string][] = [
-    ['TextInput', TextInput, {id: 'name', modelValue: ''}, 'input'],
+    ['TextInput', TextInput, {id: 'name', placeholder: 'Name', modelValue: ''}, 'input'],
 ];
 
 const mark = (control: unknown, props: Record<string, unknown>, selector: string) =>

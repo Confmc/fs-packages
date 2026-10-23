@@ -15,7 +15,7 @@ describe.each([
 ] as const)('%s — IME composition', (_name, component, selector) => {
     const mountField = () =>
         // eslint-disable-next-line @typescript-eslint/no-explicit-any -- two SFCs through one mount
-        mount(component as any, {props: {id: 't', modelValue: ''}});
+        mount(component as any, {props: {id: 't', placeholder: 'one', modelValue: ''}});
 
     const type = (field: HTMLInputElement | HTMLTextAreaElement, value: string): void => {
         field.value = value;

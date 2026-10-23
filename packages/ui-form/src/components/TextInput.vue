@@ -41,7 +41,8 @@ const {
     /** control id, pairing the input with its label and error; inside a `FormField` the field passes its own. */
     id: string;
     type?: 'text' | 'email' | 'password' | 'search' | 'tel' | 'url';
-    placeholder?: string;
+    /** required, so no input goes without one. */
+    placeholder: string;
     disabled?: boolean;
     /** conveys the required state to assistive tech via `aria-required`. */
     required?: boolean;
