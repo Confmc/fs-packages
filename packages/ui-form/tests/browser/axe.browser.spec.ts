@@ -15,6 +15,7 @@ import {userEvent} from 'vitest/browser';
 import {defineComponent, h, ref} from 'vue';
 
 import Checkbox from '../../src/components/Checkbox.vue';
+import Disclosure from '../../src/components/Disclosure.vue';
 import FormField from '../../src/components/FormField.vue';
 import Switch from '../../src/components/Switch.vue';
 import TextInput from '../../src/components/TextInput.vue';
@@ -158,6 +159,64 @@ describe('axe-core audits — zero violations, closed and open', () => {
         await expectNoViolations(screen.container);
     });
     // each control adds its cases
+});
+
+describe('axe-core audits — interactive non-form controls, zero violations', () => {
+    // Pressable's cases return with it.
+
+    it('Disclosure — heading-wrapped trigger, collapsed and expanded', async () => {
+        const expanded = ref(false);
+        const screen = await render(
+            defineComponent(
+                () => () =>
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFC in a render-fn host
+                    h(
+                        Disclosure as any,
+                        {
+                            id: 'details',
+                            label: 'Details',
+                            headingLevel: 2,
+                            expanded: expanded.value,
+                            'onUpdate:expanded': (value: boolean) => {
+                                expanded.value = value;
+                            },
+                        },
+                        {default: () => h('p', 'Panel body')},
+                    ),
+            ),
+        );
+        // Collapsed: aria-controls already points at a MOUNTED panel, so the IDREF resolves. axe
+        // does NOT check that (measured: a dangling aria-controls raises neither a violation nor an
+        // incomplete), which is why the hand-written assertion in the next test exists.
+        await expectNoViolations(screen.container);
+
+        await userEvent.click(document.getElementById('details') as HTMLElement);
+        expect(expanded.value).toBe(true);
+        await expectNoViolations(screen.container);
+    });
+
+    // The live shape this replaces is `<h2 @click="collapse?.toggle">`. axe cannot see that defect
+    // either (a heading with a click handler violates no ARIA rule), so pin the correct output.
+    it('the Disclosure heading CONTAINS the button and never behaves as one', async () => {
+        const screen = await render(
+            defineComponent(
+                () => () =>
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFC in a render-fn host
+                    h(Disclosure as any, {id: 'row', label: 'Overview', headingLevel: 2}),
+            ),
+        );
+
+        const heading = screen.container.querySelector('h2') as HTMLElement;
+        expect(heading.getAttribute('role')).toBeNull();
+        expect(heading.getAttribute('tabindex')).toBeNull();
+        expect(heading.firstElementChild?.tagName).toBe('BUTTON');
+
+        const trigger = heading.querySelector('button') as HTMLButtonElement;
+        expect(trigger.getAttribute('aria-expanded')).toBe('false');
+        // The IDREF resolves in the collapsed state, in a real document. This assertion — not the
+        // green axe run above — is what goes red if the panel ever becomes a v-if (teeth-proven).
+        expect(document.getElementById(trigger.getAttribute('aria-controls') as string)).not.toBeNull();
+    });
 });
 
 describe('axe-core audits — the field frame: hint, label row and native groups', () => {
