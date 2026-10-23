@@ -33,6 +33,41 @@ describe('FormField', () => {
         expect(wrapper.text()).toContain('inv:true|db:email-error');
     });
 
+    it('renders a hint between the control and the message, read with the field after the message', () => {
+        const wrapper = mount(FormField, {
+            props: {label: 'Email', id: 'email', error: 'Bad email'},
+            slots: {default: wiringSlot, hint: 'We never share it'},
+        });
+
+        const parts = [...wrapper.find('.ui-field').element.children].map((child) => child.className);
+        expect(parts.slice(-3)).toEqual(['ui-field__control', 'ui-hint', 'ui-error']);
+        expect(wrapper.find('.ui-hint').attributes('id')).toBe('email-hint');
+        expect(wrapper.find('.ui-hint').text()).toBe('We never share it');
+        expect(wrapper.text()).toContain('db:email-error email-hint');
+    });
+
+    it('names the hint alone while there is no message, and nothing without a hint', () => {
+        const hinted = mount(FormField, {
+            props: {label: 'Email', id: 'email'},
+            slots: {default: wiringSlot, hint: 'We never share it'},
+        });
+        const plain = mount(FormField, {props: {label: 'Email', id: 'email'}, slots: {default: wiringSlot}});
+
+        expect(hinted.text()).toContain('inv:false|db:email-hint');
+        expect(plain.find('.ui-hint').exists()).toBe(false);
+        expect(plain.text()).toContain('db:undefined');
+    });
+
+    it('renders no hint when the slot is left out conditionally, and names none', () => {
+        // what `<template v-if="hint" #hint>` hands over: a hint slot that is undefined
+        const wrapper = mount(() =>
+            h(FormField, {label: 'Email', id: 'email'}, {default: wiringSlot, hint: undefined}),
+        );
+
+        expect(wrapper.find('.ui-hint').exists()).toBe(false);
+        expect(wrapper.text()).toContain('db:undefined');
+    });
+
     it('hands a native element the same wiring as aria attributes, named by the label', () => {
         let aria!: Record<string, unknown>;
         const wrapper = mount(FormField, {
@@ -42,6 +77,7 @@ describe('FormField', () => {
                     aria = scope.aria;
                     return h('div', {role: 'group', ...scope.aria});
                 },
+                hint: 'Any that apply',
             },
         });
 
@@ -50,7 +86,7 @@ describe('FormField', () => {
             id: 'laws',
             'aria-labelledby': 'laws-label',
             'aria-invalid': 'true',
-            'aria-describedby': 'laws-error',
+            'aria-describedby': 'laws-error laws-hint',
         });
         expect(wrapper.find('[role="group"]').attributes()).not.toHaveProperty('invalid');
     });
