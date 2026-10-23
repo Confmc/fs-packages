@@ -36,7 +36,13 @@ npm ci --ignore-scripts && npm run build
   fixed. Short sentences, active voice, one term per concept.
 - Pushing back is expected, on the emmie side's proposals too.
 - **CSS:** ui-form runs next to npm ui-inputs 0.17 in emmie and its stylesheet must keep 0.17 markup working.
-  New styling goes on new class names. All component rules sit in `@layer ui-form`, tokens unlayered.
+  New styling goes on new class names. All component rules sit in `@layer ui-form`, tokens unlayered. The token
+  defaults are ui-inputs' own, neutral; a new token defaults to a no-op or a neutral value. emmie's look is a
+  `--ui-*` token map in emmie, never a package default.
+- **The package absorbs awkwardness:** when the consumer needs a workaround (an extra prop, logic moved out of
+  where it belongs), fix the package's shape instead of documenting the workaround.
+- **Messages for the reviewer** go to Mattermost: clickable `[#NNN](url)` links, short lines with blank lines
+  between them, not one block.
 - Gates before a pack: the package's unit tests, `typecheck`, `lint`. Before the PR: everything in the
   repo's CI (`check` + `browser-tests`), Stryker included.
 
@@ -47,18 +53,17 @@ for the whole line. The emmie side decides that line; this side builds the packa
 what emmie must change. Without the peer session at home, leave notes for it in the commit messages and
 `HANDOFF.md`, or update `PLAN.md` on that branch directly if asked to.
 
-Sent to the emmie side on 2026-10-19: four corrections to `PLAN.md` (check they landed there):
-
-1. `private` comes out in the package PR itself (npm refuses to publish a private package); the plan keeps it.
-2. Phase 2 steps 1–3 are done and step 4 is folded into the kit; the MultiSelect sorted-model item is closed.
-3. The control contract for controls emmie keeps must include `error`: `field()` passes it, so a control that
-   doesn't declare it gets a stray attribute.
-4. Lead with `<TextField name>` in the wording; `field()` stays for compound fields.
+Sent to the emmie side on 2026-10-23 (see `HANDOFF.md` § "State at 2026-10-23" § emmie): the new rules (style
+from emmie as a token map, controls take only `invalid`, `id` required, TextInput's `placeholder` required and no
+`password`, `v-model` on the inner input) and the package-side view on its phase 3 plan. The 2026-10-19 note that
+the control contract must include `error` is superseded: controls take no `error`.
 
 ## Where the package is, and what is next
 
-See `HANDOFF.md` § "State at 2026-10-22": two branches (`experiment/ui-form-control` for work and packs,
-`feat/ui-form` for the PR), the open list, and what was done since control.21.
+See `HANDOFF.md` § "State at 2026-10-23": the package lands as one small PR per component, each against `main`
+(no push rights upstream, so no stacking). #328 is open; the next branches are on `fork` (`ui-form/p02-…`,
+`ui-form/n-…`); `reference/ui-form-*` and `review/ui-form-vs-sources` are sources only. `feat/ui-form` (#323, closed)
+is the old one-package branch, reference only.
 
 ## Gotchas
 
@@ -69,3 +74,8 @@ See `HANDOFF.md` § "State at 2026-10-22": two branches (`experiment/ui-form-con
 - happy-dom has no layout and no `showPicker`: size logic is pinned in the browser suite.
 - The select-family unit flake is local and load-only; CI has never shown it.
 - `useId()` is unique per Vue app: specs mounting two forms separately share ids; mount them under one parent.
+- The account has no admin or write rights on script-development/fs-packages: it cannot add labels or re-run CI.
+  A CI run that fails on infrastructure (the runner's Chromium deps install timing out) is re-run with an empty
+  commit whose message says so.
+- `validate:workflows` sizes the publish `tags` job's timeout by the number of folders under `packages/`
+  (2 × packages × 1 min + 6 + 3), private packages included: ui-form makes 16, so 41.
