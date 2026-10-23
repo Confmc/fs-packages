@@ -21,6 +21,7 @@ describe("a consumer's listener on a control", () => {
             defineComponent(
                 () => () =>
                     h(control as never, {
+                        id: 'control',
                         modelValue: model.value,
                         'onUpdate:modelValue': (value: unknown) => (model.value = value),
                         [`on${event[0].toUpperCase()}${event.slice(1)}`]: () => seen.push(model.value),

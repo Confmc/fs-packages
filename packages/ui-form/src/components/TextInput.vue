@@ -9,7 +9,7 @@
             @change="onChange"
             v-bind="controlAttrs($attrs)"
             ref="input"
-            :id="controlId"
+            :id="id"
             :type="type"
             class="ui-control ui-input"
             :class="{'is-invalid': isInvalid}"
@@ -25,7 +25,7 @@
 </template>
 
 <script setup lang="ts">
-import {computed, onMounted, useId, useTemplateRef} from 'vue';
+import {computed, onMounted, useTemplateRef} from 'vue';
 
 import {commitOutsideComposition} from '../internal/composition';
 import {controlAttrs, rootAttrs} from '../internal/split-attrs';
@@ -38,8 +38,8 @@ const {
     error,
     autofocus = false,
 } = defineProps<{
-    /** control id; inside a `FormField` the field passes its own, standalone it defaults to `useId()`. */
-    id?: string;
+    /** control id, pairing the input with its label and error; inside a `FormField` the field passes its own. */
+    id: string;
     type?: 'text' | 'email' | 'password' | 'search' | 'tel' | 'url';
     placeholder?: string;
     disabled?: boolean;
@@ -70,9 +70,6 @@ const input = useTemplateRef<HTMLInputElement>('input');
 onMounted(() => {
     if (autofocus) input.value?.focus();
 });
-
-const ownId = useId();
-const controlId = computed(() => id ?? ownId);
 
 // Accepts null so it binds a nullable backend field directly (Vue renders null as
 // an empty control); a cleared input emits '', which the fleet's

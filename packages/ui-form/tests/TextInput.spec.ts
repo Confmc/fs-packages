@@ -55,7 +55,7 @@ describe('TextInput', () => {
 
 describe('TextInput error icon and attributes', () => {
     it('shows the in-input error icon only while marked, hidden from assistive tech', async () => {
-        const wrapper = mount(TextInput, {props: {modelValue: ''}});
+        const wrapper = mount(TextInput, {props: {id: 'name', modelValue: ''}});
         expect(wrapper.find('.ui-input__icon').exists()).toBe(false);
 
         await wrapper.setProps({error: 'Required'});
@@ -67,7 +67,7 @@ describe('TextInput error icon and attributes', () => {
 
     it('puts class and style on the wrapper and every other attribute on the input', () => {
         const wrapper = mount(TextInput, {
-            props: {modelValue: ''},
+            props: {id: 'name', modelValue: ''},
             attrs: {class: 'w-40', style: 'margin: 1px', 'data-test': 'name', autocomplete: 'off'},
         });
         const input = wrapper.find('input');
@@ -82,14 +82,17 @@ describe('TextInput error icon and attributes', () => {
 
 describe('TextInput autofocus', () => {
     it('focuses the input when it mounts, also when that happens after page load (a dialog)', () => {
-        const wrapper = mount(TextInput, {props: {modelValue: '', autofocus: true}, attachTo: document.body});
+        const wrapper = mount(TextInput, {
+            props: {id: 'name', modelValue: '', autofocus: true},
+            attachTo: document.body,
+        });
 
         expect(document.activeElement).toBe(wrapper.find('input').element);
         wrapper.unmount();
     });
 
     it('leaves focus alone without it, and never renders the native attribute', () => {
-        const wrapper = mount(TextInput, {props: {modelValue: ''}, attachTo: document.body});
+        const wrapper = mount(TextInput, {props: {id: 'name', modelValue: ''}, attachTo: document.body});
 
         expect(document.activeElement).not.toBe(wrapper.find('input').element);
         expect(wrapper.find('input').attributes()).not.toHaveProperty('autofocus');
