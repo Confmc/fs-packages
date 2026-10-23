@@ -1,36 +1,38 @@
-import {isAxiosError} from '@script-development/fs-http';
 import {ref} from 'vue';
 
-import type {UseFormSubmit} from './types';
-
-const HTTP_UNPROCESSABLE_ENTITY = 422;
+import type {SubmitOutcome, UseFormSubmit} from './types';
 
 /**
  * Wrap a form-submit action with double-submit prevention and validation-aware
  * error handling. While an action is in flight `submitting` is `true` and
- * re-entrant calls are ignored. Before each attempt `clearErrors()` resets the
- * previous field errors.
+ * re-entrant calls are ignored.
  *
- * A 422 rejection is swallowed (the field errors were already surfaced by
- * `useValidationErrors`' middleware, so the populated form is preserved); every
- * other rejection is re-thrown to the caller / async error boundary.
+ * The previous messages stand until the action settles: an action that resolves
+ * clears them (`'sent'`), one that resolves `false` sent nothing and leaves them
+ * (`'cancelled'`, for a save the user declined), and a 422 it rejects with replaces
+ * them (`take`, `'refused'`). Every other rejection is re-thrown to the caller /
+ * async error boundary, the messages left as they were.
  *
- * @param validationErrors anything exposing `clearErrors` — typically the object
- *                         returned by `useValidationErrors`.
+ * @param validationErrors `clearErrors` and `take` — typically the object returned by `useValidationErrors`.
  */
-export const useFormSubmit = (validationErrors: {clearErrors: () => void}): UseFormSubmit => {
+export const useFormSubmit = (validationErrors: {
+    clearErrors: () => void;
+    take: (error: unknown) => boolean;
+}): UseFormSubmit => {
     const submitting = ref(false);
 
-    const handleSubmit = async (action: () => Promise<void>): Promise<void> => {
-        if (submitting.value) return;
+    const handleSubmit = async (action: () => Promise<unknown>): Promise<SubmitOutcome> => {
+        if (submitting.value) return 'ignored';
 
         submitting.value = true;
-        validationErrors.clearErrors();
 
         try {
-            await action();
+            if ((await action()) === false) return 'cancelled';
+
+            validationErrors.clearErrors();
+            return 'sent';
         } catch (error) {
-            if (isAxiosError(error) && error.response?.status === HTTP_UNPROCESSABLE_ENTITY) return;
+            if (validationErrors.take(error)) return 'refused';
 
             throw error;
         } finally {

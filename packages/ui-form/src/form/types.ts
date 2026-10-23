@@ -5,11 +5,17 @@ export type ValidationErrors<T extends string = string> = Partial<Record<T, stri
 
 /** Reactive validation-error state returned by `useValidationErrors`. */
 export interface UseValidationErrors<T extends string = string> {
-    /** Current field errors. Populated from a 422 response, cleared on demand. */
+    /** Current field errors. Populated by `take` from a 422, cleared on demand. */
     errors: Ref<ValidationErrors<T>>;
     /** Clear all field errors, the refusal and the unmapped keys together. */
     clearErrors: () => void;
-    /** `true` once a 422 has been accepted, until `clearErrors` (which `handleSubmit` calls first). */
+    /**
+     * Bind the validation errors of a caught 422 and return `true`; anything else returns `false`
+     * untouched. `handleSubmit` does this with its own error; call it for a 422 caught elsewhere:
+     * `catch (error) { if (!form.take(error)) throw error; }`.
+     */
+    take: (error: unknown) => boolean;
+    /** `true` once a 422 has been taken, until `clearErrors` (which a `'sent'` submit calls). */
     refused: Readonly<Ref<boolean>>;
     /**
      * The mapped keys of the last accepted 422 that `errors` does not hold: not named by
@@ -17,7 +23,10 @@ export interface UseValidationErrors<T extends string = string> {
      * once, however many dropped keys map to it, and never while another key bound it.
      */
     unmapped: Readonly<Ref<readonly string[]>>;
-    /** The last accepted 422 named nothing this form can mark — ADR-0048 rule 4's empty-bag check, kept in one place. */
+    /**
+     * The last taken 422 named no field this form holds (nothing to point at), so a caller can say so
+     * after `outcome === 'refused'`. Decided when it is taken: dropping messages later never flips it.
+     */
     refusedUnnamed: Readonly<Ref<boolean>>;
 }
 
@@ -36,69 +45,24 @@ export interface UseValidationErrorsOptions<T extends string = string> {
      * list is left out of `errors` and reported in `unmapped`. Omitted: every key binds.
      */
     fields?: readonly T[];
-    /**
-     * Consulted on every 422; while it returns `false` the 422 is ignored — `errors`,
-     * `refused` and `unmapped` stay as they were. `useForm`'s `onlyWhileSubmitting` passes
-     * one that reads its own `submitting`. Omitted: every 422 is taken.
-     */
-    acceptWhen?: () => boolean;
 }
+
+/**
+ * How a `handleSubmit` call ended: the action ran to the end (`'sent'`), the server refused it with a
+ * 422 (`'refused'`), the action resolved `false` because it sent nothing, such as a save the user
+ * declined (`'cancelled'`), or it never ran because a submit was already in flight (`'ignored'`).
+ */
+export type SubmitOutcome = 'sent' | 'refused' | 'cancelled' | 'ignored';
 
 /** Form-submit helper returned by `useFormSubmit`. */
 export interface UseFormSubmit {
     /**
-     * Run a submit action with double-submit prevention. A 422 (validation)
-     * rejection is swallowed — the field errors have already been surfaced by
-     * `useValidationErrors`' response middleware, so the form is preserved. Any
-     * other rejection is re-thrown to the caller / error boundary.
+     * Run a submit action with double-submit prevention. A 422 (validation) rejection is
+     * taken into the form's bag and swallowed, so the form is preserved; any other rejection
+     * is re-thrown to the caller / error boundary. An action that resolves `false` sent
+     * nothing: the messages stay. The previous messages stand until the action settles.
      */
-    handleSubmit: (action: () => Promise<void>) => Promise<void>;
+    handleSubmit: (action: () => Promise<unknown>) => Promise<SubmitOutcome>;
     /** `true` while a submit action is in flight — the form's loading state. */
     submitting: Ref<boolean>;
 }
-
-/** Options for `useForm`: the validation options plus `useForm`-only behaviour. */
-export type UseFormOptions<T extends string = string> = Omit<UseValidationErrorsOptions<T>, 'acceptWhen'> & {
-    /**
-     * Take a 422 only while this form's `handleSubmit` is in flight, so a refusal that lands
-     * while the form is idle (a late answer from a screen the user left) does not enter its bag.
-     * This is a time window, not request identity: ANY request on the same `HttpService` that
-     * answers 422 during the window lands here too — another form's submit, a background save,
-     * a dialog's request. Telling the requests apart needs a marker the consumer threads into
-     * its request options (WR-1992; DECISIONS D1).
-     * @default false
-     */
-    onlyWhileSubmitting?: boolean;
-    /**
-     * On a 422, scroll the first invalid field into view. Off unless you ask for it: an
-     * `HttpService` is shared, so a 422 fills every mounted form's bag and this cannot tell
-     * whose refusal it was — turning it on without a `scrollRoot` lets one form's refusal
-     * scroll the page to another form's field. Requires the presentation layer to mark the
-     * errored control (the default target is `[aria-invalid="true"]`, which
-     * `@script-development/ui-inputs` renders from `:invalid`).
-     * @default false
-     */
-    scrollToError?: boolean;
-    /**
-     * Scopes the `scrollToError` query to one form's subtree — pass it when forms
-     * share a page (a dialog over a page form on the same `HttpService` **must** pass
-     * it). Omitted: document-wide. Provided but `null`: no scroll (never falls back to
-     * document).
-     */
-    scrollRoot?: Ref<HTMLElement | null>;
-    /**
-     * CSS selector for the invalid-field mark, used by `scrollToError`. Defaults to
-     * `'[aria-invalid="true"]'` (what `@script-development/ui-inputs` renders). Pass your
-     * own when your inputs mark errors differently (e.g. a class) — the package derives
-     * no ids and marks nothing itself.
-     * @default '[aria-invalid="true"]'
-     */
-    scrollTarget?: string;
-};
-
-/**
- * Everything `useForm` returns: the field-error bag and `clearErrors` from
- * `useValidationErrors`, plus `handleSubmit` and the `submitting` loading flag
- * from `useFormSubmit` — wired together so a page composes one call, not two.
- */
-export type UseForm<T extends string = string> = UseValidationErrors<T> & UseFormSubmit;
