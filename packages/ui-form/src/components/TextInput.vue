@@ -12,20 +12,20 @@
             :id="id"
             :type="type"
             class="ui-control ui-input"
-            :class="{'is-invalid': isInvalid}"
+            :class="{'is-invalid': invalid}"
             :value="shown"
             :placeholder="placeholder"
             :disabled="disabled"
             :aria-required="required || undefined"
-            :aria-invalid="isInvalid || undefined"
+            :aria-invalid="invalid || undefined"
             :aria-describedby="describedby"
         />
-        <ErrorIcon v-if="isInvalid" />
+        <ErrorIcon v-if="invalid" />
     </span>
 </template>
 
 <script setup lang="ts">
-import {computed, onMounted, useTemplateRef} from 'vue';
+import {onMounted, useTemplateRef} from 'vue';
 
 import {commitOutsideComposition} from '../internal/composition';
 import {controlAttrs, rootAttrs} from '../internal/split-attrs';
@@ -34,8 +34,7 @@ import ErrorIcon from './ErrorIcon.vue';
 const {
     type = 'text',
     id,
-    invalid = undefined,
-    error,
+    invalid = false,
     autofocus = false,
 } = defineProps<{
     /** control id, pairing the input with its label and error; inside a `FormField` the field passes its own. */
@@ -47,12 +46,7 @@ const {
     disabled?: boolean;
     /** conveys the required state to assistive tech via `aria-required`. */
     required?: boolean;
-    /**
-     * the field's message (`field(name)` passes it). It marks the control invalid unless `invalid`
-     * says otherwise: `invalid: false` shows a message without the mark.
-     */
-    error?: string;
-    /** overrides the mark `error` sets; omitted, the mark follows `error`. */
+    /** marks the input invalid, with the error icon; the field around it decides the message. */
     invalid?: boolean;
     /** id of the paired error element for `aria-describedby`. */
     describedby?: string;
@@ -64,9 +58,6 @@ const {
 }>();
 
 defineOptions({inheritAttrs: false});
-
-// The mark: `invalid` when given, otherwise whether there is a message.
-const isInvalid = computed(() => invalid ?? Boolean(error));
 
 const input = useTemplateRef<HTMLInputElement>('input');
 onMounted(() => {

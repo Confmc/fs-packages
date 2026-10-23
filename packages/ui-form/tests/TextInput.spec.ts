@@ -58,7 +58,7 @@ describe('TextInput error icon and attributes', () => {
         const wrapper = mount(TextInput, {props: {id: 'name', placeholder: 'Name', modelValue: ''}});
         expect(wrapper.find('.ui-input__icon').exists()).toBe(false);
 
-        await wrapper.setProps({error: 'Required'});
+        await wrapper.setProps({invalid: true});
         expect(wrapper.find('.ui-input__icon').attributes('aria-hidden')).toBe('true');
 
         await wrapper.setProps({invalid: false});
