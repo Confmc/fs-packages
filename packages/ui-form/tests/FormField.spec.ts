@@ -33,6 +33,28 @@ describe('FormField', () => {
         expect(wrapper.text()).toContain('inv:true|db:email-error');
     });
 
+    it('puts label-after content inside the label, after the text and the required mark', () => {
+        const wrapper = mount(FormField, {
+            props: {label: 'Email', required: true, id: 'email'},
+            slots: {default: wiringSlot, 'label-after': '<em class="note">optional</em>'},
+        });
+
+        const label = wrapper.find('label.ui-label');
+        expect(label.find('.note').text()).toBe('optional');
+        expect(label.element.lastElementChild?.className).toBe('note');
+    });
+
+    it('separates label-after content from the label text, so the accessible name reads as words', () => {
+        const wrapper = mount(FormField, {
+            props: {label: 'Email', id: 'email'},
+            slots: {default: wiringSlot, 'label-after': '<span>(work)</span>'},
+        });
+        const plain = mount(FormField, {props: {label: 'Email', id: 'email'}, slots: {default: wiringSlot}});
+
+        expect(wrapper.find('label').element.textContent?.replace(/\s+/g, ' ').trim()).toBe('Email (work)');
+        expect(plain.find('label').element.textContent).toBe('Email');
+    });
+
     it('renders a hint between the control and the message, read with the field after the message', () => {
         const wrapper = mount(FormField, {
             props: {label: 'Email', id: 'email', error: 'Bad email'},

@@ -16,4 +16,12 @@ describe('FormLabel', () => {
         const wrapper = mount(FormLabel, {props: {htmlFor: 'name', required: true}, slots: {default: 'Name'}});
         expect(wrapper.find('.ui-label__req').exists()).toBe(true);
     });
+
+    it('renders the after slot last, after the text and the required marker', () => {
+        const wrapper = mount(FormLabel, {
+            props: {htmlFor: 'name', required: true},
+            slots: {default: 'Name', after: '<em class="note">optional</em>'},
+        });
+        expect(wrapper.find('label').element.lastElementChild?.className).toBe('note');
+    });
 });

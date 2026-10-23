@@ -93,7 +93,7 @@ describe('axe-core audits — zero violations, closed and open', () => {
 });
 
 describe('axe-core audits — the field frame and native groups', () => {
-    it('a field with a hint, while it shows a message', async () => {
+    it('a field with a hint and a label-after tooltip, while it shows a message', async () => {
         const screen = await render(
             defineComponent(
                 () => () =>
@@ -105,6 +105,7 @@ describe('axe-core audits — the field frame and native groups', () => {
                             {
                                 default: ({field}: {field: object}) =>
                                     h(TextInput, {...field, required: true, placeholder: '0', modelValue: ''}),
+                                'label-after': () => h('span', {title: 'Per year'}, '?'),
                                 hint: () => 'The amount awarded for the whole period',
                             },
                         ),
