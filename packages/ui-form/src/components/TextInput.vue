@@ -40,7 +40,8 @@ const {
 } = defineProps<{
     /** control id, pairing the input with its label and error; inside a `FormField` the field passes its own. */
     id: string;
-    type?: 'text' | 'email' | 'password' | 'search' | 'tel' | 'url';
+    /** a password field is PasswordInput. */
+    type?: 'text' | 'email' | 'search' | 'tel' | 'url';
     /** required, so no input goes without one. */
     placeholder: string;
     disabled?: boolean;

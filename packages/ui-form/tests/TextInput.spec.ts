@@ -20,26 +20,26 @@ describe('TextInput', () => {
     it('honours type/placeholder/required/invalid/describedby and emits on input', async () => {
         const wrapper = mount(TextInput, {
             props: {
-                id: 'pw',
-                type: 'password',
-                placeholder: 'Password',
+                id: 'email',
+                type: 'email',
+                placeholder: 'Email',
                 required: true,
                 invalid: true,
-                describedby: 'pw-error',
+                describedby: 'email-error',
                 modelValue: '',
             },
         });
         const input = wrapper.find('input');
 
-        expect(input.attributes('type')).toBe('password');
-        expect(input.attributes('placeholder')).toBe('Password');
+        expect(input.attributes('type')).toBe('email');
+        expect(input.attributes('placeholder')).toBe('Email');
         expect(input.classes()).toContain('is-invalid');
         expect(input.attributes('aria-invalid')).toBe('true');
         expect(input.attributes('aria-required')).toBe('true');
-        expect(input.attributes('aria-describedby')).toBe('pw-error');
+        expect(input.attributes('aria-describedby')).toBe('email-error');
 
-        await input.setValue('secret');
-        expect(wrapper.emitted('update:modelValue')?.[0]).toEqual(['secret']);
+        await input.setValue('a@b.nl');
+        expect(wrapper.emitted('update:modelValue')?.[0]).toEqual(['a@b.nl']);
     });
 
     it('renders the disabled attribute when disabled', () => {
