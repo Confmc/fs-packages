@@ -10,6 +10,7 @@ import {render} from 'vitest-browser-vue';
 import {cdp, page} from 'vitest/browser';
 
 import Checkbox from '../../src/components/Checkbox.vue';
+import RadioGroup from '../../src/components/RadioGroup.vue';
 import Switch from '../../src/components/Switch.vue';
 import TextInput from '../../src/components/TextInput.vue';
 import '../../styles.css';
@@ -111,6 +112,11 @@ const expectVisiblyDifferent = async (a: Element, b: Element): Promise<void> => 
     expect.soft(count / total, `${count} of ${total} pixels differ`).toBeGreaterThan(VISIBLE);
 };
 
+const expectIdentical = async (a: Element, b: Element): Promise<void> => {
+    const {count, total} = await differing(a, b);
+    expect.soft(count, `${count} of ${total} pixels differ`).toBe(0);
+};
+
 /**
  * The invalid cue is a ring around the control, not a fill, so it is measured on the padded host and
  * held to a pixel floor rather than a share of the box: a ring covers a small share of a wide input.
@@ -151,7 +157,29 @@ const mountSwitch = async (props: Record<string, unknown>): Promise<Element> => 
     return control;
 };
 
-// RadioGroup's mount helper, its cases and the expectIdentical helper they use return with it.
+/**
+ * The first option of a two-option RadioGroup. `1` selects it, `2` selects its sibling, `null` leaves
+ * the group without a selection — where every radio matches `:indeterminate`.
+ */
+const mountRadio = async (model: 1 | 2 | null, extra: Record<string, unknown> = {}): Promise<Element> => {
+    const {container} = await render(RadioGroup, {
+        container: nextHost(),
+        props: {
+            id: `rg-${slot}`,
+            label: 'Fruit',
+            optionLabel: 'name',
+            options: [
+                {id: 1, name: 'Mango'},
+                {id: 2, name: 'Apricot'},
+            ],
+            modelValue: model,
+            ...extra,
+        },
+    });
+    const control = container.querySelector('.ui-check__control');
+    if (!control) throw new Error('no radio control');
+    return control;
+};
 
 describe.each<Mode>(['none', 'active'])('forced-colors: %s — the checked state is painted', (mode) => {
     it('the instrument reads two identical controls as identical', async () => {
@@ -175,6 +203,13 @@ describe.each<Mode>(['none', 'active'])('forced-colors: %s — the checked state
         await expectVisiblyDifferent(off, mixed);
     });
 
+    it('RadioGroup: a selected option differs from an unselected one', async () => {
+        await setForcedColors(mode);
+        const off = await mountRadio(2);
+        const on = await mountRadio(1);
+        await expectVisiblyDifferent(off, on);
+    });
+
     it('Switch: on differs from off, and both differ from the bare page', async () => {
         await setForcedColors(mode);
         const off = await mountSwitch({modelValue: false});
@@ -184,12 +219,13 @@ describe.each<Mode>(['none', 'active'])('forced-colors: %s — the checked state
         await expectVisiblyDifferent(blankBeside(off), off);
     });
 
-    it('disabled Checkbox keeps checked apart from unchecked', async () => {
+    it('disabled Checkbox and RadioGroup keep checked apart from unchecked', async () => {
         await setForcedColors(mode);
         await expectVisiblyDifferent(
             await mountCheckbox({modelValue: false, disabled: true}),
             await mountCheckbox({modelValue: true, disabled: true}),
         );
+        await expectVisiblyDifferent(await mountRadio(2, {disabled: true}), await mountRadio(1, {disabled: true}));
     });
 
     it('disabled indeterminate Checkbox differs from disabled unchecked and from enabled indeterminate', async () => {
@@ -199,7 +235,14 @@ describe.each<Mode>(['none', 'active'])('forced-colors: %s — the checked state
         await expectVisiblyDifferent(await mountCheckbox({modelValue: false, indeterminate: true}), mixed);
     });
 
-    it('invalid differs from valid on TextInput, Checkbox and Switch', async () => {
+    it('RadioGroup: an option of a group with no selection paints as unselected', async () => {
+        await setForcedColors(mode);
+        await expectIdentical(await mountRadio(2), await mountRadio(null));
+        await expectIdentical(await mountRadio(2, {disabled: true}), await mountRadio(null, {disabled: true}));
+        await expectVisiblyDifferent(await mountRadio(null), await mountRadio(1));
+    });
+
+    it('invalid differs from valid on TextInput, Checkbox, RadioGroup and Switch', async () => {
         await setForcedColors(mode);
         const text = async (invalid: boolean) => {
             // ui-form's invalid TextInput pads room for its error icon, which widens a shrink-to-fit
@@ -219,6 +262,7 @@ describe.each<Mode>(['none', 'active'])('forced-colors: %s — the checked state
             await mountCheckbox({modelValue: false}),
             await mountCheckbox({modelValue: false, invalid: true}),
         );
+        await expectRingDiffers(await mountRadio(2), await mountRadio(2, {invalid: true}));
         await expectRingDiffers(
             await mountSwitch({modelValue: false}),
             await mountSwitch({modelValue: false, invalid: true}),

@@ -3,7 +3,7 @@ import {mount, shallowMount} from '@vue/test-utils';
 import {describe, expect, it} from 'vitest';
 import {defineComponent, h} from 'vue';
 
-import {Checkbox, FormField, Switch, TextInput} from '../src';
+import {Checkbox, CheckboxGroup, FormField, RadioGroup, Switch, TextInput} from '../src';
 
 interface FieldScope {
     field: {id: string; invalid: boolean; describedby: string | undefined};
@@ -90,6 +90,22 @@ describe('FormField hands its control one object to bind', () => {
         expect(wrapper.find('input').attributes('aria-describedby')).toBeUndefined();
     });
 
+    it('wires a group on its fieldset; its members are its own and never repeat the describedby', () => {
+        const wrapper = inField(
+            {id: 'fruit', error: 'Pick one'},
+            spread(CheckboxGroup, {
+                options: [{id: 1, name: 'Apple'}],
+                optionLabel: 'name',
+                label: 'Fruit',
+                modelValue: [],
+            }),
+        );
+
+        expect(wrapper.find('fieldset').attributes('aria-describedby')).toBe('fruit-error');
+        expect(wrapper.find('input[type="checkbox"]').attributes('id')).toBe('fruit-opt-0');
+        expect(wrapper.find('input[type="checkbox"]').attributes('aria-describedby')).toBeUndefined();
+    });
+
     it('wires a shallow-mounted consumer: the stubbed control receives the bound props', () => {
         const Host = defineComponent({
             setup: () => () =>
@@ -114,6 +130,13 @@ describe('FormField hands its control one object to bind', () => {
         ['TextInput', TextInput, {modelValue: ''}, 'input'],
         ['Checkbox', Checkbox, {modelValue: false, label: 'Accept'}, 'input'],
         ['Switch', Switch, {modelValue: false, label: 'On'}, 'input'],
+        ['RadioGroup', RadioGroup, {options: [], optionLabel: 'name', label: 'Fruit', modelValue: null}, 'fieldset'],
+        [
+            'CheckboxGroup',
+            CheckboxGroup,
+            {options: [], optionLabel: 'name', label: 'Fruit', modelValue: []},
+            'fieldset',
+        ],
         // each control adds its row
     ])('%s used outside a field gets its own id, and keeps one it was given', (_, control, props, selector) => {
         expect(

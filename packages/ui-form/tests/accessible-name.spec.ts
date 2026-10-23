@@ -6,6 +6,8 @@ import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {defineComponent, h} from 'vue';
 
 import Checkbox from '../src/components/Checkbox.vue';
+import CheckboxGroup from '../src/components/CheckboxGroup.vue';
+import RadioGroup from '../src/components/RadioGroup.vue';
 import Switch from '../src/components/Switch.vue';
 import {warnWhenUnnamed} from '../src/internal/accessible-name';
 
@@ -207,7 +209,72 @@ describe.each(CONTROLS.filter(({name}) => name === 'Checkbox' || name === 'Switc
     },
 );
 
-// The fieldset groups' cases (named by their legend) return with CheckboxGroup and RadioGroup.
+/**
+ * A fieldset group is named by its legend. The guard is the same defect one level up, and it has
+ * its own wrong-element trap: the fieldset's own text includes every OPTION label, so reading
+ * content off the fieldset would let the options silence a group whose question is missing.
+ */
+const OPTIONS = [
+    {id: 1, name: 'Apple'},
+    {id: 2, name: 'Pear'},
+];
+const GROUPS = [
+    {name: 'CheckboxGroup', component: CheckboxGroup as Component, modelValue: []},
+    {name: 'RadioGroup', component: RadioGroup as Component, modelValue: null},
+] as const;
+
+describe.each(GROUPS)('$name — accessible-name guard', ({name, component, modelValue}) => {
+    const props = (label: string) => ({id: 'fruit', options: OPTIONS, optionLabel: 'name', label, modelValue});
+
+    it('warns when the legend is empty, however well its options are named', () => {
+        mount(component, {props: props('')});
+
+        expect(warn).toHaveBeenCalledTimes(1);
+        const message = String(warn.mock.calls[0]?.[0]);
+        expect(message).toContain(`<${name}>`);
+        expect(message).toContain('legend');
+    });
+
+    it('warns when the legend is whitespace-only', () => {
+        mount(component, {props: props('   ')});
+
+        expect(warn).toHaveBeenCalledTimes(1);
+    });
+
+    it('stays silent when the label names the legend', () => {
+        mount(component, {props: props('Fruit')});
+
+        expect(warn).not.toHaveBeenCalled();
+    });
+
+    it.each(['aria-label', 'aria-labelledby', 'title'])('stays silent on %s on the fieldset alone', (attribute) => {
+        mount(component, {props: props(''), attrs: {[attribute]: 'Fruit'}});
+
+        expect(warn).not.toHaveBeenCalled();
+    });
+
+    // The required conveyance lives in the legend too (CheckboxGroup's sr-only `requiredLabel`), and
+    // a status is not a name: "(required)" alone must not silence the guard.
+    it('warns when the legend is empty on a REQUIRED group — the required text is not a name', () => {
+        mount(component, {props: {...props(''), required: true}});
+
+        expect(warn).toHaveBeenCalledTimes(1);
+    });
+
+    it('stays silent on a required group with a real label', () => {
+        mount(component, {props: {...props('Fruit'), required: true}});
+
+        expect(warn).not.toHaveBeenCalled();
+    });
+
+    it('is stripped in production', () => {
+        vi.stubEnv('NODE_ENV', 'production');
+
+        mount(component, {props: props('')});
+
+        expect(warn).not.toHaveBeenCalled();
+    });
+});
 
 describe('warnWhenUnnamed — a non-labelable element', () => {
     it('reads the attribute routes alone when `labels` is null', () => {

@@ -8,11 +8,11 @@
          land here, and a pointer on an option's label text reaches them without touching a
          disabled input. -->
     <fieldset
-        :id="id"
+        :id="controlId"
         ref="group"
         v-guard-while-disabled="disabled"
         class="ui-check-group"
-        :aria-invalid="invalid || undefined"
+        :aria-invalid="isInvalid || undefined"
         :aria-describedby="describedby"
     >
         <legend class="ui-label ui-check-group__legend">
@@ -22,11 +22,11 @@
         </legend>
         <Checkbox
             v-for="(option, index) in options"
-            :id="`${id}-opt-${index}`"
+            :id="`${controlId}-opt-${index}`"
             :key="String(option.id)"
             :label="labelOf(option)"
             :disabled="disabled"
-            :invalid="invalid"
+            :invalid="isInvalid"
             :model-value="model.includes(option.id)"
             @update:model-value="toggle(option.id)"
         />
@@ -34,7 +34,7 @@
 </template>
 
 <script setup lang="ts" generic="T extends SelectItem">
-import {onMounted, useTemplateRef} from 'vue';
+import {computed, onMounted, useId, useTemplateRef} from 'vue';
 
 import type {LabelKey, SelectItem} from '../types';
 
@@ -50,7 +50,8 @@ const {
     id,
     disabled = false,
     required = false,
-    invalid = false,
+    invalid = undefined,
+    error,
     describedby,
     requiredLabel = '(required)',
 } = defineProps<{
@@ -63,11 +64,17 @@ const {
     /** the group legend. */
     label: string;
     /** stable id — on the fieldset, and the base for position-keyed member ids. */
-    id: string;
+    /** stable id — on the fieldset, and the base for position-keyed member ids; defaults to `useId()`. */
+    id?: string;
     disabled?: boolean;
     /** conveys the required state at group level (legend marker + sr-only text). */
     required?: boolean;
-    /** invalid styling + aria — mirrored onto the members so the boxes show it. */
+    /**
+     * the field's message (`field(name)` passes it). It marks the control invalid unless `invalid`
+     * says otherwise: `invalid: false` shows a message without the mark.
+     */
+    error?: string;
+    /** overrides the mark `error` sets; omitted, the mark follows `error`. */
     invalid?: boolean;
     /** id of the paired error element for `aria-describedby` (fieldset only). */
     describedby?: string;
@@ -78,7 +85,13 @@ const {
     requiredLabel?: string;
 }>();
 
+// The mark: `invalid` when given, otherwise whether there is a message.
+const isInvalid = computed(() => invalid ?? Boolean(error));
+
 /** The committed membership: an array of option ids, kept in OPTIONS order. */
+const ownId = useId();
+const controlId = computed(() => id ?? ownId);
+
 const model = defineModel<T['id'][]>({required: true});
 
 const group = useTemplateRef<HTMLElement>('group');

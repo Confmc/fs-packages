@@ -15,10 +15,23 @@ import {userEvent} from 'vitest/browser';
 import {defineComponent, h, ref} from 'vue';
 
 import Checkbox from '../../src/components/Checkbox.vue';
+import CheckboxGroup from '../../src/components/CheckboxGroup.vue';
 import FormField from '../../src/components/FormField.vue';
+import RadioGroup from '../../src/components/RadioGroup.vue';
 import Switch from '../../src/components/Switch.vue';
 import TextInput from '../../src/components/TextInput.vue';
 import '../../styles.css';
+
+interface Fruit {
+    id: number;
+    name: string;
+}
+
+const FRUITS: Fruit[] = [
+    {id: 1, name: 'Watermelon'},
+    {id: 2, name: 'Apricot'},
+    {id: 3, name: 'Mango'},
+];
 
 // What FormField's slot hands the control (`field`), plus the `required` the consumer passes
 // itself (it is not in `field`: a control that does not declare it would take it as an attribute).
@@ -155,6 +168,53 @@ describe('axe-core audits — zero violations, closed and open', () => {
 
         await userEvent.click(document.getElementById('notify') as HTMLElement);
         expect(on.value).toBe(true);
+        await expectNoViolations(screen.container);
+    });
+
+    it('CheckboxGroup — fieldset/legend, required (sr-only conveyance) and invalid with an error', async () => {
+        const screen = await renderInField(
+            (slot) =>
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFC in a render-fn host
+                h(CheckboxGroup as any, {
+                    ...slot.field,
+                    options: FRUITS,
+                    optionLabel: 'name',
+                    label: 'Fruits',
+                    modelValue: [2],
+                    'onUpdate:modelValue': noop,
+                    required: slot.required,
+                }),
+            // The group self-labels via its legend — FormField contributes error wiring only.
+            // This composition also proves the aria-required-free fieldset passes
+            // aria-allowed-attr (role=group forbids aria-required — the legend conveys it).
+            {label: undefined, required: true, error: 'Pick at least one fruit'},
+        );
+        await expectNoViolations(screen.container);
+    });
+
+    it('RadioGroup — role=radiogroup fieldset with aria-required, none and one selected', async () => {
+        const choice = ref<number | null>(null);
+        const screen = await render(
+            defineComponent(
+                () => () =>
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFC in a render-fn host
+                    h(RadioGroup as any, {
+                        id: 'fruit-choice',
+                        options: FRUITS,
+                        optionLabel: 'name',
+                        label: 'Favourite fruit',
+                        required: true,
+                        modelValue: choice.value,
+                        'onUpdate:modelValue': (value: number | null) => {
+                            choice.value = value;
+                        },
+                    }),
+            ),
+        );
+        await expectNoViolations(screen.container);
+
+        await userEvent.click(document.getElementById('fruit-choice-opt-1') as HTMLElement);
+        expect(choice.value).toBe(2);
         await expectNoViolations(screen.container);
     });
     // each control adds its cases
