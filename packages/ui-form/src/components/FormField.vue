@@ -1,6 +1,13 @@
 <template>
     <div class="ui-field" :class="{'is-horizontal': orientation === 'horizontal' && Boolean(label)}">
-        <FormLabel v-if="label" :id="labelId(id)" :html-for="id" :required="required">
+        <!-- with an aside the label shares a row with it; without one the label stays a direct child, as in ui-inputs -->
+        <div v-if="label && $slots.aside" class="ui-field__head">
+            <FormLabel :id="labelId(id)" :html-for="id" :required="required">
+                {{ label }}<template v-if="$slots['label-after']" #after>{{ ' ' }}<slot name="label-after" /></template>
+            </FormLabel>
+            <slot name="aside" />
+        </div>
+        <FormLabel v-else-if="label" :id="labelId(id)" :html-for="id" :required="required">
             {{ label }}<template v-if="$slots['label-after']" #after>{{ ' ' }}<slot name="label-after" /></template>
         </FormLabel>
         <!-- the slot receives `field`, whose keys are the control's own prop names, so one
@@ -52,6 +59,8 @@ defineSlots<{
     default?: (scope: {field: FieldBinding; aria: FieldAria}) => unknown;
     /** inside the label, after its text and required mark: a tooltip. */
     'label-after'?: () => unknown;
+    /** at the far end of the label's row, e.g. a switch that belongs to the field; it takes no wiring: the field's id is the control's. */
+    aside?: () => unknown;
     /** under the control, above the message: what the field expects. Read with the field after the message. */
     hint?: () => unknown;
 }>();
