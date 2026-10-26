@@ -73,7 +73,8 @@ const {
 const model = defineModel<boolean>({required: true});
 
 // change (not input) is the native checkbox commit event; the input follows the model once the host
-// has rendered, for the reason Checkbox gives (WR-1922).
+// has rendered, for the reason Checkbox gives (WR-1922), and that is also why it binds `checked` and
+// `change` by hand instead of `v-model`.
 const onChange = (event: Event): void => {
     const control = event.target as HTMLInputElement;
     model.value = control.checked;

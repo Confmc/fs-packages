@@ -89,7 +89,9 @@ const model = defineModel<boolean>({required: true});
 
 // change (not input) is the native checkbox commit event. The browser has already flipped the input,
 // and a host that declines or decides later leaves the model where it was, so Vue never re-patches
-// `checked` (WR-1922): once the host has rendered, the input is set back to the model.
+// `checked` (WR-1922): once the host has rendered, the input is set back to the model. That is why
+// this control binds `checked` and `change` by hand instead of `v-model`: Vue's checkbox v-model
+// re-syncs `checked` only when the component re-renders, which a declined change never causes.
 const onChange = (event: Event): void => {
     const control = event.target as HTMLInputElement;
     model.value = control.checked;
