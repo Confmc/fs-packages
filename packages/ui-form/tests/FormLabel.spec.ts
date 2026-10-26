@@ -12,8 +12,9 @@ describe('FormLabel', () => {
         expect(wrapper.find('.ui-label__req').exists()).toBe(false);
     });
 
-    it('renders the required marker when required', () => {
+    it('renders the required marker when required, hidden from assistive tech', () => {
         const wrapper = mount(FormLabel, {props: {htmlFor: 'name', required: true}, slots: {default: 'Name'}});
-        expect(wrapper.find('.ui-label__req').exists()).toBe(true);
+        // the control conveys the required state through aria-required; the marker is only visual
+        expect(wrapper.find('.ui-label__req').attributes('aria-hidden')).toBe('true');
     });
 });
