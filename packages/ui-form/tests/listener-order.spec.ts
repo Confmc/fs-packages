@@ -6,9 +6,10 @@ import {defineComponent, h, ref} from 'vue';
 import {TextInput} from '../src';
 
 // Every value control, the value it starts from, the event its value arrives on, and what the user enters.
-// A consumer's listener on that event runs after the control's own (Vue calls merged listeners in order),
-// so it reads the new value, as with native v-model; the reverse order lost the first keystroke of a row
-// whose @input added the next row.
+// A consumer's listener on that event runs after the control's own, so it reads the new value, as with
+// native v-model: Vue attaches a v-model listener before the element's props, and a control's own listener
+// sits before the consumer's attributes (merged listeners run in order). The reverse order lost the first
+// keystroke of a row whose @input added the next row.
 const CONTROLS: [string, unknown, unknown, 'input' | 'change', (element: HTMLInputElement) => unknown][] = [
     ['TextInput', TextInput, '', 'input', (element) => (element.value = 'A')],
 ];

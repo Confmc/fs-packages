@@ -47,6 +47,17 @@ describe('TextInput', () => {
         expect(wrapper.find('input').attributes('disabled')).toBeDefined();
     });
 
+    it("follows the parent's model: a new value shows, and null shows an empty field", async () => {
+        const wrapper = mount(TextInput, {props: {id: 'name', placeholder: 'Name', modelValue: 'hi'}});
+        const input = wrapper.find('input').element as HTMLInputElement;
+
+        await wrapper.setProps({modelValue: 'there'});
+        expect(input.value).toBe('there');
+
+        await wrapper.setProps({modelValue: null});
+        expect(input.value).toBe('');
+    });
+
     it('renders empty for a null model (binds a nullable backend field directly)', () => {
         const wrapper = mount(TextInput, {props: {id: 'name', placeholder: 'Name', modelValue: null}});
         expect((wrapper.find('input').element as HTMLInputElement).value).toBe('');
