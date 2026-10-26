@@ -1,3 +1,4 @@
+export {default as FormLabel} from './components/FormLabel.vue';
 export {default as TextInput} from './components/TextInput.vue';
 
 // Form state (ported from @script-development/fs-form): the validation bag and the submit it binds.
