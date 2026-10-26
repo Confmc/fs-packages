@@ -15,6 +15,11 @@ npm ci --ignore-scripts && npm run build
   `0.1.0-control.N` (see `package.json`), `npm install --ignore-scripts`, build, then
   `cd packages/ui-form && npm pack --pack-destination ../../.experiment-packs`. Commit the bump, push to `fork`.
   `.experiment-packs/` is git-excluded; create it.
+- emmie's `error-keys-raw` installs `.experiment-packs/script-development-ui-form-0.1.0-control.36.tgz` by a
+  `file:` path (`~/script-development` must resolve to `~/github/script-development`). Without that file, emmie's
+  `npm ci` fails at home. Rebuild it from the commit that packed it, not from the branch head (later commits changed
+  the source): `git worktree add --detach /tmp/pack36 ebafe6c && cd /tmp/pack36 && npm ci --ignore-scripts &&
+  npm run build && cd packages/ui-form && npm pack --pack-destination <fs-packages>/.experiment-packs`.
 - Browser tests and Playwright: never download Chromium. A launch error naming a missing
   `chromium_headless_shell-NNNN` is a revision mismatch. Read the wanted revision from
   `node_modules/playwright-core/browsers.json`, then in `~/.cache/ms-playwright` run
@@ -23,6 +28,10 @@ npm ci --ignore-scripts && npm run build
   `npx vue-tsc -p` from a subfolder silently uses the package tsconfig.
 
 ## Working rules
+
+- **No `! command` hand-offs to Marcel.** sudo goes through `sudo -A` with the askpass popup. A git deletion the
+  safety hook blocks (worktree remove, branch delete in a script-development repo) needs a confirm popup that is not
+  built yet: ask Marcel before building one; don't paste him the command.
 
 - **One commit per point**, so anything reverts cheaply. Never rebase. Push only to `fork`. No PR until asked.
 - **Order of concerns:** clean package code, then the consumer's goals, then migration cost. Migration cost
