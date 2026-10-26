@@ -22,6 +22,17 @@ describe('NumberInput', () => {
         expect((wrapper.find('input').element as HTMLInputElement).value).toBe('');
     });
 
+    it("follows the parent's model: a new number shows, and null shows an empty field", async () => {
+        const wrapper = mount(NumberInput, {props: {id: 'qty', placeholder: 'How many', modelValue: 3}});
+        const input = wrapper.find('input').element as HTMLInputElement;
+
+        await wrapper.setProps({modelValue: 7});
+        expect(input.value).toBe('7');
+
+        await wrapper.setProps({modelValue: null});
+        expect(input.value).toBe('');
+    });
+
     it('honours placeholder/min/max/step/required/invalid/describedby', () => {
         const wrapper = mount(NumberInput, {
             props: {
