@@ -6,7 +6,6 @@
                  aria-checked by hand — double-setting could contradict the real state. -->
             <input
                 :id="id"
-                v-guard-while-disabled="disabled"
                 @change="onChange"
                 v-bind="controlAttrs($attrs)"
                 type="checkbox"
@@ -30,7 +29,6 @@
 <script setup lang="ts">
 import {nextTick} from 'vue';
 
-import {vGuardWhileDisabled} from '../internal/disabled-guard';
 import {controlAttrs, rootAttrs} from '../internal/split-attrs';
 
 // The root is the <label> (implicit labelling), so attrs are re-aimed at the native input —

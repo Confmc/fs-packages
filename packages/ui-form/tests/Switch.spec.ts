@@ -57,19 +57,11 @@ describe('Switch', () => {
         expect(bare.find('.ui-switch__label').exists()).toBe(false);
     });
 
-    it('renders disabled and ignores a change reaching the handler anyway', async () => {
+    it('renders disabled', () => {
         const wrapper = mount(Switch, {props: {id: 's', modelValue: false, disabled: true}});
-        const input = wrapper.find('input');
 
-        expect(input.attributes('disabled')).toBeDefined();
+        expect(wrapper.find('input').attributes('disabled')).toBeDefined();
         expect(wrapper.find('.ui-switch').classes()).toContain('is-disabled');
-
-        // Native dispatch — VTU setValue()/trigger() skip disabled elements, which would
-        // leave the disabled guard unexercised (the vacuous-assertion trap).
-        (input.element as HTMLInputElement).checked = true;
-        input.element.dispatchEvent(new Event('change', {bubbles: true}));
-        await wrapper.vm.$nextTick();
-        expect(wrapper.emitted('update:modelValue')).toBeUndefined();
     });
 
     it('falls native attrs through to the input, not the label root', () => {

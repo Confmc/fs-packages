@@ -69,36 +69,11 @@ describe('Checkbox', () => {
         expect(bare.find('.ui-check__label').exists()).toBe(false);
     });
 
-    it('renders disabled and ignores a change reaching the handler anyway', async () => {
+    it('renders disabled', () => {
         const wrapper = mount(Checkbox, {props: {id: 'c', modelValue: false, disabled: true}});
-        const input = wrapper.find('input');
 
-        expect(input.attributes('disabled')).toBeDefined();
+        expect(wrapper.find('input').attributes('disabled')).toBeDefined();
         expect(wrapper.find('.ui-check').classes()).toContain('is-disabled');
-
-        // Dispatched natively: VTU's trigger()/setValue() silently SKIP disabled elements,
-        // which would leave the handler's disabled guard unexercised and the no-emit
-        // assertion vacuous — the event must actually reach the handler to prove the guard.
-        (input.element as HTMLInputElement).checked = true;
-        input.element.dispatchEvent(new Event('change', {bubbles: true}));
-        await wrapper.vm.$nextTick();
-        expect(wrapper.emitted('update:modelValue')).toBeUndefined();
-    });
-
-    it('follows `disabled` as it changes after mount — the guard reads the current value', async () => {
-        let heard = 0;
-        const wrapper = mount(Checkbox, {
-            props: {id: 'c', modelValue: false, disabled: false},
-            attrs: {onChange: () => (heard += 1)},
-        });
-        const input = wrapper.find('input').element;
-
-        await wrapper.setProps({disabled: true});
-        input.dispatchEvent(new Event('change', {bubbles: true}));
-        await wrapper.setProps({disabled: false});
-        input.dispatchEvent(new Event('change', {bubbles: true}));
-
-        expect(heard).toBe(1);
     });
 
     it('falls native attrs through to the input, not the label root', () => {

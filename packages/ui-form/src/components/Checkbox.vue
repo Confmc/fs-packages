@@ -3,7 +3,6 @@
         <span class="ui-check__control">
             <input
                 :id="id"
-                v-guard-while-disabled="disabled"
                 @change="onChange"
                 v-bind="controlAttrs($attrs)"
                 type="checkbox"
@@ -36,7 +35,6 @@
 <script setup lang="ts">
 import {nextTick} from 'vue';
 
-import {vGuardWhileDisabled} from '../internal/disabled-guard';
 import {controlAttrs, rootAttrs} from '../internal/split-attrs';
 
 // The root is the <label> (implicit labelling — the whole row is the hit target), so attrs
