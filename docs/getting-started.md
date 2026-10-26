@@ -61,8 +61,8 @@ Here's a realistic setup that shows how services layer on top of each other:
 
 ```typescript
 import {createHttpService} from '@script-development/fs-http';
-import {createStorageService} from '@script-development/fs-storage';
 import {createLoadingService, registerLoadingMiddleware} from '@script-development/fs-loading';
+import {createStorageService} from '@script-development/fs-storage';
 import {createThemeService} from '@script-development/fs-theme';
 
 // 1. Create foundation services
@@ -108,13 +108,15 @@ In practice, you create all services once in a setup file and export them for us
 
 ```typescript
 // services/index.ts
+
+import {createDialogService} from '@script-development/fs-dialog';
 import {createHttpService} from '@script-development/fs-http';
-import {createStorageService} from '@script-development/fs-storage';
 import {createLoadingService, registerLoadingMiddleware} from '@script-development/fs-loading';
+import {createStorageService} from '@script-development/fs-storage';
 import {createThemeService} from '@script-development/fs-theme';
 import {createToastService} from '@script-development/fs-toast';
-import {createDialogService} from '@script-development/fs-dialog';
 import {createTranslationService} from '@script-development/fs-translation';
+
 import MyToastComponent from '@/components/MyToast.vue';
 
 // Foundation
