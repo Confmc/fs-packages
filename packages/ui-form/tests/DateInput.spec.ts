@@ -22,6 +22,31 @@ describe('DateInput', () => {
         expect((wrapper.find('input').element as HTMLInputElement).value).toBe('');
     });
 
+    it("follows the parent's model: a new date shows, and null shows an empty field", async () => {
+        const wrapper = mount(DateInput, {props: {id: 'dob', modelValue: '2026-07-17'}});
+        const input = wrapper.find('input').element as HTMLInputElement;
+
+        await wrapper.setProps({modelValue: '2026-08-01'});
+        expect(input.value).toBe('2026-08-01');
+
+        await wrapper.setProps({modelValue: null});
+        expect(input.value).toBe('');
+    });
+
+    it('puts every attribute, class and style included, on the input: it is its own root', () => {
+        const wrapper = mount(DateInput, {
+            props: {id: 'dob', modelValue: null},
+            attrs: {class: 'w-40', style: 'margin: 1px', 'data-test': 'dob', autocomplete: 'bday'},
+        });
+        const input = wrapper.find('input');
+
+        expect(wrapper.element).toBe(input.element);
+        expect(input.classes()).toEqual(expect.arrayContaining(['ui-control', 'w-40']));
+        expect(input.attributes('style')).toBe('margin: 1px;');
+        expect(input.attributes('data-test')).toBe('dob');
+        expect(input.attributes('autocomplete')).toBe('bday');
+    });
+
     it('honours min/max/required/invalid/describedby', () => {
         const wrapper = mount(DateInput, {
             props: {
