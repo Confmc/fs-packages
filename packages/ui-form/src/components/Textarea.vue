@@ -44,6 +44,7 @@ const {autogrow = false, maxRows} = defineProps<{
 // method composes.
 const model = defineModel<string | null>({required: true});
 
+// The textarea is its own (single) root, so every attribute, class and style included, lands on it.
 const textarea = useTemplateRef<HTMLTextAreaElement>('textarea');
 
 const px = (value: string): number => Number.parseFloat(value) || 0;
