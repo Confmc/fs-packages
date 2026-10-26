@@ -39,8 +39,7 @@ const namingText = (element: Element): string => {
  *   layer that catches it.
  * - **Where each route is read** is not always one element. A label-root control (Checkbox,
  *   Switch) re-aims its attributes onto the native `<input>` while its visible text sits in the
- *   wrapping `<label>`, and a fieldset group is named by its `<legend>`, not by the option text it
- *   also contains. `contentFrom` names the elements whose content can name `element`; reading
+ *   wrapping `<label>`. `contentFrom` names the elements whose content can name `element`; reading
  *   either route off the wrong element false-positives one legitimate naming shape. `null` is the
  *   platform's `labels` on a non-labelable element: no content route at all.
  */
