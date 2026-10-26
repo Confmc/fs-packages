@@ -1,17 +1,16 @@
 <template>
     <input
+        v-model="model"
         :id="id"
         type="date"
         class="ui-control ui-input"
         :class="{'is-invalid': invalid}"
-        :value="model"
         :disabled="disabled"
         :min="min"
         :max="max"
         :aria-required="required || undefined"
         :aria-invalid="invalid || undefined"
         :aria-describedby="describedby"
-        @input="model = ($event.target as HTMLInputElement).value"
     />
 </template>
 
