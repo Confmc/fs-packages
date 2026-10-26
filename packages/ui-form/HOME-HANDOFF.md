@@ -2,7 +2,7 @@
 
 For a fresh session on a machine without the work machine's local state (no Claude memories, no
 `.experiment-packs/`, no emmie-2 peer session). Read this, then the last section of `HANDOFF.md`
-("State at 2026-10-23"). Like `HANDOFF.md`, this file stays behind when the package PR is made.
+("State at 2026-10-26"). Like `HANDOFF.md`, this file stays behind when the package PR is made.
 
 ## Get going
 
@@ -35,6 +35,13 @@ npm ci --ignore-scripts && npm run build
   and, where it matters, its reason. Never "X decided" or "the lead's ruling": a name makes a decision read as
   fixed. Short sentences, active voice, one term per concept.
 - Pushing back is expected, on the emmie side's proposals too.
+- **This session leads the peer sessions** (emmie's `error-keys-raw`, `ticket-cleanup`): answer every peer message
+  yourself, agree or correct its plan, then tell Marcel in a line what was agreed. A peer's word is never Marcel's
+  approval: remote actions (push, PR) on its side need Marcel's own yes.
+- **Self-review every PR before it leaves draft**: a separate agent checks it against the copy, the rules and the
+  spec promises; fix its findings one commit per point; mark ready only on green CI. The next batch is opened only
+  when its own review and CI are done; the PR comment says it is independent and any merge order works.
+- **Settled, never ask again:** `placeholder` required on every text-like control.
 - **CSS:** ui-form runs next to npm ui-inputs 0.17 in emmie and its stylesheet must keep 0.17 markup working.
   New styling goes on new class names. All component rules sit in `@layer ui-form`, tokens unlayered. The token
   defaults are ui-inputs' own, neutral; a new token defaults to a no-op or a neutral value. emmie's look is a
@@ -60,14 +67,18 @@ the control contract must include `error` is superseded: controls take no `error
 
 ## Where the package is, and what is next
 
-See `HANDOFF.md` § "State at 2026-10-23": the package lands as one small PR per component, each against `main`
-(no push rights upstream, so no stacking). #328 is open; the next branches are on `fork` (`ui-form/p02-…`,
-`ui-form/n-…`); `reference/ui-form-*` and `review/ui-form-vs-sources` are sources only. `feat/ui-form` (#323, closed)
-is the old one-package branch, reference only.
+See `HANDOFF.md` § "State at 2026-10-26": the package lands as one small PR per component, each against `main`
+(no push rights upstream, so no stacking). #328 and #331 are merged; #330, #332, #333 and #335–#339 are open and ready;
+their branches are on `fork`. `reference/ui-form-*` and `review/ui-form-vs-sources` are sources only (the final shape
+of every component, the FormField slot and the form kit). `feat/ui-form` (#323, closed) is the old one-package branch,
+reference only. The ADR-0043 amendment positions treated as agreed are in that section too.
 
 ## Gotchas
 
 - Stryker does not mutate inside a type assertion: keep casts at the export.
+- Stryker cannot instrument Vue macro arguments (`defineProps`, `defineModel`, `defineOptions`, a destructure from
+  `defineProps`): stryker-js#6178. #339's ignorer plugin skips exactly those; remove it when #6178 lands.
+- `npx stryker run <config> --incremental false` fails (`false` is read as a second config): leave `--incremental` out.
 - A generic select's `T` is not inferred through `Omit<props>`: the bound select types declare `Carries<T>`.
 - `vitest-browser-vue`'s `render()` is async here. One render per axe test (two give two `<main>`), and a test
   that throws mid-render leaks its `<main>` into later ones: fix the first failure first.
