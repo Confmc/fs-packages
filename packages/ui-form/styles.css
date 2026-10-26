@@ -381,11 +381,11 @@
         border-left: 0;
         border-radius: 0 var(--ui-control-radius) var(--ui-control-radius) 0;
     }
-    .ui-input-group:has(> .is-start) .ui-control {
+    .ui-input-group:has(> .ui-input-group__addon:first-child) .ui-control {
         border-top-left-radius: 0;
         border-bottom-left-radius: 0;
     }
-    .ui-input-group:has(> .is-end) .ui-control {
+    .ui-input-group:has(> .ui-input-group__addon:last-child) .ui-control {
         border-top-right-radius: 0;
         border-bottom-right-radius: 0;
     }
