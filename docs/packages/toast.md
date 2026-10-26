@@ -40,6 +40,7 @@ The service automatically injects an `onClose` prop that removes the toast from 
 
 ```typescript
 import {createToastService} from '@script-development/fs-toast';
+
 import MyToast from '@/components/MyToast.vue';
 
 const toast = createToastService(MyToast);
