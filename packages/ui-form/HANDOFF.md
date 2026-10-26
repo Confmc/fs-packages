@@ -454,7 +454,7 @@ cases from `review/ui-form-vs-sources`).
 3. Continue preparing locally: `03-input-group` (reference `de022a7`, plus its axe case), then
    `03-checkbox-switch` (reference `f56c1eb`).
 
-## State at 2026-10-23: first review round, new rules (read this section first)
+## State at 2026-10-23: first review round, new rules (superseded by the last section)
 
 ### Decided in review and by the reviewer, 2026-10-23
 
@@ -537,3 +537,84 @@ by the sent list) is moot for emmie.
 1. Watch #328 (a `gh` poll every 10 min was running at work). On review comments: one commit per comment, reply in
    the thread, push. On merge: merge main into the four step-2 branches, run every gate, open them.
 2. While waiting, nothing else is to be built: the rest waits for the reviewer's feedback on the first five.
+
+## State at 2026-10-26: the component PRs are open (read this section first)
+
+### Merged
+
+- #328 scaffold + TextInput (approved at 10c5463 after a second round: the layer header states the cascade rule as it
+  holds, with the order per stack and the import order; TextInput's `type` has no `search`).
+- #331 FormLabel. #334 the audit fix (zod, fast-uri, happy-dom lockfile bumps; main's `npm audit` was red for every PR).
+
+### Open, ready for review, each against main, independent of each other (any merge order)
+
+| PR | Branch | State |
+|---|---|---|
+| #330 FormError | `ui-form/p02-form-error` | review fix in (`v-if="error"` in the component, spec pins `error: ''` renders nothing); waiting re-review |
+| #332 Checkbox + Switch | `ui-form/n-checkbox-switch` | review fix in: the four internals are gone (missing-label dev warning never fires in a browser; disabled guard only blocked dispatched events); waiting re-review |
+| #333 validation errors + submit | `ui-form/n-form-submit` | self-review fixes in (refusedUnnamed while the bag holds a field; why the check keys on `isAxiosError`) |
+| #335 NumberInput | `ui-form/n-number-input` | spin buttons stay (hiding them is a look); parent-model test |
+| #336 DateInput | `ui-form/n-date-input` | now `v-model`; attrs and parent-model tests |
+| #337 Textarea | `ui-form/n-textarea` | autogrow refits on a width change (ResizeObserver) |
+| #338 InputGroup | `ui-form/n-input-group` | new component; keeps `id` (addon ids for the control's `describedby`, as FormError's id); ring and selector fixes |
+| #339 mutate `<script setup>` | `ui-form/n-mutate-vue` | Stryker ignorer plugin `stryker-vue-macros.mjs` (stryker-js#6178); TextInput 100% |
+
+After each merge: merge main into every other open branch (each adds an export line to `index.ts`; git usually
+places them itself) and push. With #339 merged, NumberInput (92.9 %) and Textarea (92.2 %) have survivors to tighten.
+
+Every PR went through a self-review by a separate agent before opening (copy verbatim? one commit per point? the
+rules below? spec promises pinned?). Keep doing that: it found real bugs each time.
+
+### Rules settled in this round (on top of the 2026-10-23 list)
+
+- `placeholder` is required on every text-like control (TextInput, NumberInput, Textarea). Settled; do not ask again.
+  DateInput has none (a native date input shows none).
+- `class`/`style` on the root, the rest on the control element, for every control (`split-attrs.ts`). A control whose
+  root is the element itself (DateInput, Textarea) needs no split; say so in the script, not in a template comment:
+  a comment beside the root makes the component a fragment and attrs stop falling through.
+- `v-model` on the inner element where Vue's v-model fits; where it doesn't (NumberInput's NaN → null, Checkbox/Switch
+  re-sync after a declined change), the component says why.
+- A component renders nothing rather than asking its caller to guard (FormError `v-if`).
+- No dev-only warnings that rely on `process` (they never fire in a consumer's browser). Missing names are axe's job.
+- Internals come with the component that needs them, not before: `disabled-guard` returns with CheckboxGroup/RadioGroup
+  (and Pressable's `as` escape hatch, where no native `disabled` exists); `reactivity` with `useListbox`.
+- A new control's PR names its consumer (emmie for TimeInput, SearchInput, PasswordInput, InputGroup).
+- Bootstrap recipes are moot (the fleet leaves Bootstrap); only UnoCSS and Tailwind v4 matter. The Bootstrap recipe can
+  leave the layer header in a small follow-up.
+
+### ADR-0043 Amendment 1
+
+On adrs.script.nl as Proposed. The site is read-only for us. Marcel sent the package side's answer to the reviewer on
+Mattermost (2026-10-26); the reviewer agrees in principle, so work as if agreed until a ruling says otherwise:
+§ 1 merge, agreed. § 2 `invalid` only, ruled. § 3 no default look, ruled; `@layer` stays, gated on browser fixtures
+for the recipes before first publish (WR-2715). § 4 agreed. § 5 interim: ui-inputs frozen now, fixes only as 0.17.x
+patches, each fix PR carries its ui-form port; the end point (when that lane stops, "removed" = no releases or deleted)
+is decided at ui-form's first publish, by the reviewer. § 6 a control comes in because a consumer needs it. § 7 typing
+checks land with the form chain. Mutation of `.vue` logic: #339.
+
+### Not opened yet
+
+- `ui-form/n-pressable`, `ui-form/n-disclosure` (pushed to fork for reference, on #332's OLD head): they need a small
+  design round after #332's ruling, not a port: drop the dev warning; the disabled guard is not needed on the real
+  `<button>`, but is on the `as` escape hatch. Wait for #332 to merge.
+- FormField chain: rebuild on main from `p04`…`p08` (on fork) once #330 merges; FormLabel is already in. Its Lists
+  docs paragraph gets one line: a message is read by the path the error layer hands over, so an object-keyed row's key
+  must survive any key conversion the consumer runs.
+- Then TimeInput, SearchInput, PasswordInput; the groups; the listbox core and selects; the form chain; the release.
+
+### emmie (`error-keys-raw`, worktree emmie-2)
+
+Slices 8–10 done locally (raw 422 keys, camelCase per segment in the error middleware, request trait off our own
+requests, kept only on the 3 external day-update requests). Checked with it on 2026-10-26 and found sound: one place
+for the conversion (frontend), backend converts nothing; slices 8 and 9 meet ADR-0048 rule 6 (slice 8 alone changes no
+key a form reads); the error middleware writes the camel body back onto `error.response.data`, which ui-form's `take()`
+reads. Noted as follow-ups for Marcel, not built: a shared `toFormData(object)` helper plus a test:arch rule against
+`new FormData` elsewhere; field names put an underscore before a digit (string-ts snake_cases `addressLine1` to
+`address_line_1`). Its commits were local at the end of the day, waiting for Marcel's yes to push.
+
+### Next steps
+
+1. Read reviews on the open PRs; one commit per finding, reply in each thread, push; merge main into the others after
+   each merge. Mark a PR ready only after its self-review and green CI.
+2. Build the FormField chain on main (ready to open when #330 merges).
+3. Pressable/Disclosure after #332's merge, as above.
