@@ -1,1 +1,2 @@
 export {default as TextInput} from './components/TextInput.vue';
+export {default as DateInput} from './components/DateInput.vue';
