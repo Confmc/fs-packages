@@ -85,14 +85,6 @@ describe('NumberInput autofocus and class', () => {
         expect(plain.find('input').attributes()).not.toHaveProperty('autofocus');
         plain.unmount();
     });
-
-    it('carries ui-number, the hook its spin-button styling keys on', () => {
-        expect(
-            mount(NumberInput, {props: {id: 'qty', placeholder: 'How many', modelValue: null}})
-                .find('input')
-                .classes(),
-        ).toContain('ui-number');
-    });
 });
 
 describe('NumberInput error icon and attributes', () => {

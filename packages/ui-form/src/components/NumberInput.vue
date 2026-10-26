@@ -7,7 +7,7 @@
             ref="input"
             :id="id"
             type="number"
-            class="ui-control ui-input ui-number"
+            class="ui-control ui-input"
             :class="{'is-invalid': invalid}"
             :value="model"
             :placeholder="placeholder"
