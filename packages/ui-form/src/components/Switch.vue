@@ -6,7 +6,6 @@
                  aria-checked by hand — double-setting could contradict the real state. -->
             <input
                 :id="id"
-                ref="input"
                 v-guard-while-disabled="disabled"
                 @change="onChange"
                 v-bind="controlAttrs($attrs)"
@@ -29,24 +28,14 @@
 </template>
 
 <script setup lang="ts">
-import {nextTick, onMounted, useTemplateRef} from 'vue';
+import {nextTick} from 'vue';
 
-import {warnWhenUnnamed} from '../internal/accessible-name';
 import {vGuardWhileDisabled} from '../internal/disabled-guard';
-import {ensureRefValueExists} from '../internal/reactivity';
 import {controlAttrs, rootAttrs} from '../internal/split-attrs';
 
 // The root is the <label> (implicit labelling), so attrs are re-aimed at the native input —
 // see Checkbox for the fall-through rationale.
 defineOptions({inheritAttrs: false});
-
-const input = useTemplateRef<HTMLInputElement>('input');
-
-// The same naming guard as Checkbox, for the same attribute/text split — see there.
-onMounted(() => {
-    const control = ensureRefValueExists(input);
-    warnWhenUnnamed(control, 'Switch', 'the `label` prop, default-slot content, a `<label for>`', control.labels);
-});
 
 const {
     label,
