@@ -175,37 +175,34 @@ describe.each(CONTROLS)('$name — aria-hidden content names nothing', ({compone
 });
 
 /** The label-root pair can also be named from OUTSIDE — the `<label for>` their `id` exists to pair with. */
-describe.each(CONTROLS.filter(({name}) => name === 'Checkbox' || name === 'Switch'))(
-    '$name — an external <label for> names it',
-    ({component, props}) => {
-        const withExternalLabel = (text: string): Component =>
-            defineComponent({render: () => [h('label', {for: props.id}, text), h(component, props)]});
+describe.each(CONTROLS)('$name — an external <label for> names it', ({component, props}) => {
+    const withExternalLabel = (text: string): Component =>
+        defineComponent({render: () => [h('label', {for: props.id}, text), h(component, props)]});
 
-        afterEach(() => {
-            document.body.innerHTML = '';
-        });
+    afterEach(() => {
+        document.body.innerHTML = '';
+    });
 
-        it('stays silent when a paired external label carries text', () => {
-            mount(withExternalLabel('Accept the terms'), {attachTo: document.body});
+    it('stays silent when a paired external label carries text', () => {
+        mount(withExternalLabel('Accept the terms'), {attachTo: document.body});
 
-            expect(warn).not.toHaveBeenCalled();
-        });
+        expect(warn).not.toHaveBeenCalled();
+    });
 
-        it('WARNS when the paired external label is empty — pairing is not naming', () => {
-            mount(withExternalLabel('  '), {attachTo: document.body});
+    it('WARNS when the paired external label is empty — pairing is not naming', () => {
+        mount(withExternalLabel('  '), {attachTo: document.body});
 
-            expect(warn).toHaveBeenCalledTimes(1);
-        });
+        expect(warn).toHaveBeenCalledTimes(1);
+    });
 
-        it('lands the attribute routes on the INPUT, where the guard reads them', () => {
-            const wrapper = mount(component, {props, attrs: {'aria-label': 'Accept the terms'}});
+    it('lands the attribute routes on the INPUT, where the guard reads them', () => {
+        const wrapper = mount(component, {props, attrs: {'aria-label': 'Accept the terms'}});
 
-            expect(wrapper.element.hasAttribute('aria-label')).toBe(false);
-            expect(wrapper.find('input').attributes('aria-label')).toBe('Accept the terms');
-            expect(warn).not.toHaveBeenCalled();
-        });
-    },
-);
+        expect(wrapper.element.hasAttribute('aria-label')).toBe(false);
+        expect(wrapper.find('input').attributes('aria-label')).toBe('Accept the terms');
+        expect(warn).not.toHaveBeenCalled();
+    });
+});
 
 // The fieldset groups' cases (named by their legend) return with CheckboxGroup and RadioGroup.
 

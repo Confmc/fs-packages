@@ -3,8 +3,7 @@
 // first) or decides later (awaits a save) leaves the bound value unchanged, Vue sees no prop change
 // and never re-patches `checked`, so the control shows the browser's state instead of the model's.
 // happy-dom is faithful here: the defect is a DOM property Vue does not re-patch, not a platform
-// event rule. The browser suite repeats the decline with a real pointer, so the two environments
-// are held to the same answer.
+// event rule.
 import {mount} from '@vue/test-utils';
 import {describe, expect, it} from 'vitest';
 import {nextTick} from 'vue';
