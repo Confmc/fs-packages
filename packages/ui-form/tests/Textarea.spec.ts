@@ -131,4 +131,45 @@ describe('Textarea autogrow (happy-dom: wiring only; the sizing is pinned in the
         expect(element.style.height).toBe('182px');
         expect(wrapper.emitted('update:modelValue')).toBeUndefined();
     });
+    it('refits when its width changes, and only then; observes nothing without autogrow', () => {
+        const observers: {callback: ResizeObserverCallback; observed: Element[]; disconnected: boolean}[] = [];
+        vi.stubGlobal(
+            'ResizeObserver',
+            class {
+                record: (typeof observers)[number];
+                constructor(callback: ResizeObserverCallback) {
+                    this.record = {callback, observed: [], disconnected: false};
+                    observers.push(this.record);
+                }
+                observe(element: Element) {
+                    this.record.observed.push(element);
+                }
+                disconnect() {
+                    this.record.disconnected = true;
+                }
+            },
+        );
+        const resize = (index: number, width: number) =>
+            observers[index]!.callback([{contentRect: {width}} as ResizeObserverEntry], {} as ResizeObserver);
+
+        const height = measured(100, {});
+        const wrapper = mount(Textarea, {props: {...props, autogrow: true}});
+        const plain = mount(Textarea, {props});
+        const element = wrapper.find('textarea').element;
+        expect(observers[0]!.observed).toEqual([element]);
+        expect(observers[1]!.observed).toEqual([]);
+
+        resize(0, 400);
+        height.mockReturnValue(300);
+        resize(0, 400);
+        expect(element.style.height).toBe('102px');
+
+        resize(0, 150);
+        expect(element.style.height).toBe('302px');
+
+        wrapper.unmount();
+        plain.unmount();
+        expect(observers.every(({disconnected}) => disconnected)).toBe(true);
+        vi.unstubAllGlobals();
+    });
 });

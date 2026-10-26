@@ -16,7 +16,7 @@
 </template>
 
 <script setup lang="ts">
-import {onMounted, useTemplateRef, watch} from 'vue';
+import {onBeforeUnmount, onMounted, useTemplateRef, watch} from 'vue';
 
 const {autogrow = false, maxRows} = defineProps<{
     /** control id, pairing the textarea with its label and error; inside a `FormField` the field passes its own. */
@@ -68,6 +68,20 @@ const fit = (): void => {
     element.style.overflowY = content > cap ? 'auto' : 'hidden';
 };
 
-onMounted(fit);
+// A narrower box wraps the same text onto more lines, so a width change refits too (a responsive
+// layout, a sidebar or dialog resizing). Only the width: the height fit() sets must not refit again.
+let width: number | undefined;
+const observer = new ResizeObserver(([entry]) => {
+    const next = entry!.contentRect.width;
+    if (next === width) return;
+    width = next;
+    fit();
+});
+
+onMounted(() => {
+    fit();
+    if (autogrow) observer.observe(textarea.value!);
+});
+onBeforeUnmount(() => observer.disconnect());
 watch(model, fit, {flush: 'post'});
 </script>
