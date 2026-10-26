@@ -1,5 +1,5 @@
 <template>
-    <label class="ui-switch" :class="{'is-disabled': disabled}">
+    <label v-bind="rootAttrs($attrs)" class="ui-switch" :class="{'is-disabled': disabled}">
         <span class="ui-switch__control">
             <!-- role="switch" on the native checkbox itself is the standard pattern: the native
                  checked state maps to aria-checked (HTML-AAM), so the component never sets
@@ -9,7 +9,7 @@
                 ref="input"
                 v-guard-while-disabled="disabled"
                 @change="onChange"
-                v-bind="$attrs"
+                v-bind="controlAttrs($attrs)"
                 type="checkbox"
                 role="switch"
                 class="ui-switch__input"
@@ -34,6 +34,7 @@ import {nextTick, onMounted, useTemplateRef} from 'vue';
 import {warnWhenUnnamed} from '../internal/accessible-name';
 import {vGuardWhileDisabled} from '../internal/disabled-guard';
 import {ensureRefValueExists} from '../internal/reactivity';
+import {controlAttrs, rootAttrs} from '../internal/split-attrs';
 
 // The root is the <label> (implicit labelling), so attrs are re-aimed at the native input —
 // see Checkbox for the fall-through rationale.

@@ -78,4 +78,17 @@ describe('Switch', () => {
         expect(wrapper.find('input').attributes('name')).toBe('notifications');
         expect(wrapper.find('label').attributes('name')).toBeUndefined();
     });
+    it('puts class and style on the label root and every other attribute on the input', () => {
+        const wrapper = mount(Switch, {
+            props: {id: 'c', label: 'Accept', modelValue: false},
+            attrs: {class: 'w-40', style: 'margin: 1px', 'data-test': 'accept'},
+        });
+        const input = wrapper.find('input');
+
+        expect(wrapper.classes()).toEqual(expect.arrayContaining(['ui-switch', 'w-40']));
+        expect(wrapper.attributes('style')).toBe('margin: 1px;');
+        expect(input.attributes('data-test')).toBe('accept');
+        expect(input.classes()).not.toContain('w-40');
+        expect(input.attributes('style')).toBeUndefined();
+    });
 });

@@ -1,12 +1,12 @@
 <template>
-    <label class="ui-check" :class="{'is-disabled': disabled}">
+    <label v-bind="rootAttrs($attrs)" class="ui-check" :class="{'is-disabled': disabled}">
         <span class="ui-check__control">
             <input
                 :id="id"
                 ref="input"
                 v-guard-while-disabled="disabled"
                 @change="onChange"
-                v-bind="$attrs"
+                v-bind="controlAttrs($attrs)"
                 type="checkbox"
                 class="ui-check__input"
                 :class="{'is-invalid': invalid}"
@@ -40,6 +40,7 @@ import {nextTick, onMounted, useTemplateRef} from 'vue';
 import {warnWhenUnnamed} from '../internal/accessible-name';
 import {vGuardWhileDisabled} from '../internal/disabled-guard';
 import {ensureRefValueExists} from '../internal/reactivity';
+import {controlAttrs, rootAttrs} from '../internal/split-attrs';
 
 // The root is the <label> (implicit labelling — the whole row is the hit target), so attrs
 // must be re-aimed at the native input: `name`, `autocomplete`, `data-*`, … fall through to
