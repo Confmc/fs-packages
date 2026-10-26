@@ -1,3 +1,8 @@
 export {default as TextInput} from './components/TextInput.vue';
 export {default as Checkbox} from './components/Checkbox.vue';
 export {default as Switch} from './components/Switch.vue';
+
+// Interactive controls that are NOT form inputs: they carry no value and belong to no field.
+// Each exists to make a keyboard-reachable control the path of least resistance — the class of
+// defect a bare `<div @click>` ships (WCAG 2.1.1 / 4.1.2, Level A).
+export {default as Pressable} from './components/Pressable.vue';
