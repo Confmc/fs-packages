@@ -60,6 +60,31 @@ describe('Textarea', () => {
         const wrapper = mount(Textarea, {props: {id: 'notes', placeholder: 'Notes', disabled: true, modelValue: null}});
         expect(wrapper.find('textarea').attributes('disabled')).toBeDefined();
     });
+
+    it("follows the parent's model: a new value shows, and null shows an empty field", async () => {
+        const wrapper = mount(Textarea, {props: {id: 'notes', placeholder: 'Notes', modelValue: 'hi'}});
+        const element = wrapper.find('textarea').element;
+
+        await wrapper.setProps({modelValue: 'there'});
+        expect(element.value).toBe('there');
+
+        await wrapper.setProps({modelValue: null});
+        expect(element.value).toBe('');
+    });
+
+    it('puts every attribute, class and style included, on the textarea: it is its own root', () => {
+        const wrapper = mount(Textarea, {
+            props: {id: 'notes', placeholder: 'Notes', modelValue: null},
+            attrs: {class: 'w-40', style: 'margin: 1px', 'data-test': 'notes', maxlength: '500'},
+        });
+        const textarea = wrapper.find('textarea');
+
+        expect(wrapper.element).toBe(textarea.element);
+        expect(textarea.classes()).toEqual(expect.arrayContaining(['ui-control', 'w-40']));
+        expect(textarea.attributes('style')).toBe('margin: 1px;');
+        expect(textarea.attributes('data-test')).toBe('notes');
+        expect(textarea.attributes('maxlength')).toBe('500');
+    });
 });
 
 afterEach(() => {
