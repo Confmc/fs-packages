@@ -9,16 +9,43 @@
  * surface), and every component follows. The defaults use :where() so they carry
  * zero specificity and are trivially overridden by a territory theme.
  *
- * Every component rule sits in the `ui-form` cascade layer: package styles are defaults that
- * consumer CSS always overrides without hacks. Unlayered CSS (utilities such as UnoCSS's
- * `w-40` / `[w-40]`) beats any layered rule whatever its specificity or load order, while the
- * package's own rules keep their specificity among themselves. A consumer with an element base
- * (`input { font-size: inherit }`, `p { margin-bottom: 1rem }`) puts it in a layer declared
- * BEFORE this one, at the very top of its first stylesheet:
+ * Every component rule sits in the `ui-form` cascade layer, and the package's own rules keep their
+ * specificity among themselves. Against consumer CSS the cascade decides by layer, not by
+ * specificity or load order:
  *
- *   @layer base, ui-form;
+ *   - Unlayered consumer CSS beats every `ui-form` rule. That covers utilities (UnoCSS's `w-40`),
+ *     and it covers an unlayered reset: `*, ::before, ::after { border-width: 0 }` and
+ *     `input { padding: 0 }` strip the controls bare.
+ *   - Layered consumer CSS beats `ui-form` only from a layer declared AFTER it, and loses from a
+ *     layer declared before it.
  *
- * The tokens below stay unlayered.
+ * So a reset or element base goes in a layer declared before `ui-form`, and utilities stay
+ * unlayered or in a layer declared after it. Layers take their order from where each name first
+ * appears across all the page's stylesheets, so the order is declared once, at the very top of the
+ * consumer's stylesheet, and that stylesheet loads BEFORE this one: import it before
+ * `@script-development/ui-form/style.css` in main.ts, or import this sheet from it, after the order
+ * statement. Imported the other way round, `ui-form` is declared first and the reset wins again.
+ * Per stack:
+ *
+ *   UnoCSS with `@unocss/reset` (move the reset import from main.ts into that stylesheet, since a
+ *   JS import cannot carry a layer):
+ *
+ *     @layer base, ui-form;
+ *     @import '@unocss/reset/tailwind.css' layer(base);
+ *
+ *   Tailwind v4 (its utilities are layered, so `ui-form` goes between `base` and `utilities`):
+ *
+ *     @layer theme, base, ui-form, components, utilities;
+ *     @import 'tailwindcss';
+ *
+ *   Bootstrap (the whole sheet goes in `base`; its `!important` utilities still win, since no
+ *   `ui-form` rule is important):
+ *
+ *     @layer base, ui-form;
+ *     @import 'bootstrap/dist/css/bootstrap.css' layer(base);
+ *
+ * The tokens below are unlayered, so a consumer's token map must be unlayered too: inside any
+ * layer it loses to these defaults.
  */
 
 :where(:root) {
