@@ -9,8 +9,8 @@
 <script setup lang="ts">
 defineProps<{
     /**
-     * the control's id; the addons take `${id}-prepend` / `${id}-append`, so the control can name them
-     * in its `aria-describedby`.
+     * the control's id. The addons take `${id}-prepend` / `${id}-append`; the control is read with them
+     * once its `describedby` names them, after the field's own message.
      */
     id: string;
     /** text joined to the start of the control (`€`). */

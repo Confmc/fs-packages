@@ -32,4 +32,22 @@ describe('InputGroup', () => {
         expect(start.findAll('.ui-input-group__addon')).toHaveLength(1);
         expect(start.find('.is-start').attributes('id')).toBe('rate-prepend');
     });
+
+    it('lets the control name its addons in aria-describedby, after the field message', () => {
+        const wrapper = mount(InputGroup, {
+            props: {id: 'rate', prepend: '€', append: 'per month'},
+            slots: {
+                default: () =>
+                    h(TextInput, {
+                        id: 'rate',
+                        placeholder: 'Rate',
+                        modelValue: null,
+                        describedby: 'rate-error rate-prepend rate-append',
+                    }),
+            },
+        });
+        const described = wrapper.find('input').attributes('aria-describedby')!.split(' ');
+
+        expect(described.slice(1).map((id) => wrapper.find(`#${id}`).text())).toEqual(['€', 'per month']);
+    });
 });
