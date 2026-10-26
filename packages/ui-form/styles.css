@@ -354,7 +354,11 @@
         align-items: stretch;
         width: 100%;
     }
+    /* The control sits above the addons, so its focus and invalid rings paint over both sides
+       instead of being covered by the later addon. */
     .ui-input-group > :not(.ui-input-group__addon) {
+        position: relative;
+        z-index: 1;
         flex: 1 1 auto;
         min-width: 0;
     }
