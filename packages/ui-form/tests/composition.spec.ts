@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 // WR-1990: an IME composes a character through several `input` events. Vue's own `v-model` on a text
 // field ignores them until `compositionend`; these controls must do the same, or a consumer gets
-// every candidate (lokalekeuze measured a GET per candidate). They do it by binding the inner field
+// every candidate (one consumer sent a request per candidate). They do it by binding the inner field
 // with `v-model`, so this spec pins Vue's handling. Neither happy-dom nor Chromium can be driven by a
 // real IME from a test, so both would run these same dispatched events, which happy-dom runs faithfully.
 import {mount} from '@vue/test-utils';
