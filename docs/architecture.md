@@ -161,6 +161,7 @@ onUnmounted(() => {
 
 ```typescript
 import {createToastService} from '@script-development/fs-toast';
+
 import MyToast from '@/components/MyToast.vue'; // YOUR component
 
 const toast = createToastService(MyToast);
