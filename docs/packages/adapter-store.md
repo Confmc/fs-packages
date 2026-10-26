@@ -41,6 +41,7 @@ interface User {
 
 ```typescript
 import {createAdapterStoreModule, resourceAdapter} from '@script-development/fs-adapter-store';
+
 import {http, storage, loading} from '@/services';
 
 const usersStore = createAdapterStoreModule<User>({
