@@ -57,7 +57,9 @@ export const useValidationErrors = <T extends string = string>(
         if (!isValidationRefusal(error)) return false;
 
         refused.value = true;
-        unnamed.value = true;
+        // Until the parse finishes, the bag still holds the previous refusal's fields: a parse that
+        // throws leaves it there, so it names a field exactly when it holds one.
+        unnamed.value = Object.keys(errors.value).length === 0;
 
         const kept: [string, string][] = [];
         const dropped: string[] = [];

@@ -195,6 +195,7 @@ describe('useValidationErrors', () => {
         expect(result().refused.value).toBe(true);
         expect(result().errors.value).toEqual({name: 'Required'});
         expect(result().unmapped.value).toEqual(['token']);
+        expect(result().refusedUnnamed.value).toBe(false);
     });
 
     describe('fields allow-list', () => {
