@@ -15,7 +15,10 @@
 </template>
 
 <script setup lang="ts">
+// The native date input keeps the browser's own picker, so it has no wrapper and no in-input error
+// icon, and no placeholder: a native date input shows none.
 defineProps<{
+    /** control id, pairing the input with its label and error; inside a `FormField` the field passes its own. */
     id: string;
     disabled?: boolean;
     /** ISO date bound (`YYYY-MM-DD`) for the native picker. */
@@ -23,7 +26,7 @@ defineProps<{
     max?: string;
     /** conveys the required state to assistive tech via `aria-required`. */
     required?: boolean;
-    /** invalid styling + aria; drive it from the field's error. */
+    /** marks the input invalid; the field around it decides the message. */
     invalid?: boolean;
     /** id of the paired error element for `aria-describedby`. */
     describedby?: string;
