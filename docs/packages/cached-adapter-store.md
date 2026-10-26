@@ -19,8 +19,9 @@ The protocol is ADR-0032, at [adrs.script.nl](https://adrs.script.nl).
 ## Basic Usage
 
 ```typescript
-import {createCachedAdapterStoreModule} from '@script-development/fs-cached-adapter-store';
 import {resourceAdapter} from '@script-development/fs-adapter-store';
+import {createCachedAdapterStoreModule} from '@script-development/fs-cached-adapter-store';
+
 import {http, storage, loading} from '@/services';
 
 export const categoriesStore = createCachedAdapterStoreModule<Category>(

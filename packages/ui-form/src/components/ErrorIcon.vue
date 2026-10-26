@@ -8,7 +8,3 @@
         />
     </svg>
 </template>
-
-<script setup lang="ts">
-// Shown inside a text-like control while it shows invalid (the text-like controls). Internal: not exported.
-</script>
