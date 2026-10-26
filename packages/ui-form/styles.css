@@ -20,10 +20,14 @@
  *     layer declared before it.
  *
  * So a reset or element base goes in a layer declared before `ui-form`, and utilities stay
- * unlayered or in a layer declared after it. The order is declared once, at the very top of the
- * first stylesheet, before any import. Per stack:
+ * unlayered or in a layer declared after it. Layers take their order from where each name first
+ * appears across all the page's stylesheets, so the order is declared once, at the very top of the
+ * consumer's stylesheet, and that stylesheet loads BEFORE this one: import it before
+ * `@script-development/ui-form/style.css` in main.ts, or import this sheet from it, after the order
+ * statement. Imported the other way round, `ui-form` is declared first and the reset wins again.
+ * Per stack:
  *
- *   UnoCSS with `@unocss/reset` (move the reset import from main.ts into this stylesheet, since a
+ *   UnoCSS with `@unocss/reset` (move the reset import from main.ts into that stylesheet, since a
  *   JS import cannot carry a layer):
  *
  *     @layer base, ui-form;
@@ -34,13 +38,14 @@
  *     @layer theme, base, ui-form, components, utilities;
  *     @import 'tailwindcss';
  *
- *   Bootstrap (the whole sheet goes in `base`; its `!important` utilities still win, since an
- *   important declaration in an earlier layer beats a later layer):
+ *   Bootstrap (the whole sheet goes in `base`; its `!important` utilities still win, since no
+ *   `ui-form` rule is important):
  *
  *     @layer base, ui-form;
  *     @import 'bootstrap/dist/css/bootstrap.css' layer(base);
  *
- * The tokens below stay unlayered, so a consumer's token map never needs a layer.
+ * The tokens below are unlayered, so a consumer's token map must be unlayered too: inside any
+ * layer it loses to these defaults.
  */
 
 :where(:root) {
