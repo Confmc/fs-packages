@@ -18,7 +18,7 @@ export interface UseValidationErrors<T extends string = string> {
     /** `true` once a 422 has been taken, until `clearErrors` (which a `'sent'` submit calls). */
     refused: Readonly<Ref<boolean>>;
     /**
-     * The mapped keys of the last accepted 422 that `errors` does not hold: not named by
+     * The mapped keys of the last taken 422 that `errors` does not hold: not named by
      * `fields`, or whose value was not a list with a string first entry. Each name appears
      * once, however many dropped keys map to it, and never while another key bound it.
      */

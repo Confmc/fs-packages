@@ -2,8 +2,7 @@ import {describe, expect, it} from 'vitest';
 
 import {isValidationRefusal} from '../../src/form/http-contract';
 
-// The one piece ui-form used to import from fs-http at runtime, inlined so the package needs no fs-http
-// at build or CJS load. It must keep fs-http's behaviour exactly.
+// Mirrors fs-http's `isAxiosError` check, inlined so the package needs no fs-http at build or CJS load.
 
 describe('isValidationRefusal', () => {
     it('is true only for an axios error whose response is a 422', () => {

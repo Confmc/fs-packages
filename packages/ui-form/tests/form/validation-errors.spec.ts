@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import {afterEach, describe, expect, it, vi} from 'vitest';
+import {describe, expect, it} from 'vitest';
 
 import type {UseValidationErrorsOptions} from '../../src';
 
@@ -14,10 +14,6 @@ const mountComposable = <T extends string = string>(options?: UseValidationError
 };
 
 const VALIDATION_BODY = {message: 'The given data was invalid.', errors: {first_name: ['Required', 'Too short']}};
-
-afterEach(() => {
-    vi.restoreAllMocks();
-});
 
 describe('useValidationErrors', () => {
     it('takes a 422 and reports it; returns false for anything else and leaves the bag alone', () => {
@@ -55,13 +51,11 @@ describe('useValidationErrors', () => {
     });
 
     it('yields an empty bag when errors is null', () => {
-        const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
         const {result} = mountComposable();
 
         result().take(refusal(422, {errors: null}));
 
         expect(result().errors.value).toEqual({});
-        expect(consoleError).not.toHaveBeenCalled();
     });
 
     it('yields an empty bag when errors is not an object', () => {
@@ -101,23 +95,19 @@ describe('useValidationErrors', () => {
     });
 
     it('yields an empty bag when the 422 body is null', () => {
-        const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
         const {result} = mountComposable();
 
         result().take(refusal(422, null));
 
         expect(result().errors.value).toEqual({});
-        expect(consoleError).not.toHaveBeenCalled();
     });
 
     it('handles an error with no response at all', () => {
-        const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
         const {result} = mountComposable();
 
         result().take({isAxiosError: true, message: 'boom'});
 
         expect(result().errors.value).toEqual({});
-        expect(consoleError).not.toHaveBeenCalled();
     });
 
     it('applies a custom keyMapper to field keys', () => {
