@@ -12,4 +12,9 @@ describe('FormError', () => {
         expect(paragraph.attributes('id')).toBe('email-error');
         expect(paragraph.attributes('role')).toBe('alert');
     });
+
+    it('renders nothing for an empty error, so no empty alert is announced', () => {
+        const wrapper = mount(FormError, {props: {error: '', id: 'email-error'}});
+        expect(wrapper.find('p.ui-error').exists()).toBe(false);
+    });
 });
