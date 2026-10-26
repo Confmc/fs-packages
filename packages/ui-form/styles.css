@@ -305,6 +305,18 @@
         box-shadow: var(--ui-danger-shadow);
     }
 
+    /* NumberInput hides the browser's spin buttons. Keyed on .ui-number, which only ui-form's
+       NumberInput renders, so a ui-inputs 0.17 number input keeps its own. */
+    .ui-number::-webkit-outer-spin-button,
+    .ui-number::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+    .ui-number {
+        -moz-appearance: textfield;
+        appearance: textfield;
+    }
+
     /* TextInput's in-input error icon: shown while the control is marked, at the right edge,
        with the text kept clear of it. Keyed on .ui-input-wrap, which only ui-form's TextInput
        renders: during the migration this sheet also styles ui-inputs 0.17 controls, whose invalid
