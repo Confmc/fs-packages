@@ -610,7 +610,9 @@ for the conversion (frontend), backend converts nothing; slices 8 and 9 meet ADR
 key a form reads); the error middleware writes the camel body back onto `error.response.data`, which ui-form's `take()`
 reads. Noted as follow-ups for Marcel, not built: a shared `toFormData(object)` helper plus a test:arch rule against
 `new FormData` elsewhere; field names put an underscore before a digit (string-ts snake_cases `addressLine1` to
-`address_line_1`). Its commits were local at the end of the day, waiting for Marcel's yes to push.
+`address_line_1`). Pushed at the end of the day: the collector `error-keys-raw` through 07e9ce2e7f (with its own
+handoff), and slice 1 on a new branch `error-keys-1-mechanism` @ acfa63f58c off development, no PR yet (Marcel's call).
+Nothing in it changes what ui-form reads or sends.
 
 ### Next steps
 
