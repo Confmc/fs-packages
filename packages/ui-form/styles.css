@@ -332,9 +332,9 @@
         box-shadow: var(--ui-danger-shadow);
     }
 
-    /* TextInput's in-input error icon: shown while the control is marked, at the right edge,
-       with the text kept clear of it. Keyed on .ui-input-wrap, which only ui-form's TextInput
-       renders: during the migration this sheet also styles ui-inputs 0.17 controls, whose invalid
+    /* The text inputs' in-input error icon: shown while the control is marked, at the right edge,
+       with the text kept clear of it. Keyed on .ui-input-wrap, which only ui-form's text inputs
+       render: during the migration this sheet also styles ui-inputs 0.17 controls, whose invalid
        TextInput has no icon and must keep its own padding. */
     .ui-input-wrap {
         position: relative;
@@ -342,6 +342,62 @@
     }
     .ui-input-wrap > .ui-input.is-invalid {
         padding-right: calc(var(--ui-control-pad-x) * 2 + 1em);
+    }
+    /* A leading glyph (TimeInput's clock) and an in-input button (its clear button), with room in the text
+       for both. ui-form's own classes: no ui-inputs 0.17 control has them. */
+    .ui-input-wrap > .ui-input.has-lead {
+        padding-left: calc(var(--ui-control-pad-x) * 2 + 1em);
+    }
+    .ui-input-wrap > .ui-input.has-button {
+        padding-right: calc(var(--ui-control-pad-x) * 2 + 1em);
+    }
+    .ui-input-wrap > .ui-input.has-button.is-invalid {
+        padding-right: calc(var(--ui-control-pad-x) * 3 + 2em);
+    }
+    .ui-input__lead {
+        position: absolute;
+        top: 50%;
+        left: var(--ui-control-pad-x);
+        width: 1em;
+        height: 1em;
+        transform: translateY(-50%);
+        color: var(--ui-control-text-muted);
+        font-size: var(--ui-control-font-size);
+        pointer-events: none;
+    }
+    .ui-input__button {
+        position: absolute;
+        top: 50%;
+        right: var(--ui-control-pad-x);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.5em;
+        height: 1.5em;
+        margin-right: -0.25em;
+        padding: 0;
+        border: none;
+        border-radius: 50%;
+        background: transparent;
+        color: var(--ui-control-text-muted);
+        font-size: var(--ui-control-font-size);
+        transform: translateY(-50%);
+        cursor: pointer;
+    }
+    .ui-input__button svg {
+        width: 0.75em;
+        height: 0.75em;
+    }
+    .ui-input__button:hover {
+        color: var(--ui-control-text);
+    }
+    /* with the error icon at the edge, the button moves in beside it */
+    .ui-input.is-invalid ~ .ui-input__button {
+        right: calc(var(--ui-control-pad-x) * 2 + 1em);
+    }
+    /* the browser's own clock gives way to the glyph */
+    .ui-time::-webkit-calendar-picker-indicator {
+        display: none;
     }
     .ui-input__icon {
         position: absolute;
