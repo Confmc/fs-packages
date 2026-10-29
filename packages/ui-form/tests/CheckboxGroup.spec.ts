@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import {mount} from '@vue/test-utils';
 import {describe, expect, it} from 'vitest';
+import {h} from 'vue';
 
 import CheckboxGroup from '../src/components/CheckboxGroup.vue';
 
@@ -23,6 +24,18 @@ const mountGroup = (props: Record<string, unknown>, attrs: Record<string, unknow
     });
 
 describe('CheckboxGroup', () => {
+    it('takes its legend from the default slot over label, so the legend can carry more than text', () => {
+        const wrapper = mount(CheckboxGroup as any, {
+            props: {options: FRUITS, optionLabel: 'name', id: 'fruit', modelValue: [], required: true},
+            slots: {default: () => [h('span', 'Fruit'), h('button', {type: 'button'}, 'Info')]},
+        });
+        const legend = wrapper.get('legend');
+
+        expect(legend.find('span').text()).toBe('Fruit');
+        expect(legend.find('button').text()).toBe('Info');
+        expect(legend.find('.ui-label__req').exists()).toBe(true);
+    });
+
     const STOCK = [
         {id: 1, name: 'Apple', disabled: false},
         {id: 2, name: 'Apricot', disabled: true},
