@@ -16,9 +16,10 @@ const FRUITS: Fruit[] = [
 ];
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFC + VTU mount inference
-const mountGroup = (props: Record<string, unknown>) =>
+const mountGroup = (props: Record<string, unknown>, attrs: Record<string, unknown> = {}) =>
     mount(CheckboxGroup as any, {
         props: {options: FRUITS, optionLabel: 'name', label: 'Fruits', id: 'fruit', modelValue: [], ...props},
+        attrs,
     });
 
 describe('CheckboxGroup', () => {
@@ -113,6 +114,34 @@ describe('CheckboxGroup', () => {
         first.dispatchEvent(new Event('change', {bubbles: true}));
         await wrapper.vm.$nextTick();
         expect(wrapper.emitted('update:modelValue')).toBeUndefined();
+    });
+
+    it.each(['click', 'input', 'change'])(
+        'withholds %s on an option label from the listeners bound on a disabled group',
+        (type) => {
+            let heard = 0;
+            const wrapper = mountGroup(
+                {disabled: true},
+                {[`on${type[0].toUpperCase()}${type.slice(1)}`]: () => (heard += 1)},
+            );
+
+            wrapper.find('.ui-check__label').element.dispatchEvent(new Event(type, {bubbles: true}));
+
+            expect(heard).toBe(0);
+        },
+    );
+
+    it('follows `disabled` as it changes after mount', async () => {
+        let heard = 0;
+        const wrapper = mountGroup({}, {onChange: () => (heard += 1)});
+        const input = wrapper.find('input').element;
+
+        await wrapper.setProps({disabled: true});
+        input.dispatchEvent(new Event('change', {bubbles: true}));
+        await wrapper.setProps({disabled: false});
+        input.dispatchEvent(new Event('change', {bubbles: true}));
+
+        expect(heard).toBe(1);
     });
 
     it('round-trips string ids and resolves member labels via a getter', async () => {
