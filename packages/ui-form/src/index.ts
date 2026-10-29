@@ -1,6 +1,7 @@
 export {default as Checkbox} from './components/Checkbox.vue';
 export {default as DateInput} from './components/DateInput.vue';
 export {default as FormError} from './components/FormError.vue';
+export {default as FormField} from './components/FormField.vue';
 export {default as FormLabel} from './components/FormLabel.vue';
 export {default as InputGroup} from './components/InputGroup.vue';
 export {default as NumberInput} from './components/NumberInput.vue';
@@ -14,3 +15,5 @@ export type {
 export {default as DateInput} from './components/DateInput.vue';
 export {default as Textarea} from './components/Textarea.vue';
 export {default as InputGroup} from './components/InputGroup.vue';
+
+export type {FieldAria, FieldBinding} from './types';
