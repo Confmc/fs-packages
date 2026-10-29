@@ -23,6 +23,36 @@ const mountGroup = (props: Record<string, unknown>, attrs: Record<string, unknow
     });
 
 describe('CheckboxGroup', () => {
+    const STOCK = [
+        {id: 1, name: 'Apple', soldOut: false},
+        {id: 2, name: 'Apricot', soldOut: true},
+        {id: 3, name: 'Mango', soldOut: false},
+    ];
+
+    it.each([
+        ['a property name', 'soldOut'],
+        ['a getter', (option: {soldOut: boolean}) => option.soldOut],
+    ])('disables an option on its own by %s, leaving the others', (_, optionDisabled) => {
+        const wrapper = mountGroup({options: STOCK, optionDisabled});
+
+        expect(
+            wrapper.findAll('input[type="checkbox"]').map((input) => input.attributes('disabled') !== undefined),
+        ).toEqual([false, true, false]);
+    });
+
+    it('takes no change on a disabled option, a dispatched one included, and sets its box back', async () => {
+        const wrapper = mountGroup({options: STOCK, optionDisabled: 'soldOut', modelValue: [1]});
+        const inputs = wrapper.findAll<HTMLInputElement>('input[type="checkbox"]');
+
+        // A dispatched change runs on a disabled checkbox; a user's never fires.
+        inputs[1].element.checked = true;
+        inputs[1].element.dispatchEvent(new Event('change', {bubbles: true}));
+        await wrapper.vm.$nextTick();
+
+        expect(wrapper.emitted('update:modelValue')).toBeUndefined();
+        expect(inputs.map((input) => input.element.checked)).toEqual([true, false, false]);
+    });
+
     it('renders a fieldset with legend and one native checkbox per option, in options order', () => {
         const wrapper = mountGroup({});
 

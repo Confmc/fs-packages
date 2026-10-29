@@ -23,10 +23,10 @@
             :id="`${id}-opt-${index}`"
             :key="String(option.id)"
             :label="labelOf(option)"
-            :disabled="disabled"
+            :disabled="disabled || disabledOf(option)"
             :invalid="invalid"
             :model-value="model.includes(option.id)"
-            @update:model-value="toggle(option.id)"
+            @update:model-value="toggle(option)"
         />
     </fieldset>
 </template>
@@ -40,6 +40,7 @@ import Checkbox from './Checkbox.vue';
 const {
     options,
     optionLabel,
+    optionDisabled,
     label,
     id,
     disabled = false,
@@ -54,6 +55,11 @@ const {
      * convention — named optionLabel here because `label` is the group legend).
      */
     optionLabel: LabelKey<T>;
+    /**
+     * property name or getter for whether an option is disabled on its own (one that does not apply
+     * yet); `disabled` disables the whole group.
+     */
+    optionDisabled?: (keyof T & string) | ((option: T) => boolean);
     /** the group legend. */
     label: string;
     /** stable id — on the fieldset, and the base for position-keyed member ids. */
@@ -81,10 +87,22 @@ const labelOf = (option: T): string =>
         ? optionLabel(option)
         : String((option as Record<PropertyKey, unknown>)[optionLabel as PropertyKey]);
 
+/** Whether an option is disabled on its own, from the `optionDisabled` prop. */
+const disabledOf = (option: T): boolean =>
+    optionDisabled === undefined
+        ? false
+        : typeof optionDisabled === 'function'
+          ? optionDisabled(option)
+          : Boolean((option as Record<PropertyKey, unknown>)[optionDisabled]);
+
 // Membership keeps a stable OPTIONS order, not click order: adding re-derives the resolved
 // members from the options list. An id whose option has not arrived yet (the async-options
-// edit-form window) is preserved at the tail rather than silently dropped by the re-derive.
-const toggle = (value: T['id']): void => {
+// edit-form window) is preserved at the tail rather than silently dropped by the re-derive. A disabled
+// option takes no change, also not a dispatched one, which a browser runs on a disabled checkbox: its
+// member sets its box back to the unchanged membership.
+const toggle = (option: T): void => {
+    if (disabledOf(option)) return;
+    const value = option.id;
     if (model.value.includes(value)) {
         model.value = model.value.filter((member) => member !== value);
         return;
