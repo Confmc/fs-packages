@@ -239,17 +239,34 @@ describe('styles.css — WR-0512 font-size source-order regression pins', () => 
         expect(getComputedStyle(control).width).toBe('160px');
     });
 
-    it('an unlayered element base also beats the package; declaring its layer first restores the package', () => {
+    it('an unlayered element base beats the package', () => {
         addStyle(uiCss);
         addStyle('input { font-size: 20px; }');
-        expect(getComputedStyle(addControl('font-size: 18px')).fontSize).toBe('20px');
 
-        // the documented consumer setup: order declared first, the element base in the earlier layer
-        for (const el of cleanupTargets.splice(0)) el.remove();
+        expect(getComputedStyle(addControl('font-size: 18px')).fontSize).toBe('20px');
+    });
+
+    it('an element base in a layer declared before ui-form loses to the package (the documented setup)', () => {
         addStyle('@layer base, ui-form;');
         addStyle('@layer base { input { font-size: 20px; } }');
         addStyle(uiCss);
+
         expect(getComputedStyle(addControl('font-size: 18px')).fontSize).toBe('18px');
+    });
+
+    it('a layer declared after ui-form beats the package, the Tailwind utilities case', () => {
+        addStyle('@layer ui-form, utilities;');
+        addStyle('@layer utilities { input { font-size: 20px; } }');
+        addStyle(uiCss);
+
+        expect(getComputedStyle(addControl('font-size: 18px')).fontSize).toBe('20px');
+    });
+
+    it('a token map inside a layer loses to the unlayered defaults, so a token map stays unlayered', () => {
+        addStyle('@layer theme { :root { --ui-control-bg: rgb(255, 0, 0); } }');
+        addStyle(uiCss);
+
+        expect(getComputedStyle(addControl()).backgroundColor).toBe('rgb(255, 255, 255)');
     });
 
     it('the --ui-control-font-size var wins by contract, regardless of source order', () => {
