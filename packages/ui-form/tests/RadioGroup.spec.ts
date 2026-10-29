@@ -117,6 +117,41 @@ describe('RadioGroup', () => {
         },
     );
 
+    const STOCK = [
+        {id: 1, name: 'Apple', soldOut: false},
+        {id: 2, name: 'Apricot', soldOut: true},
+        {id: 3, name: 'Mango', soldOut: false},
+    ];
+
+    it.each([
+        ['a property name', 'soldOut'],
+        ['a getter', (option: {soldOut: boolean}) => option.soldOut],
+    ])('disables an option on its own by %s, leaving the others', (_, optionDisabled) => {
+        const wrapper = mountGroup({options: STOCK, optionDisabled});
+
+        expect(
+            wrapper.findAll('input[type="radio"]').map((radio) => radio.attributes('disabled') !== undefined),
+        ).toEqual([false, true, false]);
+        expect(wrapper.findAll('.ui-radio').map((row) => row.classes().includes('is-disabled'))).toEqual([
+            false,
+            true,
+            false,
+        ]);
+    });
+
+    it('takes no change on a disabled option, a dispatched one included, and sets its radio back', async () => {
+        const wrapper = mountGroup({options: STOCK, optionDisabled: 'soldOut', modelValue: 1});
+        const radios = wrapper.findAll<HTMLInputElement>('input[type="radio"]');
+
+        // A dispatched change runs on a disabled radio; a user's never fires.
+        radios[1].element.checked = true;
+        radios[1].element.dispatchEvent(new Event('change', {bubbles: true}));
+        await wrapper.vm.$nextTick();
+
+        expect(wrapper.emitted('update:modelValue')).toBeUndefined();
+        expect(radios.map((radio) => radio.element.checked)).toEqual([true, false, false]);
+    });
+
     it('keeps a click on an option label from the consumer while disabled', () => {
         let heard = 0;
         const wrapper = mountGroup({disabled: true, onClick: () => (heard += 1)});

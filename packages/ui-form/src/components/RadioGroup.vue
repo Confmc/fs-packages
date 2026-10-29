@@ -24,7 +24,7 @@
             v-for="(option, index) in options"
             :key="String(option.id)"
             class="ui-check ui-radio"
-            :class="{'is-disabled': disabled}"
+            :class="{'is-disabled': disabled || disabledOf(option)}"
         >
             <span class="ui-check__control">
                 <input
@@ -35,8 +35,8 @@
                     :name="id"
                     :value="String(option.id)"
                     :checked="model === option.id"
-                    :disabled="disabled"
-                    @change="onChange($event, option.id)"
+                    :disabled="disabled || disabledOf(option)"
+                    @change="onChange($event, option)"
                 />
                 <svg class="ui-check__icon" viewBox="0 0 20 20" aria-hidden="true">
                     <circle class="ui-radio__dot" cx="10" cy="10" r="4.5" fill="currentColor" />
@@ -57,6 +57,7 @@ import {vGuardWhileDisabled} from '../internal/disabled-guard';
 const {
     options,
     optionLabel,
+    optionDisabled,
     label,
     id,
     disabled = false,
@@ -70,6 +71,11 @@ const {
      * convention — named optionLabel here because `label` is the group legend).
      */
     optionLabel: LabelKey<T>;
+    /**
+     * property name or getter for whether an option is disabled on its own (one that does not apply
+     * yet); `disabled` disables the whole group.
+     */
+    optionDisabled?: (keyof T & string) | ((option: T) => boolean);
     /** the group legend. */
     label: string;
     /** stable id — on the fieldset, the shared radio `name`, and the member-id base. */
@@ -92,13 +98,22 @@ const labelOf = (option: T): string =>
         ? optionLabel(option)
         : String((option as Record<PropertyKey, unknown>)[optionLabel as PropertyKey]);
 
+/** Whether an option is disabled on its own, from the `optionDisabled` prop. */
+const disabledOf = (option: T): boolean =>
+    optionDisabled === undefined
+        ? false
+        : typeof optionDisabled === 'function'
+          ? optionDisabled(option)
+          : Boolean((option as Record<PropertyKey, unknown>)[optionDisabled]);
+
 // The model follows the native change event (keyboard arrows and clicks both land here). The browser
 // has already moved the checked radio, so once the host has rendered every radio is set back to the
 // model — a declined or deferred change otherwise leaves the clicked one showing (WR-1922). The
-// radios are found from the one that changed: every radio sits inside this component's fieldset.
-const onChange = (event: Event, value: T['id']): void => {
+// radios are found from the one that changed: every radio sits inside this component's fieldset. A
+// disabled option takes no change, also not a dispatched one, which a browser runs on a disabled radio.
+const onChange = (event: Event, option: T): void => {
     const fieldset = (event.currentTarget as HTMLElement).closest('fieldset') as HTMLFieldSetElement;
-    model.value = value;
+    if (!disabledOf(option)) model.value = option.id;
     void nextTick(() => {
         const radios = fieldset.querySelectorAll<HTMLInputElement>('.ui-radio__input');
         for (const [index, radio] of radios.entries()) radio.checked = model.value === options[index].id;
