@@ -113,6 +113,20 @@ describe.each(SELECT_ONLY)('$name — typeahead', ({mountIt, keyTarget}) => {
         expect(active()).toBe('f-opt-0');
     });
 
+    it('each key restarts the idle window, so a string typed at a steady pace keeps growing', async () => {
+        const {press, active} = await setup();
+
+        await press('b');
+        vi.advanceTimersByTime(400);
+        await press('l');
+        vi.advanceTimersByTime(400);
+        await press('b');
+
+        // "blb" matches nothing, so Blue moon stays. Had the first key's window run on, the string
+        // would have reset before the last b, which would then cycle on to Blueberry.
+        expect(active()).toBe('f-opt-3');
+    });
+
     it('after a typed string resets, a repeated character cycles again', async () => {
         const {press, active} = await setup();
 

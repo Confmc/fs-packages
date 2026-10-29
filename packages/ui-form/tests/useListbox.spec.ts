@@ -436,3 +436,233 @@ describe('useListbox without the optional hooks', () => {
         wrapper.unmount();
     });
 });
+
+describe('useListbox keyboard and highlight contract', () => {
+    const LABELS = ['Apple', 'Banana', 'Cherry'];
+
+    it('uses fixed positioning, since the top-layer popup is placed against the viewport', () => {
+        const wrapper = mount(Harness);
+
+        expect(lastFloatingConfig()).toMatchObject({strategy: 'fixed'});
+        wrapper.unmount();
+    });
+
+    it('swallows a key that opens the closed list', () => {
+        const wrapper = mount(Harness, {
+            props: {overrides: {listLength: () => 3, openKeys: (name: string) => name === 'ArrowDown'}},
+        });
+
+        const event = key('ArrowDown');
+        api.onKey(event);
+
+        expect(api.open.value).toBe(true);
+        expect(event.defaultPrevented).toBe(true);
+        wrapper.unmount();
+    });
+
+    it('opens on Space when the list is closed, even with typeahead on', () => {
+        const wrapper = mount(Harness, {
+            props: {
+                overrides: {
+                    listLength: () => 3,
+                    openKeys: (name: string) => name === ' ',
+                    typeaheadLabels: () => LABELS,
+                },
+            },
+        });
+
+        api.onKey(key(' '));
+
+        expect(api.open.value).toBe(true);
+        wrapper.unmount();
+    });
+
+    it.each(['ArrowDown', 'ArrowUp', 'Escape'])('swallows %s while open', (name) => {
+        const wrapper = mount(Harness, {props: {overrides: {listLength: () => 3}}});
+
+        api.openList();
+        api.onKey(key('ArrowDown'));
+        const event = key(name);
+        api.onKey(event);
+
+        expect(event.defaultPrevented).toBe(true);
+        wrapper.unmount();
+    });
+
+    it('swallows Enter when it commits an option', () => {
+        const wrapper = mount(Harness, {props: {overrides: {listLength: () => 3, onCommit: () => true}}});
+
+        api.openList();
+        api.onKey(key('ArrowDown'));
+        const enter = key('Enter');
+        api.onKey(enter);
+
+        expect(enter.defaultPrevented).toBe(true);
+        wrapper.unmount();
+    });
+
+    it('ArrowDown from the first option moves to the second, past the clear entry above it', () => {
+        const wrapper = mount(Harness, {props: {overrides: {listLength: () => 3, clearEntry: () => true}}});
+
+        api.openList();
+        api.onKey(key('ArrowDown'));
+        api.onKey(key('ArrowDown'));
+        api.onKey(key('ArrowDown'));
+
+        expect(api.pointer.value).toBe(1);
+        expect(api.clearHighlighted.value).toBe(false);
+        wrapper.unmount();
+    });
+
+    it('ArrowUp from the last option moves to the one above, not to the clear entry', () => {
+        const wrapper = mount(Harness, {props: {overrides: {listLength: () => 3, clearEntry: () => true}}});
+
+        api.openList();
+        api.onKey(key('End'));
+        api.onKey(key('ArrowUp'));
+
+        expect(api.pointer.value).toBe(1);
+        expect(api.clearHighlighted.value).toBe(false);
+        wrapper.unmount();
+    });
+
+    it('a highlighted clear flag without a clear entry is no highlight', () => {
+        const wrapper = mount(Harness, {props: {overrides: {listLength: () => 3}}});
+
+        api.openList();
+        api.highlightClear();
+
+        expect(api.clearHighlighted.value).toBe(false);
+        wrapper.unmount();
+    });
+
+    it('closing drops the clear entry highlight, so reopening shows none', () => {
+        const wrapper = mount(Harness, {props: {overrides: {listLength: () => 3, clearEntry: () => true}}});
+
+        api.openList();
+        api.highlightClear();
+        api.close();
+
+        expect(api.clearHighlighted.value).toBe(false);
+        wrapper.unmount();
+    });
+
+    // A move onto an option drops the clear flag, not only the pointer: the pointer is the
+    // caller's to write (SingleSelect sets it on hover), and a flag left up would light the clear
+    // entry again the moment the pointer returns to -1.
+    it.each([
+        ['typeahead', () => api.onKey(key('b'))],
+        ['ArrowDown off the clear entry', () => api.onKey(key('ArrowDown'))],
+        ['End', () => api.onKey(key('End'))],
+        [
+            'ArrowDown from a hovered option',
+            () => {
+                api.pointer.value = 1;
+                api.onKey(key('ArrowDown'));
+            },
+        ],
+    ])('%s drops the clear flag', (_, move) => {
+        const wrapper = mount(Harness, {
+            props: {overrides: {listLength: () => 3, clearEntry: () => true, typeaheadLabels: () => LABELS}},
+        });
+
+        api.openList();
+        api.highlightClear();
+        move();
+        expect(api.pointer.value).toBeGreaterThanOrEqual(0);
+        api.pointer.value = -1;
+
+        expect(api.clearHighlighted.value).toBe(false);
+        wrapper.unmount();
+    });
+
+    it('a list shrinking under the pointer drops the clear flag with the clamp', async () => {
+        const length = ref(3);
+        const wrapper = mount(Harness, {props: {overrides: {listLength: () => length.value, clearEntry: () => true}}});
+
+        api.openList();
+        api.highlightClear();
+        api.pointer.value = 2;
+        length.value = 2;
+        await nextTick();
+        expect(api.pointer.value).toBe(1);
+        api.pointer.value = -1;
+
+        expect(api.clearHighlighted.value).toBe(false);
+        wrapper.unmount();
+    });
+
+    it('a list shrinking to exactly the pointer clamps it onto the new last option', async () => {
+        const length = ref(3);
+        const wrapper = mount(Harness, {props: {overrides: {listLength: () => length.value}}});
+
+        api.openList();
+        api.onKey(key('End'));
+        length.value = 2;
+        await nextTick();
+
+        expect(api.pointer.value).toBe(1);
+        expect(api.activeDescendant.value).toBe('harness-opt-1');
+        wrapper.unmount();
+    });
+
+    it('names no active option while closed, wherever the pointer is', () => {
+        const wrapper = mount(Harness, {props: {overrides: {listLength: () => 3}}});
+
+        api.pointer.value = 1;
+
+        expect(api.activeDescendant.value).toBeUndefined();
+        wrapper.unmount();
+    });
+
+    it.each([
+        ['nothing is highlighted', -1],
+        ['the pointer is past the end, before the clamp runs', 3],
+    ])('names no active option when %s', (_, pointer) => {
+        const wrapper = mount(Harness, {props: {overrides: {listLength: () => 3}}});
+
+        api.openList();
+        api.pointer.value = pointer;
+
+        expect(api.activeDescendant.value).toBeUndefined();
+        wrapper.unmount();
+    });
+
+    it('typeahead on the first option searches on from it, not from the committed option', () => {
+        const wrapper = mount(Harness, {
+            props: {
+                overrides: {
+                    listLength: () => 3,
+                    typeaheadLabels: () => ['Banana', 'Blue', 'Berry'],
+                    committedIndex: () => 2,
+                },
+            },
+        });
+
+        api.openList();
+        api.onKey(key('ArrowDown'));
+        api.onKey(key('b'));
+
+        expect(api.pointer.value).toBe(1);
+        wrapper.unmount();
+    });
+
+    it('a growing string searches from the current option, not from the top', () => {
+        const wrapper = mount(Harness, {
+            props: {
+                overrides: {
+                    listLength: () => 3,
+                    typeaheadLabels: () => ['Blue a', 'Bark', 'Blue b'],
+                    committedIndex: () => 1,
+                },
+            },
+        });
+
+        api.onKey(key('b'));
+        expect(api.pointer.value).toBe(2);
+        api.onKey(key('l'));
+
+        expect(api.pointer.value).toBe(2);
+        wrapper.unmount();
+    });
+});
