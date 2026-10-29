@@ -103,6 +103,30 @@ describe('RadioGroup', () => {
         expect(wrapper.emitted('update:modelValue')).toBeUndefined();
     });
 
+    it('keeps a click on an option label from the consumer while disabled', () => {
+        let heard = 0;
+        const wrapper = mountGroup({disabled: true, onClick: () => (heard += 1)});
+
+        // The label text is not the disabled radio, so the browser withholds nothing here: the
+        // click bubbles to the fieldset, where the consumer's attrs land.
+        wrapper.find('.ui-check__label').element.dispatchEvent(new MouseEvent('click', {bubbles: true}));
+
+        expect(heard).toBe(0);
+    });
+
+    it('follows `disabled` as it changes after mount — the guard reads the current value', async () => {
+        let heard = 0;
+        const wrapper = mountGroup({onChange: () => (heard += 1)});
+        const radio = wrapper.find('input[type="radio"]').element;
+
+        await wrapper.setProps({disabled: true});
+        radio.dispatchEvent(new Event('change', {bubbles: true}));
+        await wrapper.setProps({disabled: false});
+        radio.dispatchEvent(new Event('change', {bubbles: true}));
+
+        expect(heard).toBe(1);
+    });
+
     it('round-trips string ids and resolves member labels via a getter', async () => {
         interface Tag {
             id: string;
