@@ -19,7 +19,7 @@ const mountTime = (props: Record<string, unknown> = {}) =>
     mount(TimeInput, {props: {id: 'start', modelValue: '09:30', ...props}, attachTo: document.body});
 
 describe('TimeInput', () => {
-    it('shows the time and emits the typed one', async () => {
+    it('shows the time, and emits the typed one, an emptied field as null (no time)', async () => {
         const wrapper = mountTime();
         const input = wrapper.find('input');
 
@@ -27,8 +27,9 @@ describe('TimeInput', () => {
         expect(input.attributes('id')).toBe('start');
         expect(input.element.value).toBe('09:30');
         await input.setValue('14:15');
+        await input.setValue('');
 
-        expect(wrapper.emitted('update:modelValue')).toEqual([['14:15']]);
+        expect(wrapper.emitted('update:modelValue')).toEqual([['14:15'], [null]]);
         wrapper.unmount();
     });
 
@@ -61,7 +62,7 @@ describe('TimeInput', () => {
     it('offers a clear button named by clearLabel while there is a time, which clears it and keeps focus on the input', async () => {
         const wrapper = mountTime({
             clearLabel: 'Wis tijd',
-            'onUpdate:modelValue': (value: string) => wrapper.setProps({modelValue: value}),
+            'onUpdate:modelValue': (value: string | null) => wrapper.setProps({modelValue: value}),
         });
         const input = wrapper.find('input');
         const clear = wrapper.find('.ui-input__button');
@@ -75,7 +76,7 @@ describe('TimeInput', () => {
         expect(down.defaultPrevented).toBe(true);
 
         await clear.trigger('click');
-        expect(wrapper.emitted('update:modelValue')).toEqual([['']]);
+        expect(wrapper.emitted('update:modelValue')).toEqual([[null]]);
         expect(input.element.value).toBe('');
         expect(wrapper.find('.ui-input__button').exists()).toBe(false);
         expect(document.activeElement).toBe(input.element);
@@ -120,13 +121,13 @@ describe('TimeInput', () => {
         wrapper.unmount();
     });
 
-    it('opens the picker on the next click after Escape closed it', async () => {
+    it('opens the picker on the next click after a time was picked in it', async () => {
         const showPicker = stubPicker();
         const wrapper = mountTime();
         const input = wrapper.find('input');
 
         await input.trigger('click');
-        await input.trigger('keydown', {key: 'Escape'});
+        await input.trigger('change');
         await input.trigger('click');
 
         expect(showPicker).toHaveBeenCalledTimes(2);

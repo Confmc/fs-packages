@@ -10,9 +10,9 @@
             />
         </svg>
         <input
-            v-model="model"
+            @input="onInput"
             @click="togglePicker"
-            @keydown.escape="pickerOpen = false"
+            @change="pickerOpen = false"
             @blur="pickerOpen = false"
             v-bind="controlAttrs($attrs)"
             ref="input"
@@ -20,6 +20,7 @@
             type="time"
             class="ui-control ui-input ui-time has-lead"
             :class="{'is-invalid': invalid, 'has-button': showClear}"
+            :value="model ?? ''"
             :step="step === undefined ? undefined : step * 60"
             :disabled="disabled"
             :aria-required="required || undefined"
@@ -76,18 +77,25 @@ const {
 
 defineOptions({inheritAttrs: false});
 
-// `HH:MM`. As TextInput: binds null as empty, emits '' when cleared (by the button or the keyboard), which
-// the fleet's ConvertEmptyStringsToNull middleware converts back to null.
+// `HH:MM`, or null for no time: the clear button and an emptied field both emit null, as an empty string is
+// no time. A consumer's own logic reads the model before any backend does (`time === null`), so a time keeps
+// the honest empty value, as NumberInput does. That is why the input is bound by hand, not with v-model,
+// which would emit the native input's ''.
 const model = defineModel<string | null>({required: true});
+
+const onInput = (event: Event): void => {
+    model.value = (event.target as HTMLInputElement).value || null;
+};
 
 const showClear = computed(() => clearLabel !== undefined && !disabled && Boolean(model.value));
 
 const input = useTemplateRef<HTMLInputElement>('input');
 const pickerOpen = ref(false);
 
-// A click opens the browser's picker. The browser closes it on the next click, on Escape or on a blur; this
-// state follows, so the click after that opens it again. The picker is a browser feature: where it is
-// missing or refused, the click just edits the field.
+// A click opens the browser's picker; the next click, which the browser spends closing it, only resets this
+// state. Picking a time (change) and a blur reset it too. Escape does not: an open picker keeps its keys from
+// the page, so after Escape one click is spent before the picker opens again. The picker is a browser
+// feature: where it is missing or refused, the click just edits the field.
 const togglePicker = (): void => {
     if (pickerOpen.value) {
         pickerOpen.value = false;
@@ -103,7 +111,7 @@ const togglePicker = (): void => {
 
 // The clear button keeps focus on the input, so no blur resets the picker state.
 const clear = (): void => {
-    model.value = '';
+    model.value = null;
     pickerOpen.value = false;
     input.value?.focus();
 };
