@@ -637,6 +637,14 @@ a separate self-review agent with its fixes in:
 | `ui-form/n-search-input` | main | SearchInput (emmie's): `type="search"`, magnifier, `clearLabel` clear button | #342 (draft until CI green) |
 | `ui-form/n-password-input` | main | PasswordInput (emmie's): show/hide toggle, Caps Lock notice, `--ui-warning-text` | #343 (draft until CI green) |
 
+| `ui-form/n-radio-group` | main | RadioGroup: disabled guard back on the fieldset, declined-change tests, per-option `disabled` | after the test bed's landing.7 run |
+| `ui-form/n-checkbox-group` | n-checkbox-switch (#332) | CheckboxGroup: same, plus its listener-order row | after #332 merges (merge main in first) |
+
+The two group branches carry byte-identical `disabled-guard.ts` and `types.ts` (`SelectItem` with optional
+`disabled`, `LabelKey`), so they merge cleanly with each other; `types.ts` is an add/add conflict with
+FormField's (`FieldBinding`, `FieldAria`): concatenate. RadioGroup's listener-order row waits for #332's props
+column.
+
 TimeInput and SearchInput add the same glyph/button CSS lines, so they merge cleanly in either order;
 PasswordInput takes only the button rules and takes main in after whichever lands first.
 
@@ -651,7 +659,7 @@ FormField and the control. Don't reopen it on the FormField PR.
 ### The test bed
 
 The emmie session (`error-keys-raw`) is a test bed: it installs temporary packs and uses them on real forms, it
-does not prep or polish slices. Current pack: `.experiment-packs/script-development-ui-form-landing.4.tgz` from
+does not prep or polish slices. Current pack: `.experiment-packs/script-development-ui-form-landing.7.tgz` from
 `experiment/ui-form-landing` on fork (main + every open PR + FormField + the three new inputs; index.ts, the
 stylesheet and the listener-order table merged by hand). Each pack carries its own version (`0.0.0-landing.N`)
 or Vite keeps its stale pre-bundle. After a hand merge run oxfmt and the tests before committing: a conflict
@@ -676,12 +684,15 @@ the reviewer sees them meanwhile. Add a line when a rule settles; strike one tha
   English default name, and leaving it out is how a value that must stay set says so. (2026-10-29, #341 #342)
 - In-input buttons are keyboard-reachable, show the focus ring (and a forced-colors outline), and are a 24px target
   at least; a pointer press keeps focus in the field. (2026-10-29, #341 #342 #343)
-- Every string control emits `''` on clear, by button or keyboard; NumberInput alone emits `null`. (2026-10-29,
-  #336 #341 #342)
 - A look is tokens on the wrapper's class, never a prop (emmie's `small` search pill). (2026-10-29, #342)
 - Controls take `invalid` only; `id` required; `placeholder` required on text-like inputs (none on date/time,
   which show none); `v-model` on the inner element where it fits; `class`/`style` on the root. (settled 10-23/26)
 - The bound-control kit (K2): `useForm` hands out `<TextField name label required/>`, `required` written once.
   (decided 10-19, not built)
+- An option disables itself with `disabled` on the option (`SelectItem.disabled`), not a prop: the screen
+  sets it when it builds its options, as emmie did before; the group-wide `disabled` stays. (2026-10-29,
+  n-radio-group n-checkbox-group)
+- A time (like a number) is `HH:MM` or `null`: a consumer's own logic reads `=== null` before any backend
+  middleware runs. Other string controls emit `''`. (2026-10-29, #341)
 - Toggle buttons keep one name and carry their state in `aria-pressed`; status notices are live regions that are
   always rendered, with only their text changing. (2026-10-29, #343)
