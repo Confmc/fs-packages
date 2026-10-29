@@ -8,6 +8,7 @@ export {default as NumberInput} from './components/NumberInput.vue';
 export {default as Switch} from './components/Switch.vue';
 export {default as Textarea} from './components/Textarea.vue';
 export {default as TextInput} from './components/TextInput.vue';
+export {default as TimeInput} from './components/TimeInput.vue';
 export {useFormSubmit} from './form/form-submit';
 export {useValidationErrors} from './form/validation-errors';
 
