@@ -17,4 +17,9 @@ describe('FormError', () => {
         const wrapper = mount(FormError, {props: {error: '', id: 'email-error'}});
         expect(wrapper.find('p.ui-error').exists()).toBe(false);
     });
+
+    it("renders nothing without an error, so a bag's missing key binds as is", () => {
+        const wrapper = mount(FormError, {props: {id: 'email-error'}});
+        expect(wrapper.find('p.ui-error').exists()).toBe(false);
+    });
 });

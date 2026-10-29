@@ -5,10 +5,11 @@
 <script setup lang="ts">
 defineProps<{
     /**
-     * the resolved error string. Supplied by the consumer — never read from a service. An empty
-     * string renders nothing, so no empty `role="alert"` element is announced.
+     * the resolved error string. Supplied by the consumer — never read from a service. An empty or
+     * missing one renders nothing, so no empty `role="alert"` element is announced and a validation
+     * bag's `errors.x` binds as is.
      */
-    error: string;
+    error?: string;
     /** id used to pair with a control's `aria-describedby`. */
     id: string;
 }>();
