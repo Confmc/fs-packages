@@ -623,22 +623,21 @@ Nothing in it changes what ui-form reads or sends.
 
 ## State at 2026-10-29: prep while the open PRs wait (read this section first)
 
-Nothing merged or reviewed since 10-26; every comment on #330 and #332 is answered. Prep built since, each through
+Nothing merged or reviewed since 10-26; every comment on #330 and #332 is answered, and both are re-requested. Prep built since, each through
 a separate self-review agent with its fixes in:
 
 | Branch (on `fork`) | Base | What | Opens |
 |---|---|---|---|
-| `ui-form/n-browser-styles` | main | ui-form's browser suite: stylesheet + every rule of the layer header pinned | #340 (draft until CI green) |
+| `ui-form/n-browser-styles` | main | ui-form's browser suite: stylesheet + every rule of the layer header pinned | #340, ready |
 | `ui-form/n-form-field` | #330's branch | FormField: slot hands `field` {id, invalid, describedby} and `aria`; leaves the empty-message check to FormError | after #330 merges (merge main in first) |
 | `ui-form/n-field-hint` | n-form-field | hint slot, `<id>-hint`, read after the message | after FormField |
 | `ui-form/n-field-label-after` | n-form-field | FormLabel `after` slot + FormField `label-after` | after FormField |
 | `ui-form/n-field-aside` | n-form-field | aside slot, `.ui-field__head` row | after FormField |
-| `ui-form/n-time-input` | main | TimeInput (emmie's): clock glyph, picker toggle, `clearLabel` clear button, `step` | #341 (draft until CI green) |
-| `ui-form/n-search-input` | main | SearchInput (emmie's): `type="search"`, magnifier, `clearLabel` clear button | #342 (draft until CI green) |
-| `ui-form/n-password-input` | main | PasswordInput (emmie's): show/hide toggle, Caps Lock notice, `--ui-warning-text` | #343 (draft until CI green) |
-
-| `ui-form/n-radio-group` | main | RadioGroup: disabled guard back on the fieldset, declined-change tests, per-option `disabled`, legend slot | #344 |
-| `ui-form/n-single-select` | main | SingleSelect + the listbox core (useListbox, OptionList, ListboxOption, reactivity, types), direct OptionList.spec, `optionLabel` | open next, after its local Stryker run |
+| `ui-form/n-time-input` | main | TimeInput (emmie's): clock glyph, picker toggle, `clearLabel` clear button, `step` | #341, ready |
+| `ui-form/n-search-input` | main | SearchInput (emmie's): `type="search"`, magnifier, `clearLabel` clear button | #342, ready |
+| `ui-form/n-password-input` | main | PasswordInput (emmie's): show/hide toggle, Caps Lock notice, `--ui-warning-text` | #343, ready |
+| `ui-form/n-radio-group` | main | RadioGroup: disabled guard back on the fieldset, declined-change tests, per-option `disabled`, legend slot | #344, ready |
+| `ui-form/n-single-select` | main | SingleSelect + the listbox core (useListbox, OptionList, ListboxOption, reactivity, types), direct OptionList.spec, `optionLabel`; Stryker 97.14 | open next, after a short review of its last three commits (see HOME-HANDOFF) |
 | `ui-form/n-checkbox-group` | n-checkbox-switch (#332) | CheckboxGroup: same, plus its listener-order row | after #332 merges (merge main in first) |
 
 The two group branches carry byte-identical `disabled-guard.ts` and `types.ts` (`SelectItem` with optional
@@ -660,12 +659,14 @@ FormField and the control. Don't reopen it on the FormField PR.
 ### The test bed
 
 The emmie session (`error-keys-raw`) is a test bed: it installs temporary packs and uses them on real forms, it
-does not prep or polish slices. Current pack: `.experiment-packs/script-development-ui-form-landing.7.tgz` from
-`experiment/ui-form-landing` on fork (main + every open PR + FormField + the three new inputs; index.ts, the
+does not prep or polish slices. Current pack: `.experiment-packs/script-development-ui-form-landing.8.tgz` from
+`experiment/ui-form-landing` on fork (main + every open PR + FormField + the groups; index.ts, types.ts, the
 stylesheet and the listener-order table merged by hand). Each pack carries its own version (`0.0.0-landing.N`)
 or Vite keeps its stale pre-bundle. After a hand merge run oxfmt and the tests before committing: a conflict
-whose closing brace sits outside the markers leaves a CSS rule open, and a type check reads neither CSS nor specs. It wires the rooms form (422 on `workplaces.new_139.name`) and one simple form on a scratch
-branch off its collector, and reports what breaks. Its collector push waits for Marcel.
+whose closing brace sits outside the markers leaves a CSS rule open, and a type check reads neither CSS nor specs. It compares with emmie's controls as they were before the forms work. Screens wired so far: the rooms form (422
+row keys), the registration editor's TimeInputs, CareAgreementForm and the timetracking export (RadioGroup,
+per-option `disabled`, legend slot), ContactReportTab's search pill, UserPasswordModal. Its commits stay local
+(branch `ui-form-landing-test`); its collector push waits for Marcel.
 
 ### Mutation gate
 
