@@ -54,13 +54,12 @@ defineSlots<{
 }>();
 
 const errorId = computed(() => messageId(id));
-const message = computed(() => error || undefined);
 
 // The field decides the message; the control only learns whether it is invalid and where its message is.
 const field = computed<FieldBinding>(() => ({
     id,
-    invalid: Boolean(message.value),
-    describedby: message.value && errorId.value,
+    invalid: Boolean(error),
+    describedby: error ? errorId.value : undefined,
 }));
 
 // A <label for> names only a form control; a native element is named by aria-labelledby instead. An attribute
