@@ -40,7 +40,6 @@ import Checkbox from './Checkbox.vue';
 const {
     options,
     optionLabel,
-    optionDisabled,
     label,
     id,
     disabled = false,
@@ -55,11 +54,6 @@ const {
      * convention — named optionLabel here because `label` is the group legend).
      */
     optionLabel: LabelKey<T>;
-    /**
-     * property name or getter for whether an option is disabled on its own (one that does not apply
-     * yet); `disabled` disables the whole group.
-     */
-    optionDisabled?: (keyof T & string) | ((option: T) => boolean);
     /** the group legend. */
     label: string;
     /** stable id — on the fieldset, and the base for position-keyed member ids. */
@@ -87,13 +81,8 @@ const labelOf = (option: T): string =>
         ? optionLabel(option)
         : String((option as Record<PropertyKey, unknown>)[optionLabel as PropertyKey]);
 
-/** Whether an option is disabled on its own, from the `optionDisabled` prop. */
-const disabledOf = (option: T): boolean =>
-    optionDisabled === undefined
-        ? false
-        : typeof optionDisabled === 'function'
-          ? optionDisabled(option)
-          : Boolean((option as Record<PropertyKey, unknown>)[optionDisabled]);
+/** Whether an option is disabled on its own (`disabled` on the option); `disabled` disables the whole group. */
+const disabledOf = (option: T): boolean => option.disabled === true;
 
 // Membership keeps a stable OPTIONS order, not click order: adding re-derives the resolved
 // members from the options list. An id whose option has not arrived yet (the async-options

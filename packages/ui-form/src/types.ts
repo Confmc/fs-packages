@@ -1,6 +1,8 @@
 /** The minimal shape every option in a select must satisfy: a stable identity. */
 export interface SelectItem {
     id: string | number;
+    /** disables this option on its own (one that does not apply yet), where the control supports it. */
+    disabled?: boolean;
 }
 
 /**
