@@ -1,5 +1,5 @@
 /**
- * happy-dom 20 ships no Popover API, and `useListbox` calls `showPopover()` unconditionally —
+ * happy-dom 21 ships no Popover API, and `useListbox` calls `showPopover()` unconditionally —
  * the API is Baseline (Chrome 114 / Safari 17 / Firefox 125) and a capability branch in source
  * would be permanently unreachable under the coverage gate, which runs happy-dom only.
  *

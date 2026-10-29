@@ -6,11 +6,11 @@
         :aria-label="optionsLabel"
         :aria-multiselectable="multiselectable || undefined"
     >
-        <!-- The committing clear entry (SingleSelect/Combobox/GroupSelect/GroupCombobox
-             `clearLabel`) renders OUTSIDE the index space — its own <li> above the rows, its
-             own id (`${id}-clear`), its own highlight flag — so every option index below keeps
-             mapping 1:1 onto the parent's list. It is an option to assistive tech (role="option"
-             inside the listbox); aria-selected marks the committed-null state. -->
+        <!-- The committing clear entry (a select's `clearLabel`) renders OUTSIDE the index
+             space — its own <li> above the rows, its own id (`${id}-clear`), its own highlight
+             flag — so every option index below keeps mapping 1:1 onto the parent's list. It is an
+             option to assistive tech (role="option" inside the listbox); aria-selected marks the
+             committed-null state. -->
         <li
             v-if="clearLabel !== undefined"
             :id="clearId"
@@ -99,19 +99,20 @@ import ListboxOption from './ListboxOption.vue';
  * by the class-prefix `variant`, so the `role="listbox"` / `role="option"` / position-keyed
  * `optionId` / committed-value `aria-selected` semantics stay byte-identical across the family.
  *
- * Both the flat controls (SingleSelect; Combobox, MultiSelect and MultiCombobox to follow) and
- * the grouped ones (GroupSelect and GroupCombobox, to follow) render through this single
- * component: the ONLY difference is the `rows` a parent hands down. A flat control passes a run of all-option rows (no headers,
- * rendered flat); a grouped control interleaves `header`/`boundary` rows and this component
- * folds them into named `role="group"` runs. `boundary` closes the open run so a `header:false`
- * group after a named one renders flat instead of being absorbed into the preceding group.
+ * Flat and grouped selects render through this single component: the ONLY difference is the
+ * `rows` a parent hands down. A flat control (SingleSelect) passes a run of all-option rows (no
+ * headers, rendered flat); a grouped control interleaves `header`/`boundary` rows and this
+ * component folds them into named `role="group"` runs. `boundary` closes the open run so a
+ * `header:false` group after a named one renders flat instead of being absorbed into the
+ * preceding group.
  *
  * Entirely index-based, mirroring `useListbox`: the option type `T` never crosses this
- * boundary. The parent hands down `rows` + `keys` derived from ITS list (SingleSelect `sorted`,
- * Combobox `filtered`, GroupSelect the flattened groups) plus index-keyed lookups, and receives
- * `hover`/`commit` back by index — the parent stays the sole owner of `pointer` and of the
- * commit disposition. Per-option content flows through the index-scoped `option` slot; the
- * clear entry (`clear*` props) sits above the list, outside the index space.
+ * boundary. The parent hands down `rows` + `keys` derived from ITS list (SingleSelect's
+ * `sorted`; a filtering select's filtered list; a grouped one's flattened groups) plus
+ * index-keyed lookups, and receives `hover`/`commit` back by index — the parent stays the sole
+ * owner of `pointer` and of the commit disposition. Per-option content flows through the
+ * index-scoped `option` slot; the clear entry (`clear*` props) sits above the list, outside the
+ * index space.
  *
  * The single `<ul>` root is LOAD-BEARING: parents reach the floating element through the
  * `.ui-menu-anchor` wrapper that parents teleport (KD-1136) — floating-ui positions the
@@ -164,7 +165,7 @@ const {
     optionsLabel: string;
     /** shown when there are no navigable options. */
     emptyText: string;
-    /** marks the listbox `aria-multiselectable` (MultiSelect) — absent, not "false", otherwise. */
+    /** marks the listbox `aria-multiselectable` (a multi-select) — absent, not "false", otherwise. */
     multiselectable?: boolean;
     /** display string of the committing clear entry — absent means no entry renders. */
     clearLabel?: string;

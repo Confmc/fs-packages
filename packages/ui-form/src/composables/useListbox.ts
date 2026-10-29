@@ -30,7 +30,7 @@ export interface ListboxFloatingOptions {
 export interface UseListboxOptions {
     /** the component root — click-outside is measured against it (the popup stays inside it). */
     root: ElementRef;
-    /** the floating-ui reference element (the trigger button / the combobox input). */
+    /** the floating-ui reference element (the trigger button, or a combobox's input). */
     reference: ElementRef;
     /** the floating-ui floating element (the listbox popup). */
     floating: ElementRef;
@@ -38,26 +38,26 @@ export interface UseListboxOptions {
     id: () => string;
     /** whether the control is disabled — the keyboard path guards on it, as a getter so it stays live. */
     disabled: () => boolean;
-    /** length of the currently-rendered option list (SingleSelect `sorted`, Combobox/MultiSelect `filtered`). */
+    /** length of the currently-rendered option list (SingleSelect's `sorted`, or a filtered list). */
     listLength: () => number;
-    /** whether a key pressed while CLOSED should open the list (SingleSelect Enter/ArrowDown/Space; Combobox ArrowDown only). */
+    /** whether a key pressed while CLOSED should open the list (SingleSelect: Enter/ArrowDown/Space). */
     openKeys: (key: string) => boolean;
     /**
      * Commit the option at `index`; returns whether a commit actually happened, which is what
      * decides whether Enter is `preventDefault`-ed. The callback owns the read-through-a-local
      * race guard (the array read) AND the close decision — the composable NEVER closes on commit,
-     * so a MultiSelect callback can toggle membership and stay open while a SingleSelect one closes.
+     * so a multi-select callback can toggle membership and stay open while SingleSelect's closes.
      */
     onCommit: (index: number) => boolean;
-    /** dismiss the list (Escape / Tab). SingleSelect closes; Combobox reverts-then-closes. */
+    /** dismiss the list (Escape / Tab). SingleSelect closes; a combobox may revert its text first. */
     onDismiss: () => void;
-    /** click-outside disposition. SingleSelect closes; Combobox reverts-then-closes. */
+    /** click-outside disposition. SingleSelect closes; a combobox may revert its text first. */
     onOutside: () => void;
     /** floating-ui layout-policy overrides — layout is the caller's business, not the core's. */
     floatingOptions?: ListboxFloatingOptions;
     /**
      * Whether a committing CLEAR ENTRY currently renders above the option list (the
-     * `clearLabel` feature on SingleSelect/Combobox). The entry lives OUTSIDE the index
+     * `clearLabel` feature on SingleSelect). The entry lives OUTSIDE the index
      * space — indexes keep mapping to the caller's option list — and gets its own keyboard
      * slot between "nothing highlighted" and index 0, plus its own activedescendant id
      * (`${id}-clear`). A getter so it tracks the prop reactively.
@@ -95,8 +95,8 @@ const TYPEAHEAD_MAX_LENGTH = 64;
 const fold = (text: string): string => Array.from(text, (character) => character.toLocaleLowerCase()).join('');
 
 /**
- * The behavioural core shared by every ui-form listbox control (SingleSelect; Combobox and
- * MultiSelect, which the optional hooks serve, to follow). Entirely position/index-based, so the
+ * The behavioural core shared by every ui-form listbox control (SingleSelect; the optional
+ * hooks serve selects that filter or pick many). Entirely position/index-based, so the
  * option type `T` never crosses this boundary: the caller owns the derived list and hands back
  * only its length and index-keyed callbacks. Owns `open`/`pointer`, the position-keyed IDREFs,
  * `aria-activedescendant`, the clamp watcher, click-outside, floating-ui, and the keyboard-nav
@@ -128,7 +128,7 @@ export const useListbox = (options: UseListboxOptions) => {
     // `clearHighlighted`: the flag itself, the pointer parked at -1 (an option hover moves
     // the pointer without touching this flag, which must instantly un-highlight the entry),
     // and the entry still rendering (`clearLabel` can be withdrawn reactively while
-    // highlighted). The entry check runs FIRST so the no-entry family (MultiSelect) settles
+    // highlighted). The entry check runs FIRST so a select without a clear entry settles
     // the computed on its own leg.
     const clearActive = ref(false);
     const clearHighlighted = computed(() => (clearEntry?.() ?? false) && clearActive.value && pointer.value === -1);
@@ -139,7 +139,7 @@ export const useListbox = (options: UseListboxOptions) => {
         pointer.value = -1;
     };
 
-    // Reset the highlight to "nothing" — shared by close() and the Combobox keystroke reset
+    // Reset the highlight to "nothing" — shared by close() and a combobox's keystroke reset
     // (typing must drop a hovered clear entry exactly as it drops an option highlight).
     const resetHighlight = () => {
         clearActive.value = false;
@@ -150,7 +150,7 @@ export const useListbox = (options: UseListboxOptions) => {
     // Owned here so a future consumer cannot forget the `-1` — a stale pointer would resurface
     // as a phantom highlight (and a phantom aria-activedescendant) on the next open. The
     // composable still never calls this on commit: closing after a commit stays the caller's
-    // decision (`onCommit` — the MultiSelect toggle-and-stay-open contract).
+    // decision (`onCommit` — a multi-select toggles and stays open).
     let typed = '';
     // The first key, folded. Not `typed[0]`: a fold can be two code units (İ → i̇).
     let first = '';
@@ -361,7 +361,7 @@ export const useListbox = (options: UseListboxOptions) => {
     // `composedPath()`, never `event.target`: at a DOCUMENT listener a click inside a shadow
     // root is retargeted to the shadow HOST, which is an ancestor of `root` rather than a
     // descendant, so `root.contains(target)` rejects it and every option click would read as
-    // outside — MultiSelect and MultiCombobox would close instead of toggling. The composed
+    // outside — a multi-select would close instead of toggling. The composed
     // path carries the true chain across shadow boundaries. The popup needs no separate check:
     // it is promoted to the top layer IN PLACE, so it never leaves `root`.
     const onDocumentPointer = (event: MouseEvent) => {

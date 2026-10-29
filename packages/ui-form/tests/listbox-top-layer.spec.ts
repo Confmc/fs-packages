@@ -21,7 +21,7 @@ const FAMILY = [
 
 const mountOpen = (
     component: (typeof FAMILY)[number]['component'],
-    modelValue: number | null | number[],
+    modelValue: number | null,
     attachTo: Element = document.body,
 ) => mount(component as never, {props: {options: FRUITS, optionLabel: 'name', id: 'fruit', modelValue}, attachTo});
 

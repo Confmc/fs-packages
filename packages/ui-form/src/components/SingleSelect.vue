@@ -34,7 +34,7 @@
         <!-- WR-0521: the empty state must be ANNOUNCED, not just painted — a persistent,
              visually-hidden live region (mounted for the component's whole lifetime, so
              the emptyText lands as a content CHANGE, the reliable live-region path). One
-             treatment, applied uniformly across the whole select family. -->
+             treatment, for every select in the family. -->
         <span class="ui-live-region" role="status" aria-live="polite">{{
             open && optionLabels.length === 0 ? emptyText : ''
         }}</span>
@@ -166,7 +166,7 @@ const sorted = computed(() =>
 const optionLabels = computed(() => sorted.value.map(labelOf));
 const optionKeys = computed(() => sorted.value.map((option) => String(option.id)));
 // A flat control renders one headerless run — an all-option row sequence OptionList lays out
-// flat (no group wrappers), the same component the grouped controls feed a header/option mix.
+// flat (no group wrappers), the same component a grouped select feeds a header/option mix.
 const rows = computed<GroupRow[]>(() => sorted.value.map((_, index) => ({type: 'option', index})));
 /** `aria-selected` marks the COMMITTED value — OptionList only asks about rendered indices. */
 const isSelected = (index: number): boolean => sorted.value[index].id === model.value;
