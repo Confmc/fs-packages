@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import {mount} from '@vue/test-utils';
 import {describe, expect, it} from 'vitest';
+import {nextTick} from 'vue';
 
 import RadioGroup from '../src/components/RadioGroup.vue';
 
@@ -148,5 +149,48 @@ describe('RadioGroup', () => {
 
         await radios[0].setValue(true);
         expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual(['b']);
+    });
+});
+
+// WR-1922: the browser moves the checked radio before the host decides. A host that declines (never
+// applies the update) or decides later leaves the bound value unchanged, so Vue never re-patches
+// `checked` and the clicked radio keeps showing unless the component sets every radio back.
+describe('RadioGroup — a change the host does not take', () => {
+    // A bound listener is what makes the model controlled: with no `onUpdate:modelValue`,
+    // `defineModel` keeps the value locally and the host never gets to decline.
+    const mountControlled = (onUpdate: (value: number) => void = () => undefined) =>
+        mountGroup({modelValue: 1, 'onUpdate:modelValue': onUpdate});
+
+    const checkedOf = (wrapper: ReturnType<typeof mount>): boolean[] =>
+        wrapper.findAll('input[type="radio"]').map((radio) => (radio.element as HTMLInputElement).checked);
+
+    it('puts the committed radio back when the host declines', async () => {
+        const wrapper = mountControlled();
+
+        await wrapper.findAll('input[type="radio"]')[1].setValue(true);
+        await nextTick();
+
+        expect(wrapper.emitted('update:modelValue')).toEqual([[2]]);
+        expect(checkedOf(wrapper)).toEqual([true, false, false]);
+    });
+
+    it('shows the model while the host decides later, then follows it', async () => {
+        const wrapper = mountControlled();
+
+        await wrapper.findAll('input[type="radio"]')[1].setValue(true);
+        await nextTick();
+        expect(checkedOf(wrapper)).toEqual([true, false, false]);
+
+        await wrapper.setProps({modelValue: 2});
+        expect(checkedOf(wrapper)).toEqual([false, true, false]);
+    });
+
+    it('keeps the clicked radio checked when the host takes the change at once', async () => {
+        const wrapper = mountControlled((value) => void wrapper.setProps({modelValue: value}));
+
+        await wrapper.findAll('input[type="radio"]')[1].setValue(true);
+        await nextTick();
+
+        expect(checkedOf(wrapper)).toEqual([false, true, false]);
     });
 });
