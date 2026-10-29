@@ -1,6 +1,6 @@
 {
     "name": "@script-development/ui-form",
-    "version": "0.0.0",
+    "version": "0.0.0-landing.3",
     "private": true,
     "description": "Vue 3 form components and form state in one package, succeeding ui-inputs and fs-form. Not published yet.",
     "homepage": "https://packages.script.nl/packages/ui-form",
