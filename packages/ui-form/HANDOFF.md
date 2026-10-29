@@ -637,7 +637,8 @@ a separate self-review agent with its fixes in:
 | `ui-form/n-search-input` | main | SearchInput (emmie's): `type="search"`, magnifier, `clearLabel` clear button | #342 (draft until CI green) |
 | `ui-form/n-password-input` | main | PasswordInput (emmie's): show/hide toggle, Caps Lock notice, `--ui-warning-text` | #343 (draft until CI green) |
 
-| `ui-form/n-radio-group` | main | RadioGroup: disabled guard back on the fieldset, declined-change tests, per-option `disabled` | after the test bed's landing.7 run |
+| `ui-form/n-radio-group` | main | RadioGroup: disabled guard back on the fieldset, declined-change tests, per-option `disabled`, legend slot | #344 |
+| `ui-form/n-single-select` | main | SingleSelect + the listbox core (useListbox, OptionList, ListboxOption, reactivity, types), direct OptionList.spec, `optionLabel` | open next, after its local Stryker run |
 | `ui-form/n-checkbox-group` | n-checkbox-switch (#332) | CheckboxGroup: same, plus its listener-order row | after #332 merges (merge main in first) |
 
 The two group branches carry byte-identical `disabled-guard.ts` and `types.ts` (`SelectItem` with optional
@@ -665,6 +666,13 @@ stylesheet and the listener-order table merged by hand). Each pack carries its o
 or Vite keeps its stale pre-bundle. After a hand merge run oxfmt and the tests before committing: a conflict
 whose closing brace sits outside the markers leaves a CSS rule open, and a type check reads neither CSS nor specs. It wires the rooms form (422 on `workplaces.new_139.name`) and one simple form on a scratch
 branch off its collector, and reports what breaks. Its collector push waits for Marcel.
+
+### Mutation gate
+
+ui-form's Stryker gate is real (`src/form/**`, `src/composables/**`, `src/internal/**`, break 90); the local
+vitest/oxlint/oxfmt/vue-tsc checks don't run it. #344 went red at 86.67% on two disabled-guard mutants
+(`preventDefault` dropped, capture → bubble) with 100% line coverage. Run `npx stryker run` in `packages/ui-form`
+before every push that touches those folders.
 
 ### Test conventions (checked 2026-10-29)
 

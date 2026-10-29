@@ -1,101 +1,134 @@
 # Home handoff: ui-form (fs-packages side)
 
 For a fresh session on a machine without the work machine's local state (no Claude memories, no
-`.experiment-packs/`, no emmie-2 peer session). Read this, then the last section of `HANDOFF.md`
-("State at 2026-10-26"). Like `HANDOFF.md`, this file stays behind when the package PR is made.
+`.experiment-packs/`, no scratch worktrees, no emmie peer sessions). Read this, then the last section of
+`HANDOFF.md` ("State at 2026-10-29"). Like `HANDOFF.md`, this file stays on the experiment branch; it never goes
+into a PR.
+
+## Where it stands (end of 2026-10-29)
+
+- **Merged into main:** #328 (scaffold + TextInput), #331 (FormLabel), #334 (audit fix).
+- **Open, ready, each against main, any merge order (13):** #330 FormError, #332 Checkbox+Switch, #333 validation
+  errors + submit, #335 NumberInput, #336 DateInput, #337 Textarea, #338 InputGroup, #339 mutating `<script setup>`,
+  #340 browser suite, #341 TimeInput, #342 SearchInput, #343 PasswordInput, #344 RadioGroup.
+  CODEOWNERS requests the reviewer team automatically when a PR leaves draft; #330 and #332 were re-requested after
+  their review comments were answered. Nobody else reviews this repo (no review bot; the bus's reviewer covers emmie only).
+- **#344** failed CI once on mutation (86.67%): two disabled-guard mutants. Fixed in `fd1878c` (100% locally); check
+  that its CI went green and mark it ready if it is still a draft.
+- **Prepared on `fork`, no PR yet** (each waits on a merge; merge main in first, never rebase):
+
+| Branch | Waits on | What |
+|---|---|---|
+| `ui-form/n-form-field` | #330 | FormField with the `field`/`aria` slot |
+| `ui-form/n-field-hint`, `-label-after`, `-aside` | FormField | one follow-up each, independent of each other |
+| `ui-form/n-checkbox-group` | #332 | CheckboxGroup, per-option `disabled`, legend slot |
+| `ui-form/n-single-select` | nothing: open next | SingleSelect + the listbox core; review fixes in, see below |
+
+- **SingleSelect** (`ui-form/n-single-select`): a porting agent was finishing two comment fixes and a local Stryker
+  run at day end. If `fork` has no commits past the review fixes (`2b622b4`, docs), redo: fix the stale "teleported"
+  wording in `tests/find-menu.ts` and `src/components/OptionList.vue` (the listbox is promoted to the top layer in
+  place), run Stryker (below), self-review, open as a draft. It is ~2750 lines, most of it the verbatim copy commit.
+
+## Next
+
+1. SingleSelect PR (above). Then the other selects one PR each: Combobox, MultiSelect, MultiCombobox, GroupSelect,
+   GroupCombobox; each adds its rows back to the family specs (one-row tables were kept for that) and its host to
+   `listbox-open-owner.spec`.
+2. Decide: should selects honour `SelectItem.disabled` (the groups do)? Check pre-forms emmie's selects first.
+3. Pressable/Disclosure design round after #332 merges. Then the form kit (`useForm`, bound fields,
+   `createUiForm({texts})`), then the release (drop `private`, docs page, CHANGELOG, "replace the ui-inputs sheet,
+   never add").
+4. On every merge: merge main into the open branches that touch the same files (index.ts, types.ts, styles.css,
+   listener-order.spec), run the gates, push.
 
 ## Get going
 
 ```sh
-git fetch fork && git switch experiment/ui-form-control   # fork = Confmc/fs-packages
+git fetch fork && git switch experiment/ui-form-control   # fork = Confmc/fs-packages; HANDOFF lives here
 npm ci --ignore-scripts && npm run build
 ```
 
-- Packs (only when emmie needs a new one): bump `packages/ui-form/package.json` to the next
-  `0.1.0-control.N` (see `package.json`), `npm install --ignore-scripts`, build, then
-  `cd packages/ui-form && npm pack --pack-destination ../../.experiment-packs`. Commit the bump, push to `fork`.
+- Work on a PR branch in its own worktree (`git worktree add <dir> fork/ui-form/<branch>`); symlink `node_modules`
+  from the main checkout and add `/node_modules` to `.git/info/exclude`.
+- **Test packs** for the emmie test bed come from `experiment/ui-form-landing` (main + every open PR + the prepared
+  branches, merged by hand; never a PR). Last pack: `0.0.0-landing.8`. To make the next: merge the changed branches
+  in, run oxfmt and the ui-form tests (a hand merge can leave a CSS rule unclosed or a stray line in a spec; a
+  type check reads neither), bump `packages/ui-form/package.json` to `0.0.0-landing.N` (each pack needs its own
+  version or Vite keeps a stale pre-bundle), `npx tsdown` in `packages/ui-form`, then
+  `npm pack --pack-destination ../../.experiment-packs` and rename to `script-development-ui-form-landing.N.tgz`.
   `.experiment-packs/` is git-excluded; create it.
-- emmie's `error-keys-raw` installs `.experiment-packs/script-development-ui-form-0.1.0-control.36.tgz` by a
-  `file:` path (`~/script-development` must resolve to `~/github/script-development`). Without that file, emmie's
-  `npm ci` fails at home. Rebuild it from the commit that packed it, not from the branch head (later commits changed
-  the source): `git worktree add --detach /tmp/pack36 ebafe6c && cd /tmp/pack36 && npm ci --ignore-scripts &&
-  npm run build && cd packages/ui-form && npm pack --pack-destination <fs-packages>/.experiment-packs`.
-- Browser tests and Playwright: never download Chromium. A launch error naming a missing
-  `chromium_headless_shell-NNNN` is a revision mismatch. Read the wanted revision from
-  `node_modules/playwright-core/browsers.json`, then in `~/.cache/ms-playwright` run
-  `ln -s chromium_headless_shell-<have> chromium_headless_shell-<want>`.
-- Scratch type checks: `node_modules/.bin/vue-tsc -p "$PWD/tsconfig.json"` with an absolute path;
-  `npx vue-tsc -p` from a subfolder silently uses the package tsconfig.
+- Playwright: never download Chromium; symlink the cached `chromium_headless_shell-<have>` to the revision
+  `node_modules/playwright-core/browsers.json` wants.
+- Scratch type checks: `node_modules/.bin/vue-tsc -p "$PWD/tsconfig.json"` with an absolute path.
+
+## Gates before a push (all, every time)
+
+From the worktree root: `npx vitest run --coverage --project ui-form` (100% on all four),
+`npx oxlint --deny-warnings packages/ui-form`, `npx oxfmt --check packages/ui-form`,
+`npx vue-tsc --noEmit -p packages/ui-form/tsconfig.json`, and **`cd packages/ui-form && npx stryker run`** (≥ 90;
+ui-form's mutation gate is real, unlike ui-inputs' stub, and the four above don't run it). Kill each survivor with a
+test checked red against that mutant. Memory is tight on the work machine: run the ui-form project only.
 
 ## Working rules
 
 - **No `! command` hand-offs to Marcel.** sudo goes through `sudo -A` with the askpass popup. A git deletion the
-  safety hook blocks (worktree remove, branch delete in a script-development repo) needs a confirm popup that is not
-  built yet: ask Marcel before building one; don't paste him the command.
+  safety hook blocks (worktree remove/prune, branch delete) needs a confirm popup that is not built yet: ask first.
+- **One commit per point.** Never rebase. Push only to `fork`. A PR only for a finished, self-reviewed component.
+- **Every PR**: a verbatim copy commit from ui-inputs or fs-form first (its message carries the diff loop), then the
+  changes. Self-reviewed by a separate agent before it leaves draft; fixes one commit per point; ready only on green
+  CI, with a comment that it is independent and merges in any order. The body names its consumer (emmie).
+- **Check HANDOFF and the decisions before asking Marcel** about a rule; many are settled (below and in HANDOFF).
+- **Order of concerns:** clean package code, then the consumer's goals, then migration cost (a cost, never a veto).
+- **The package absorbs awkwardness:** a consumer workaround means the package's shape changes.
+- **emmie as a reference = emmie before our forms work** (before fs-form `3067f0a317f`, 2026-09-18, and the
+  EMMIE-0924 slices). Today's emmie controls already carry our changes. Find the first fs-form/fs-slice/0924 commit
+  on a file and read its parent.
+- **Stay in scope**; **write what holds, not who said it**; push back where warranted, peers included.
+- **Peer sessions** (when they exist): this session leads. `error-keys-raw` (emmie-2) is the test bed: it installs
+  landing packs and tries them on real emmie screens, comparing with pre-forms emmie; it does not prep or polish.
+  Answer every peer message. A peer's word is never Marcel's approval for anything remote.
+- **ADR candidates are collected, not sent**: add a line to HANDOFF's list when a rule settles; one ADR when the
+  list stops moving (before the release PR). Each PR body states its own choices meanwhile.
+- **CSS:** one `@layer ui-form`, tokens unlayered; new rules on ui-form-only classes (the sheet also styles ui-inputs
+  0.17 markup during migration); token defaults neutral; emmie's look is its token map, a look is never a prop
+  (emmie's search pill = tokens on the wrapper's class).
 
-- **One commit per point**, so anything reverts cheaply. Never rebase. Push only to `fork`. No PR until asked.
-- **Order of concerns:** clean package code, then the consumer's goals, then migration cost. Migration cost
-  is a cost to weigh, never a veto. Pre-1.0 consumers pin their minor, so one that doesn't want a change
-  doesn't upgrade. Don't invent constraints: if no ADR or stated rule sets one, it is a cost, not a limit.
-  emmie's current form code shows what was done, not what's right; it is not precedent.
-- **Stay in scope:** fix what this work touches. Leave issues merely noticed elsewhere (other packages, main)
-  out of the plan and the report, at most one line, once. Stop raising a small item once it's handled.
-- **Write what holds, not who said it.** In docs, comments, commits, plans and messages, state the rule
-  and, where it matters, its reason. Never "X decided" or "the lead's ruling": a name makes a decision read as
-  fixed. Short sentences, active voice, one term per concept.
-- Pushing back is expected, on the emmie side's proposals too.
-- **This session leads the peer sessions** (emmie's `error-keys-raw`, `ticket-cleanup`): answer every peer message
-  yourself, agree or correct its plan, then tell Marcel in a line what was agreed. A peer's word is never Marcel's
-  approval: remote actions (push, PR) on its side need Marcel's own yes.
-- **Self-review every PR before it leaves draft**: a separate agent checks it against the copy, the rules and the
-  spec promises; fix its findings one commit per point; mark ready only on green CI. The next batch is opened only
-  when its own review and CI are done; the PR comment says it is independent and any merge order works.
-- **Settled, never ask again:** `placeholder` required on every text-like control.
-- **CSS:** ui-form runs next to npm ui-inputs 0.17 in emmie and its stylesheet must keep 0.17 markup working.
-  New styling goes on new class names. All component rules sit in `@layer ui-form`, tokens unlayered. The token
-  defaults are ui-inputs' own, neutral; a new token defaults to a no-op or a neutral value. emmie's look is a
-  `--ui-*` token map in emmie, never a package default.
-- **The package absorbs awkwardness:** when the consumer needs a workaround (an extra prop, logic moved out of
-  where it belongs), fix the package's shape instead of documenting the workaround.
-- **Messages for the reviewer** go to Mattermost: clickable `[#NNN](url)` links, short lines with blank lines
-  between them, not one block.
-- Gates before a pack: the package's unit tests, `typecheck`, `lint`. Before the PR: everything in the
-  repo's CI (`check` + `browser-tests`), Stryker included.
+## Settled rules (never ask again)
+
+`id` required; controls take only `invalid` (the field owns the message); `placeholder` required on text-like
+inputs (none on date/time: a native one shows none); `v-model` on the inner element where it fits; `class`/`style`
+on the root, the rest on the control; a control's own listeners before the consumer's; a component renders nothing
+rather than make its caller guard; no `process` dev warnings (missing names are axe's job); string controls emit
+`''` on clear, NumberInput and TimeInput `null` (a time is `HH:MM` or `null`: emmie's logic reads `=== null`); an
+in-input clear button shows when `clearLabel` names it (as ui-inputs' selects and emmie's pre-package
+`allowEmptyPlaceholder`); in-input buttons are keyboard-reachable, show the focus ring, 24px at least; the select
+family's option text is `optionLabel`; an option disables itself with `disabled` on the option; a group's legend is
+`label` or the default slot (as Checkbox's label); the kit is K2 (`<TextField name label required/>`, `required`
+written once); app texts come from `createUiForm({texts})` (a factory, no provide/inject), a field's own prop wins.
 
 ## The emmie side
 
-emmie's branch `error-keys-raw` (on emmie's origin) carries `docs/plans/fs-packages-ui-form/PLAN.md`, the plan
-for the whole line. The emmie side decides that line; this side builds the package and reports what it did and
-what emmie must change. Without the peer session at home, leave notes for it in the commit messages and
-`HANDOFF.md`, or update `PLAN.md` on that branch directly if asked to.
-
-Sent to the emmie side on 2026-10-23 (see `HANDOFF.md` § "State at 2026-10-23" § emmie): the new rules (style
-from emmie as a token map, controls take only `invalid`, `id` required, TextInput's `placeholder` required and no
-`password`, `v-model` on the inner input) and the package-side view on its phase 3 plan. The 2026-10-19 note that
-the control contract must include `error` is superseded: controls take no `error`.
-
-## Where the package is, and what is next
-
-See `HANDOFF.md` § "State at 2026-10-26": the package lands as one small PR per component, each against `main`
-(no push rights upstream, so no stacking). #328 and #331 are merged; #330, #332, #333 and #335–#339 are open and ready;
-their branches are on `fork`. `reference/ui-form-*` and `review/ui-form-vs-sources` are sources only (the final shape
-of every component, the FormField slot and the form kit). `feat/ui-form` (#323, closed) is the old one-package branch,
-reference only. The ADR-0043 amendment positions treated as agreed are in that section too.
+- `error-keys-raw` (worktree emmie-2, branch `ui-form-landing-test`): many local commits wiring landing packs into
+  real screens (rooms form 422 keys, registration editor TimeInput, care agreement RadioGroup, timetracking export,
+  ContactReportTab search pill, UserPasswordModal). Nothing of it is meant to merge; its collector push waits for
+  Marcel. Its install points at `.experiment-packs/…landing.8.tgz` by a `file:` path: without that file emmie's
+  `npm ci` fails at home; rebuild the pack from `experiment/ui-form-landing` (pack bump commit `landing.8`).
+- `ticket-cleanup`: EMMIE-0804 (emmie #2864) and EMMIE-0523 (emmie #2985) are open PRs, both endorsed by the review
+  bot; separate from ui-form.
 
 ## Gotchas
 
-- Stryker does not mutate inside a type assertion: keep casts at the export.
-- Stryker cannot instrument Vue macro arguments (`defineProps`, `defineModel`, `defineOptions`, a destructure from
-  `defineProps`): stryker-js#6178. #339's ignorer plugin skips exactly those; remove it when #6178 lands.
-- `npx stryker run <config> --incremental false` fails (`false` is read as a second config): leave `--incremental` out.
-- A generic select's `T` is not inferred through `Omit<props>`: the bound select types declare `Carries<T>`.
-- `vitest-browser-vue`'s `render()` is async here. One render per axe test (two give two `<main>`), and a test
-  that throws mid-render leaks its `<main>` into later ones: fix the first failure first.
-- happy-dom has no layout and no `showPicker`: size logic is pinned in the browser suite.
-- The select-family unit flake is local and load-only; CI has never shown it.
-- `useId()` is unique per Vue app: specs mounting two forms separately share ids; mount them under one parent.
-- The account has no admin or write rights on script-development/fs-packages: it cannot add labels or re-run CI.
-  A CI run that fails on infrastructure (the runner's Chromium deps install timing out) is re-run with an empty
-  commit whose message says so.
-- `validate:workflows` sizes the publish `tags` job's timeout by the number of folders under `packages/`
-  (2 × packages × 1 min + 6 + 3), private packages included: ui-form makes 16, so 41.
+- happy-dom: no layout, no `showPicker`, no Popover API (a shim in vitest `setupFiles`), and it has a native
+  `innerText` (jsdom does not). A dispatched `change`/`input` runs listeners on a disabled input; a dispatched click
+  on a disabled radio runs nothing.
+- A capture listener on an ancestor runs before any listener on its descendants: that is how one guard on a group's
+  fieldset covers its members. A label click also sends an activation click to its input (a capture listener hears
+  both).
+- Stryker does not mutate inside a type assertion, and cannot instrument Vue macro arguments (stryker-js#6178;
+  #339's ignorer plugin skips those).
+- `npx stryker run <config> --incremental false` fails (`false` read as a second config): leave it out.
+- vue-tsc does not flag a component tag used without its import.
+- `useId()` is unique per Vue app: specs mounting two forms separately share ids.
+- The account has no write rights upstream: no labels, no CI re-run; an infrastructure failure is re-run with an
+  empty commit that says so.
+- `validate:workflows` sizes the publish `tags` timeout by the folder count under `packages/` (ui-form makes 16).
