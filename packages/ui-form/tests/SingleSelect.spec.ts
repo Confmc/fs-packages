@@ -274,6 +274,19 @@ describe('SingleSelect', () => {
         expect(menu(wrapper).exists()).toBe(false);
     });
 
+    it("toggles before a consumer's click listener runs, so that listener cannot hold the toggle back", async () => {
+        // Merged listeners run in order; one calling stopImmediatePropagation skips the ones after it.
+        const wrapper = mount(SingleSelect as never, {
+            props: {options: FRUITS, optionLabel: 'name', id: 'fruit', modelValue: null},
+            attrs: {onClick: (event: Event) => event.stopImmediatePropagation()},
+            attachTo: document.body,
+        });
+
+        await wrapper.find('.ui-select__trigger').trigger('click');
+
+        expect(menu(wrapper).exists()).toBe(true);
+    });
+
     it('does not open when disabled, by click or by keyboard', async () => {
         const wrapper = mountSelect({disabled: true});
         await wrapper.find('.ui-select__trigger').trigger('click');
