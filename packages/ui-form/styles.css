@@ -459,6 +459,7 @@
     .ui-input-wrap > .ui-input.ui-time.has-button,
     .ui-input-wrap > .ui-input.ui-time.is-invalid {
         padding-right: var(--ui-control-pad-x);
+    }
     /* the browser's own clear button gives way to the package's, and Safari's decoration takes no room */
     .ui-search::-webkit-search-cancel-button,
     .ui-search::-webkit-search-decoration {
