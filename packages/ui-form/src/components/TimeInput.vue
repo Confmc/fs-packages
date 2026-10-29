@@ -12,6 +12,7 @@
         <input
             v-model="model"
             @click="togglePicker"
+            @keydown.escape="pickerOpen = false"
             @blur="pickerOpen = false"
             v-bind="controlAttrs($attrs)"
             ref="input"
@@ -25,13 +26,12 @@
             :aria-invalid="invalid || undefined"
             :aria-describedby="describedby"
         />
-        <!-- mousedown is prevented so the click keeps focus on the input -->
+        <!-- mousedown is prevented so a pointer click keeps focus on the input; the keyboard reaches it by Tab -->
         <button
             v-if="showClear"
             type="button"
             class="ui-input__button"
-            tabindex="-1"
-            :aria-label="clearButtonLabel"
+            :aria-label="clearLabel"
             @mousedown.prevent
             @click="clear"
         >
@@ -54,8 +54,7 @@ const {
     disabled = false,
     invalid = false,
     step,
-    clearable = true,
-    clearButtonLabel = 'Clear',
+    clearLabel,
     autofocus = false,
 } = defineProps<{
     /** control id, pairing the input with its label and error; inside a `FormField` the field passes its own. */
@@ -69,34 +68,33 @@ const {
     describedby?: string;
     /** the minute step of the picker and the arrow keys (`15` for quarter hours). */
     step?: number;
-    /** offer a clear button while there is a time; `false` for a time that must always be set. */
-    clearable?: boolean;
-    /** the clear button's accessible name. */
-    clearButtonLabel?: string;
+    /** the clear button's accessible name: given, a clear button shows while there is a time. Leave it out for a time that must always be set. */
+    clearLabel?: string;
     /** focus the input when it mounts; in script, since the native attribute only acts on page load. */
     autofocus?: boolean;
 }>();
 
 defineOptions({inheritAttrs: false});
 
-// `HH:MM`. Accepts null so it binds a nullable time column directly; the clear button sets null, and a time
-// emptied by keyboard emits '', which the fleet's ConvertEmptyStringsToNull middleware converts back to null.
+// `HH:MM`. As TextInput: binds null as empty, emits '' when cleared (by the button or the keyboard), which
+// the fleet's ConvertEmptyStringsToNull middleware converts back to null.
 const model = defineModel<string | null>({required: true});
 
-const showClear = computed(() => clearable && !disabled && Boolean(model.value));
+const showClear = computed(() => clearLabel !== undefined && !disabled && Boolean(model.value));
 
 const input = useTemplateRef<HTMLInputElement>('input');
 const pickerOpen = ref(false);
 
-// A click opens the browser's picker, a second click closes it again (the input keeps focus). The
-// picker is a browser feature: where it is missing or refused, the click just edits the field.
+// A click opens the browser's picker. The browser closes it on the next click, on Escape or on a blur; this
+// state follows, so the click after that opens it again. The picker is a browser feature: where it is
+// missing or refused, the click just edits the field.
 const togglePicker = (): void => {
     if (pickerOpen.value) {
         pickerOpen.value = false;
         return;
     }
     try {
-        (input.value as HTMLInputElement).showPicker();
+        input.value?.showPicker();
         pickerOpen.value = true;
     } catch {
         // no picker here: the click edits the field, and the picker stays closed
@@ -105,7 +103,7 @@ const togglePicker = (): void => {
 
 // The clear button keeps focus on the input, so no blur resets the picker state.
 const clear = (): void => {
-    model.value = null;
+    model.value = '';
     pickerOpen.value = false;
     input.value?.focus();
 };

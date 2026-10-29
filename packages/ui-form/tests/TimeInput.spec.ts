@@ -39,6 +39,17 @@ describe('TimeInput', () => {
         wrapper.unmount();
     });
 
+    it("follows the parent's model", async () => {
+        const wrapper = mountTime();
+        const input = wrapper.find('input');
+
+        await wrapper.setProps({modelValue: '17:45'});
+        expect(input.element.value).toBe('17:45');
+        await wrapper.setProps({modelValue: null});
+        expect(input.element.value).toBe('');
+        wrapper.unmount();
+    });
+
     it('shows its own clock glyph, hidden from assistive tech, with room in the text for it', () => {
         const wrapper = mountTime();
 
@@ -47,48 +58,46 @@ describe('TimeInput', () => {
         wrapper.unmount();
     });
 
-    it('offers a clear button while there is a time, which clears to null and keeps focus on the input', async () => {
-        const wrapper = mountTime();
+    it('offers a clear button named by clearLabel while there is a time, which clears it and keeps focus on the input', async () => {
+        const wrapper = mountTime({
+            clearLabel: 'Wis tijd',
+            'onUpdate:modelValue': (value: string) => wrapper.setProps({modelValue: value}),
+        });
         const input = wrapper.find('input');
         const clear = wrapper.find('.ui-input__button');
 
         expect(input.classes()).toContain('has-button');
         expect(clear.attributes('type')).toBe('button');
-        expect(clear.attributes('aria-label')).toBe('Clear');
-        expect(clear.attributes('tabindex')).toBe('-1');
+        expect(clear.attributes('aria-label')).toBe('Wis tijd');
+        expect(clear.attributes()).not.toHaveProperty('tabindex');
         const down = new MouseEvent('mousedown', {cancelable: true});
         clear.element.dispatchEvent(down);
         expect(down.defaultPrevented).toBe(true);
 
         await clear.trigger('click');
-        expect(wrapper.emitted('update:modelValue')).toEqual([[null]]);
+        expect(wrapper.emitted('update:modelValue')).toEqual([['']]);
+        expect(input.element.value).toBe('');
+        expect(wrapper.find('.ui-input__button').exists()).toBe(false);
         expect(document.activeElement).toBe(input.element);
         wrapper.unmount();
     });
 
     it.each([
+        ['no clear label', {clearLabel: undefined}],
         ['no time', {modelValue: null}],
         ['an emptied time', {modelValue: ''}],
         ['disabled', {disabled: true}],
-        ['clearable false', {clearable: false}],
     ])('has no clear button with %s', (_, props) => {
-        const wrapper = mountTime(props);
+        const wrapper = mountTime({clearLabel: 'Wis tijd', ...props});
 
         expect(wrapper.find('.ui-input__button').exists()).toBe(false);
         expect(wrapper.find('input').classes()).not.toContain('has-button');
         wrapper.unmount();
     });
 
-    it('names the clear button as asked', () => {
-        const wrapper = mountTime({clearButtonLabel: 'Wis tijd'});
-
-        expect(wrapper.find('.ui-input__button').attributes('aria-label')).toBe('Wis tijd');
-        wrapper.unmount();
-    });
-
     it('steps in minutes, and leaves the step to the browser without one', () => {
         const quarters = mountTime({step: 15});
-        const plain = mountTime();
+        const plain = mountTime({id: 'end'});
 
         expect(quarters.find('input').attributes('step')).toBe('900');
         expect(plain.find('input').attributes()).not.toHaveProperty('step');
@@ -111,9 +120,22 @@ describe('TimeInput', () => {
         wrapper.unmount();
     });
 
-    it('opens the picker on the next click after a clear', async () => {
+    it('opens the picker on the next click after Escape closed it', async () => {
         const showPicker = stubPicker();
         const wrapper = mountTime();
+        const input = wrapper.find('input');
+
+        await input.trigger('click');
+        await input.trigger('keydown', {key: 'Escape'});
+        await input.trigger('click');
+
+        expect(showPicker).toHaveBeenCalledTimes(2);
+        wrapper.unmount();
+    });
+
+    it('opens the picker on the next click after a clear', async () => {
+        const showPicker = stubPicker();
+        const wrapper = mountTime({clearLabel: 'Wis tijd'});
         const input = wrapper.find('input');
 
         await input.trigger('click');
@@ -138,7 +160,7 @@ describe('TimeInput', () => {
 
     it('marks itself invalid with the error icon, wired to the message, and conveys required', () => {
         const marked = mountTime({invalid: true, describedby: 'start-error', required: true});
-        const plain = mountTime();
+        const plain = mountTime({id: 'end'});
         const input = marked.find('input');
 
         expect(input.classes()).toContain('is-invalid');
