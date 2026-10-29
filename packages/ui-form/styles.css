@@ -217,6 +217,8 @@
     --ui-danger-shadow: 0 0 0 3px rgba(220, 38, 38, 0.2);
     --ui-error-size: 0.8125rem;
     --ui-error-weight: 400;
+    /* a notice beside a field that is not an error (PasswordInput's Caps Lock notice) */
+    --ui-warning-text: #b45309;
 }
 
 @layer ui-form {
@@ -446,6 +448,10 @@
         outline: none;
         box-shadow: var(--ui-focus-ring);
     }
+    .ui-input__button:disabled {
+        color: var(--ui-control-text-muted);
+        cursor: not-allowed;
+    }
     /* with the error icon at the edge, the button moves in beside it */
     .ui-input.is-invalid ~ .ui-input__button {
         right: calc(var(--ui-control-pad-x) * 2 + 1em);
@@ -464,6 +470,18 @@
     .ui-search::-webkit-search-cancel-button,
     .ui-search::-webkit-search-decoration {
         appearance: none;
+    }
+    /* PasswordInput: the field, and under it the Caps Lock notice while it is on. */
+    .ui-password {
+        display: block;
+    }
+    .ui-password__caps {
+        display: block;
+        color: var(--ui-warning-text);
+        font-size: var(--ui-error-size);
+    }
+    .ui-password__caps:not(:empty) {
+        margin-top: var(--ui-field-gap);
     }
     .ui-input__icon {
         position: absolute;
