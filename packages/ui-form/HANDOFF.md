@@ -638,10 +638,9 @@ The three FormField follow-ups are independent of each other (each off n-form-fi
 merged into all three. The axe harness (renders every control inside FormField) goes into FormField's PR once
 #340 has merged; each follow-up then adds its axe case.
 
-Open design point from the self-review, not changed: FormField knows `required` but neither `field` nor `aria`
-carries it, so a consumer passes `required` to the control as well (types.ts says so). Left out of `field` on
-purpose (a consumer's own control would take it as a native attribute); `aria-required` is not allowed on
-`role="group"`.
+`required` stays out of FormField's `field` (decided in the experiment: a consumer's own control would take it
+as a native attribute). Written once only through the kit: `<TextField name label required/>` passes it to both
+FormField and the control. Don't reopen it on the FormField PR.
 
 ### The test bed
 
