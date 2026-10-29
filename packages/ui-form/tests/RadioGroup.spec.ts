@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import {mount} from '@vue/test-utils';
 import {describe, expect, it} from 'vitest';
-import {nextTick} from 'vue';
+import {h, nextTick} from 'vue';
 
 import RadioGroup from '../src/components/RadioGroup.vue';
 
@@ -22,6 +22,18 @@ const mountGroup = (props: Record<string, unknown>) =>
     });
 
 describe('RadioGroup', () => {
+    it('takes its legend from the default slot over label, so the legend can carry more than text', () => {
+        const wrapper = mount(RadioGroup as any, {
+            props: {options: FRUITS, optionLabel: 'name', id: 'fruit', modelValue: null, required: true},
+            slots: {default: () => [h('span', 'Fruit'), h('button', {type: 'button'}, 'Info')]},
+        });
+        const legend = wrapper.get('legend');
+
+        expect(legend.find('span').text()).toBe('Fruit');
+        expect(legend.find('button').text()).toBe('Info');
+        expect(legend.find('.ui-label__req').exists()).toBe(true);
+    });
+
     it('renders a radiogroup fieldset with legend and native radios sharing one name, none checked for a null model', () => {
         const wrapper = mountGroup({});
 
