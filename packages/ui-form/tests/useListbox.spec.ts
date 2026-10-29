@@ -2,7 +2,7 @@
 import {useFloating} from '@floating-ui/vue';
 import {mount} from '@vue/test-utils';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
-import {defineComponent, h, nextTick, shallowRef} from 'vue';
+import {defineComponent, h, nextTick, ref, shallowRef} from 'vue';
 
 import type {UseListboxOptions} from '../src/composables/useListbox';
 
@@ -390,6 +390,46 @@ describe('useListbox without the optional hooks', () => {
         api.onKey(key('ArrowDown'));
         expect(api.pointer.value).toBe(0);
         api.onKey(key('ArrowUp'));
+
+        expect(api.pointer.value).toBe(-1);
+        expect(api.clearHighlighted.value).toBe(false);
+        wrapper.unmount();
+    });
+
+    it('without typeahead labels, an open list leaves a printable key alone', () => {
+        const wrapper = mount(Harness, {props: {overrides: {listLength: () => 3}}});
+
+        api.openList();
+        const event = key('b');
+        api.onKey(event);
+
+        expect(api.pointer.value).toBe(-1);
+        expect(event.defaultPrevented).toBe(false);
+        wrapper.unmount();
+    });
+
+    it('ArrowDown on the last option stays there', () => {
+        const wrapper = mount(Harness, {props: {overrides: {listLength: () => 3}}});
+
+        api.openList();
+        for (let press = 0; press < 4; press++) api.onKey(key('ArrowDown'));
+
+        expect(api.pointer.value).toBe(2);
+        wrapper.unmount();
+    });
+
+    it('ArrowUp from the first option with no clear entry does not park the highlight on one that appears later', () => {
+        // A nullish answer is "no entry". Were ArrowUp to read it as an entry, the clear entry would
+        // light up the moment one renders.
+        const entry = ref<boolean | undefined>(undefined);
+        const wrapper = mount(Harness, {
+            props: {overrides: {listLength: () => 3, clearEntry: () => entry.value as boolean}},
+        });
+
+        api.openList();
+        api.onKey(key('ArrowDown'));
+        api.onKey(key('ArrowUp'));
+        entry.value = true;
 
         expect(api.pointer.value).toBe(-1);
         expect(api.clearHighlighted.value).toBe(false);
