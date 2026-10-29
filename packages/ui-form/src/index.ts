@@ -5,6 +5,7 @@ export {default as FormField} from './components/FormField.vue';
 export {default as FormLabel} from './components/FormLabel.vue';
 export {default as InputGroup} from './components/InputGroup.vue';
 export {default as NumberInput} from './components/NumberInput.vue';
+export {default as SearchInput} from './components/SearchInput.vue';
 export {default as Switch} from './components/Switch.vue';
 export {default as Textarea} from './components/Textarea.vue';
 export {default as TextInput} from './components/TextInput.vue';
