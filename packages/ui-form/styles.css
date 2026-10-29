@@ -343,8 +343,8 @@
     .ui-input-wrap > .ui-input.is-invalid {
         padding-right: calc(var(--ui-control-pad-x) * 2 + 1em);
     }
-    /* A leading glyph (TimeInput's clock) and an in-input button (its clear button), with room in the text
-       for both. ui-form's own classes: no ui-inputs 0.17 control has them. */
+    /* A leading glyph and an in-input button (a clear button), with room in the text for both. ui-form's
+       own classes: no ui-inputs 0.17 control has them. */
     .ui-input-wrap > .ui-input.has-lead {
         padding-left: calc(var(--ui-control-pad-x) * 2 + 1em);
     }
