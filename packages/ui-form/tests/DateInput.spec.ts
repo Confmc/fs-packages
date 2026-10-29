@@ -17,6 +17,20 @@ describe('DateInput', () => {
         expect(input.attributes('aria-required')).toBeUndefined();
     });
 
+    it('shows the calendar date of an ISO datetime, as a Laravel date cast sends it, and leaves the model as is', () => {
+        const wrapper = mount(DateInput, {props: {id: 'start', modelValue: '2026-09-05T00:00:00.000000Z'}});
+
+        expect((wrapper.find('input').element as HTMLInputElement).value).toBe('2026-09-05');
+        expect(wrapper.emitted('update:modelValue')).toBeUndefined();
+    });
+
+    it('emits the picked date as YYYY-MM-DD when the model held a datetime', async () => {
+        const wrapper = mount(DateInput, {props: {id: 'start', modelValue: '2026-09-05T00:00:00.000000Z'}});
+        await wrapper.find('input').setValue('2026-09-06');
+
+        expect(wrapper.emitted('update:modelValue')?.[0]).toEqual(['2026-09-06']);
+    });
+
     it('renders empty for a null model', () => {
         const wrapper = mount(DateInput, {props: {id: 'dob', modelValue: null}});
         expect((wrapper.find('input').element as HTMLInputElement).value).toBe('');
