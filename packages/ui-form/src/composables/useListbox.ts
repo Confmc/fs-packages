@@ -156,7 +156,8 @@ export const useListbox = (options: UseListboxOptions) => {
     let first = '';
     let keys = 0;
     // Whether every key in `typed` is its first character — kept as a flag, so a held key costs the
-    // same on every repeat instead of re-scanning a run that key repeat grows without limit.
+    // same on every repeat instead of re-scanning a run that key repeat grows without limit. True
+    // whenever `typed` is empty: it starts so, and `dropTyped` empties both together.
     let repeated = true;
     let typedTimer: ReturnType<typeof setTimeout> | undefined;
     const dropTyped = () => {
@@ -209,7 +210,7 @@ export const useListbox = (options: UseListboxOptions) => {
 
         const character = fold(key);
         if (typed === '') first = character;
-        repeated = typed === '' || (repeated && character === first);
+        repeated = repeated && character === first;
         if (keys < TYPEAHEAD_MAX_LENGTH) {
             typed += character;
             keys++;
