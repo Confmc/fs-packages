@@ -633,6 +633,12 @@ a separate self-review agent with its fixes in:
 | `ui-form/n-field-hint` | n-form-field | hint slot, `<id>-hint`, read after the message | after FormField |
 | `ui-form/n-field-label-after` | n-form-field | FormLabel `after` slot + FormField `label-after` | after FormField |
 | `ui-form/n-field-aside` | n-form-field | aside slot, `.ui-field__head` row | after FormField |
+| `ui-form/n-time-input` | main | TimeInput (emmie's): clock glyph, picker toggle, `clearLabel` clear button, `step` | #341 (draft until CI green) |
+| `ui-form/n-search-input` | main | SearchInput (emmie's): `type="search"`, magnifier, `clearLabel` clear button | #342 (draft until CI green) |
+| `ui-form/n-password-input` | main | PasswordInput (emmie's): show/hide toggle, Caps Lock notice, `--ui-warning-text` | #343 (draft until CI green) |
+
+TimeInput and SearchInput add the same glyph/button CSS lines, so they merge cleanly in either order;
+PasswordInput takes only the button rules and takes main in after whichever lands first.
 
 The three FormField follow-ups are independent of each other (each off n-form-field). A fix on n-form-field is
 merged into all three. The axe harness (renders every control inside FormField) goes into FormField's PR once
@@ -645,12 +651,37 @@ FormField and the control. Don't reopen it on the FormField PR.
 ### The test bed
 
 The emmie session (`error-keys-raw`) is a test bed: it installs temporary packs and uses them on real forms, it
-does not prep or polish slices. Current pack: `.experiment-packs/script-development-ui-form-landing.1.tgz` from
-`experiment/ui-form-landing` @ 03e5d60 on fork (main + every open PR + FormField; index.ts and the listener-order
-table merged by hand). It wires the rooms form (422 on `workplaces.new_139.name`) and one simple form on a scratch
+does not prep or polish slices. Current pack: `.experiment-packs/script-development-ui-form-landing.4.tgz` from
+`experiment/ui-form-landing` on fork (main + every open PR + FormField + the three new inputs; index.ts, the
+stylesheet and the listener-order table merged by hand). Each pack carries its own version (`0.0.0-landing.N`)
+or Vite keeps its stale pre-bundle. After a hand merge run oxfmt and the tests before committing: a conflict
+whose closing brace sits outside the markers leaves a CSS rule open, and a type check reads neither CSS nor specs. It wires the rooms form (422 on `workplaces.new_139.name`) and one simple form on a scratch
 branch off its collector, and reports what breaks. Its collector push waits for Marcel.
 
-### Later, when prep runs out
+### Test conventions (checked 2026-10-29)
 
-- Compare our test code with the repo's existing tests for conventions (naming, helpers, structure). A mismatch
-  is not wrong, but always worth a look.
+Written: specs in `tests/`, `describe` + `it`, the happy-dom pragma, 100% coverage, 90% mutation. Unwritten, from
+the 81 specs on main: `.spec.ts`; `expect` imported from vitest (never `({expect})`); present-tense titles (ui-inputs)
+rather than `should …` (older fs packages); no Arrange/Act/Assert comments; `mount`, `attachTo: document.body`
+followed by `unmount()`; `toEqual` (`toStrictEqual` only where an extra undefined key must fail); `it.each` tables;
+`vi.fn`/`vi.spyOn`, rarely `vi.mock`. Our ui-form specs match. Note these are the opposite of emmie's conventions.
+
+### ADR candidates (collect, don't send yet)
+
+Rules that look like they belong in a new ADR. Collected here until they stop moving, then proposed as one,
+e.g. after the test bed has run them and before the release PR. Each PR body already states its own choices, so
+the reviewer sees them meanwhile. Add a line when a rule settles; strike one that changes.
+
+- An in-input clear button shows only when the consumer names it (`clearLabel`, as ui-inputs' `clearLabel`): no
+  English default name, and leaving it out is how a value that must stay set says so. (2026-10-29, #341 #342)
+- In-input buttons are keyboard-reachable, show the focus ring (and a forced-colors outline), and are a 24px target
+  at least; a pointer press keeps focus in the field. (2026-10-29, #341 #342 #343)
+- Every string control emits `''` on clear, by button or keyboard; NumberInput alone emits `null`. (2026-10-29,
+  #336 #341 #342)
+- A look is tokens on the wrapper's class, never a prop (emmie's `small` search pill). (2026-10-29, #342)
+- Controls take `invalid` only; `id` required; `placeholder` required on text-like inputs (none on date/time,
+  which show none); `v-model` on the inner element where it fits; `class`/`style` on the root. (settled 10-23/26)
+- The bound-control kit (K2): `useForm` hands out `<TextField name label required/>`, `required` written once.
+  (decided 10-19, not built)
+- Toggle buttons keep one name and carry their state in `aria-pressed`; status notices are live regions that are
+  always rendered, with only their text changing. (2026-10-29, #343)
