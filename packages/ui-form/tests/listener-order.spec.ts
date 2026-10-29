@@ -3,7 +3,7 @@ import {mount} from '@vue/test-utils';
 import {describe, expect, it} from 'vitest';
 import {defineComponent, h, ref} from 'vue';
 
-import {Checkbox, Switch, TextInput} from '../src';
+import {Checkbox, CheckboxGroup, Switch, TextInput} from '../src';
 
 // Every value control, the props it needs, the value it starts from, the event its value arrives on, and
 // what the user enters. A consumer's listener on that event runs after the control's own, so it reads the
@@ -20,6 +20,14 @@ const CONTROLS: [
 ][] = [
     ['TextInput', TextInput, {placeholder: 'Name'}, '', 'input', (element) => (element.value = 'A')],
     ['Checkbox', Checkbox, {label: 'Agree'}, false, 'change', (element) => (element.checked = true)],
+    [
+        'CheckboxGroup',
+        CheckboxGroup,
+        {label: 'Fruit', options: [{id: 1, name: 'Mango'}], optionLabel: 'name'},
+        [],
+        'change',
+        (element) => (element.checked = true),
+    ],
     ['Switch', Switch, {label: 'On'}, false, 'change', (element) => (element.checked = true)],
 ];
 
