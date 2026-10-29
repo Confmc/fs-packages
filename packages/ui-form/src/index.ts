@@ -11,9 +11,11 @@ export {default as TextInput} from './components/TextInput.vue';
 export {useFormSubmit} from './form/form-submit';
 export {useValidationErrors} from './form/validation-errors';
 
-export type {
-export {default as DateInput} from './components/DateInput.vue';
-export {default as Textarea} from './components/Textarea.vue';
-export {default as InputGroup} from './components/InputGroup.vue';
-
 export type {FieldAria, FieldBinding} from './types';
+export type {
+    SubmitOutcome,
+    UseFormSubmit,
+    UseValidationErrors,
+    UseValidationErrorsOptions,
+    ValidationErrors,
+} from './form/types';
