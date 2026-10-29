@@ -8,7 +8,7 @@
         <div class="ui-field__control">
             <slot :field="field" :aria="aria" />
         </div>
-        <FormError v-if="message" :error="message" :id="errorId" />
+        <FormError :error="error ?? ''" :id="errorId" />
     </div>
 </template>
 
