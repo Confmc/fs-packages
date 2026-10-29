@@ -71,13 +71,14 @@ describe('PasswordInput', () => {
         wrapper.unmount();
     });
 
-    it('keeps focus on the input when the toggle is pressed with a pointer', () => {
+    it('focuses the input, not the toggle, when the toggle is pressed with a pointer', () => {
         const wrapper = mountPassword();
         const down = new MouseEvent('mousedown', {cancelable: true});
 
         wrapper.find('.ui-input__button').element.dispatchEvent(down);
 
         expect(down.defaultPrevented).toBe(true);
+        expect(document.activeElement).toBe(wrapper.find('input').element);
         wrapper.unmount();
     });
 
@@ -123,7 +124,8 @@ describe('PasswordInput', () => {
         const wrapper = mountPassword();
         await pressKey(wrapper, 'keydown', true);
 
-        wrapper.find('input').element.dispatchEvent(new Event('keyup'));
+        // a plain event, as autofill's; were it read, this reading would turn the notice off
+        wrapper.find('input').element.dispatchEvent(Object.assign(new Event('keyup'), {getModifierState: () => false}));
         await wrapper.vm.$nextTick();
 
         expect(wrapper.find('.ui-password__caps').text()).toBe('Caps Lock is on');

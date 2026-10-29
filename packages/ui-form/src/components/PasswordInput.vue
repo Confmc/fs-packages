@@ -19,7 +19,8 @@
                 :aria-invalid="invalid || undefined"
                 :aria-describedby="describedbyWithCaps"
             />
-            <!-- a toggle: one name, its state in aria-pressed. mousedown is prevented so the click keeps focus on the input -->
+            <!-- a toggle: one name, its state in aria-pressed. A pointer press focuses the input, not the toggle,
+                 so typing goes on in the field; the keyboard reaches the toggle by Tab -->
             <button
                 type="button"
                 class="ui-input__button"
@@ -27,7 +28,7 @@
                 :aria-pressed="shown"
                 :aria-controls="id"
                 :disabled="disabled"
-                @mousedown.prevent
+                @mousedown.prevent="input?.focus()"
                 @click="shown = !shown"
             >
                 <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
@@ -82,7 +83,7 @@ const {
     describedby?: string;
     /** the show/hide toggle's accessible name; whether it is on is its pressed state. */
     showPasswordLabel?: string;
-    /** the notice shown while Caps Lock is on. */
+    /** the notice shown once a key in the field says Caps Lock is on. */
     capsLockText?: string;
     /** focus the input when it mounts; in script, since the native attribute only acts on page load. */
     autofocus?: boolean;
