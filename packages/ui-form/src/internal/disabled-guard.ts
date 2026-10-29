@@ -26,7 +26,8 @@ const guard = (event: Event): void => {
  * within a phase and capture before bubble, so a capture listener registered first runs ahead of
  * everything the consumer bound on this element, in either phase, without reordering Vue's merged
  * handlers — an enabled control keeps the order its consumers already see. An ancestor's capture
- * listener runs before any listener on the element and stays out of reach.
+ * listener runs before any listener on the element and stays out of reach. The same order is why a
+ * guard on a group's fieldset withholds its members' own listeners too: the groups guard only there.
  */
 export const vGuardWhileDisabled: Directive<HTMLElement, boolean> = {
     created: (element, {value}) => {
