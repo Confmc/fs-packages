@@ -3,11 +3,12 @@ import {mount} from '@vue/test-utils';
 import {describe, expect, it} from 'vitest';
 import {h} from 'vue';
 
+import type {FieldBinding} from '../src';
+
 import FormField from '../src/components/FormField.vue';
 
 // A slot stub that renders the `field` object the slot hands the control, so we can assert it.
-const wiringSlot = ({field}: {field: {id: string; invalid: boolean; describedby: string | undefined}}) =>
-    `id:${field.id}|inv:${field.invalid}|db:${field.describedby}`;
+const wiringSlot = ({field}: {field: FieldBinding}) => `id:${field.id}|inv:${field.invalid}|db:${field.describedby}`;
 
 describe('FormField', () => {
     it('renders a label, generates matching control/error ids, and reports valid state', () => {
@@ -96,6 +97,18 @@ describe('FormField', () => {
 
         // absent, not undefined: an aria-labelledby of your own then holds wherever it sits next to v-bind="aria"
         expect(Object.keys(aria)).toEqual(['id']);
+    });
+
+    it("keeps an aria attribute of the consumer's own that the field leaves out, in any binding order", () => {
+        const wrapper = mount(FormField, {
+            props: {id: 'laws'},
+            slots: {
+                default: (scope: {aria: Record<string, unknown>}) =>
+                    h('div', {'aria-labelledby': 'mine', ...scope.aria}),
+            },
+        });
+
+        expect(wrapper.find('div[id="laws"]').attributes('aria-labelledby')).toBe('mine');
     });
 
     it('omits the label when none is given, keeping the wiring on the provided id', () => {
