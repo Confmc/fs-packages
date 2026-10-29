@@ -16,7 +16,6 @@ const FRUITS: Fruit[] = [
     {id: 3, name: 'Mango'},
 ];
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFC + VTU mount inference
 const mountGroup = (props: Record<string, unknown>) =>
     mount(RadioGroup as any, {
         props: {options: FRUITS, optionLabel: 'name', label: 'Fruit', id: 'fruit', modelValue: null, ...props},
@@ -51,9 +50,9 @@ describe('RadioGroup', () => {
         const wrapper = mountGroup({});
         const radios = wrapper.findAll('input[type="radio"]');
 
-        // The model follows `change` — exactly what native arrow-key selection fires (the
-        // real arrow-key walk is pinned in the browser-mode interaction suite; happy-dom
-        // implements no radio roving).
+        // The model follows `change` — exactly what native arrow-key selection fires. The arrow-key
+        // walk itself is the browser's (shared `name`, nothing hand-rolled) and is not tested here:
+        // happy-dom implements no radio roving.
         await radios[1].setValue(true);
         expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([2]);
 
@@ -89,20 +88,34 @@ describe('RadioGroup', () => {
         expect(radios.every((radio) => radio.attributes('aria-describedby') === undefined)).toBe(true);
     });
 
-    it('disables every radio and ignores a change reaching the handler anyway', async () => {
-        const wrapper = mountGroup({disabled: true});
-        const radios = wrapper.findAll('input[type="radio"]');
+    it.each(['input', 'change'])(
+        'disables every radio and withholds a dispatched %s from the handlers, and only while disabled',
+        async (type) => {
+            let heard = 0;
+            const wrapper = mountGroup({[`on${type[0].toUpperCase()}${type.slice(1)}`]: () => (heard += 1)});
+            const first = wrapper.find('input[type="radio"]').element as HTMLInputElement;
+            // Native dispatch — VTU setValue() skips disabled elements (vacuous-assertion trap).
+            const dispatch = () => first.dispatchEvent(new Event(type, {bubbles: true}));
 
-        expect(radios.every((radio) => radio.attributes('disabled') !== undefined)).toBe(true);
-        expect(wrapper.findAll('.ui-radio').every((row) => row.classes().includes('is-disabled'))).toBe(true);
+            dispatch();
+            expect(heard).toBe(1);
 
-        // Native dispatch — VTU setValue() skips disabled elements (vacuous-assertion trap).
-        const first = radios[0].element as HTMLInputElement;
-        first.checked = true;
-        first.dispatchEvent(new Event('change', {bubbles: true}));
-        await wrapper.vm.$nextTick();
-        expect(wrapper.emitted('update:modelValue')).toBeUndefined();
-    });
+            await wrapper.setProps({disabled: true});
+            const emitted = wrapper.emitted('update:modelValue')?.length ?? 0;
+            const radios = wrapper.findAll('input[type="radio"]');
+            expect(radios.every((radio) => radio.attributes('disabled') !== undefined)).toBe(true);
+            expect(wrapper.findAll('.ui-radio').every((row) => row.classes().includes('is-disabled'))).toBe(true);
+            first.checked = true;
+            dispatch();
+            await wrapper.vm.$nextTick();
+            expect(heard).toBe(1);
+            expect(wrapper.emitted('update:modelValue')?.length ?? 0).toBe(emitted);
+
+            await wrapper.setProps({disabled: false});
+            dispatch();
+            expect(heard).toBe(2);
+        },
+    );
 
     it('keeps a click on an option label from the consumer while disabled', () => {
         let heard = 0;

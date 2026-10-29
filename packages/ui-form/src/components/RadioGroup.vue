@@ -15,8 +15,7 @@
         :aria-describedby="describedby"
     >
         <legend class="ui-label ui-radio-group__legend">
-            <span>{{ label }}</span
-            ><span v-if="required" class="ui-label__req" aria-hidden="true">*</span>
+            {{ label }}<span v-if="required" class="ui-label__req" aria-hidden="true">*</span>
         </legend>
         <!-- Native radios sharing one name: the browser provides the roving tabindex and the
              arrow-key selection (never hand-rolled here) — the component only mirrors the
@@ -98,7 +97,7 @@ const labelOf = (option: T): string =>
 // model — a declined or deferred change otherwise leaves the clicked one showing (WR-1922). The
 // radios are found from the one that changed: every radio sits inside this component's fieldset.
 const onChange = (event: Event, value: T['id']): void => {
-    const fieldset = (event.currentTarget as HTMLInputElement).closest('fieldset') as HTMLFieldSetElement;
+    const fieldset = (event.currentTarget as HTMLElement).closest('fieldset') as HTMLFieldSetElement;
     model.value = value;
     void nextTick(() => {
         const radios = fieldset.querySelectorAll<HTMLInputElement>('.ui-radio__input');
