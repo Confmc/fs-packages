@@ -2,8 +2,9 @@
     <!-- role="radiogroup" (overriding fieldset's implicit `group`) because radiogroup — unlike
          group — legitimately carries aria-required, giving the group-level required conveyance
          as a real attribute; the legend still names the fieldset. ONE described-by story: the
-         error IDREF lives on the fieldset only. The disabled guard sits on the fieldset for the
-         reason CheckboxGroup gives. -->
+         error IDREF lives on the fieldset only. The disabled guard sits on the fieldset, not only
+         on the radios: consumer attrs land here, and a pointer on an option's label text reaches
+         them without touching a disabled radio. -->
     <fieldset
         :id="id"
         v-guard-while-disabled="disabled"
@@ -83,7 +84,7 @@ const {
     describedby?: string;
 }>();
 
-/** The committed choice — `null` while nothing is selected (the SingleSelect model shape). */
+/** The committed choice — `null` while nothing is selected. */
 const model = defineModel<T['id'] | null>({required: true});
 
 /** Resolve an option's display string from the `optionLabel` prop (property name or getter). */
