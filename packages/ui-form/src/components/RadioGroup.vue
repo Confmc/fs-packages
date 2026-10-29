@@ -6,7 +6,6 @@
          reason CheckboxGroup gives. -->
     <fieldset
         :id="id"
-        ref="group"
         v-guard-while-disabled="disabled"
         class="ui-radio-group"
         role="radiogroup"
@@ -37,7 +36,7 @@
                     :value="String(option.id)"
                     :checked="model === option.id"
                     :disabled="disabled"
-                    @change="onChange(option.id)"
+                    @change="onChange($event, option.id)"
                 />
                 <svg class="ui-check__icon" viewBox="0 0 20 20" aria-hidden="true">
                     <circle class="ui-radio__dot" cx="10" cy="10" r="4.5" fill="currentColor" />
@@ -49,12 +48,11 @@
 </template>
 
 <script setup lang="ts" generic="T extends SelectItem">
-import {nextTick, useTemplateRef} from 'vue';
+import {nextTick} from 'vue';
 
 import type {LabelKey, SelectItem} from '../types';
 
 import {vGuardWhileDisabled} from '../internal/disabled-guard';
-import {ensureRefValueExists} from '../internal/reactivity';
 
 const {
     options,
@@ -88,8 +86,6 @@ const {
 /** The committed choice — `null` while nothing is selected (the SingleSelect model shape). */
 const model = defineModel<T['id'] | null>({required: true});
 
-const group = useTemplateRef<HTMLElement>('group');
-
 /** Resolve an option's display string from the `optionLabel` prop (property name or getter). */
 const labelOf = (option: T): string =>
     typeof optionLabel === 'function'
@@ -98,9 +94,10 @@ const labelOf = (option: T): string =>
 
 // The model follows the native change event (keyboard arrows and clicks both land here). The browser
 // has already moved the checked radio, so once the host has rendered every radio is set back to the
-// model — a declined or deferred change otherwise leaves the clicked one showing (WR-1922).
-const onChange = (value: T['id']): void => {
-    const fieldset = ensureRefValueExists(group);
+// model — a declined or deferred change otherwise leaves the clicked one showing (WR-1922). The
+// radios are found from the one that changed: every radio sits inside this component's fieldset.
+const onChange = (event: Event, value: T['id']): void => {
+    const fieldset = (event.currentTarget as HTMLInputElement).closest('fieldset') as HTMLFieldSetElement;
     model.value = value;
     void nextTick(() => {
         const radios = fieldset.querySelectorAll<HTMLInputElement>('.ui-radio__input');
