@@ -15,7 +15,8 @@
         :aria-describedby="describedby"
     >
         <legend class="ui-label ui-check-group__legend">
-            {{ label }}<span v-if="required" class="ui-label__req" aria-hidden="true">*</span
+            <slot>{{ label }}</slot
+            ><span v-if="required" class="ui-label__req" aria-hidden="true">*</span
             ><span v-if="required" class="ui-check-group__sr">{{ requiredLabel }}</span>
         </legend>
         <Checkbox
@@ -54,8 +55,8 @@ const {
      * convention — named optionLabel here because `label` is the group legend).
      */
     optionLabel: LabelKey<T>;
-    /** the group legend. */
-    label: string;
+    /** the group legend's text; the default slot overrides it, for a legend that carries more than text. */
+    label?: string;
     /** stable id — on the fieldset, and the base for position-keyed member ids. */
     id: string;
     disabled?: boolean;
