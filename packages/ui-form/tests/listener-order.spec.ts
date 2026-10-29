@@ -3,14 +3,23 @@ import {mount} from '@vue/test-utils';
 import {describe, expect, it} from 'vitest';
 import {defineComponent, h, ref} from 'vue';
 
-import {Checkbox, DateInput, NumberInput, PasswordInput, SearchInput, Switch, TextInput, Textarea, TimeInput} from '../src';
+import {
+    Checkbox,
+    DateInput,
+    NumberInput,
+    PasswordInput,
+    SearchInput,
+    Switch,
+    Textarea,
+    TextInput,
+    TimeInput,
+} from '../src';
 
 // Every value control, the props it needs, the value it starts from, the event its value arrives on, and
 // what the user enters. A consumer's listener on that event runs after the control's own, so it reads the
 // new value, as with native v-model: Vue attaches a v-model listener before the element's props, and a
 // control's own listener sits before the consumer's attributes (merged listeners run in order). The reverse
 // order lost the first keystroke of a row whose @input added the next row.
-    ['PasswordInput', PasswordInput, {placeholder: 'Password', autocomplete: 'current-password'}, '', 'input', (element) => (element.value = 'A')],
 const CONTROLS: [
     string,
     unknown,
@@ -27,7 +36,14 @@ const CONTROLS: [
     ['Textarea', Textarea, {placeholder: 'Notes'}, '', 'input', (element) => (element.value = 'A')],
     ['TimeInput', TimeInput, {}, null, 'input', (element) => (element.value = '10:00')],
     ['SearchInput', SearchInput, {placeholder: 'Search'}, '', 'input', (element) => (element.value = 'A')],
-    ['PasswordInput', PasswordInput, {placeholder: 'Password', autocomplete: 'current-password'}, '', 'input', (element) => (element.value = 'A')],
+    [
+        'PasswordInput',
+        PasswordInput,
+        {placeholder: 'Password', autocomplete: 'current-password'},
+        '',
+        'input',
+        (element) => (element.value = 'A'),
+    ],
 ];
 
 describe("a consumer's listener on a control", () => {
