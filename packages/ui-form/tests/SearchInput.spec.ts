@@ -32,6 +32,17 @@ describe('SearchInput', () => {
         wrapper.unmount();
     });
 
+    it("follows the parent's model", async () => {
+        const wrapper = mountSearch();
+        const input = wrapper.find('input');
+
+        await wrapper.setProps({modelValue: 'Piet'});
+        expect(input.element.value).toBe('Piet');
+        await wrapper.setProps({modelValue: null});
+        expect(input.element.value).toBe('');
+        wrapper.unmount();
+    });
+
     it('shows its own magnifier, hidden from assistive tech, with room in the text for it', () => {
         const wrapper = mountSearch();
 
@@ -40,47 +51,46 @@ describe('SearchInput', () => {
         wrapper.unmount();
     });
 
-    it('offers a clear button while there is text, which clears to an empty string and keeps focus on the input', async () => {
-        const wrapper = mountSearch();
+    it('offers a clear button named by clearLabel while there is text, which clears it and keeps focus on the input', async () => {
+        const wrapper = mountSearch({
+            clearLabel: 'Wis zoekterm',
+            'onUpdate:modelValue': (value: string) => wrapper.setProps({modelValue: value}),
+        });
         const input = wrapper.find('input');
         const clear = wrapper.find('.ui-input__button');
 
         expect(input.classes()).toContain('has-button');
         expect(clear.attributes('type')).toBe('button');
-        expect(clear.attributes('aria-label')).toBe('Clear');
-        expect(clear.attributes('tabindex')).toBe('-1');
+        expect(clear.attributes('aria-label')).toBe('Wis zoekterm');
+        expect(clear.attributes()).not.toHaveProperty('tabindex');
         const down = new MouseEvent('mousedown', {cancelable: true});
         clear.element.dispatchEvent(down);
         expect(down.defaultPrevented).toBe(true);
 
         await clear.trigger('click');
         expect(wrapper.emitted('update:modelValue')).toEqual([['']]);
+        expect(input.element.value).toBe('');
+        expect(wrapper.find('.ui-input__button').exists()).toBe(false);
         expect(document.activeElement).toBe(input.element);
         wrapper.unmount();
     });
 
     it.each([
+        ['no clear label', {clearLabel: undefined}],
         ['no text', {modelValue: null}],
         ['an empty text', {modelValue: ''}],
         ['disabled', {disabled: true}],
     ])('has no clear button with %s', (_, props) => {
-        const wrapper = mountSearch(props);
+        const wrapper = mountSearch({clearLabel: 'Wis zoekterm', ...props});
 
         expect(wrapper.find('.ui-input__button').exists()).toBe(false);
         expect(wrapper.find('input').classes()).not.toContain('has-button');
         wrapper.unmount();
     });
 
-    it('names the clear button as asked', () => {
-        const wrapper = mountSearch({clearButtonLabel: 'Wis zoekterm'});
-
-        expect(wrapper.find('.ui-input__button').attributes('aria-label')).toBe('Wis zoekterm');
-        wrapper.unmount();
-    });
-
     it('marks itself invalid with the error icon, wired to the message, and conveys required', () => {
         const marked = mountSearch({invalid: true, describedby: 'search-error', required: true});
-        const plain = mountSearch();
+        const plain = mountSearch({id: 'other-search'});
         const input = marked.find('input');
 
         expect(input.classes()).toContain('is-invalid');

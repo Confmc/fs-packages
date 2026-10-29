@@ -23,13 +23,12 @@
             :aria-invalid="invalid || undefined"
             :aria-describedby="describedby"
         />
-        <!-- mousedown is prevented so the click keeps focus on the input -->
+        <!-- mousedown is prevented so a pointer click keeps focus on the input; the keyboard reaches it by Tab -->
         <button
             v-if="showClear"
             type="button"
             class="ui-input__button"
-            tabindex="-1"
-            :aria-label="clearButtonLabel"
+            :aria-label="clearLabel"
             @mousedown.prevent
             @click="clear"
         >
@@ -50,7 +49,7 @@ import ErrorIcon from './ErrorIcon.vue';
 const {
     disabled = false,
     invalid = false,
-    clearButtonLabel = 'Clear',
+    clearLabel,
     autofocus = false,
 } = defineProps<{
     /** control id, pairing the input with its label and error; inside a `FormField` the field passes its own. */
@@ -64,8 +63,8 @@ const {
     invalid?: boolean;
     /** id of the paired error element for `aria-describedby`. */
     describedby?: string;
-    /** the clear button's accessible name. */
-    clearButtonLabel?: string;
+    /** the clear button's accessible name: given, a clear button shows while there is text. */
+    clearLabel?: string;
     /** focus the input when it mounts; in script, since the native attribute only acts on page load. */
     autofocus?: boolean;
 }>();
@@ -75,7 +74,7 @@ defineOptions({inheritAttrs: false});
 // As TextInput: binds null as empty, emits '' when cleared.
 const model = defineModel<string | null>({required: true});
 
-const showClear = computed(() => !disabled && Boolean(model.value));
+const showClear = computed(() => clearLabel !== undefined && !disabled && Boolean(model.value));
 
 const input = useTemplateRef<HTMLInputElement>('input');
 

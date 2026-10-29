@@ -332,8 +332,8 @@
         box-shadow: var(--ui-danger-shadow);
     }
 
-    /* The text inputs' in-input error icon: shown while the control is marked, at the right edge,
-       with the text kept clear of it. Keyed on .ui-input-wrap, which only ui-form's text inputs
+    /* The wrapped inputs' in-input error icon: shown while the control is marked, at the right edge,
+       with the text kept clear of it. Keyed on .ui-input-wrap, which only ui-form's wrapped inputs
        render: during the migration this sheet also styles ui-inputs 0.17 controls, whose invalid
        TextInput has no icon and must keep its own padding. */
     .ui-input-wrap {
@@ -374,6 +374,9 @@
         justify-content: center;
         width: 1.5em;
         height: 1.5em;
+        /* a pointer target of at least 24px (WCAG 2.5.8) at any control font size */
+        min-width: 24px;
+        min-height: 24px;
         margin-right: -0.25em;
         padding: 0;
         border: none;
@@ -395,8 +398,9 @@
     .ui-input.is-invalid ~ .ui-input__button {
         right: calc(var(--ui-control-pad-x) * 2 + 1em);
     }
-    /* the browser's own clear button gives way to the package's */
-    .ui-search::-webkit-search-cancel-button {
+    /* the browser's own clear button gives way to the package's, and Safari's decoration takes no room */
+    .ui-search::-webkit-search-cancel-button,
+    .ui-search::-webkit-search-decoration {
         appearance: none;
     }
     .ui-input__icon {
