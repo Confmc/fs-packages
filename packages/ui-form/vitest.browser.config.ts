@@ -22,7 +22,7 @@ export default defineConfig({
         // Spec files must run SERIALLY: the suite asserts real `:focus-visible` state, and a
         // parallel sibling page holding OS focus makes the focused document inactive — the
         // focus ring then legitimately never computes (observed: styles.browser.spec.ts focus
-        // test failing in the full run, green in isolation). Four small files; cost is seconds.
+        // test failing in the full run, green in isolation). A few small files; cost is seconds.
         fileParallelism: false,
         browser: {enabled: true, headless: true, provider: playwright(), instances: [{browser: 'chromium'}]},
     },

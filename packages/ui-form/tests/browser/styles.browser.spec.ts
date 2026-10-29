@@ -3,13 +3,13 @@
 //
 // First-ever coverage of styles.css: the shipped stylesheet applied in a real layout engine,
 // asserted through getComputedStyle — the layer no happy-dom spec can see. Includes the
-// WR-0512 regression pins (font-size source-order fight) and the state-variant hooks on a
-// real keyboard :focus-visible.
+// cascade-layer pins (WR-0512's source-order fight, which the layer closes) and the
+// state-variant hooks on a real keyboard :focus-visible.
 import {afterEach, beforeEach, describe, expect, it} from 'vitest';
 import {cdp, page, userEvent} from 'vitest/browser';
 
 // `?inline` yields the stylesheet as text so each test controls WHERE in the cascade the
-// package sheet sits — the WR-0512 pins need both orderings, which a plain side-effect
+// package sheet sits — the layer pins need several orderings, which a plain side-effect
 // import (one fixed <style> position) cannot express.
 import uiCss from '../../styles.css?inline';
 
@@ -212,7 +212,7 @@ describe('styles.css — group header (--ui-group-header-*)', () => {
     });
 });
 
-describe('styles.css — WR-0512 font-size source-order regression pins', () => {
+describe('styles.css — the ui-form layer against consumer CSS (WR-0512)', () => {
     it('the default reproduces the historical `font: inherit` (control text follows the parent)', () => {
         addStyle(uiCss);
         const control = addControl('font-size: 18px');
