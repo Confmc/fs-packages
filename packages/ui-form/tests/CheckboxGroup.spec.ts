@@ -102,7 +102,7 @@ describe('CheckboxGroup', () => {
         expect(inputs.every((input) => input.attributes('aria-describedby') === undefined)).toBe(true);
     });
 
-    it('threads disabled to every member and ignores a change reaching a handler anyway', async () => {
+    it('threads disabled to every member and withholds a dispatched change from the handler of the member', async () => {
         const wrapper = mountGroup({disabled: true});
         const inputs = wrapper.findAll('input[type="checkbox"]');
 
@@ -117,32 +117,23 @@ describe('CheckboxGroup', () => {
     });
 
     it.each(['click', 'input', 'change'])(
-        'withholds %s on an option label from the listeners bound on a disabled group',
-        (type) => {
+        'withholds %s on an option label from the listeners bound on the group while disabled, and only then',
+        async (type) => {
             let heard = 0;
-            const wrapper = mountGroup(
-                {disabled: true},
-                {[`on${type[0].toUpperCase()}${type.slice(1)}`]: () => (heard += 1)},
-            );
+            const wrapper = mountGroup({}, {[`on${type[0].toUpperCase()}${type.slice(1)}`]: () => (heard += 1)});
+            const dispatch = () =>
+                wrapper.find('.ui-check__label').element.dispatchEvent(new Event(type, {bubbles: true}));
 
-            wrapper.find('.ui-check__label').element.dispatchEvent(new Event(type, {bubbles: true}));
-
-            expect(heard).toBe(0);
+            dispatch();
+            expect(heard).toBe(1);
+            await wrapper.setProps({disabled: true});
+            dispatch();
+            expect(heard).toBe(1);
+            await wrapper.setProps({disabled: false});
+            dispatch();
+            expect(heard).toBe(2);
         },
     );
-
-    it('follows `disabled` as it changes after mount', async () => {
-        let heard = 0;
-        const wrapper = mountGroup({}, {onChange: () => (heard += 1)});
-        const input = wrapper.find('input').element;
-
-        await wrapper.setProps({disabled: true});
-        input.dispatchEvent(new Event('change', {bubbles: true}));
-        await wrapper.setProps({disabled: false});
-        input.dispatchEvent(new Event('change', {bubbles: true}));
-
-        expect(heard).toBe(1);
-    });
 
     it('round-trips string ids and resolves member labels via a getter', async () => {
         interface Tag {
