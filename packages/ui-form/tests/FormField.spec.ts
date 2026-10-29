@@ -71,6 +71,18 @@ describe('FormField', () => {
         expect(Object.keys(aria)).toEqual(['id']);
     });
 
+    it("keeps an aria attribute of the consumer's own that the field leaves out, in any binding order", () => {
+        const wrapper = mount(FormField, {
+            props: {id: 'laws'},
+            slots: {
+                default: (scope: {aria: Record<string, unknown>}) =>
+                    h('div', {'aria-labelledby': 'mine', ...scope.aria}),
+            },
+        });
+
+        expect(wrapper.find('div[id="laws"]').attributes('aria-labelledby')).toBe('mine');
+    });
+
     it('omits the label when none is given, keeping the wiring on the provided id', () => {
         const wrapper = mount(FormField, {props: {id: 'search'}, slots: {default: wiringSlot}});
 
