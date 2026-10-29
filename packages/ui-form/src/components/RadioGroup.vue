@@ -15,7 +15,7 @@
         :aria-describedby="describedby"
     >
         <legend class="ui-label ui-radio-group__legend">
-            <span ref="legendText">{{ label }}</span
+            <span>{{ label }}</span
             ><span v-if="required" class="ui-label__req" aria-hidden="true">*</span>
         </legend>
         <!-- Native radios sharing one name: the browser provides the roving tabindex and the
@@ -49,11 +49,10 @@
 </template>
 
 <script setup lang="ts" generic="T extends SelectItem">
-import {nextTick, onMounted, useTemplateRef} from 'vue';
+import {nextTick, useTemplateRef} from 'vue';
 
 import type {LabelKey, SelectItem} from '../types';
 
-import {warnWhenUnnamed} from '../internal/accessible-name';
 import {vGuardWhileDisabled} from '../internal/disabled-guard';
 import {ensureRefValueExists} from '../internal/reactivity';
 
@@ -90,14 +89,6 @@ const {
 const model = defineModel<T['id'] | null>({required: true});
 
 const group = useTemplateRef<HTMLElement>('group');
-const legendText = useTemplateRef<HTMLElement>('legendText');
-
-// The same label-only naming guard as CheckboxGroup — see there.
-onMounted(() =>
-    warnWhenUnnamed(ensureRefValueExists(group), 'RadioGroup', 'the `label` prop (the legend)', [
-        ensureRefValueExists(legendText),
-    ]),
-);
 
 /** Resolve an option's display string from the `optionLabel` prop (property name or getter). */
 const labelOf = (option: T): string =>
