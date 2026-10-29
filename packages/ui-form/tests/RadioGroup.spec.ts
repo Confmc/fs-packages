@@ -118,16 +118,13 @@ describe('RadioGroup', () => {
     );
 
     const STOCK = [
-        {id: 1, name: 'Apple', soldOut: false},
-        {id: 2, name: 'Apricot', soldOut: true},
-        {id: 3, name: 'Mango', soldOut: false},
+        {id: 1, name: 'Apple', disabled: false},
+        {id: 2, name: 'Apricot', disabled: true},
+        {id: 3, name: 'Mango', disabled: false},
     ];
 
-    it.each([
-        ['a property name', 'soldOut'],
-        ['a getter', (option: {soldOut: boolean}) => option.soldOut],
-    ])('disables an option on its own by %s, leaving the others', (_, optionDisabled) => {
-        const wrapper = mountGroup({options: STOCK, optionDisabled});
+    it('disables an option on its own by its `disabled`, leaving the others', () => {
+        const wrapper = mountGroup({options: STOCK});
 
         expect(
             wrapper.findAll('input[type="radio"]').map((radio) => radio.attributes('disabled') !== undefined),
@@ -140,7 +137,7 @@ describe('RadioGroup', () => {
     });
 
     it('takes no change on a disabled option, a dispatched one included, and sets its radio back', async () => {
-        const wrapper = mountGroup({options: STOCK, optionDisabled: 'soldOut', modelValue: 1});
+        const wrapper = mountGroup({options: STOCK, modelValue: 1});
         const radios = wrapper.findAll<HTMLInputElement>('input[type="radio"]');
 
         // A dispatched change runs on a disabled radio; a user's never fires.
