@@ -93,15 +93,15 @@ import type {GroupRow} from '../internal/group-rows';
 import ListboxOption from './ListboxOption.vue';
 
 /**
- * The listbox popup shared by every ui-inputs select control — INTERNAL, deliberately not
+ * The listbox popup shared by every ui-form select control — INTERNAL, deliberately not
  * exported from the barrel (like `useListbox`, its behavioural twin). Where the composable
  * dedupes behaviour, this component dedupes markup: one `<ul>/<li>` body, parameterised only
  * by the class-prefix `variant`, so the `role="listbox"` / `role="option"` / position-keyed
  * `optionId` / committed-value `aria-selected` semantics stay byte-identical across the family.
  *
- * Both the flat controls (SingleSelect/Combobox/MultiSelect/MultiCombobox) and the grouped
- * ones (GroupSelect/GroupCombobox) render through this single component: the ONLY difference
- * is the `rows` a parent hands down. A flat control passes a run of all-option rows (no headers,
+ * Both the flat controls (SingleSelect; Combobox, MultiSelect and MultiCombobox to follow) and
+ * the grouped ones (GroupSelect and GroupCombobox, to follow) render through this single
+ * component: the ONLY difference is the `rows` a parent hands down. A flat control passes a run of all-option rows (no headers,
  * rendered flat); a grouped control interleaves `header`/`boundary` rows and this component
  * folds them into named `role="group"` runs. `boundary` closes the open run so a `header:false`
  * group after a named one renders flat instead of being absorbed into the preceding group.

@@ -16,7 +16,7 @@ export class MissingRefValue extends Error {
  * failure names the assumption — and a spec can assert it.
  *
  * Mirrors emmie's `helpers/reactivity` helper of the same name (message included), so the
- * eventual emmie migration onto ui-inputs reads familiar code.
+ * eventual emmie migration onto ui-form reads familiar code.
  */
 export const ensureRefValueExists = <T>(refVariable: Readonly<Ref<T | undefined | null>>): T => {
     if (refVariable.value !== undefined && refVariable.value !== null) return refVariable.value;

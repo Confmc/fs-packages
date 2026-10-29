@@ -95,11 +95,12 @@ const TYPEAHEAD_MAX_LENGTH = 64;
 const fold = (text: string): string => Array.from(text, (character) => character.toLocaleLowerCase()).join('');
 
 /**
- * The behavioural core shared by every ui-inputs listbox control (SingleSelect, Combobox, and —
- * forthcoming — MultiSelect). Entirely position/index-based, so the option type `T` never crosses
- * this boundary: the caller owns the derived list and hands back only its length and index-keyed
- * callbacks. Owns `open`/`pointer`, the position-keyed IDREFs, `aria-activedescendant`, the
- * clamp watcher, click-outside, floating-ui, and the keyboard-nav skeleton.
+ * The behavioural core shared by every ui-form listbox control (SingleSelect; Combobox and
+ * MultiSelect, which the optional hooks serve, to follow). Entirely position/index-based, so the
+ * option type `T` never crosses this boundary: the caller owns the derived list and hands back
+ * only its length and index-keyed callbacks. Owns `open`/`pointer`, the position-keyed IDREFs,
+ * `aria-activedescendant`, the clamp watcher, click-outside, floating-ui, and the keyboard-nav
+ * skeleton.
  */
 export const useListbox = (options: UseListboxOptions) => {
     const {
