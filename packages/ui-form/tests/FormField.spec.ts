@@ -3,11 +3,12 @@ import {mount} from '@vue/test-utils';
 import {describe, expect, it} from 'vitest';
 import {h} from 'vue';
 
+import type {FieldBinding} from '../src';
+
 import FormField from '../src/components/FormField.vue';
 
 // A slot stub that renders the `field` object the slot hands the control, so we can assert it.
-const wiringSlot = ({field}: {field: {id: string; invalid: boolean; describedby: string | undefined}}) =>
-    `id:${field.id}|inv:${field.invalid}|db:${field.describedby}`;
+const wiringSlot = ({field}: {field: FieldBinding}) => `id:${field.id}|inv:${field.invalid}|db:${field.describedby}`;
 
 describe('FormField', () => {
     it('renders a label, generates matching control/error ids, and reports valid state', () => {
