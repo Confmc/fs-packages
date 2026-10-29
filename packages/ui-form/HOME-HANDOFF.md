@@ -13,8 +13,7 @@ into a PR.
   #340 browser suite, #341 TimeInput, #342 SearchInput, #343 PasswordInput, #344 RadioGroup.
   CODEOWNERS requests the reviewer team automatically when a PR leaves draft; #330 and #332 were re-requested after
   their review comments were answered. Nobody else reviews this repo (no review bot; the bus's reviewer covers emmie only).
-- **#344** failed CI once on mutation (86.67%): two disabled-guard mutants. Fixed in `fd1878c` (100% locally); check
-  that its CI went green and mark it ready if it is still a draft.
+- **#344** failed CI once on mutation (86.67%): two disabled-guard mutants. Fixed in `fd1878c`; CI green, ready.
 - **Prepared on `fork`, no PR yet** (each waits on a merge; merge main in first, never rebase):
 
 | Branch | Waits on | What |
@@ -22,12 +21,13 @@ into a PR.
 | `ui-form/n-form-field` | #330 | FormField with the `field`/`aria` slot |
 | `ui-form/n-field-hint`, `-label-after`, `-aside` | FormField | one follow-up each, independent of each other |
 | `ui-form/n-checkbox-group` | #332 | CheckboxGroup, per-option `disabled`, legend slot |
-| `ui-form/n-single-select` | nothing: open next | SingleSelect + the listbox core; review fixes in, see below |
+| `ui-form/n-single-select` | nothing: open next | SingleSelect + the listbox core; all on `fork` @ `98244ab` |
 
-- **SingleSelect** (`ui-form/n-single-select`): a porting agent was finishing two comment fixes and a local Stryker
-  run at day end. If `fork` has no commits past the review fixes (`2b622b4`, docs), redo: fix the stale "teleported"
-  wording in `tests/find-menu.ts` and `src/components/OptionList.vue` (the listbox is promoted to the top layer in
-  place), run Stryker (below), self-review, open as a draft. It is ~2750 lines, most of it the verbatim copy commit.
+- **SingleSelect** (`ui-form/n-single-select` @ `98244ab`): reviewed, review fixes in, Stryker 97.14 locally (9
+  survivors are equivalent mutants: no behaviour difference). Before opening: a short second review of the last
+  three commits only (`5c47cec` comments, `338d898` a typeahead refactor, `98244ab` ~25 useListbox harness tests;
+  some of those set `pointer = -1` directly, a state no real input reaches: keep or drop deliberately). Then open as a
+  draft; the body says most of the ~2750+ lines are the verbatim copy commit.
 
 ## Next
 
