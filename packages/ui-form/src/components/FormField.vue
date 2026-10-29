@@ -9,7 +9,7 @@
             <slot :field="field" :aria="aria" />
         </div>
         <div v-if="$slots.hint" :id="hintId(id)" class="ui-hint"><slot name="hint" /></div>
-        <FormError :error="error ?? ''" :id="errorId" />
+        <FormError :error="error" :id="errorId" />
     </div>
 </template>
 
