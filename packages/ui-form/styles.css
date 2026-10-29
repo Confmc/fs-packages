@@ -394,6 +394,11 @@
     .ui-input__button:hover {
         color: var(--ui-control-text);
     }
+    /* reachable by keyboard, so it shows focus as every other focus surface does */
+    .ui-input__button:focus-visible {
+        outline: none;
+        box-shadow: var(--ui-focus-ring);
+    }
     /* with the error icon at the edge, the button moves in beside it */
     .ui-input.is-invalid ~ .ui-input__button {
         right: calc(var(--ui-control-pad-x) * 2 + 1em);
@@ -1044,7 +1049,8 @@
         .ui-multicombobox__box:focus-within,
         .ui-check__input:focus-visible,
         .ui-switch__input:focus-visible,
-        .ui-pressable:focus-visible {
+        .ui-pressable:focus-visible,
+        .ui-input__button:focus-visible {
             outline: 2px solid Highlight;
             outline-offset: 2px;
         }
