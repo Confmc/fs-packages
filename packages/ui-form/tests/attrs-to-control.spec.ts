@@ -19,7 +19,7 @@ describe.each(FAMILY)('$name — attribute fall-through', ({component, props}) =
     const mountWithAttrs = () =>
         // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFCs through one mount
         mount(component as any, {
-            props: {label: 'name', id: 'f', ...props},
+            props: {optionLabel: 'name', id: 'f', ...props},
             attrs: {
                 'aria-label': 'Fruit',
                 'data-qa': 'fruit-picker',
@@ -52,7 +52,7 @@ describe.each(FAMILY)('$name — attribute fall-through', ({component, props}) =
     it("a consumer attr never overrides the component's own wiring on the control", () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFCs through one mount
         const wrapper = mount(component as any, {
-            props: {label: 'name', id: 'f', ...props},
+            props: {optionLabel: 'name', id: 'f', ...props},
             attrs: {id: 'hijack', role: 'button'},
             attachTo: document.body,
         });
@@ -66,7 +66,7 @@ describe.each(FAMILY)('$name — attribute fall-through', ({component, props}) =
         const onFocus = vi.fn();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFCs through one mount
         const wrapper = mount(component as any, {
-            props: {label: 'name', id: 'f', ...props},
+            props: {optionLabel: 'name', id: 'f', ...props},
             attrs: {onFocus},
             attachTo: document.body,
         });

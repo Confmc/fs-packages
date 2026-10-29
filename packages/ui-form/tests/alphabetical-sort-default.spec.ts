@@ -22,7 +22,7 @@ describe.each(SORTABLE)('$name — option order', ({component, modelValue, opene
     const renderedOrder = async (extra: Record<string, unknown>) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFCs through one mount
         const wrapper = mount(component as any, {
-            props: {options: CALLER_ORDER, label: 'name', id: 'f', modelValue, ...extra},
+            props: {options: CALLER_ORDER, optionLabel: 'name', id: 'f', modelValue, ...extra},
             attachTo: document.body,
         });
         await wrapper.find(opener).trigger('click');

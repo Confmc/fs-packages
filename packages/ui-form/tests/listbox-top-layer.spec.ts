@@ -23,7 +23,7 @@ const mountOpen = (
     component: (typeof FAMILY)[number]['component'],
     modelValue: number | null | number[],
     attachTo: Element = document.body,
-) => mount(component as never, {props: {options: FRUITS, label: 'name', id: 'fruit', modelValue}, attachTo});
+) => mount(component as never, {props: {options: FRUITS, optionLabel: 'name', id: 'fruit', modelValue}, attachTo});
 
 afterEach(() => {
     document.body.innerHTML = '';

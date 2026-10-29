@@ -98,7 +98,7 @@ defineOptions({inheritAttrs: false});
 
 const {
     options,
-    label,
+    optionLabel,
     id,
     placeholder = 'Select…',
     disabled = false,
@@ -114,7 +114,7 @@ const {
 } = defineProps<{
     options: T[];
     /** property name or getter for an option's display string. */
-    label: LabelKey<T>;
+    optionLabel: LabelKey<T>;
     /** stable id — required so the trigger can pair with a label/error. */
     id: string;
     placeholder?: string;
@@ -150,11 +150,11 @@ defineSlots<{
 
 const model = defineModel<T['id'] | null>({required: true});
 
-/** Resolve an option's display string from the `label` prop (property name or getter). */
+/** Resolve an option's display string from the `optionLabel` prop (property name or getter). */
 const labelOf = (option: T): string =>
-    typeof label === 'function'
-        ? label(option)
-        : String((option as Record<PropertyKey, unknown>)[label as PropertyKey]);
+    typeof optionLabel === 'function'
+        ? optionLabel(option)
+        : String((option as Record<PropertyKey, unknown>)[optionLabel as PropertyKey]);
 
 const selected = computed(() => options.find((option) => option.id === model.value));
 const sorted = computed(() =>

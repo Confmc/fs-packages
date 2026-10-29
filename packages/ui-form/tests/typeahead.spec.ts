@@ -26,7 +26,7 @@ const SELECT_ONLY = [
         name: 'SingleSelect',
         mountIt: () =>
             mount(SingleSelect, {
-                props: {options: FRUITS, label: 'name', id: 'f', modelValue: null, alphabeticalSort: false},
+                props: {options: FRUITS, optionLabel: 'name', id: 'f', modelValue: null, alphabeticalSort: false},
                 attachTo: document.body,
             }),
         keyTarget: '.ui-select',
@@ -188,7 +188,7 @@ describe('typeahead — a search starts after the committed value (native <selec
 
     it('SingleSelect with Banana chosen: closed, b moves to Blue moon, not Banana again', async () => {
         const wrapper = mount(SingleSelect, {
-            props: {options: FRUITS, label: 'name', id: 'f', modelValue: banana, alphabeticalSort: false},
+            props: {options: FRUITS, optionLabel: 'name', id: 'f', modelValue: banana, alphabeticalSort: false},
             attachTo: document.body,
         });
 
@@ -199,7 +199,7 @@ describe('typeahead — a search starts after the committed value (native <selec
 
     it('REGRESSION PIN — SingleSelect with Banana chosen: a string still matching it stays on it', async () => {
         const wrapper = mount(SingleSelect, {
-            props: {options: FRUITS, label: 'name', id: 'f', modelValue: banana, alphabeticalSort: false},
+            props: {options: FRUITS, optionLabel: 'name', id: 'f', modelValue: banana, alphabeticalSort: false},
             attachTo: document.body,
         });
         const root = wrapper.find('.ui-select');
@@ -223,7 +223,7 @@ describe('typeahead — a held key costs the same on its thousandth repeat as on
         // the 500 ms idle reset cannot fire inside it either way.
         vi.useRealTimers();
         const wrapper = mount(SingleSelect, {
-            props: {options: FRUITS, label: 'name', id: 'f', modelValue: null, alphabeticalSort: false},
+            props: {options: FRUITS, optionLabel: 'name', id: 'f', modelValue: null, alphabeticalSort: false},
             attachTo: document.body,
         });
         const root = wrapper.find('.ui-select').element;
@@ -284,7 +284,7 @@ describe('typeahead — the typed string stops growing at 64 characters', () => 
 
     it('a 65th key leaves the 64-character match in place', async () => {
         const wrapper = mount(SingleSelect, {
-            props: {options: LONG, label: 'name', id: 'f', modelValue: null, alphabeticalSort: false},
+            props: {options: LONG, optionLabel: 'name', id: 'f', modelValue: null, alphabeticalSort: false},
             attachTo: document.body,
         });
         const root = wrapper.find('.ui-select');
@@ -302,7 +302,7 @@ describe('typeahead — the typed string stops growing at 64 characters', () => 
                     {id: 1, name: `${shared}🍌`},
                     {id: 2, name: `${shared}🍒`},
                 ],
-                label: 'name',
+                optionLabel: 'name',
                 id: 'f',
                 modelValue: null,
                 alphabeticalSort: false,
@@ -330,7 +330,7 @@ describe('typeahead — a typed key and a label fold the same, whatever follows 
         const wrapper = mount(SingleSelect, {
             props: {
                 options: names.map((name, index) => ({id: index + 1, name})),
-                label: 'name',
+                optionLabel: 'name',
                 id: 'f',
                 modelValue: null,
                 alphabeticalSort: false,
@@ -369,7 +369,7 @@ describe('typeahead — a named key is not a character', () => {
                     {id: 1, name: 'Apple'},
                     {id: 2, name: `${key} here`},
                 ],
-                label: 'name',
+                optionLabel: 'name',
                 id: 'f',
                 modelValue: null,
                 alphabeticalSort: false,
@@ -404,7 +404,7 @@ describe.each(SELECT_ONLY)('$name — a held key that matches nothing folds no l
 describe('typeahead — the labels fold again when the options change', () => {
     it('a label added after mount is found', async () => {
         const wrapper = mount(SingleSelect, {
-            props: {options: FRUITS, label: 'name', id: 'f', modelValue: null, alphabeticalSort: false},
+            props: {options: FRUITS, optionLabel: 'name', id: 'f', modelValue: null, alphabeticalSort: false},
             attachTo: document.body,
         });
         await wrapper.setProps({options: [...FRUITS, {id: 7, name: 'Damson'}]});
