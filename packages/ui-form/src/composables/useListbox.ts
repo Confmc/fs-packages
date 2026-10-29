@@ -409,9 +409,9 @@ export const useListbox = (options: UseListboxOptions) => {
             shift({padding: floatingOptions.shiftPadding ?? 8}),
             // `elements.floating` is the `.ui-menu-anchor` box, not the <ul>. Sizing it to the
             // trigger is what keeps `--ui-menu-min-width: 100%` meaning "as wide as the
-            // trigger" after the teleport — the menu's percentage resolves against this box.
-            // Without it the percentage would measure body (or the dialog), and every menu
-            // would paint viewport-wide. `min-width`, not `width`: styles.css gives the anchor
+            // trigger" in the top layer — the menu's percentage resolves against this box.
+            // Without it the percentage would measure the viewport, and every menu would paint
+            // viewport-wide. `min-width`, not `width`: styles.css gives the anchor
             // `width: max-content` so it still grows when the menu outgrows the trigger.
             size({
                 apply({rects, elements}) {

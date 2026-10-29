@@ -175,8 +175,9 @@ const isMuted = (index: number): boolean => mutedOptions !== undefined && mutedO
 
 const root = useTemplateRef<HTMLElement>('root');
 const reference = useTemplateRef<HTMLElement>('reference');
-// The teleported `.ui-menu-anchor` (null while closed) — floating-ui's floating element, and
-// the box click-outside treats as inside. The <ul> inside it is positioned by nothing.
+// The `.ui-menu-anchor` (null while closed) — floating-ui's floating element, promoted to the
+// top layer in place, so it stays inside `root` and click-outside needs no check of its own.
+// The <ul> inside it is positioned by nothing.
 const floating = useTemplateRef<HTMLElement>('floating');
 
 // Both keyboard (Enter via useListbox) and pointer (OptionList `commit`) funnel through this
