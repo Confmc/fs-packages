@@ -5,9 +5,11 @@ import {defineComponent, h, ref} from 'vue';
 
 import {
     Checkbox,
+    CheckboxGroup,
     DateInput,
     NumberInput,
     PasswordInput,
+    RadioGroup,
     SearchInput,
     Switch,
     Textarea,
@@ -30,6 +32,24 @@ const CONTROLS: [
 ][] = [
     ['TextInput', TextInput, {placeholder: 'Name'}, '', 'input', (element) => (element.value = 'A')],
     ['Checkbox', Checkbox, {label: 'Agree'}, false, 'change', (element) => (element.checked = true)],
+    // A group's own listener sits on the member input, the consumer's on the fieldset: target before
+    // bubble orders them, so this row pins that the group emits within the change, not after it.
+    [
+        'CheckboxGroup',
+        CheckboxGroup,
+        {label: 'Fruit', options: [{id: 1, name: 'Mango'}], optionLabel: 'name'},
+        [],
+        'change',
+        (element) => (element.checked = true),
+    ],
+    [
+        'RadioGroup',
+        RadioGroup,
+        {label: 'Fruit', options: [{id: 1, name: 'Mango'}], optionLabel: 'name'},
+        null,
+        'change',
+        (element) => (element.checked = true),
+    ],
     ['Switch', Switch, {label: 'On'}, false, 'change', (element) => (element.checked = true)],
     ['NumberInput', NumberInput, {placeholder: 'Amount'}, null, 'input', (element) => (element.value = '3')],
     ['DateInput', DateInput, {}, null, 'input', (element) => (element.value = '2026-10-22')],
