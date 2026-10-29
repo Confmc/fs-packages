@@ -24,6 +24,23 @@ const mountGroup = (props: Record<string, unknown>, attrs: Record<string, unknow
     });
 
 describe('CheckboxGroup', () => {
+    it('cancels a click while disabled and holds it back from a capture listener too, and only then', async () => {
+        let heard = 0;
+        const wrapper = mountGroup({disabled: true}, {onClickCapture: () => (heard += 1)});
+        const click = () => {
+            const event = new MouseEvent('click', {bubbles: true, cancelable: true});
+            wrapper.find('.ui-check__label').element.dispatchEvent(event);
+            return event.defaultPrevented;
+        };
+
+        expect(click()).toBe(true);
+        expect(heard).toBe(0);
+        await wrapper.setProps({disabled: false});
+        expect(click()).toBe(false);
+        // the label's click and the activation click it sends to its input
+        expect(heard).toBe(2);
+    });
+
     it('takes its legend from the default slot over label, so the legend can carry more than text', () => {
         const wrapper = mount(CheckboxGroup as any, {
             props: {options: FRUITS, optionLabel: 'name', id: 'fruit', modelValue: [], required: true},
