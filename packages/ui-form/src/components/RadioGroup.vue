@@ -15,7 +15,8 @@
         :aria-describedby="describedby"
     >
         <legend class="ui-label ui-radio-group__legend">
-            {{ label }}<span v-if="required" class="ui-label__req" aria-hidden="true">*</span>
+            <slot>{{ label }}</slot
+            ><span v-if="required" class="ui-label__req" aria-hidden="true">*</span>
         </legend>
         <!-- Native radios sharing one name: the browser provides the roving tabindex and the
              arrow-key selection (never hand-rolled here) — the component only mirrors the
@@ -70,8 +71,8 @@ const {
      * convention — named optionLabel here because `label` is the group legend).
      */
     optionLabel: LabelKey<T>;
-    /** the group legend. */
-    label: string;
+    /** the group legend's text; the default slot overrides it, for a legend that carries more than text. */
+    label?: string;
     /** stable id — on the fieldset, the shared radio `name`, and the member-id base. */
     id: string;
     disabled?: boolean;
