@@ -620,3 +620,38 @@ Nothing in it changes what ui-form reads or sends.
    each merge. Mark a PR ready only after its self-review and green CI.
 2. Build the FormField chain on main (ready to open when #330 merges).
 3. Pressable/Disclosure after #332's merge, as above.
+
+## State at 2026-10-29: prep while the open PRs wait (read this section first)
+
+Nothing merged or reviewed since 10-26; every comment on #330 and #332 is answered. Prep built since, each through
+a separate self-review agent with its fixes in:
+
+| Branch (on `fork`) | Base | What | Opens |
+|---|---|---|---|
+| `ui-form/n-browser-styles` | main | ui-form's browser suite: stylesheet + every rule of the layer header pinned | #340 (draft until CI green) |
+| `ui-form/n-form-field` | #330's branch | FormField: slot hands `field` {id, invalid, describedby} and `aria`; leaves the empty-message check to FormError | after #330 merges (merge main in first) |
+| `ui-form/n-field-hint` | n-form-field | hint slot, `<id>-hint`, read after the message | after FormField |
+| `ui-form/n-field-label-after` | n-form-field | FormLabel `after` slot + FormField `label-after` | after FormField |
+| `ui-form/n-field-aside` | n-form-field | aside slot, `.ui-field__head` row | after FormField |
+
+The three FormField follow-ups are independent of each other (each off n-form-field). A fix on n-form-field is
+merged into all three. The axe harness (renders every control inside FormField) goes into FormField's PR once
+#340 has merged; each follow-up then adds its axe case.
+
+Open design point from the self-review, not changed: FormField knows `required` but neither `field` nor `aria`
+carries it, so a consumer passes `required` to the control as well (types.ts says so). Left out of `field` on
+purpose (a consumer's own control would take it as a native attribute); `aria-required` is not allowed on
+`role="group"`.
+
+### The test bed
+
+The emmie session (`error-keys-raw`) is a test bed: it installs temporary packs and uses them on real forms, it
+does not prep or polish slices. Current pack: `.experiment-packs/script-development-ui-form-landing.1.tgz` from
+`experiment/ui-form-landing` @ 03e5d60 on fork (main + every open PR + FormField; index.ts and the listener-order
+table merged by hand). It wires the rooms form (422 on `workplaces.new_139.name`) and one simple form on a scratch
+branch off its collector, and reports what breaks. Its collector push waits for Marcel.
+
+### Later, when prep runs out
+
+- Compare our test code with the repo's existing tests for conventions (naming, helpers, structure). A mismatch
+  is not wrong, but always worth a look.
