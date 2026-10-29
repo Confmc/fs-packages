@@ -4,9 +4,9 @@
          aria-required is NOT valid on `group` (axe aria-allowed-attr), so the required state
          is conveyed group-level through the legend instead: the family's visual * marker plus
          screen-reader-only text (localisable via requiredLabel), announced when AT enters the
-         fieldset. The disabled guard sits on the fieldset, not only on the inputs: consumer attrs
-         land here, and a pointer on an option's label text reaches them without touching a
-         disabled input. -->
+         fieldset. The disabled guard sits on the fieldset: consumer attrs land here, a pointer on
+         an option's label text reaches them without touching a disabled input, and its capture
+         listener stops a dispatched event before any member's own. -->
     <fieldset
         :id="id"
         v-guard-while-disabled="disabled"

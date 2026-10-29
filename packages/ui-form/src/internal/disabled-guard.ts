@@ -14,7 +14,7 @@ const guard = (event: Event): void => {
 
 /**
  * `v-guard-while-disabled="disabled"`: while the value is true, no `click`/`input`/`change` listener
- * the consumer bound on the component runs — the family rule `Pressable` and `Disclosure` keep.
+ * the consumer bound on the component runs.
  *
  * The browser is no help: Chromium withholds these only for USER interaction. A dispatched `change`
  * or `input` runs every listener on a disabled input, and a dispatched `click` on a disabled checkbox
