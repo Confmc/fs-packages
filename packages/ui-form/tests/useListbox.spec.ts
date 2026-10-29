@@ -356,3 +356,43 @@ describe('useListbox size middleware — the anchor tracks the trigger width', (
         wrapper.unmount();
     });
 });
+
+describe('useListbox without the optional hooks', () => {
+    // SingleSelect passes every hook; the controls that leave one out are not in this package yet,
+    // so what the composable does without each is pinned here.
+    it('closed, a key openKeys rejects opens nothing and is not swallowed', () => {
+        const wrapper = mount(Harness, {props: {overrides: {listLength: () => 3}}});
+
+        const event = key('ArrowUp');
+        api.onKey(event);
+
+        expect(api.open.value).toBe(false);
+        expect(event.defaultPrevented).toBe(false);
+        wrapper.unmount();
+    });
+
+    it('without committedIndex, a closed search starts at the top', () => {
+        const wrapper = mount(Harness, {
+            props: {overrides: {listLength: () => 3, typeaheadLabels: () => ['Banana', 'Blue moon', 'Berry']}},
+        });
+
+        api.onKey(key('b'));
+
+        expect(api.open.value).toBe(true);
+        expect(api.pointer.value).toBe(0);
+        wrapper.unmount();
+    });
+
+    it('without a clear entry, ArrowUp on the first option leaves nothing highlighted', () => {
+        const wrapper = mount(Harness, {props: {overrides: {listLength: () => 3}}});
+
+        api.openList();
+        api.onKey(key('ArrowDown'));
+        expect(api.pointer.value).toBe(0);
+        api.onKey(key('ArrowUp'));
+
+        expect(api.pointer.value).toBe(-1);
+        expect(api.clearHighlighted.value).toBe(false);
+        wrapper.unmount();
+    });
+});

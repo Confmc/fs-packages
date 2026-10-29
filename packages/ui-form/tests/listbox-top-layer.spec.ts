@@ -2,9 +2,6 @@
 import {mount} from '@vue/test-utils';
 import {afterEach, describe, expect, it} from 'vitest';
 
-import Combobox from '../src/components/Combobox.vue';
-import MultiCombobox from '../src/components/MultiCombobox.vue';
-import MultiSelect from '../src/components/MultiSelect.vue';
 import SingleSelect from '../src/components/SingleSelect.vue';
 
 interface Fruit {
@@ -20,9 +17,6 @@ const FRUITS: Fruit[] = [
 
 const FAMILY = [
     {name: 'SingleSelect', component: SingleSelect, menuClass: '.ui-select__menu', modelValue: null},
-    {name: 'Combobox', component: Combobox, menuClass: '.ui-combobox__menu', modelValue: null},
-    {name: 'MultiSelect', component: MultiSelect, menuClass: '.ui-multiselect__menu', modelValue: []},
-    {name: 'MultiCombobox', component: MultiCombobox, menuClass: '.ui-multicombobox__menu', modelValue: []},
 ] as const;
 
 const mountOpen = (

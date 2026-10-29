@@ -5,24 +5,11 @@
 import {mount} from '@vue/test-utils';
 import {afterEach, describe, expect, it, vi} from 'vitest';
 
-import Combobox from '../src/components/Combobox.vue';
-import GroupCombobox from '../src/components/GroupCombobox.vue';
-import GroupSelect from '../src/components/GroupSelect.vue';
-import MultiCombobox from '../src/components/MultiCombobox.vue';
-import MultiSelect from '../src/components/MultiSelect.vue';
 import SingleSelect from '../src/components/SingleSelect.vue';
 
 const OPTIONS = [{id: 1, name: 'Apricot'}];
-const GROUPS = [{text: 'Fruit', options: OPTIONS}];
 
-const FAMILY = [
-    {name: 'SingleSelect', component: SingleSelect, props: {options: OPTIONS, modelValue: null}},
-    {name: 'MultiSelect', component: MultiSelect, props: {options: OPTIONS, modelValue: []}},
-    {name: 'GroupSelect', component: GroupSelect, props: {groups: GROUPS, modelValue: null}},
-    {name: 'Combobox', component: Combobox, props: {options: OPTIONS, modelValue: null}},
-    {name: 'MultiCombobox', component: MultiCombobox, props: {options: OPTIONS, modelValue: []}},
-    {name: 'GroupCombobox', component: GroupCombobox, props: {groups: GROUPS, modelValue: null}},
-] as const;
+const FAMILY = [{name: 'SingleSelect', component: SingleSelect, props: {options: OPTIONS, modelValue: null}}] as const;
 
 afterEach(() => {
     document.body.innerHTML = '';
@@ -30,7 +17,7 @@ afterEach(() => {
 
 describe.each(FAMILY)('$name — attribute fall-through', ({component, props}) => {
     const mountWithAttrs = () =>
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- six generic SFCs through one mount
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFCs through one mount
         mount(component as any, {
             props: {label: 'name', id: 'f', ...props},
             attrs: {
@@ -63,7 +50,7 @@ describe.each(FAMILY)('$name — attribute fall-through', ({component, props}) =
     });
 
     it("a consumer attr never overrides the component's own wiring on the control", () => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- six generic SFCs through one mount
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFCs through one mount
         const wrapper = mount(component as any, {
             props: {label: 'name', id: 'f', ...props},
             attrs: {id: 'hijack', role: 'button'},
@@ -77,7 +64,7 @@ describe.each(FAMILY)('$name — attribute fall-through', ({component, props}) =
     it('a consumer listener passed as an attr fires on the combobox element', () => {
         // `focus` does not bubble: a listener left on the root would never hear it.
         const onFocus = vi.fn();
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- six generic SFCs through one mount
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFCs through one mount
         const wrapper = mount(component as any, {
             props: {label: 'name', id: 'f', ...props},
             attrs: {onFocus},

@@ -4,9 +4,6 @@
 import {mount} from '@vue/test-utils';
 import {afterEach, beforeEach, describe, expect, it, onTestFinished, vi} from 'vitest';
 
-import Combobox from '../src/components/Combobox.vue';
-import GroupSelect from '../src/components/GroupSelect.vue';
-import MultiSelect from '../src/components/MultiSelect.vue';
 import SingleSelect from '../src/components/SingleSelect.vue';
 
 interface Fruit {
@@ -33,33 +30,6 @@ const SELECT_ONLY = [
                 attachTo: document.body,
             }),
         keyTarget: '.ui-select',
-    },
-    {
-        name: 'MultiSelect',
-        mountIt: () =>
-            mount(MultiSelect, {
-                props: {options: FRUITS, label: 'name', id: 'f', modelValue: [] as number[], alphabeticalSort: false},
-                attachTo: document.body,
-            }),
-        keyTarget: '.ui-multiselect__trigger',
-    },
-    {
-        name: 'GroupSelect',
-        mountIt: () =>
-            mount(GroupSelect, {
-                props: {
-                    groups: [
-                        {text: 'A', options: FRUITS.slice(0, 2)},
-                        {text: 'B', options: FRUITS.slice(2, 5)},
-                        {text: 'C', options: FRUITS.slice(5)},
-                    ],
-                    label: 'name',
-                    id: 'f',
-                    modelValue: null,
-                },
-                attachTo: document.body,
-            }),
-        keyTarget: '.ui-groupselect',
     },
 ] as const;
 
@@ -213,21 +183,6 @@ describe.each(SELECT_ONLY)('$name — typeahead', ({mountIt, keyTarget}) => {
     });
 });
 
-describe('Combobox — typeahead belongs to the text input', () => {
-    it('NEGATIVE PIN — typing filters the query and never jumps the highlight', async () => {
-        const wrapper = mount(Combobox, {
-            props: {options: FRUITS, label: 'name', id: 'f', modelValue: null, alphabeticalSort: false},
-            attachTo: document.body,
-        });
-        const input = wrapper.find('input');
-
-        await input.trigger('keydown', {key: 'ArrowDown'});
-        await input.trigger('keydown', {key: 'c'});
-
-        expect(input.attributes('aria-activedescendant')).toBeUndefined();
-    });
-});
-
 describe('typeahead — a search starts after the committed value (native <select> parity)', () => {
     const banana = 3;
 
@@ -242,25 +197,6 @@ describe('typeahead — a search starts after the committed value (native <selec
         expect(wrapper.find('[role="combobox"]').attributes('aria-activedescendant')).toBe('f-opt-3');
     });
 
-    it('GroupSelect with Banana chosen: closed, b moves to Blue moon', async () => {
-        const wrapper = mount(GroupSelect, {
-            props: {
-                groups: [
-                    {text: 'A', options: FRUITS.slice(0, 2)},
-                    {text: 'B', options: FRUITS.slice(2)},
-                ],
-                label: 'name',
-                id: 'f',
-                modelValue: banana,
-            },
-            attachTo: document.body,
-        });
-
-        await wrapper.find('.ui-groupselect').trigger('keydown', {key: 'b'});
-
-        expect(wrapper.find('[role="combobox"]').attributes('aria-activedescendant')).toBe('f-opt-3');
-    });
-
     it('REGRESSION PIN — SingleSelect with Banana chosen: a string still matching it stays on it', async () => {
         const wrapper = mount(SingleSelect, {
             props: {options: FRUITS, label: 'name', id: 'f', modelValue: banana, alphabeticalSort: false},
@@ -270,17 +206,6 @@ describe('typeahead — a search starts after the committed value (native <selec
 
         await root.trigger('keydown', {key: 'b'});
         await root.trigger('keydown', {key: 'a'});
-
-        expect(wrapper.find('[role="combobox"]').attributes('aria-activedescendant')).toBe('f-opt-2');
-    });
-
-    it('PIN — MultiSelect has no single committed value, so a search starts at the top', async () => {
-        const wrapper = mount(MultiSelect, {
-            props: {options: FRUITS, label: 'name', id: 'f', modelValue: [banana], alphabeticalSort: false},
-            attachTo: document.body,
-        });
-
-        await wrapper.find('.ui-multiselect__trigger').trigger('keydown', {key: 'b'});
 
         expect(wrapper.find('[role="combobox"]').attributes('aria-activedescendant')).toBe('f-opt-2');
     });
@@ -330,8 +255,8 @@ describe('typeahead — a held key costs the same on its thousandth repeat as on
     });
 });
 
-describe.each(SELECT_ONLY)('$name — closing through the trigger drops a half-typed string', ({name, mountIt}) => {
-    it(`${name === 'GroupSelect' ? 'REGRESSION PIN — ' : ''}a reopen within the idle window starts a new search`, async () => {
+describe.each(SELECT_ONLY)('$name — closing through the trigger drops a half-typed string', ({mountIt}) => {
+    it('a reopen within the idle window starts a new search', async () => {
         const wrapper = mountIt();
         const trigger = wrapper.find('[role="combobox"]');
 
