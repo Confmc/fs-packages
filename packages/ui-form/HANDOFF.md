@@ -873,6 +873,11 @@ and the release CHANGELOG. ui-inputs (emmie's `^0.17.2`) has the same 26 today: 
 (Amendment 1 § 5 allows fixes); its docs table `docs/packages/ui-inputs.md:482-487` lists the old defaults. Asked Marcel.
 Chromium: the `chromium_headless_shell-1248` alias now points at `-1252` (1247 was cleaned up 2026-11-02).
 
+**2026-11-02 14:42: #330 (FormError) merged**, the first since 10-26. All 14 other open PRs dry-merge cleanly into the
+new main (`git merge-tree`). #332 still shows CHANGES_REQUESTED from 10-26 (fixed the same day, review re-requested
+10-29). Unblocked: `n-form-field` (FormField) can open as the next PR; wait for #354 so it isn't red on the audit step
+from its first run. Its branches (label-after, hint, aside, n-form-kit) already contain #330's head.
+
 **Amendment 2 draft:** `packages/ui-form/AMENDMENT-2.draft.md` on this branch. Not sent; § 1 (placeholder) and § 6
 (app defaults) wait on the reviewer's answers, and the amendment itself waits on his yes. Form/kit rules stay out
 until landing.10 confirms them.
