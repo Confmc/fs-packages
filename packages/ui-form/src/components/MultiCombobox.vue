@@ -316,8 +316,15 @@ const removeLastChip = (): void => {
 // the query it stays native editing. Everything else follows the shared listbox keyboard
 // skeleton. The disabled guard mirrors the composable's own — the native :disabled blocks
 // focus in a real browser, but the guard keeps synthetic dispatch honest too.
+// A key pressed during a composition belongs to the input method: it moves through its candidates
+// with the arrow keys, confirms one with Enter and edits it with Backspace, so the list must not
+// move or commit and no chip may go on them — `query` holds no candidate text until the
+// composition commits, so a Backspace there would read as one on an empty query. The keys inside a
+// composition carry `isComposing`. The keydown that starts one fires before `compositionstart`,
+// so it carries `isComposing: false` and only keyCode 229 marks it.
 const onInputKey = (event: KeyboardEvent): void => {
     if (disabled) return;
+    if (event.isComposing || event.keyCode === 229) return;
     if (event.key === 'Backspace' && query.value === '') {
         removeLastChip();
         return;

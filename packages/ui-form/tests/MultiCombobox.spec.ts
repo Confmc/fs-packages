@@ -533,6 +533,53 @@ describe('MultiCombobox', () => {
             expect(input.attributes('aria-activedescendant')).toBeUndefined();
         });
 
+        it.each([
+            ['isComposing', {isComposing: true}],
+            ['keyCode 229', {keyCode: 229}],
+        ])('commits no highlighted option on an Enter flagged by %s', async (_, flag) => {
+            const wrapper = mountMultiCombobox({});
+            const input = wrapper.find('input');
+
+            await input.trigger('keydown', {key: 'ArrowDown'}); // open
+            await input.trigger('keydown', {key: 'ArrowDown'}); // → Apricot
+            input.element.dispatchEvent(
+                new KeyboardEvent('keydown', {key: 'Enter', bubbles: true, cancelable: true, ...flag}),
+            );
+            await wrapper.vm.$nextTick();
+
+            expect(wrapper.emitted('update:modelValue')).toBeUndefined();
+            expect(input.attributes('aria-activedescendant')).toBe('fruit-opt-0');
+        });
+
+        // The keys inside a composition carry `isComposing`; the keydown that starts one fires before
+        // `compositionstart` and carries only keyCode 229. An IME moves through its candidates with
+        // the arrow keys, confirms one with Enter and edits it with Backspace, so none may reach the
+        // list or the chips.
+        it.each([
+            ['isComposing', {isComposing: true}],
+            ['keyCode 229', {keyCode: 229}],
+        ])('leaves ArrowDown, Enter and Backspace flagged by %s to the input method', async (_, flag) => {
+            const wrapper = mountMultiCombobox({modelValue: [2]});
+            const input = wrapper.find('input');
+            const press = (key: string): void => {
+                input.element.dispatchEvent(
+                    new KeyboardEvent('keydown', {key, bubbles: true, cancelable: true, ...flag}),
+                );
+            };
+
+            await input.trigger('keydown', {key: 'ArrowDown'}); // open
+            input.element.dispatchEvent(new CompositionEvent('compositionstart', {bubbles: true}));
+            compose(input.element, 'か');
+            press('ArrowDown');
+            press('Enter');
+            press('Backspace');
+            await wrapper.vm.$nextTick();
+
+            expect(input.attributes('aria-activedescendant')).toBeUndefined();
+            expect(wrapper.emitted('update:modelValue')).toBeUndefined();
+            expect(menu(wrapper).exists()).toBe(true);
+        });
+
         it('keeps the candidate text in the field across a re-render while composing', async () => {
             const wrapper = mountMultiCombobox({});
             const field = wrapper.find('input').element;
