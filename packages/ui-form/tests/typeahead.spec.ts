@@ -4,6 +4,7 @@
 import {mount} from '@vue/test-utils';
 import {afterEach, beforeEach, describe, expect, it, onTestFinished, vi} from 'vitest';
 
+import MultiSelect from '../src/components/MultiSelect.vue';
 import SingleSelect from '../src/components/SingleSelect.vue';
 
 interface Fruit {
@@ -30,6 +31,21 @@ const SELECT_ONLY = [
                 attachTo: document.body,
             }),
         keyTarget: '.ui-select',
+    },
+    {
+        name: 'MultiSelect',
+        mountIt: () =>
+            mount(MultiSelect, {
+                props: {
+                    options: FRUITS,
+                    optionLabel: 'name',
+                    id: 'f',
+                    modelValue: [] as number[],
+                    alphabeticalSort: false,
+                },
+                attachTo: document.body,
+            }),
+        keyTarget: '.ui-multiselect__trigger',
     },
 ] as const;
 
@@ -220,6 +236,17 @@ describe('typeahead — a search starts after the committed value (native <selec
 
         await root.trigger('keydown', {key: 'b'});
         await root.trigger('keydown', {key: 'a'});
+
+        expect(wrapper.find('[role="combobox"]').attributes('aria-activedescendant')).toBe('f-opt-2');
+    });
+
+    it('PIN — MultiSelect has no single committed value, so a search starts at the top', async () => {
+        const wrapper = mount(MultiSelect, {
+            props: {options: FRUITS, optionLabel: 'name', id: 'f', modelValue: [banana], alphabeticalSort: false},
+            attachTo: document.body,
+        });
+
+        await wrapper.find('.ui-multiselect__trigger').trigger('keydown', {key: 'b'});
 
         expect(wrapper.find('[role="combobox"]').attributes('aria-activedescendant')).toBe('f-opt-2');
     });
