@@ -854,6 +854,15 @@ out with `clear-label=""`); `placeholder` optional again (the reviewer's "mag we
 Marcel is asking him). Pre-forms emmie counts: ~100 selects sorted by default, 17 opt-outs; TimeInput clearable unless
 `notNullable` (17), SearchInput always (14), selects opt-in (14); ~30 inputs without a placeholder.
 
+**Token scope fix (shape review #1):** `ui-form/n-token-scope` on fork, on #340's branch (`n-browser-styles`; opens
+after #340). The 26 derived tokens are no longer declared on `:root` (comments there now); each use is
+`var(--ui-x, var(--ui-base))`, so a base set on one area reaches focus/invalid/check/chip/switch. Browser tests: the
+scoped base reaching control and check, a consumer's own derived token still winning, nothing frozen on `:root`, and
+every use matching its comment. Breaking only for an app that READS a derived token (now unset): say so in the PR body
+and the release CHANGELOG. ui-inputs (emmie's `^0.17.2`) has the same 26 today: a 0.17.x patch would fix emmie now
+(Amendment 1 § 5 allows fixes); its docs table `docs/packages/ui-inputs.md:482-487` lists the old defaults. Asked Marcel.
+Chromium: the `chromium_headless_shell-1248` alias now points at `-1252` (1247 was cleaned up 2026-11-02).
+
 **Held until #354 merges** (a push now reruns CI and the audit step reds a green PR), on fork as `hold/*`:
 `hold/344-boolean-id` @5107dd3 = #344 + `SelectItem.id: string | number | boolean` (spec: true/false/null round-trip);
 `hold/333-spec-type` @771edc0 = #333 + the spec helper typing fix (vue-tsc on `validation-errors.spec.ts:12`). After
