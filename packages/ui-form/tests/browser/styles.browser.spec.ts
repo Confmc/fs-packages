@@ -1108,6 +1108,31 @@ describe('styles.css — a base token set on one area reaches the tokens derived
         expect(getComputedStyle(other).backgroundColor).toBe('rgb(9, 9, 9)');
     });
 
+    it('a scoped base reaches the check family too: an unchecked box takes the area background', () => {
+        addStyle(uiCss);
+        const box = addCheck();
+        (box.closest('.ui-check') as HTMLElement).style.setProperty('--ui-control-bg', 'rgb(1, 2, 3)');
+
+        expect(getComputedStyle(box).backgroundColor).toBe('rgb(1, 2, 3)');
+    });
+
+    it('uses every derived token with exactly the fallback its :root comment names', () => {
+        const pairs = [
+            ...uiCss.matchAll(/\/\* (--ui-[\w-]+): unset; where it is used it falls back to (--ui-[\w-]+)\. \*\//g),
+        ];
+        const rules = uiCss.slice(uiCss.indexOf('@layer ui-form'));
+
+        expect(pairs).toHaveLength(26);
+        for (const [, derived, base] of pairs) {
+            const uses = [...rules.matchAll(new RegExp(`var\\(${derived}(?![\\w-])[^)]*\\)?\\)?`, 'g'))].map(
+                ([use]) => use,
+            );
+
+            expect(uses.length, derived).toBeGreaterThan(0);
+            for (const use of uses) expect(use, derived).toBe(`var(${derived}, var(${base}))`);
+        }
+    });
+
     it('declares no token on :root as another token: each one would freeze to the root value', () => {
         const rootBlock = uiCss.slice(uiCss.indexOf(':where(:root)'), uiCss.indexOf('@layer ui-form'));
         const derived = rootBlock.match(/--ui-[\w-]+:\s*var\(--ui-[\w-]+\)/g) ?? [];
