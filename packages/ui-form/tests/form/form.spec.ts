@@ -721,6 +721,25 @@ describe('client refusals share the bag', () => {
         expect(shown(wrapper)).toEqual([]);
     });
 
+    it('keeps every standing refusal when it refuses another field', async () => {
+        const {form, wrapper} = mountRows(['name', 'url']);
+
+        form.refuse('name', 'Vul een naam in');
+        form.refuse('url', 'Ongeldige url');
+        await nextTick();
+
+        expect(shown(wrapper)).toEqual(['Vul een naam in', 'Ongeldige url']);
+    });
+
+    it('assigns nothing on clearErrors when the form refused nothing itself', () => {
+        const {form} = mountRows(['name']);
+        const empty = form.clientErrors.value;
+
+        form.clearErrors();
+
+        expect(form.clientErrors.value).toBe(empty);
+    });
+
     it('withdraws per field, and clears all client refusals at once', async () => {
         const {form, wrapper} = mountRows(['name', 'url', 'kvkNumber']);
 
