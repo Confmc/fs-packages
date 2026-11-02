@@ -77,6 +77,8 @@
 </template>
 
 <script setup lang="ts" generic="T extends SelectItem">
+import type {Placement} from '@floating-ui/vue';
+
 import {computed, ref, useTemplateRef, watch} from 'vue';
 
 import type {LabelKey, SelectItem} from '../types';
@@ -104,6 +106,7 @@ const {
     mutedOptions,
     clearLabel,
     emptyDisplayValue,
+    placement,
 } = defineProps<{
     /** caller-ordered groups, each with options and a display header. */
     groups: {options: T[]; text: string; header?: boolean}[];
@@ -129,6 +132,12 @@ const {
     clearLabel?: string;
     /** what the input renders when the model is null — a NAMED empty state instead of `''`. */
     emptyDisplayValue?: string;
+    /**
+     * where the list opens against the input (default `'bottom-start'`). With no room it flips to the
+     * opposite side at the same alignment (`bottom-start` → `top-start`), never to the other
+     * alignment. Read once.
+     */
+    placement?: Placement;
 }>();
 
 defineSlots<{
@@ -250,6 +259,7 @@ const {
     onOutside: () => dismiss(),
     clearEntry: () => clearLabel !== undefined,
     onClearCommit: commitClear,
+    floatingOptions: {placement},
 });
 
 // The input text is local, but it must still track the committed label when it changes from

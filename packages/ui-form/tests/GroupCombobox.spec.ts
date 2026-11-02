@@ -1,10 +1,17 @@
 // @vitest-environment happy-dom
+import {useFloating} from '@floating-ui/vue';
 import {mount} from '@vue/test-utils';
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {h} from 'vue';
 
 import GroupCombobox from '../src/components/GroupCombobox.vue';
 import {menu} from './find-menu';
+
+// The real floating-ui, spied on so the placement case can read what GroupCombobox hands it.
+vi.mock('@floating-ui/vue', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('@floating-ui/vue')>();
+    return {...actual, useFloating: vi.fn(actual.useFloating)};
+});
 
 interface Fruit {
     id: number;
@@ -601,5 +608,17 @@ describe('GroupCombobox', () => {
 
             expect(field.value).toBe('か');
         });
+    });
+});
+
+describe('GroupCombobox placement', () => {
+    it.each([
+        [undefined, 'bottom-start'],
+        ['top', 'top'],
+    ] as const)('hands floating-ui placement %s as %s', (placement, expected) => {
+        const wrapper = mountGroupCombobox(placement === undefined ? {} : {placement});
+
+        expect(vi.mocked(useFloating).mock.calls.at(-1)?.[2]).toMatchObject({placement: expected});
+        wrapper.unmount();
     });
 });
