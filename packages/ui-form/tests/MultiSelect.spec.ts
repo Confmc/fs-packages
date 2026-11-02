@@ -1,10 +1,17 @@
 // @vitest-environment happy-dom
+import {useFloating} from '@floating-ui/vue';
 import {mount} from '@vue/test-utils';
-import {afterEach, describe, expect, it} from 'vitest';
+import {afterEach, describe, expect, it, vi} from 'vitest';
 import {h} from 'vue';
 
 import MultiSelect from '../src/components/MultiSelect.vue';
 import {menu} from './find-menu';
+
+// The real floating-ui, spied on so the placement case can read what MultiSelect hands it.
+vi.mock('@floating-ui/vue', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('@floating-ui/vue')>();
+    return {...actual, useFloating: vi.fn(actual.useFloating)};
+});
 
 interface Fruit {
     id: number;
@@ -454,6 +461,18 @@ describe('MultiSelect model order', () => {
         await menu(wrapper).findAll('li[role="option"]')[1].trigger('click');
 
         expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[1, 3]]);
+        wrapper.unmount();
+    });
+});
+
+describe('MultiSelect placement', () => {
+    it.each([
+        [undefined, 'bottom-start'],
+        ['top', 'top'],
+    ] as const)('hands floating-ui placement %s as %s', (placement, expected) => {
+        const wrapper = mountMulti(placement === undefined ? {} : {placement});
+
+        expect(vi.mocked(useFloating).mock.calls.at(-1)?.[2]).toMatchObject({placement: expected});
         wrapper.unmount();
     });
 });

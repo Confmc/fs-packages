@@ -107,6 +107,8 @@
 </template>
 
 <script setup lang="ts" generic="T extends SelectItem">
+import type {Placement} from '@floating-ui/vue';
+
 import {computed, useTemplateRef} from 'vue';
 
 import type {GroupRow} from '../internal/group-rows';
@@ -133,6 +135,7 @@ const {
     optionsLabel = 'Options',
     removeLabel = 'Remove',
     mutedOptions,
+    placement,
 } = defineProps<{
     options: T[];
     /** property name or getter for an option's display string. */
@@ -157,6 +160,8 @@ const {
     removeLabel?: string;
     /** ids rendered visually muted (`.is-muted`) — still committable, still in the keyboard path. */
     mutedOptions?: T['id'][];
+    /** where the list opens against the box (default `'bottom-start'`; it still flips when there is no room). Read once. */
+    placement?: Placement;
 }>();
 
 defineSlots<{
@@ -250,6 +255,7 @@ const {open, pointer, listboxId, optionId, activeDescendant, floatingStyles, onK
     onDismiss: () => close(),
     onOutside: () => close(),
     typeaheadLabels: () => optionLabels.value,
+    floatingOptions: {placement},
 });
 
 /** Per-chip remove — drops one committed id; never touches `open`. */
