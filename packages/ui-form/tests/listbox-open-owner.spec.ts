@@ -20,7 +20,7 @@ const DIRECT_OPEN_WRITE = /\bopen\.value\s*=(?!=)/u;
 describe('listbox open state has one owner', () => {
     it('found the listbox components it is meant to scan', () => {
         // Without this the guard passes over an empty list — a clean report from a scan that never ran.
-        expect(LISTBOX_HOSTS.map(({name}) => name).sort()).toEqual(['SingleSelect.vue']);
+        expect(LISTBOX_HOSTS.map(({name}) => name).sort()).toEqual(['MultiSelect.vue', 'SingleSelect.vue']);
     });
 
     it('no component writes open.value directly', () => {
