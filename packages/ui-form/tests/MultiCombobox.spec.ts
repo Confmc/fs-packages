@@ -21,7 +21,7 @@ const FRUITS: Fruit[] = [
 const mountMultiCombobox = (props: Record<string, unknown>, slots?: Record<string, unknown>) =>
     mount(MultiCombobox as any, {
         // Sorted on purpose: the cases below index the sorted order (the default is caller order).
-        props: {options: FRUITS, label: 'name', id: 'fruit', modelValue: [], alphabeticalSort: true, ...props},
+        props: {options: FRUITS, optionLabel: 'name', id: 'fruit', modelValue: [], alphabeticalSort: true, ...props},
         slots,
         attachTo: document.body,
     });
@@ -314,7 +314,7 @@ describe('MultiCombobox', () => {
         ];
         const wrapper = mountMultiCombobox({
             options: tags,
-            label: (tag: Tag) => tag.title.toUpperCase(),
+            optionLabel: (tag: Tag) => tag.title.toUpperCase(),
             modelValue: ['a'],
             alphabeticalSort: false,
         });

@@ -126,7 +126,7 @@ defineOptions({inheritAttrs: false});
 
 const {
     options,
-    label,
+    optionLabel,
     id,
     placeholder = 'Select…',
     disabled = false,
@@ -141,7 +141,7 @@ const {
 } = defineProps<{
     options: T[];
     /** property name or getter for an option's display string. */
-    label: LabelKey<T>;
+    optionLabel: LabelKey<T>;
     /** stable id — required so the input can pair with a label/error. */
     id: string;
     /** shown only while nothing is committed — chips replace it, like MultiSelect. */
@@ -176,11 +176,11 @@ defineSlots<{
 /** The committed membership: an array of option ids, in selection order. */
 const model = defineModel<T['id'][]>({required: true});
 
-/** Resolve an option's display string from the `label` prop (property name or getter). */
+/** Resolve an option's display string from the `optionLabel` prop (property name or getter). */
 const labelOf = (option: T): string =>
-    typeof label === 'function'
-        ? label(option)
-        : String((option as Record<PropertyKey, unknown>)[label as PropertyKey]);
+    typeof optionLabel === 'function'
+        ? optionLabel(option)
+        : String((option as Record<PropertyKey, unknown>)[optionLabel as PropertyKey]);
 
 // The input's text is LOCAL filter state — never a mirror of any committed label (there is
 // no single one). It rests empty, follows the user's typing while open, and clears on every
