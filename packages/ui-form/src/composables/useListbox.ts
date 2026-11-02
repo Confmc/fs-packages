@@ -44,19 +44,20 @@ export interface UseListboxOptions {
     disabled: () => boolean;
     /**
      * length of the currently-rendered option list (SingleSelect's and MultiSelect's `sorted`,
-     * GroupSelect's flattened groups, Combobox's filtered list).
+     * GroupSelect's flattened groups, Combobox's and MultiCombobox's filtered list).
      */
     listLength: () => number;
     /**
      * whether a key pressed while CLOSED should open the list (SingleSelect, MultiSelect and
-     * GroupSelect: Enter/ArrowDown/Space; Combobox: ArrowDown).
+     * GroupSelect: Enter/ArrowDown/Space; Combobox and MultiCombobox: ArrowDown).
      */
     openKeys: (key: string) => boolean;
     /**
      * Commit the option at `index`; returns whether a commit actually happened, which is what
      * decides whether Enter is `preventDefault`-ed. The callback owns the read-through-a-local
      * race guard (the array read) AND the close decision — the composable NEVER closes on commit,
-     * so MultiSelect's callback can toggle membership and stay open while SingleSelect's closes.
+     * so MultiSelect's and MultiCombobox's callbacks can toggle membership and stay open while
+     * SingleSelect's closes.
      */
     onCommit: (index: number) => boolean;
     /** dismiss the list (Escape / Tab). The selects close; a combobox may revert its text first. */
@@ -106,11 +107,11 @@ const fold = (text: string): string => Array.from(text, (character) => character
 
 /**
  * The behavioural core shared by every ui-form listbox control (SingleSelect, MultiSelect,
- * GroupSelect and Combobox). Entirely position/index-based, so the
- * option type `T` never crosses this boundary: the caller owns the derived list and hands back
- * only its length and index-keyed callbacks. Owns `open`/`pointer`, the position-keyed IDREFs,
- * `aria-activedescendant`, the clamp watcher, click-outside, floating-ui, and the keyboard-nav
- * skeleton.
+ * GroupSelect, Combobox and MultiCombobox; the optional hooks serve the selects that pick many or
+ * filter). Entirely position/index-based, so the option type `T` never crosses this boundary: the
+ * caller owns the derived list and hands back only its length and index-keyed callbacks. Owns
+ * `open`/`pointer`, the position-keyed IDREFs, `aria-activedescendant`, the clamp watcher,
+ * click-outside, floating-ui, and the keyboard-nav skeleton.
  */
 export const useListbox = (options: UseListboxOptions) => {
     const {
@@ -160,7 +161,7 @@ export const useListbox = (options: UseListboxOptions) => {
     // Owned here so a future consumer cannot forget the `-1` — a stale pointer would resurface
     // as a phantom highlight (and a phantom aria-activedescendant) on the next open. The
     // composable still never calls this on commit: closing after a commit stays the caller's
-    // decision (`onCommit` — MultiSelect toggles and stays open).
+    // decision (`onCommit` — MultiSelect and MultiCombobox toggle and stay open).
     let typed = '';
     // The first key, folded. Not `typed[0]`: a fold can be two code units (İ → i̇).
     let first = '';
@@ -336,8 +337,8 @@ export const useListbox = (options: UseListboxOptions) => {
                 // editable comboboxes (they trade away caret jumps while the popup is open);
                 // the family takes the option-jump reading uniformly — one skeleton for every
                 // control. The option-jump reading belongs to UNMODIFIED keys only:
-                // Shift/Ctrl/Meta variants are text-SELECTION shortcuts on Combobox's query
-                // field and must fall through to native editing (#185 review).
+                // Shift/Ctrl/Meta variants are text-SELECTION shortcuts on the query field of
+                // Combobox and MultiCombobox and must fall through to native editing (#185 review).
                 if (event.shiftKey || event.ctrlKey || event.metaKey) return;
                 // A clear-entry highlight drops (the jump lands on an OPTION); an empty list
                 // leaves the highlight untouched, but the unmodified key is still swallowed
@@ -370,7 +371,7 @@ export const useListbox = (options: UseListboxOptions) => {
     // `composedPath()`, never `event.target`: at a DOCUMENT listener a click inside a shadow
     // root is retargeted to the shadow HOST, which is an ancestor of `root` rather than a
     // descendant, so `root.contains(target)` rejects it and every option click would read as
-    // outside — MultiSelect would close instead of toggling. The composed
+    // outside — MultiSelect and MultiCombobox would close instead of toggling. The composed
     // path carries the true chain across shadow boundaries. The popup needs no separate check:
     // it is promoted to the top layer IN PLACE, so it never leaves `root`.
     const onDocumentPointer = (event: MouseEvent) => {

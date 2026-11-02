@@ -7,6 +7,7 @@ import {afterEach, describe, expect, it, vi} from 'vitest';
 
 import Combobox from '../src/components/Combobox.vue';
 import GroupSelect from '../src/components/GroupSelect.vue';
+import MultiCombobox from '../src/components/MultiCombobox.vue';
 import MultiSelect from '../src/components/MultiSelect.vue';
 import SingleSelect from '../src/components/SingleSelect.vue';
 
@@ -19,6 +20,7 @@ const FAMILY = [
     {name: 'MultiSelect', component: MultiSelect, props: {options: OPTIONS, modelValue: []}},
     {name: 'Combobox', component: Combobox, props: {options: OPTIONS, modelValue: null}},
     {name: 'GroupSelect', component: GroupSelect, props: {groups: GROUPS, modelValue: null}},
+    {name: 'MultiCombobox', component: MultiCombobox, props: {options: OPTIONS, modelValue: []}},
 ] as const;
 
 afterEach(() => {

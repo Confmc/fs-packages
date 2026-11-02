@@ -6,6 +6,7 @@ import {afterEach, describe, expect, it} from 'vitest';
 
 import Combobox from '../src/components/Combobox.vue';
 import GroupSelect from '../src/components/GroupSelect.vue';
+import MultiCombobox from '../src/components/MultiCombobox.vue';
 import MultiSelect from '../src/components/MultiSelect.vue';
 import SingleSelect from '../src/components/SingleSelect.vue';
 
@@ -24,6 +25,7 @@ const SORTABLE = [
         opener: '.ui-multiselect__trigger',
     },
     {name: 'Combobox', component: Combobox, props: {options: CALLER_ORDER, modelValue: null}, opener: 'input'},
+    {name: 'MultiCombobox', component: MultiCombobox, props: {options: CALLER_ORDER, modelValue: []}, opener: 'input'},
     {
         name: 'GroupSelect',
         component: GroupSelect,

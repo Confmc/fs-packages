@@ -23,6 +23,7 @@ describe('listbox open state has one owner', () => {
         expect(LISTBOX_HOSTS.map(({name}) => name).sort()).toEqual([
             'Combobox.vue',
             'GroupSelect.vue',
+            'MultiCombobox.vue',
             'MultiSelect.vue',
             'SingleSelect.vue',
         ]);

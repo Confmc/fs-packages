@@ -1,0 +1,369 @@
+<template>
+    <div ref="root" v-bind="rootAttrs($attrs)" class="ui-multicombobox">
+        <div
+            ref="box"
+            class="ui-control ui-multicombobox__box"
+            :class="{'is-open': open, 'has-value': chips.length > 0, 'is-invalid': invalid, 'is-disabled': disabled}"
+        >
+            <!-- Chips render the committed values around the input (the APG editor-combobox
+                 layout, stolen from our own MultiSelect). Removing must not open the menu:
+                 structurally guaranteed — only the input opens, and a chip click never
+                 reaches it. -->
+            <span v-for="chip in chips" :key="String(chip.id)" class="ui-multicombobox__chip">
+                {{ labelOf(chip) }}
+                <button
+                    type="button"
+                    class="ui-multicombobox__chip-remove"
+                    :disabled="disabled"
+                    :aria-label="`${removeLabel} ${labelOf(chip)}`"
+                    @click="remove(chip.id)"
+                >
+                    <svg class="ui-multicombobox__chip-x" viewBox="0 0 20 20" aria-hidden="true">
+                        <path d="M6 6l8 8M14 6l-8 8" fill="none" stroke="currentColor" stroke-width="2" />
+                    </svg>
+                </button>
+            </span>
+
+            <!-- The INPUT is the trigger (kendo's searchable choreography; the APG-canonical
+                 combobox — an in-popup search input has an awkward focus/activedescendant
+                 story). It flexes over all remaining space, so clicking the empty part of
+                 the chip bar is clicking the input. Keyboard listens HERE (not on the root,
+                 like MultiSelect): the chip-remove buttons are focusable children of the
+                 root, and Enter on one must remove the chip — never leak into the listbox
+                 skeleton. Its resting state is EMPTY + placeholder: there is no single
+                 committed label to snap to, so Combobox's commit-snaps-query→label and
+                 closed-state label re-sync are deliberately NOT ported. -->
+            <input
+                v-model="query"
+                @input="onInput"
+                @click="onOpen"
+                @focus="onOpen"
+                @keydown="onInputKey"
+                v-bind="controlAttrs($attrs)"
+                :id="id"
+                ref="input"
+                type="text"
+                class="ui-multicombobox__input"
+                role="combobox"
+                aria-autocomplete="list"
+                aria-haspopup="listbox"
+                :aria-expanded="open"
+                :aria-required="required || undefined"
+                :aria-invalid="invalid || undefined"
+                :aria-describedby="describedbyWithSelection"
+                :aria-controls="open ? listboxId : undefined"
+                :aria-activedescendant="activeDescendant"
+                :placeholder="chips.length ? undefined : placeholder"
+                :disabled="disabled"
+            />
+        </div>
+
+        <!-- The input's accessible VALUE is the query, and the chips render outside it — so
+             the committed selection is additionally conveyed through aria-describedby (the
+             input-as-trigger analogue of MultiSelect's visually-hidden sr-value span). -->
+        <span :id="selectionId" class="ui-multicombobox__sr-selection">{{ selectedSummary }}</span>
+
+        <!-- WR-0521: the empty state must be ANNOUNCED, not just painted — a persistent,
+             visually-hidden live region (mounted for the component's whole lifetime, so
+             the emptyText lands as a content CHANGE, the reliable live-region path).
+             Matters most here, where typing can drain the filtered list. -->
+        <span class="ui-live-region" role="status" aria-live="polite">{{
+            open && optionLabels.length === 0 ? emptyText : ''
+        }}</span>
+
+        <!-- KD-1136. The anchor is promoted to the TOP LAYER in place (Popover API) — it is
+             never moved in the DOM, so no ancestor's overflow can clip it and no stacking
+             context can bury it, while scoped `--ui-*` maps still reach it. floating-ui
+             positions the ANCHOR, not the <ul>: the size() middleware sizes it to the
+             trigger, so the menu's `min-width: 100%` measures the trigger. -->
+        <div v-if="open" ref="floating" popover="manual" class="ui-menu-anchor" :style="floatingStyles">
+            <OptionList
+                variant="ui-multicombobox"
+                multiselectable
+                :rows="rows"
+                :keys="optionKeys"
+                :pointer="pointer"
+                :listbox-id="listboxId"
+                :option-id="optionId"
+                :is-selected="isSelected"
+                :is-muted="isMuted"
+                :options-label="optionsLabel"
+                :empty-text="emptyText"
+                @hover="pointer = $event"
+                @commit="commit"
+            >
+                <!-- Re-scope OptionList's index into the typed per-option payload; the fallback
+                     (the plain labelOf text) keeps slotless consumers byte-identical. -->
+                <template #option="{index}">
+                    <slot
+                        name="option"
+                        :option="filtered[index]"
+                        :index="index"
+                        :selected="isSelected(index)"
+                        :active="pointer === index"
+                    >
+                        {{ optionLabels[index] }}
+                    </slot>
+                </template>
+            </OptionList>
+        </div>
+    </div>
+</template>
+
+<script setup lang="ts" generic="T extends SelectItem">
+import type {Placement} from '@floating-ui/vue';
+
+import {computed, ref, useTemplateRef} from 'vue';
+
+import type {GroupRow} from '../internal/group-rows';
+import type {LabelKey, SelectItem} from '../types';
+
+import {useListbox} from '../composables/useListbox';
+import {ensureRefValueExists} from '../internal/reactivity';
+import {controlAttrs, rootAttrs} from '../internal/split-attrs';
+import OptionList from './OptionList.vue';
+
+// `class`/`style` → root, every other attr → the combobox element (see split-attrs).
+defineOptions({inheritAttrs: false});
+
+const {
+    options,
+    optionLabel,
+    id,
+    placeholder = 'Select…',
+    disabled = false,
+    alphabeticalSort = false,
+    required = false,
+    invalid = false,
+    describedby,
+    emptyText = 'No options',
+    optionsLabel = 'Options',
+    removeLabel = 'Remove',
+    mutedOptions,
+    placement,
+} = defineProps<{
+    options: T[];
+    /** property name or getter for an option's display string. */
+    optionLabel: LabelKey<T>;
+    /** stable id — required so the input can pair with a label/error. */
+    id: string;
+    /** shown only while no chip shows — chips replace it, so an id whose option has not loaded yet leaves it up. */
+    placeholder?: string;
+    disabled?: boolean;
+    /** sort the rendered options by display string — off by default, so the caller's order is kept. */
+    alphabeticalSort?: boolean;
+    /** conveys the required state to assistive tech via `aria-required`. */
+    required?: boolean;
+    invalid?: boolean;
+    describedby?: string;
+    emptyText?: string;
+    /** accessible name for the listbox popup (`aria-label`). */
+    optionsLabel?: string;
+    /**
+     * verb prefixed to a chip's remove-button accessible name (`"${removeLabel} ${option text}"`) —
+     * a prop, not a literal, so a consumer can localise it; the default is English.
+     */
+    removeLabel?: string;
+    /** ids rendered visually muted (`.is-muted`) — still committable, still in the keyboard path. */
+    mutedOptions?: T['id'][];
+    /**
+     * where the list opens against the box (default `'bottom-start'`). With no room it flips to the
+     * opposite side at the same alignment (`bottom-start` → `top-start`), never to the other
+     * alignment. Read once.
+     */
+    placement?: Placement;
+}>();
+
+defineSlots<{
+    /**
+     * Per-option content (swatches, icons, rich labels). Highlight/selection chrome stays
+     * on the option row, outside the slot. Fallback: the plain display string.
+     */
+    option?: (props: {option: T; index: number; selected: boolean; active: boolean}) => unknown;
+}>();
+
+/**
+ * The committed membership: an array of option ids. Its order is the consumer's: an add appends and a
+ * remove drops in place, so nothing the control shows depends on it.
+ */
+const model = defineModel<T['id'][]>({required: true});
+
+/** Resolve an option's display string from the `optionLabel` prop (property name or getter). */
+const labelOf = (option: T): string =>
+    typeof optionLabel === 'function'
+        ? optionLabel(option)
+        : String((option as Record<PropertyKey, unknown>)[optionLabel as PropertyKey]);
+
+// The input's text is LOCAL filter state — never a mirror of any committed label (there is
+// no single one). It rests empty, follows the user's typing while open, and clears on every
+// toggle-commit so the full list is re-offered.
+const query = ref('');
+
+// The options in display order: the same optional alphabetical pass the siblings apply.
+const sorted = computed(() =>
+    alphabeticalSort ? [...options].sort((a, b) => labelOf(a).localeCompare(labelOf(b))) : options,
+);
+
+// The visible list = the display order filtered by the trimmed, case-folded query (empty
+// query ⇒ all). Both aria-activedescendant and Enter index into THIS filtered list, not the
+// raw `options`.
+const filtered = computed(() => {
+    const needle = query.value.trim().toLowerCase();
+    return needle ? sorted.value.filter((option) => labelOf(option).toLowerCase().includes(needle)) : sorted.value;
+});
+
+// The chip bar renders the committed options in display order, whatever order the model arrived
+// in, so a pick never moves the chips already there; the query narrows the list, never the chips.
+// An id whose option has not arrived yet (the async-options edit-form window) has no label to
+// show — it stays in the model but renders no chip until its option loads.
+const chips = computed(() => sorted.value.filter((option) => model.value.includes(option.id)));
+
+/** The committed labels, in display order — the aria-describedby selection surface. */
+const selectedSummary = computed(() => chips.value.map(labelOf).join(', '));
+const selectionId = computed(() => `${id}-selection`);
+const describedbyWithSelection = computed(() =>
+    describedby ? `${describedby} ${selectionId.value}` : selectionId.value,
+);
+
+// The index-based view OptionList renders — parallel arrays derived from `filtered`, which
+// stays the single list every index (pointer, commit, aria) is keyed against.
+const optionLabels = computed(() => filtered.value.map(labelOf));
+const optionKeys = computed(() => filtered.value.map((option) => String(option.id)));
+// A flat control renders one headerless run — an all-option row sequence OptionList lays out
+// flat (no group wrappers), the same component a grouped select feeds a header/option mix.
+const rows = computed<GroupRow[]>(() => filtered.value.map((_, index) => ({type: 'option', index})));
+/** `aria-selected` marks committed MEMBERSHIP — the pointer is conveyed by aria-activedescendant. */
+const isSelected = (index: number): boolean => model.value.includes(filtered.value[index].id);
+/** `.is-muted` marks visual de-emphasis only — a muted option stays committable. */
+const isMuted = (index: number): boolean =>
+    mutedOptions !== undefined && mutedOptions.includes(filtered.value[index].id);
+
+const root = useTemplateRef<HTMLElement>('root');
+// The BOX (the whole visual control) is the floating-ui reference — after a few chips the
+// input can be a sliver on the last flex line, and anchoring the popup to that sliver would
+// misplace it. The input stays the ARIA combobox and the focus/imperative-handle target.
+const box = useTemplateRef<HTMLElement>('box');
+const input = useTemplateRef<HTMLInputElement>('input');
+// The `.ui-menu-anchor` (null while closed) — floating-ui's floating element, promoted to the
+// top layer in place, so it stays inside `root` and click-outside needs no check of its own.
+// The <ul> inside it is positioned by nothing.
+const floating = useTemplateRef<HTMLElement>('floating');
+
+/** Toggle an id's membership — add when absent, drop when present. Always emits a fresh array. */
+const toggleValue = (value: T['id']): void => {
+    model.value = model.value.includes(value)
+        ? model.value.filter((member) => member !== value)
+        : [...model.value, value];
+};
+
+// Both keyboard (Enter via useListbox) and pointer (OptionList `commit`) funnel through this
+// one guard. Toggle-in-place: a commit flips membership and the menu STAYS OPEN. The
+// multi-combobox choreography on top (kendo's searchable mode): the query clears so the
+// full list is re-offered, and DOM focus returns to the input (a pointer commit lands on a
+// non-focusable <li> and would otherwise drop focus to the body). The highlight resets only
+// when clearing the query actually changed the list — an unfiltered keyboard walk keeps its
+// position, so Enter can toggle neighbouring options without restarting from the top.
+// Read through a local rather than indexing blind: the clamp watcher normally keeps
+// `pointer` in range, but a keypress landing between a filter change and the watcher flush
+// would otherwise index off the end.
+const commit = (index: number): boolean => {
+    const highlighted = filtered.value[index];
+    if (!highlighted) return false;
+    toggleValue(highlighted.id);
+    if (query.value !== '') {
+        query.value = '';
+        resetHighlight();
+    }
+    ensureRefValueExists(input).focus();
+    return true;
+};
+
+const {open, pointer, listboxId, optionId, activeDescendant, floatingStyles, onKey, openList, close, resetHighlight} =
+    useListbox({
+        root,
+        reference: box,
+        floating,
+        id: () => id,
+        disabled: () => disabled,
+        listLength: () => filtered.value.length,
+        // Only ArrowDown opens a closed list — a printable key must fall through to the input so
+        // it can filter (Combobox parity); focus, click, and typing are the other open paths.
+        openKeys: (key) => key === 'ArrowDown',
+        onCommit: commit,
+        onDismiss: () => dismiss(),
+        onOutside: () => dismiss(),
+        floatingOptions: {placement},
+    });
+
+// Close-without-commit (Escape, Tab, click outside): the query clears back to the resting
+// empty state — a half-typed filter never lingers, and there is no committed label to revert to.
+const dismiss = (): void => {
+    query.value = '';
+    close();
+};
+
+// Per-chip remove — drops one committed id. Removal unmounts the focused remove button,
+// which would drop document.activeElement to the body — refocus the input (the APG chip
+// treatment; same move `commit()` makes for the pointer path). The refocus must not TOGGLE
+// the list, though: focus() fires the input's open-on-focus handler synchronously, so the
+// prior open-state is restored before Vue paints (chip remove ≠ open, and removing while
+// the list is open must not close it either).
+const remove = (value: T['id']): void => {
+    model.value = model.value.filter((member) => member !== value);
+    const wasOpen = open.value;
+    ensureRefValueExists(input).focus();
+    if (!wasOpen) close();
+};
+/**
+ * Backspace with an EMPTY query removes the LAST CHIP — the last one shown, never the model's tail,
+ * which can be an id with no chip yet. No-op when no chip shows.
+ */
+const removeLastChip = (): void => {
+    const last = chips.value.at(-1);
+    if (last) remove(last.id);
+};
+
+// Backspace with an empty query is the chip-removing analogue of deleting text; with text in
+// the query it stays native editing. Everything else follows the shared listbox keyboard
+// skeleton. The disabled guard mirrors the composable's own — the native :disabled blocks
+// focus in a real browser, but the guard keeps synthetic dispatch honest too.
+// A key pressed during a composition belongs to the input method: it moves through its candidates
+// with the arrow keys, confirms one with Enter and edits it with Backspace, so the list must not
+// move or commit and no chip may go on them — `query` holds no candidate text until the
+// composition commits, so a Backspace there would read as one on an empty query. The keys inside a
+// composition carry `isComposing`. The keydown that starts one fires before `compositionstart`,
+// so it carries `isComposing: false` and only keyCode 229 marks it.
+const onInputKey = (event: KeyboardEvent): void => {
+    if (disabled) return;
+    if (event.isComposing || event.keyCode === 229) return;
+    if (event.key === 'Backspace' && query.value === '') {
+        removeLastChip();
+        return;
+    }
+    onKey(event);
+};
+
+// Typing filters and opens. `v-model` writes `query` (its listener runs before this one), and
+// skips the `input` events an IME sends while composing, writing the committed text on
+// `compositionend`, so a candidate never filters the list. Every keystroke resets the highlight
+// (nothing is pre-selected — Enter with no highlight is a no-op), a composing one too, so the
+// Enter that confirms a candidate commits no option. Opening waits for the committed text, so a
+// composition started on a closed list opens it on what the IME commits. A blur commits a
+// composition too, with the plain `input` v-model sends on `compositionend` — after focus has
+// left, so the list stays shut then. The input's own root answers for focus, so a control inside a
+// shadow root reads it there.
+const onInput = (event: Event) => {
+    resetHighlight();
+    const field = event.target as HTMLInputElement;
+    const focused = (field.getRootNode() as Document | ShadowRoot).activeElement === field;
+    if (focused && !(event as InputEvent).isComposing) openList();
+};
+// Focusing or clicking the (enabled) input opens the list (kendo's searchable choreography —
+// focus is managed into the input, and the list is its context). A disabled input never
+// dispatches either event.
+const onOpen = openList;
+
+// The one sanctioned defineExpose: a PUBLIC imperative handle (Combobox parity).
+// The input is non-null by lifetime; the loud accessor names the assumption if it ever breaks.
+defineExpose({focus: () => ensureRefValueExists(input).focus()});
+</script>

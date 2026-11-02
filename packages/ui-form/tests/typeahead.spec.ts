@@ -6,6 +6,7 @@ import {afterEach, beforeEach, describe, expect, it, onTestFinished, vi} from 'v
 
 import Combobox from '../src/components/Combobox.vue';
 import GroupSelect from '../src/components/GroupSelect.vue';
+import MultiCombobox from '../src/components/MultiCombobox.vue';
 import MultiSelect from '../src/components/MultiSelect.vue';
 import SingleSelect from '../src/components/SingleSelect.vue';
 
@@ -233,10 +234,14 @@ describe.each(SELECT_ONLY)('$name — typeahead', ({mountIt, keyTarget}) => {
     });
 });
 
-describe('Combobox — typeahead belongs to the text input', () => {
+describe.each([
+    {name: 'Combobox', component: Combobox, modelValue: null},
+    {name: 'MultiCombobox', component: MultiCombobox, modelValue: []},
+] as const)('$name — typeahead belongs to the text input', ({component, modelValue}) => {
     it('NEGATIVE PIN — typing filters the query and never jumps the highlight', async () => {
-        const wrapper = mount(Combobox, {
-            props: {options: FRUITS, optionLabel: 'name', id: 'f', modelValue: null, alphabeticalSort: false},
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFCs through one mount
+        const wrapper = mount(component as any, {
+            props: {options: FRUITS, optionLabel: 'name', id: 'f', modelValue, alphabeticalSort: false},
             attachTo: document.body,
         });
         const input = wrapper.find('input');
