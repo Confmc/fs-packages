@@ -1,7 +1,9 @@
 // @vitest-environment happy-dom
+import type {Component} from 'vue';
+
 import {enableAutoUnmount, mount} from '@vue/test-utils';
 import {afterEach, describe, expect, it, vi} from 'vitest';
-import {defineComponent, h, nextTick, ref} from 'vue';
+import {defineComponent, h, mergeProps, nextTick, ref} from 'vue';
 
 import type {FieldBinding, UseDraftForm} from '../../src';
 
@@ -112,20 +114,26 @@ describe('form-bound controls', () => {
         expect(scope).toEqual({id, invalid: true, describedby: `${id}-error`});
     });
 
-    it("leaves a bound FormField's control its own v-model: the draft is not written", async () => {
+    it("leaves a bound FormField's control its own v-model: a proxy is written, the draft is not", async () => {
         const own = ref<string | null>(null);
+        // mergeProps, as a template merges `v-bind="field"` with a `v-model`: a listener in `field` would run too
         const {wrapper, draft} = mountWith(({FormField}) =>
             h(
                 FormField,
                 {name: 'name', label: 'Gemeente'},
                 {
                     default: ({field}: {field: FieldBinding}) =>
-                        h(TextInput, {
-                            ...field,
-                            placeholder: 'Vul in',
-                            modelValue: own.value,
-                            'onUpdate:modelValue': (next: string | null) => (own.value = next),
-                        }),
+                        h(
+                            TextInput as Component,
+                            mergeProps(
+                                {...field},
+                                {
+                                    placeholder: 'Vul in',
+                                    modelValue: own.value,
+                                    'onUpdate:modelValue': (next: string | null) => (own.value = next),
+                                },
+                            ),
+                        ),
                 },
             ),
         );
