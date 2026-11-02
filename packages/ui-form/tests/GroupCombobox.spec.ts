@@ -83,7 +83,7 @@ describe('GroupCombobox', () => {
         expect(options.map((o) => o.text())).toEqual(['Mango', 'Kiwi', 'Apricot', 'Lime']);
     });
 
-    it('filter narrows within groups; empty group is hidden; empty query shows all', async () => {
+    it('narrows each group as the user types, hides a group with no match, and shows all on an empty query', async () => {
         const wrapper = mountGroupCombobox({});
         const input = wrapper.find('input');
 
@@ -177,7 +177,7 @@ describe('GroupCombobox', () => {
         expect(wrapper.find('input').element.value).toBe('Kiwi');
     });
 
-    it('browse-to-change (WR-0576): opening with committed label shows the FULL list', async () => {
+    it('opens with the FULL list when the input holds the committed label (WR-0576)', async () => {
         const wrapper = mountGroupCombobox({modelValue: 1}); // Mango
         const input = wrapper.find('input');
         expect(input.element.value).toBe('Mango');
@@ -187,7 +187,7 @@ describe('GroupCombobox', () => {
         expect(menu(wrapper).findAll('.ui-groupcombobox__option')).toHaveLength(4);
     });
 
-    it('filter engages on divergence from the committed label', async () => {
+    it('engages the filter once the query diverges from the committed label', async () => {
         const wrapper = mountGroupCombobox({modelValue: 1}); // Mango
         await wrapper.find('input').trigger('click');
         await typeInto(wrapper.find('input'), 'Ki'); // diverged
@@ -199,7 +199,7 @@ describe('GroupCombobox', () => {
         ).toEqual(['Kiwi']);
     });
 
-    it('Escape reverts a half-typed query to the committed label', async () => {
+    it('reverts a half-typed query to the committed label on Escape', async () => {
         const wrapper = mountGroupCombobox({modelValue: 3}); // Apricot
         const input = wrapper.find('input');
 
@@ -212,7 +212,7 @@ describe('GroupCombobox', () => {
         expect(input.element.value).toBe('Apricot');
     });
 
-    it('click-outside reverts a half-typed query', async () => {
+    it('reverts a half-typed query on a click outside', async () => {
         const wrapper = mountGroupCombobox({});
         const input = wrapper.find('input');
 
@@ -226,7 +226,7 @@ describe('GroupCombobox', () => {
         expect(input.element.value).toBe('');
     });
 
-    it('select-all-on-open when input holds the committed label (WR-0576)', async () => {
+    it('selects the input text when the popup opens holding the committed label (WR-0576)', async () => {
         const wrapper = mountGroupCombobox({modelValue: 1}); // Mango
         const input = wrapper.find('input');
 
@@ -244,7 +244,7 @@ describe('GroupCombobox', () => {
         expect(select).not.toHaveBeenCalled();
     });
 
-    it('ArrowDown/Enter keyboard commit', async () => {
+    it('commits the option ArrowDown highlights on Enter', async () => {
         const wrapper = mountGroupCombobox({});
         const input = wrapper.find('input');
 
@@ -269,7 +269,7 @@ describe('GroupCombobox', () => {
         expect(menu(wrapper).exists()).toBe(true);
     });
 
-    it('clearLabel: ArrowDown lands on clear entry; Enter commits null; input snaps to ""', async () => {
+    it('commits null from the clear entry on Enter and empties the input', async () => {
         const wrapper = mountGroupCombobox({clearLabel: 'None', modelValue: 1});
         const input = wrapper.find('input');
 
@@ -293,7 +293,7 @@ describe('GroupCombobox', () => {
         expect(input.element.value).toBe('Any fruit'); // …reverts to the named empty state
     });
 
-    it('clearLabel + emptyDisplayValue: Enter commits null and snaps the input to the named empty state', async () => {
+    it('commits null from the clear entry and snaps the input to emptyDisplayValue', async () => {
         const wrapper = mountGroupCombobox({clearLabel: 'None', emptyDisplayValue: 'Any fruit', modelValue: 1});
         const input = wrapper.find('input');
         expect(input.element.value).toBe('Mango');
@@ -318,7 +318,7 @@ describe('GroupCombobox', () => {
         expect(menu(wrapper).findAll('.ui-groupcombobox__option')).toHaveLength(4);
     });
 
-    it('aria-activedescendant tracks pointer through filtered options, not headers', async () => {
+    it('points aria-activedescendant at the highlighted filtered option, never at a header', async () => {
         const wrapper = mountGroupCombobox({});
         const input = wrapper.find('input');
 
@@ -338,7 +338,7 @@ describe('GroupCombobox', () => {
         expect(headerIds.every((id) => id === undefined)).toBe(true);
     });
 
-    it('aria-selected marks the committed option across the full filtered list', async () => {
+    it('marks the committed option aria-selected', async () => {
         const wrapper = mountGroupCombobox({modelValue: 3}); // Apricot
         await wrapper.find('input').trigger('click');
 
@@ -390,13 +390,13 @@ describe('GroupCombobox', () => {
         expect(input.attributes('aria-describedby')).toBe('fruit-error');
     });
 
-    it('omits aria-required/aria-invalid when the flags are false (the `|| undefined` branch)', () => {
+    it('omits aria-required and aria-invalid when the flags are false', () => {
         const input = mountGroupCombobox({}).find('input');
         expect(input.attributes('aria-required')).toBeUndefined();
         expect(input.attributes('aria-invalid')).toBeUndefined();
     });
 
-    it('re-syncs input to committed label when model changes from outside while idle', async () => {
+    it('re-syncs the input to the committed label when the model changes from outside while idle', async () => {
         const wrapper = mountGroupCombobox({});
         expect(wrapper.find('input').element.value).toBe('');
 
@@ -404,7 +404,7 @@ describe('GroupCombobox', () => {
         expect(wrapper.find('input').element.value).toBe('Lime');
     });
 
-    it("shows label once a pre-set model's option arrives asynchronously (edit-form pattern)", async () => {
+    it("shows the committed label once a pre-set model's option arrives asynchronously (edit-form pattern)", async () => {
         const wrapper = mountGroupCombobox({modelValue: 1, groups: []});
         expect(wrapper.find('input').element.value).toBe('');
 
@@ -419,10 +419,11 @@ describe('GroupCombobox', () => {
         expect(wrapper.find('input').element.value).toBe('');
     });
 
-    it('removes its document listener on unmount — no throw on post-unmount click', async () => {
+    it('removes its document listener on unmount', async () => {
         const wrapper = mountGroupCombobox({});
         await wrapper.find('input').trigger('click');
         wrapper.unmount();
+        // Exercises onBeforeUnmount cleanup — a stray document click must not throw.
         document.body.dispatchEvent(new MouseEvent('click', {bubbles: true}));
     });
 
@@ -433,7 +434,7 @@ describe('GroupCombobox', () => {
         expect(menu(wrapper).findAll('.ui-groupcombobox__option')).toHaveLength(0);
     });
 
-    it('hovering an option moves the pointer to it (aria-activedescendant updates)', async () => {
+    it('moves the highlight to a hovered option', async () => {
         const wrapper = mountGroupCombobox({});
         await wrapper.find('input').trigger('click');
 
