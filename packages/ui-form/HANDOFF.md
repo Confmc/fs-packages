@@ -716,6 +716,7 @@ A lockfile-only fix (follow-redirects 1.16.2, qs 6.17.1) is committed on local b
 | Branch (on `fork`) | Base | What | Opens |
 |---|---|---|---|
 | `ui-form/n-single-select` | main | SingleSelect + the listbox core; two review rounds in; keydown on the trigger; Stryker 96.46 | #353, draft until the audit fix is in and CI is green |
+| `ui-form/n-combobox` | n-single-select | Combobox (searchable single): `v-model` query (an IME candidate filters nothing), keys of a composition left to the input method, no opening after a blur commit, `placement`; Stryker 96.76 | after #353 merges |
 | `ui-form/n-multi-select` | n-single-select | MultiSelect: chips in display order (as pre-forms emmie), the model keeps the consumer's order, `placement` (a given placement flips to the opposite side); Stryker 98.09 | after #353 merges |
 
 Tested on emmie (landing.9): SingleSelect on DebtorForm, ContactModal (clear entry), SchedulePlanDrawer (top layer,
@@ -744,6 +745,11 @@ no clipping), disabled. Selects ignore `SelectItem.disabled` (pre-forms emmie's 
 - **Order:** settings → finances → registrations → schedule → user → admin → client portal → user/client (77 files)
   last; a page tree per slice, controls + form logic + specs together; emmie's own controls and fs-form deleted at
   the end, then ui-inputs.
+- **SearchableSelect → Combobox:** emmie showed its search box only above 3 options (a plain button below that), so
+  its 2–3 option uses become SingleSelect, not Combobox; Combobox reverts to the committed label on every dismiss
+  (emmie kept a stale search); the `noResult` slot becomes `emptyText`; emmie always sorted (pass
+  `alphabetical-sort`).
+- **Placement** keeps its alignment when it flips (`bottom-start` → `top-start`), on every select.
 - **Blockers:** no date picker (DatePickerField 72 uses, the biggest gap); Combobox/MultiCombobox (SearchableSelect,
   `searchable`); GroupSelect/GroupCombobox; BooleanRadioGroup (RadioGroup over two options, or its own control: to
   decide); the form kit for the 146 `useForm` files (not yet in any pack: the biggest unknown).
