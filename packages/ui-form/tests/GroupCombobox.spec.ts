@@ -117,6 +117,50 @@ describe('GroupCombobox', () => {
         expect(menu(wrapper).findAll('.ui-groupcombobox__option')).toHaveLength(4);
     });
 
+    it.each([
+        [{}, ['Mango', 'Kiwi', 'Apricot', 'Lime']],
+        [{alphabeticalSort: true}, ['Kiwi', 'Mango', 'Apricot', 'Lime']],
+    ])('with %o, keeps the groups in caller order and lists %s', async (props, options) => {
+        const wrapper = mountGroupCombobox(props);
+        await wrapper.find('input').trigger('click');
+
+        const headers = menu(wrapper).findAll('.ui-groupcombobox__group-header');
+        expect(headers.map((header) => header.text())).toEqual(['Tropical', 'Stone']);
+        expect(
+            menu(wrapper)
+                .findAll('.ui-groupcombobox__option')
+                .map((option) => option.text()),
+        ).toEqual(options);
+    });
+
+    it('commits by the order it shows when alphabeticalSort is set', async () => {
+        const wrapper = mountGroupCombobox({alphabeticalSort: true});
+        const input = wrapper.find('input');
+
+        await input.trigger('keydown', {key: 'ArrowDown'}); // open
+        await input.trigger('keydown', {key: 'ArrowDown'}); // → index 0 (Kiwi)
+        await input.trigger('keydown', {key: 'Enter'});
+
+        expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([2]); // Kiwi
+    });
+
+    it.each([false, true])(
+        'renders a sparse options array without throwing — holes emit no phantom rows (alphabeticalSort %s)',
+        async (alphabeticalSort) => {
+            // The flattened options (`flatMap`) and `buildGroupRows` (`forEach`) both skip array
+            // HOLES, so a hole contributes no row on either side. With no query the group's options
+            // pass through unfiltered, holes and all; the sort copies them without filling the holes,
+            // so it keeps that true.
+            const sparse: Fruit[] = [{id: 3, name: 'Papaya'}];
+            sparse[2] = {id: 1, name: 'Mango'}; // index 1 is a hole
+            const wrapper = mountGroupCombobox({groups: [{options: sparse, text: 'Tropical'}], alphabeticalSort});
+            await wrapper.find('input').trigger('click');
+
+            // Two real options, no row for the hole, and no render throw.
+            expect(menu(wrapper).findAll('.ui-groupcombobox__option')).toHaveLength(2);
+        },
+    );
+
     it('commits on click, emits update:modelValue, closes, and snaps input to label', async () => {
         const wrapper = mountGroupCombobox({});
         await wrapper.find('input').trigger('click');

@@ -98,6 +98,7 @@ const {
     id,
     placeholder = 'Select…',
     disabled = false,
+    alphabeticalSort = false,
     required = false,
     invalid = false,
     describedby,
@@ -116,6 +117,11 @@ const {
     id: string;
     placeholder?: string;
     disabled?: boolean;
+    /**
+     * sort each group's options by display string — off by default, so the caller's order is kept.
+     * The groups always keep the caller's order.
+     */
+    alphabeticalSort?: boolean;
     /** conveys the required state to assistive tech via `aria-required`. */
     required?: boolean;
     invalid?: boolean;
@@ -169,6 +175,12 @@ const selectedLabel = computed(() => (selected.value ? labelOf(selected.value) :
 // lingers.
 const query = ref(selectedLabel.value);
 
+// The groups as shown: caller-ordered, each group's options filtered by the trimmed, case-folded
+// query (empty query ⇒ all), then sorted by display string when `alphabeticalSort` is set. A group
+// the filter empties is dropped. `slice()` copies an unfiltered group's options with its holes
+// still holes, so the hole-skipping `flatMap` and `buildGroupRows` keep agreeing; a spread would
+// fill them.
+//
 // WR-0576 (browse-to-change): a query EQUAL to the committed rendering does NOT filter. The
 // query rests on that rendering, so without this rule opening a FILLED combobox narrowed the
 // list to the already-chosen option and forced a manual clear to browse elsewhere.
@@ -176,12 +188,17 @@ const filteredData = computed(() => {
     const engaged = query.value !== selectedLabel.value;
     const needle = engaged ? query.value.trim().toLowerCase() : '';
     return groups
-        .map((group) => ({
-            ...group,
-            options: needle
+        .map((group) => {
+            const matched = needle
                 ? group.options.filter((option) => labelOf(option).toLowerCase().includes(needle))
-                : group.options,
-        }))
+                : group.options;
+            return {
+                ...group,
+                options: alphabeticalSort
+                    ? matched.slice().sort((a, b) => labelOf(a).localeCompare(labelOf(b)))
+                    : matched,
+            };
+        })
         .filter((group) => group.options.length > 0);
 });
 
