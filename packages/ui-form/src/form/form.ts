@@ -69,17 +69,17 @@ const useFormBody = <T extends string = string>(
     const withdraw = (...fields: T[]): void => {
         const {errors} = validation;
         const named = (key: string) => fields.some((field) => key === field || key.startsWith(`${field}.`));
-        const said = (Object.keys(errors.value) as T[]).filter(named);
-        const refused = (Object.keys(client.value) as T[]).filter(named);
+        const serverSaid = (Object.keys(errors.value) as T[]).filter(named);
+        const clientSaid = (Object.keys(client.value) as T[]).filter(named);
 
-        if (said.length) {
+        if (serverSaid.length) {
             const next = {...errors.value};
-            for (const field of said) delete next[field];
+            for (const field of serverSaid) delete next[field];
             errors.value = next;
         }
-        if (refused.length) {
+        if (clientSaid.length) {
             const next = {...client.value};
-            for (const field of refused) delete next[field];
+            for (const field of clientSaid) delete next[field];
             client.value = next;
         }
     };
