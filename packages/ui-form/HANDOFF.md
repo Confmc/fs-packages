@@ -790,11 +790,14 @@ CODEOWNERS requests the team automatically when a PR leaves draft).
   `flip({fallbackPlacements, flipAlignment: false})`), own listeners (incl. keydown) on the control before the
   consumer's attrs, IME-safe comboboxes (v-model query, composition keys skip the listbox, no open after a blur).
 
-**In progress at day end:** slice 3 (typed paths + draft) on local branch `ui-form/n-form-paths` off `n-use-form`, worktree
-`scratchpad/s2-paths`, being ported by an agent (no fs-form original; source = the experiment's `path.ts`/`draft.ts`).
-If it isn't on fork yet, check that worktree; push it, review it like the others.
+**Slice 3 ported, not yet reviewed:** `ui-form/n-form-paths` @8429c66 on fork (off `n-use-form`): `Path`/`PathValue`,
+`PathsFor`/`PathsOf`, `useForm({draft})` typing names (runtime use of the draft comes with `field()` in slice 4),
+`FormDraft<T>`; type tests in `tests/types` via `tsconfig.types.json` (added to the package `typecheck` script);
+a generic draft now errors at first use instead of silently typing names as `any`; `readPath`/`writePath` wait for
+slice 4. **Next step: its independent review.** Follow-up on #333: `tests/form/validation-errors.spec.ts:12` fails
+vue-tsc (CI doesn't type-check specs).
 
-**Next, in order:** form chain slice 3 (typed paths + draft), 4 (`field()` with bound
+**Next, in order:** slice 3's review; 4 (`field()` with bound
 FormLabel/FormError; `scrollToError` default true with id lookup), 5 (the kit + `createUiForm({texts})`), each off the
 previous, source = `experiment/ui-form-control`'s `src/form/` (built 10-19). Then a generic DatePicker (first shape:
 emmie's `DatePickerField` + `calendar/` grid under the package's rules; emmie's domain pickers stay emmie's). Then
