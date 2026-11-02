@@ -42,9 +42,9 @@ export interface UseListboxOptions {
     id: () => string;
     /** whether the control is disabled — the keyboard path guards on it, as a getter so it stays live. */
     disabled: () => boolean;
-    /** length of the currently-rendered option list (SingleSelect's `sorted`, GroupSelect's flattened groups, Combobox's filtered list). */
+    /** length of the currently-rendered option list (SingleSelect's `sorted`, GroupSelect's flattened groups, Combobox's filtered list, GroupCombobox's flattened filtered groups). */
     listLength: () => number;
-    /** whether a key pressed while CLOSED should open the list (SingleSelect and GroupSelect: Enter/ArrowDown/Space; Combobox: ArrowDown). */
+    /** whether a key pressed while CLOSED should open the list (SingleSelect and GroupSelect: Enter/ArrowDown/Space; Combobox and GroupCombobox: ArrowDown). */
     openKeys: (key: string) => boolean;
     /**
      * Commit the option at `index`; returns whether a commit actually happened, which is what
@@ -61,10 +61,9 @@ export interface UseListboxOptions {
     floatingOptions?: ListboxFloatingOptions;
     /**
      * Whether a committing CLEAR ENTRY currently renders above the option list (the
-     * `clearLabel` feature on SingleSelect, GroupSelect and Combobox). The entry lives OUTSIDE the
-     * index space — indexes keep mapping to the caller's option list — and gets its own keyboard
-     * slot between "nothing highlighted" and index 0, plus its own activedescendant id
-     * (`${id}-clear`). A getter so it tracks the prop reactively.
+     * `clearLabel` feature on every select here). The entry lives OUTSIDE the index space —
+     * indexes keep mapping to the caller's option list — and gets its own keyboard slot between
+     * "nothing highlighted" and index 0, plus its own activedescendant id (`${id}-clear`). A getter so it tracks the prop reactively.
      */
     clearEntry?: () => boolean;
     /** Commit the clear entry; returns whether a commit happened (decides preventDefault). */
@@ -99,10 +98,10 @@ const TYPEAHEAD_MAX_LENGTH = 64;
 const fold = (text: string): string => Array.from(text, (character) => character.toLocaleLowerCase()).join('');
 
 /**
- * The behavioural core shared by every ui-form listbox control (SingleSelect, GroupSelect and
- * Combobox; the optional hooks serve selects that filter or pick many). Entirely
- * position/index-based, so the option type `T` never crosses this boundary: the caller owns the
- * derived list and hands back only its length and index-keyed callbacks. Owns `open`/`pointer`,
+ * The behavioural core shared by every ui-form listbox control (SingleSelect, GroupSelect,
+ * Combobox and GroupCombobox; the optional hooks serve selects that filter or pick many).
+ * Entirely position/index-based, so the option type `T` never crosses this boundary: the caller
+ * owns the derived list and hands back only its length and index-keyed callbacks. Owns `open`/`pointer`,
  * the position-keyed IDREFs, `aria-activedescendant`, the clamp watcher, click-outside,
  * floating-ui, and the keyboard-nav skeleton.
  */
@@ -330,8 +329,9 @@ export const useListbox = (options: UseListboxOptions) => {
                 // editable comboboxes (they trade away caret jumps while the popup is open);
                 // the family takes the option-jump reading uniformly — one skeleton for every
                 // control. The option-jump reading belongs to UNMODIFIED keys only:
-                // Shift/Ctrl/Meta variants are text-SELECTION shortcuts on Combobox's query
-                // field and must fall through to native editing (#185 review).
+                // Shift/Ctrl/Meta variants are text-SELECTION shortcuts on the query field of
+                // Combobox and GroupCombobox, and must fall through to native editing (#185
+                // review).
                 if (event.shiftKey || event.ctrlKey || event.metaKey) return;
                 // A clear-entry highlight drops (the jump lands on an OPTION); an empty list
                 // leaves the highlight untouched, but the unmodified key is still swallowed

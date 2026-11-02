@@ -8,12 +8,12 @@ import type {UseListboxOptions} from '../src/composables/useListbox';
 
 import {useListbox} from '../src/composables/useListbox';
 
-// The component suites (SingleSelect's, GroupSelect's and Combobox's) exercise the composable's
-// behaviour against the REAL floating-ui. This suite pins the things they cannot see: the exact
-// layout policy handed to floating-ui (the family defaults, and the `floatingOptions`
-// overrides), the hide()-middleware visibility gate (driven off a controlled `middlewareData`),
-// and the clear-entry option combinations no component produces (a rendered entry without a
-// commit callback). Middleware factories return opaque objects, so each is mocked to a marker
+// The component suites (SingleSelect's, GroupSelect's, Combobox's and GroupCombobox's) exercise
+// the composable's behaviour against the REAL floating-ui. This suite pins the things they cannot
+// see: the exact layout policy handed to floating-ui (the family defaults, and the
+// `floatingOptions` overrides), the hide()-middleware visibility gate (driven off a controlled
+// `middlewareData`), and the clear-entry option combinations no component produces (a rendered
+// entry without a commit callback). Middleware factories return opaque objects, so each is mocked to a marker
 // recording its args (vi.mock is hoisted above the imports, so the top-level import gets the
 // mock too).
 const floatingMock = vi.hoisted(() => ({
@@ -387,9 +387,10 @@ describe('useListbox size middleware — the anchor tracks the trigger width', (
 });
 
 describe('useListbox without the optional hooks', () => {
-    // SingleSelect and GroupSelect pass every hook and Combobox all but typeaheadLabels and
-    // committedIndex; no control here passes typeahead labels without committedIndex or leaves out
-    // the clear-entry hooks, so what the composable does without each is pinned here.
+    // SingleSelect and GroupSelect pass every hook, and Combobox and GroupCombobox all but
+    // typeaheadLabels and committedIndex; no control here passes typeahead labels without
+    // committedIndex or leaves out the clear-entry hooks, so what the composable does without each
+    // is pinned here.
     it('closed, a key openKeys rejects opens nothing and is not swallowed', () => {
         const wrapper = mount(Harness, {props: {overrides: {listLength: () => 3}}});
 

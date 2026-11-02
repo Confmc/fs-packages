@@ -209,8 +209,9 @@ const filteredOptions = computed(() => filteredData.value.flatMap((g) => g.optio
 const optionKeys = computed(() => filteredOptions.value.map((option) => String(option.id)));
 
 // The mixed header/boundary/option row sequence over the filtered groups — same single-site
-// `buildGroupRows` encoding GroupSelect uses (filteredData has already dropped empty groups,
-// so its empty-group guard is a no-op here).
+// `buildGroupRows` encoding GroupSelect uses. filteredData drops a group the filter empties; a
+// group of holes alone still reaches buildGroupRows, whose empty-group guard emits nothing for
+// it.
 const filteredRows = computed(() => buildGroupRows(filteredData.value));
 
 /** `aria-selected` marks the COMMITTED value — OptionList only asks about rendered indices. */
@@ -222,7 +223,9 @@ const isMuted = (index: number): boolean =>
 const root = useTemplateRef<HTMLElement>('root');
 // The input is both the floating-ui reference and the target of the imperative focus handle.
 const input = useTemplateRef<HTMLInputElement>('input');
-// The teleported `.ui-menu-anchor` (null while closed) — floating-ui's floating element.
+// The `.ui-menu-anchor` (null while closed) — floating-ui's floating element, promoted to the
+// top layer in place, so it stays inside `root` and click-outside needs no check of its own.
+// The <ul> inside it is positioned by nothing.
 const floating = useTemplateRef<HTMLElement>('floating');
 
 // Both keyboard (Enter via useListbox) and pointer (OptionList `commit`) funnel through
@@ -238,8 +241,9 @@ const commit = (index: number): boolean => {
     return true;
 };
 
-// The clear entry commits null — the input snaps to '' through the same `selectedLabel` read
-// every other close path uses. Always a real commit, so always `true`.
+// The clear entry commits null — the input snaps to the committed-null rendering
+// (`emptyDisplayValue`, or blank) through the same `selectedLabel` read every other close path
+// uses. Always a real commit, so always `true`.
 const commitClear = (): boolean => {
     model.value = null;
     query.value = selectedLabel.value;
