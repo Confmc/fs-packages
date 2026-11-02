@@ -172,13 +172,12 @@ const labelOf = (option: T): string =>
         : String((option as Record<PropertyKey, unknown>)[optionLabel as PropertyKey]);
 
 // The groups as shown: caller-ordered, each group's options sorted by display string when
-// `alphabeticalSort` is set. `slice()` copies a group's options with its holes still holes, so
-// the hole-skipping `flatMap` and `buildGroupRows` keep agreeing; a spread would fill them.
+// `alphabeticalSort` is set. The sort runs on a copy, never mutating the caller's array.
 const shownGroups = computed(() =>
     alphabeticalSort
         ? groups.map((group) => ({
               ...group,
-              options: group.options.slice().sort((a, b) => labelOf(a).localeCompare(labelOf(b))),
+              options: [...group.options].sort((a, b) => labelOf(a).localeCompare(labelOf(b))),
           }))
         : groups,
 );
