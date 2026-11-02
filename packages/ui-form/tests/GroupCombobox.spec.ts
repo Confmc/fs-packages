@@ -142,13 +142,12 @@ describe('GroupCombobox', () => {
     it('Escape reverts a half-typed query to the committed label', async () => {
         const wrapper = mountGroupCombobox({modelValue: 3}); // Apricot
         const input = wrapper.find('input');
-        const root = wrapper.find('.ui-groupcombobox');
 
         await input.trigger('click');
         await input.setValue('zzz');
         expect(input.element.value).toBe('zzz');
 
-        await root.trigger('keydown', {key: 'Escape'});
+        await input.trigger('keydown', {key: 'Escape'});
         expect(menu(wrapper).exists()).toBe(false);
         expect(input.element.value).toBe('Apricot');
     });
@@ -187,12 +186,12 @@ describe('GroupCombobox', () => {
 
     it('ArrowDown/Enter keyboard commit', async () => {
         const wrapper = mountGroupCombobox({});
-        const root = wrapper.find('.ui-groupcombobox');
+        const input = wrapper.find('input');
 
-        await root.trigger('keydown', {key: 'ArrowDown'}); // open, pointer -1
-        await root.trigger('keydown', {key: 'ArrowDown'}); // → 0 (Mango)
-        await root.trigger('keydown', {key: 'ArrowDown'}); // → 1 (Kiwi)
-        await root.trigger('keydown', {key: 'Enter'});
+        await input.trigger('keydown', {key: 'ArrowDown'}); // open, pointer -1
+        await input.trigger('keydown', {key: 'ArrowDown'}); // → 0 (Mango)
+        await input.trigger('keydown', {key: 'ArrowDown'}); // → 1 (Kiwi)
+        await input.trigger('keydown', {key: 'Enter'});
 
         expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([2]); // Kiwi
         expect(menu(wrapper).exists()).toBe(false);
@@ -201,13 +200,12 @@ describe('GroupCombobox', () => {
 
     it('clearLabel: ArrowDown lands on clear entry; Enter commits null; input snaps to ""', async () => {
         const wrapper = mountGroupCombobox({clearLabel: 'None', modelValue: 1});
-        const root = wrapper.find('.ui-groupcombobox');
         const input = wrapper.find('input');
 
-        await root.trigger('keydown', {key: 'ArrowDown'}); // open
-        await root.trigger('keydown', {key: 'ArrowDown'}); // → clear entry
+        await input.trigger('keydown', {key: 'ArrowDown'}); // open
+        await input.trigger('keydown', {key: 'ArrowDown'}); // → clear entry
         expect(input.attributes('aria-activedescendant')).toBe('fruit-clear');
-        await root.trigger('keydown', {key: 'Enter'});
+        await input.trigger('keydown', {key: 'Enter'});
 
         expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([null]);
         expect(menu(wrapper).exists()).toBe(false);
@@ -216,25 +214,23 @@ describe('GroupCombobox', () => {
 
     it('starts on emptyDisplayValue when mounted with a null model, and reverts to it on dismiss', async () => {
         const wrapper = mountGroupCombobox({clearLabel: 'None', emptyDisplayValue: 'Any fruit'});
-        const root = wrapper.find('.ui-groupcombobox');
         const input = wrapper.find('input');
         expect(input.element.value).toBe('Any fruit');
 
         await input.setValue('zzz'); // half-typed non-match…
-        await root.trigger('keydown', {key: 'Escape'});
+        await input.trigger('keydown', {key: 'Escape'});
         expect(input.element.value).toBe('Any fruit'); // …reverts to the named empty state
     });
 
     it('clearLabel + emptyDisplayValue: Enter commits null and snaps the input to the named empty state', async () => {
         const wrapper = mountGroupCombobox({clearLabel: 'None', emptyDisplayValue: 'Any fruit', modelValue: 1});
-        const root = wrapper.find('.ui-groupcombobox');
         const input = wrapper.find('input');
         expect(input.element.value).toBe('Mango');
 
-        await root.trigger('keydown', {key: 'ArrowDown'}); // open
-        await root.trigger('keydown', {key: 'ArrowDown'}); // → clear entry
+        await input.trigger('keydown', {key: 'ArrowDown'}); // open
+        await input.trigger('keydown', {key: 'ArrowDown'}); // → clear entry
         expect(input.attributes('aria-activedescendant')).toBe('fruit-clear');
-        await root.trigger('keydown', {key: 'Enter'});
+        await input.trigger('keydown', {key: 'Enter'});
 
         expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([null]);
         expect(menu(wrapper).exists()).toBe(false);
@@ -253,16 +249,15 @@ describe('GroupCombobox', () => {
 
     it('aria-activedescendant tracks pointer through filtered options, not headers', async () => {
         const wrapper = mountGroupCombobox({});
-        const root = wrapper.find('.ui-groupcombobox');
         const input = wrapper.find('input');
 
-        await root.trigger('keydown', {key: 'ArrowDown'}); // open
+        await input.trigger('keydown', {key: 'ArrowDown'}); // open
         expect(input.attributes('aria-activedescendant')).toBeUndefined();
 
-        await root.trigger('keydown', {key: 'ArrowDown'}); // → 0 (Mango)
+        await input.trigger('keydown', {key: 'ArrowDown'}); // → 0 (Mango)
         expect(input.attributes('aria-activedescendant')).toBe('fruit-opt-0');
 
-        await root.trigger('keydown', {key: 'ArrowDown'}); // → 1 (Kiwi)
+        await input.trigger('keydown', {key: 'ArrowDown'}); // → 1 (Kiwi)
         expect(input.attributes('aria-activedescendant')).toBe('fruit-opt-1');
 
         // Header rows carry no id.
@@ -281,12 +276,37 @@ describe('GroupCombobox', () => {
         expect(options.map((o) => o.attributes('aria-selected'))).toEqual(['false', 'false', 'true', 'false']);
     });
 
+    it.each([
+        ['click', {}],
+        ['keydown', {key: 'ArrowDown'}],
+        ['input', {}],
+    ])("opens on %s before a consumer's listener runs, so that listener cannot hold it back", async (type, init) => {
+        // Merged listeners run in order; one calling stopImmediatePropagation skips the ones after it.
+        const listener = `on${type[0].toUpperCase()}${type.slice(1)}`;
+        const wrapper = mount(GroupCombobox as never, {
+            props: {groups: GROUPS, optionLabel: 'name', id: 'fruit', modelValue: null},
+            attrs: {[listener]: (event: Event) => event.stopImmediatePropagation()},
+            attachTo: document.body,
+        });
+
+        wrapper.find('input').element.focus();
+        await wrapper.find('input').trigger(type, init);
+
+        expect(menu(wrapper).exists()).toBe(true);
+        wrapper.unmount();
+    });
+
     it('does not open when disabled', async () => {
         const wrapper = mountGroupCombobox({disabled: true});
         await wrapper.find('input').trigger('click');
         expect(menu(wrapper).exists()).toBe(false);
 
-        await wrapper.find('.ui-groupcombobox').trigger('keydown', {key: 'ArrowDown'});
+        // Dispatched by hand: VTU's trigger() skips a disabled element, and the keyboard guard is
+        // what is under test here.
+        wrapper
+            .find('input')
+            .element.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowDown', bubbles: true, cancelable: true}));
+        await wrapper.vm.$nextTick();
         expect(menu(wrapper).exists()).toBe(false);
     });
 
