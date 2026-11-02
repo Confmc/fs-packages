@@ -1,10 +1,17 @@
 // @vitest-environment happy-dom
+import {useFloating} from '@floating-ui/vue';
 import {mount} from '@vue/test-utils';
-import {afterEach, describe, expect, it} from 'vitest';
+import {afterEach, describe, expect, it, vi} from 'vitest';
 import {h} from 'vue';
 
 import SingleSelect from '../src/components/SingleSelect.vue';
 import {menu} from './find-menu';
+
+// The real floating-ui, spied on so the placement case can read what SingleSelect hands it.
+vi.mock('@floating-ui/vue', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('@floating-ui/vue')>();
+    return {...actual, useFloating: vi.fn(actual.useFloating)};
+});
 
 interface Fruit {
     id: number;
@@ -497,5 +504,17 @@ describe('SingleSelect', () => {
             // `has-value` stays keyed on an actual selection — the model IS null.
             expect(wrapper.find('.ui-select__trigger').classes()).not.toContain('has-value');
         });
+    });
+});
+
+describe('SingleSelect placement', () => {
+    it.each([
+        [undefined, 'bottom-start'],
+        ['top', 'top'],
+    ] as const)('hands floating-ui placement %s as %s', (placement, expected) => {
+        const wrapper = mountSelect(placement === undefined ? {} : {placement});
+
+        expect(vi.mocked(useFloating).mock.calls.at(-1)?.[2]).toMatchObject({placement: expected});
+        wrapper.unmount();
     });
 });

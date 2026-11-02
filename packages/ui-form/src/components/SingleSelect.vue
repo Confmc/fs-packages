@@ -85,6 +85,8 @@
 </template>
 
 <script setup lang="ts" generic="T extends SelectItem">
+import type {Placement} from '@floating-ui/vue';
+
 import {computed, useTemplateRef} from 'vue';
 
 import type {GroupRow} from '../internal/group-rows';
@@ -112,6 +114,7 @@ const {
     mutedOptions,
     clearLabel,
     emptyDisplayValue,
+    placement,
 } = defineProps<{
     options: T[];
     /** property name or getter for an option's display string. */
@@ -139,6 +142,12 @@ const {
     clearLabel?: string;
     /** what the trigger renders when the model is null — as a VALUE, not muted placeholder text. */
     emptyDisplayValue?: string;
+    /**
+     * where the list opens against the trigger (default `'bottom-start'`). With no room it flips to
+     * the opposite side at the same alignment (`bottom-start` → `top-start`), never to the other
+     * alignment. Read once.
+     */
+    placement?: Placement;
 }>();
 
 defineSlots<{
@@ -229,6 +238,7 @@ const {
     committedIndex: () => sorted.value.findIndex((option) => option.id === model.value),
     clearEntry: () => clearLabel !== undefined,
     onClearCommit: commitClear,
+    floatingOptions: {placement},
 });
 
 const choose = (option: T): void => {
