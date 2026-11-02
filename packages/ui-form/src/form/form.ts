@@ -104,9 +104,8 @@ const useFormBody = <T extends string = string>(
     const refused = async (): Promise<SubmitOutcome> => {
         if (scrollToError) {
             // The lookup is by id, so a message element rendered only once refused must be in the DOM
-            // first. Today Vue's flush already ran while the submit awaited, so no test can see this
-            // tick go; it stays so the scroll never depends on that microtask order.
-            // Stryker disable next-line all: equivalent while the flush precedes the resume (see above)
+            // first. `validate`'s refusals are set in this same tick, so they need it; a server refusal
+            // resumes after Vue's flush already ran, and takes it so it never depends on that order.
             await nextTick();
             scrollToFirstError(fieldErrors.value, id as (name: string) => string);
         }

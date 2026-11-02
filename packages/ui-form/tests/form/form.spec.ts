@@ -380,6 +380,24 @@ describe('useForm scroll-to-error', () => {
         expect(scrollIntoView.mock.contexts[0]).toBe(wrapper.findAll('input')[0]!.element);
     });
 
+    it('scrolls to a message rendered only once validate refused its field', async () => {
+        let form!: UseForm<'email'>;
+        const wrapper = mount(
+            defineComponent({
+                setup() {
+                    form = useForm<'email'>();
+                    return () => h('div', [form.fieldErrors.value.email ? h(form.FormError, {name: 'email'}) : null]);
+                },
+            }),
+            {attachTo: document.body},
+        );
+
+        await form.handleSubmit(async () => {}, {validate: () => ({email: 'Required'})});
+
+        expect(scrollIntoView).toHaveBeenCalledOnce();
+        expect(scrollIntoView.mock.contexts[0]).toBe(wrapper.find('p.ui-error').element);
+    });
+
     it('does nothing for a validate refusal it renders no element for, or an empty message', async () => {
         const {form} = mountFields(['email']);
 
