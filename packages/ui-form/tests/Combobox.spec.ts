@@ -458,6 +458,75 @@ describe('Combobox', () => {
         expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([2]); // Apricot commits
     });
 
+    // An IME composes a character through several `input` events. The query is bound with `v-model`,
+    // which ignores them until `compositionend`, so a candidate never filters the list. Neither
+    // happy-dom nor Chromium can be driven by a real IME from a test; these are the events one sends.
+    describe('IME composition', () => {
+        const compose = (field: HTMLInputElement, value: string): void => {
+            field.value = value;
+            field.dispatchEvent(new InputEvent('input', {bubbles: true, isComposing: true}));
+        };
+
+        it('opens and filters nothing while composing, then filters by the committed text', async () => {
+            const wrapper = mountCombobox({});
+            const field = wrapper.find('input').element;
+
+            field.dispatchEvent(new CompositionEvent('compositionstart', {bubbles: true}));
+            compose(field, 'z');
+            compose(field, 'm');
+            await wrapper.vm.$nextTick();
+            expect(menu(wrapper).exists()).toBe(false);
+
+            field.dispatchEvent(new CompositionEvent('compositionend', {bubbles: true, data: 'm'}));
+            await wrapper.vm.$nextTick();
+            expect(
+                menu(wrapper)
+                    .findAll('.ui-combobox__option')
+                    .map((o) => o.text()),
+            ).toEqual(['Mango', 'Watermelon']);
+        });
+
+        it('does not select the committed label when a composition starts on a closed combobox', async () => {
+            const wrapper = mountCombobox({modelValue: 3}); // Mango
+            const field = wrapper.find('input').element;
+            const select = vi.spyOn(field, 'select');
+
+            field.dispatchEvent(new CompositionEvent('compositionstart', {bubbles: true}));
+            compose(field, 'Mangoか');
+            await wrapper.vm.$nextTick();
+            field.dispatchEvent(new CompositionEvent('compositionend', {bubbles: true, data: 'か'}));
+            await wrapper.vm.$nextTick();
+
+            // Selecting mid-composition would replace the text the IME is composing.
+            expect(select).not.toHaveBeenCalled();
+            expect(menu(wrapper).find('.ui-combobox__empty').exists()).toBe(true);
+        });
+
+        it('drops the highlight while composing, so the Enter that confirms a candidate commits no option', async () => {
+            const wrapper = mountCombobox({});
+            const input = wrapper.find('input');
+
+            await input.trigger('keydown', {key: 'ArrowDown'}); // open
+            await input.trigger('keydown', {key: 'ArrowDown'}); // → Apricot
+            input.element.dispatchEvent(new CompositionEvent('compositionstart', {bubbles: true}));
+            compose(input.element, 'か');
+            await input.trigger('keydown', {key: 'Enter', isComposing: true});
+
+            expect(wrapper.emitted('update:modelValue')).toBeUndefined();
+        });
+
+        it('keeps the candidate text in the field across a re-render while composing', async () => {
+            const wrapper = mountCombobox({});
+            const field = wrapper.find('input').element;
+
+            field.dispatchEvent(new CompositionEvent('compositionstart', {bubbles: true}));
+            compose(field, 'か');
+            await wrapper.setProps({placeholder: 'Pick one'});
+
+            expect(field.value).toBe('か');
+        });
+    });
+
     describe('browse-to-change (WR-0576)', () => {
         it('opens with the FULL option list when the input holds the committed label', async () => {
             const wrapper = mountCombobox({modelValue: 3}); // Mango committed → query rests on 'Mango'
