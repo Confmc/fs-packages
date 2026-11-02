@@ -7,7 +7,7 @@ import type {Ref} from 'vue';
 import {describe, expectTypeOf, it} from 'vitest';
 import {ref, shallowRef} from 'vue';
 
-import type {Path, UseDraftForm, UseForm} from '../../src';
+import type {FieldBinding, FieldModel, Path, UseDraftForm, UseForm} from '../../src';
 
 import {useForm} from '../../src/form/form';
 
@@ -54,11 +54,47 @@ describe('useForm with a draft', () => {
     });
 });
 
+describe('field() on a form with a draft', () => {
+    it('takes only the draft paths, nested, indexed and through a nullable branch', () => {
+        const {field} = useForm({draft});
+
+        field('firstName');
+        field('learningGoals.0.title');
+        field('parent.learningGoals.3.title');
+        // @ts-expect-error not a path of the draft
+        field('frstName');
+        // @ts-expect-error a leaf's own members are not paths
+        field('born.getTime');
+    });
+
+    it('carries the value at the path and takes that type back', () => {
+        const {field} = useForm({draft});
+
+        expectTypeOf(field('firstName').modelValue).toEqualTypeOf<string | null>();
+        expectTypeOf(field('born').modelValue).toEqualTypeOf<Date>();
+        expectTypeOf(field('learningGoals').modelValue).toEqualTypeOf<{title: string | null}[]>();
+        expectTypeOf(field('parent').modelValue).toEqualTypeOf<Draft | null>();
+        expectTypeOf(field('parent.learningGoals.3.title').modelValue).toEqualTypeOf<string | null>();
+        expectTypeOf(field('born')['onUpdate:modelValue']).toEqualTypeOf<(value: Date) => void>();
+        expectTypeOf(field('firstName')).toEqualTypeOf<FieldBinding & FieldModel<string | null>>();
+        // @ts-expect-error the write-back takes the path's value type
+        field('born')['onUpdate:modelValue']('2026-01-01');
+    });
+});
+
 describe('useForm without a draft', () => {
     it('names its fields by free strings, or by the union it is given', () => {
         expectTypeOf(useForm()).toEqualTypeOf<UseForm<string>>();
         expectTypeOf(useForm({fields: ['email', 'password']})).toEqualTypeOf<UseForm<'email' | 'password'>>();
         expectTypeOf(useForm<'email'>().errors.value).toEqualTypeOf<Partial<Record<'email', string>>>();
+    });
+
+    it('wires a field by its name, with no value', () => {
+        expectTypeOf(useForm().field('anything')).toEqualTypeOf<FieldBinding>();
+        // @ts-expect-error not one of the form's names
+        useForm<'email'>().field('name');
+        // @ts-expect-error no draft, no modelValue
+        void useForm().field('anything').modelValue;
     });
 });
 
