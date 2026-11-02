@@ -72,12 +72,11 @@ describe('the client refusals on a form with a draft', () => {
         setRefusals({frstName: 'Required'});
         // @ts-expect-error not a path of the draft
         withdraw('firstName', 'frstName');
-        // validate's bag is named by the draft paths. TypeScript checks no extra key on a literal a callback
-        // returns, so a misspelled name next to a right one passes there: a validator declared to return
-        // `ValidationErrors<Path<D>>` catches it.
-        expectTypeOf(handleSubmit)
-            .parameter(1)
-            .toEqualTypeOf<{validate?: () => ValidationErrors<Path<Draft>>} | undefined>();
+        // validate's bag is named by the draft paths, a misspelled name next to a right one included
+        // (TypeScript checks no extra key on a literal a callback returns; the signature does).
+        // @ts-expect-error not a path of the draft, next to one that is
+        void handleSubmit(async () => {}, {validate: () => ({firstName: 'Required', frstName: 'Required'})});
+        void handleSubmit(async () => {}, {validate: () => (Math.random() > 0.5 ? {firstName: 'Required'} : {})});
         void handleSubmit(async () => {}, {validate});
     });
 
@@ -140,9 +139,9 @@ describe('useForm without a draft', () => {
         form.setRefusals({password: 'Required'});
         // @ts-expect-error not one of the form's names
         form.withdraw('password');
-        expectTypeOf(form.handleSubmit)
-            .parameter(1)
-            .toEqualTypeOf<{validate?: () => ValidationErrors<'email' | 'name'>} | undefined>();
+        void form.handleSubmit(async () => {}, {validate: () => ({email: 'Required'})});
+        // @ts-expect-error not one of the form's names, next to one that is
+        void form.handleSubmit(async () => {}, {validate: () => ({email: 'Required', emial: 'Required'})});
         // free strings without a union
         useForm().refuse('anything', 'Required');
     });

@@ -106,9 +106,11 @@ interface FormSubmit<T extends string = string> extends UseFormSubmit {
      * action; an empty one clears them and the action runs. On `'refused'` (either way) the first
      * refused field scrolls into view, unless `scrollToError` is off.
      */
-    handleSubmit: (
+    handleSubmit: <B extends ValidationErrors<T>>(
         action: () => Promise<unknown>,
-        options?: {validate?: () => ValidationErrors<T>},
+        // `B` is the bag as written, so a key that is not one of the form's names is `never`: TypeScript checks
+        // no extra key on a literal a callback returns, and a misspelled name next to a right one would pass.
+        options?: {validate?: () => B & {[K in Exclude<keyof B, T>]: never}},
     ) => Promise<SubmitOutcome>;
 }
 
