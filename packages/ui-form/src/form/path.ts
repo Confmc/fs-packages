@@ -15,7 +15,7 @@ export type Whole =
     | ReadonlySet<unknown>
     | ((...args: never[]) => unknown);
 
-/** Every dotted path into `T`; an array index is any `${number}`. */
+/** Every dotted path into `T`; an array index is any `${number}`, a tuple's too (a tuple reads as its array). */
 export type Path<T, D extends number = 6> = [D] extends [never]
     ? never
     : T extends Whole
