@@ -1,7 +1,8 @@
 <template>
-    <div ref="root" v-bind="rootAttrs($attrs)" class="ui-select" @keydown="onKey">
+    <div ref="root" v-bind="rootAttrs($attrs)" class="ui-select">
         <button
             @click="toggle"
+            @keydown="onKey"
             v-bind="controlAttrs($attrs)"
             :id="id"
             ref="reference"

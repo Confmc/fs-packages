@@ -33,13 +33,13 @@ afterEach(() => {
 describe('SingleSelect', () => {
     it('jumps to the first/last option on Home/End while open (WR-0521)', async () => {
         const wrapper = mountSelect({});
-        const root = wrapper.find('.ui-select');
+        const control = wrapper.find('.ui-select__trigger');
         const trigger = wrapper.find('button');
 
-        await root.trigger('keydown', {key: 'Enter'}); // open, pointer -1
-        await root.trigger('keydown', {key: 'End'});
+        await control.trigger('keydown', {key: 'Enter'}); // open, pointer -1
+        await control.trigger('keydown', {key: 'End'});
         expect(trigger.attributes('aria-activedescendant')).toBe('fruit-opt-2');
-        await root.trigger('keydown', {key: 'Home'});
+        await control.trigger('keydown', {key: 'Home'});
         expect(trigger.attributes('aria-activedescendant')).toBe('fruit-opt-0');
     });
 
@@ -114,32 +114,32 @@ describe('SingleSelect', () => {
 
     it('navigates with the keyboard (down/up), highlights the pointer, and commits on Enter', async () => {
         const wrapper = mountSelect({});
-        const root = wrapper.find('.ui-select');
+        const control = wrapper.find('.ui-select__trigger');
 
-        await root.trigger('keydown', {key: 'ArrowDown'}); // opens (pointer stays -1)
-        await root.trigger('keydown', {key: 'ArrowDown'}); // pointer → 0 (Apricot)
+        await control.trigger('keydown', {key: 'ArrowDown'}); // opens (pointer stays -1)
+        await control.trigger('keydown', {key: 'ArrowDown'}); // pointer → 0 (Apricot)
         expect(menu(wrapper).findAll('.ui-select__option')[0].classes()).toContain('is-active');
         // Keyboard focus is visual + activedescendant only — it must NOT claim selection,
         // because nothing is committed until Enter.
         expect(menu(wrapper).findAll('.ui-select__option')[0].attributes('aria-selected')).toBe('false');
 
-        await root.trigger('keydown', {key: 'ArrowDown'}); // pointer → 1
-        await root.trigger('keydown', {key: 'ArrowUp'}); // pointer → 0
-        await root.trigger('keydown', {key: 'Enter'});
+        await control.trigger('keydown', {key: 'ArrowDown'}); // pointer → 1
+        await control.trigger('keydown', {key: 'ArrowUp'}); // pointer → 0
+        await control.trigger('keydown', {key: 'Enter'});
         expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([2]); // Apricot
         expect(menu(wrapper).exists()).toBe(false); // closed
     });
 
     it('exposes keyboard focus to assistive tech via aria-activedescendant', async () => {
         const wrapper = mountSelect({});
-        const root = wrapper.find('.ui-select');
+        const control = wrapper.find('.ui-select__trigger');
         const trigger = () => wrapper.find('.ui-select__trigger');
 
         // Closed: nothing owned, nothing focused.
         expect(trigger().attributes('aria-controls')).toBeUndefined();
         expect(trigger().attributes('aria-activedescendant')).toBeUndefined();
 
-        await root.trigger('keydown', {key: 'ArrowDown'}); // opens, pointer stays -1
+        await control.trigger('keydown', {key: 'ArrowDown'}); // opens, pointer stays -1
         expect(trigger().attributes('aria-controls')).toBe('fruit-listbox');
         expect(menu(wrapper).attributes('id')).toBe('fruit-listbox');
         // Open but nothing highlighted yet — the IDREF must be absent, not empty.
@@ -148,13 +148,13 @@ describe('SingleSelect', () => {
         // Sorted order is Apricot, Mango, Watermelon; ids are keyed by POSITION, not by
         // option.id — an unconstrained option.id could contain whitespace and yield an
         // invalid IDREF.
-        await root.trigger('keydown', {key: 'ArrowDown'}); // → Apricot
+        await control.trigger('keydown', {key: 'ArrowDown'}); // → Apricot
         expect(trigger().attributes('aria-activedescendant')).toBe('fruit-opt-0');
 
-        await root.trigger('keydown', {key: 'ArrowDown'}); // → Mango
+        await control.trigger('keydown', {key: 'ArrowDown'}); // → Mango
         expect(trigger().attributes('aria-activedescendant')).toBe('fruit-opt-1');
 
-        await root.trigger('keydown', {key: 'ArrowUp'}); // back to Apricot
+        await control.trigger('keydown', {key: 'ArrowUp'}); // back to Apricot
         expect(trigger().attributes('aria-activedescendant')).toBe('fruit-opt-0');
 
         // Every referenced id must actually exist in the listbox, and be unique.
@@ -164,26 +164,26 @@ describe('SingleSelect', () => {
         expect(ids).toEqual(['fruit-opt-0', 'fruit-opt-1', 'fruit-opt-2']);
         expect(new Set(ids).size).toBe(ids.length);
 
-        await root.trigger('keydown', {key: 'Escape'});
+        await control.trigger('keydown', {key: 'Escape'});
         expect(trigger().attributes('aria-activedescendant')).toBeUndefined();
         expect(trigger().attributes('aria-controls')).toBeUndefined();
     });
 
     it('survives options shrinking under the pointer while the listbox is open', async () => {
         const wrapper = mountSelect({});
-        const root = wrapper.find('.ui-select');
+        const control = wrapper.find('.ui-select__trigger');
         const trigger = () => wrapper.find('.ui-select__trigger');
 
-        await root.trigger('keydown', {key: 'ArrowDown'}); // open
-        await root.trigger('keydown', {key: 'ArrowDown'}); // → index 0
+        await control.trigger('keydown', {key: 'ArrowDown'}); // open
+        await control.trigger('keydown', {key: 'ArrowDown'}); // → index 0
 
         // A shrink that stays clear of the pointer must leave the highlight alone.
         await wrapper.setProps({options: FRUITS.slice(0, 2)});
         expect(trigger().attributes('aria-activedescendant')).toBe('fruit-opt-0');
 
         await wrapper.setProps({options: FRUITS});
-        await root.trigger('keydown', {key: 'ArrowDown'}); // → index 1
-        await root.trigger('keydown', {key: 'ArrowDown'}); // → index 2 (last)
+        await control.trigger('keydown', {key: 'ArrowDown'}); // → index 1
+        await control.trigger('keydown', {key: 'ArrowDown'}); // → index 2 (last)
         expect(trigger().attributes('aria-activedescendant')).toBe('fruit-opt-2');
 
         // A dependent list narrowing (e.g. City reloading on a Country change) must not
@@ -197,22 +197,22 @@ describe('SingleSelect', () => {
         if (active !== undefined) expect(menu(wrapper).find(`#${active}`).exists()).toBe(true);
 
         // Enter must commit the surviving option rather than index off the end.
-        await root.trigger('keydown', {key: 'Enter'});
+        await control.trigger('keydown', {key: 'Enter'});
         expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([FRUITS[0].id]);
     });
 
     it('empties the highlight when options drain to nothing while open', async () => {
         const wrapper = mountSelect({});
-        const root = wrapper.find('.ui-select');
+        const control = wrapper.find('.ui-select__trigger');
 
-        await root.trigger('keydown', {key: 'ArrowDown'}); // open
-        await root.trigger('keydown', {key: 'ArrowDown'}); // → index 0
+        await control.trigger('keydown', {key: 'ArrowDown'}); // open
+        await control.trigger('keydown', {key: 'ArrowDown'}); // → index 0
 
         await wrapper.setProps({options: []});
 
         expect(wrapper.find('.ui-select__trigger').attributes('aria-activedescendant')).toBeUndefined();
         // Enter on an empty list is a no-op, not a crash.
-        await root.trigger('keydown', {key: 'Enter'});
+        await control.trigger('keydown', {key: 'Enter'});
         expect(wrapper.emitted('update:modelValue')).toBeUndefined();
     });
 
@@ -235,29 +235,29 @@ describe('SingleSelect', () => {
 
     it('does nothing on Enter with no highlight, and ignores unhandled keys while open', async () => {
         const wrapper = mountSelect({});
-        const root = wrapper.find('.ui-select');
+        const control = wrapper.find('.ui-select__trigger');
 
-        await root.trigger('keydown', {key: 'ArrowDown'}); // opens, pointer -1
-        await root.trigger('keydown', {key: 'Enter'}); // pointer < 0 → no commit
+        await control.trigger('keydown', {key: 'ArrowDown'}); // opens, pointer -1
+        await control.trigger('keydown', {key: 'Enter'}); // pointer < 0 → no commit
         expect(wrapper.emitted('update:modelValue')).toBeUndefined();
         expect(menu(wrapper).exists()).toBe(true);
 
-        await root.trigger('keydown', {key: 'x'}); // unhandled → no state change
+        await control.trigger('keydown', {key: 'x'}); // unhandled → no state change
         expect(menu(wrapper).exists()).toBe(true);
     });
 
     it('ignores a non-opening key while closed', async () => {
         const wrapper = mountSelect({});
-        await wrapper.find('.ui-select').trigger('keydown', {key: 'x'});
+        await wrapper.find('.ui-select__trigger').trigger('keydown', {key: 'x'});
         expect(menu(wrapper).exists()).toBe(false);
     });
 
     it('closes on Escape', async () => {
         const wrapper = mountSelect({});
-        const root = wrapper.find('.ui-select');
-        await root.trigger('keydown', {key: 'ArrowDown'});
+        const control = wrapper.find('.ui-select__trigger');
+        await control.trigger('keydown', {key: 'ArrowDown'});
         expect(menu(wrapper).exists()).toBe(true);
-        await root.trigger('keydown', {key: 'Escape'});
+        await control.trigger('keydown', {key: 'Escape'});
         expect(menu(wrapper).exists()).toBe(false);
     });
 
@@ -274,17 +274,22 @@ describe('SingleSelect', () => {
         expect(menu(wrapper).exists()).toBe(false);
     });
 
-    it("toggles before a consumer's click listener runs, so that listener cannot hold the toggle back", async () => {
+    it.each([
+        ['click', {}],
+        ['keydown', {key: 'ArrowDown'}],
+    ])("opens on %s before a consumer's listener runs, so that listener cannot hold it back", async (type, init) => {
         // Merged listeners run in order; one calling stopImmediatePropagation skips the ones after it.
+        const listener = `on${type[0].toUpperCase()}${type.slice(1)}`;
         const wrapper = mount(SingleSelect as never, {
             props: {options: FRUITS, optionLabel: 'name', id: 'fruit', modelValue: null},
-            attrs: {onClick: (event: Event) => event.stopImmediatePropagation()},
+            attrs: {[listener]: (event: Event) => event.stopImmediatePropagation()},
             attachTo: document.body,
         });
 
-        await wrapper.find('.ui-select__trigger').trigger('click');
+        await wrapper.find('.ui-select__trigger').trigger(type, init);
 
         expect(menu(wrapper).exists()).toBe(true);
+        wrapper.unmount();
     });
 
     it('does not open when disabled, by click or by keyboard', async () => {
@@ -292,16 +297,21 @@ describe('SingleSelect', () => {
         await wrapper.find('.ui-select__trigger').trigger('click');
         expect(menu(wrapper).exists()).toBe(false);
 
-        await wrapper.find('.ui-select').trigger('keydown', {key: 'ArrowDown'});
+        // Dispatched by hand: VTU's trigger() skips a disabled element, and the keyboard guard is
+        // what is under test here.
+        wrapper
+            .find('.ui-select__trigger')
+            .element.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowDown', bubbles: true, cancelable: true}));
+        await wrapper.vm.$nextTick();
         expect(menu(wrapper).exists()).toBe(false);
     });
 
     it('closes on Tab', async () => {
         const wrapper = mountSelect({});
-        const root = wrapper.find('.ui-select');
-        await root.trigger('keydown', {key: 'ArrowDown'}); // open
+        const control = wrapper.find('.ui-select__trigger');
+        await control.trigger('keydown', {key: 'ArrowDown'}); // open
         expect(menu(wrapper).exists()).toBe(true);
-        await root.trigger('keydown', {key: 'Tab'});
+        await control.trigger('keydown', {key: 'Tab'});
         expect(menu(wrapper).exists()).toBe(false);
     });
 
@@ -325,14 +335,14 @@ describe('SingleSelect', () => {
 
     it('leaves the highlight on nothing when ArrowUp is pressed on the first option (no clear entry)', async () => {
         const wrapper = mountSelect({});
-        const root = wrapper.find('.ui-select');
+        const control = wrapper.find('.ui-select__trigger');
         const trigger = () => wrapper.find('.ui-select__trigger');
 
-        await root.trigger('keydown', {key: 'ArrowDown'}); // open
-        await root.trigger('keydown', {key: 'ArrowDown'}); // → index 0
+        await control.trigger('keydown', {key: 'ArrowDown'}); // open
+        await control.trigger('keydown', {key: 'ArrowDown'}); // → index 0
         expect(trigger().attributes('aria-activedescendant')).toBe('fruit-opt-0');
 
-        await root.trigger('keydown', {key: 'ArrowUp'}); // no entry above → nothing
+        await control.trigger('keydown', {key: 'ArrowUp'}); // no entry above → nothing
         expect(trigger().attributes('aria-activedescendant')).toBeUndefined();
         expect(menu(wrapper).exists()).toBe(true); // still open
     });
@@ -349,7 +359,7 @@ describe('SingleSelect', () => {
                     ),
             },
         );
-        const root = wrapper.find('.ui-select');
+        const control = wrapper.find('.ui-select__trigger');
 
         await wrapper.find('.ui-select__trigger').trigger('click');
         // Sorted order: Apricot(2), Mango(3, committed), Watermelon(1) — slot payload carries
@@ -361,7 +371,7 @@ describe('SingleSelect', () => {
         ).toEqual(['Apricot#0', 'Mango#1*', 'Watermelon#2']);
 
         // `active` tracks the keyboard pointer, and the .is-active chrome stays on the <li>.
-        await root.trigger('keydown', {key: 'ArrowDown'});
+        await control.trigger('keydown', {key: 'ArrowDown'});
         expect(
             menu(wrapper)
                 .findAll('.swatch')
@@ -413,35 +423,35 @@ describe('SingleSelect', () => {
 
         it('owns the keyboard slot between "nothing" and index 0', async () => {
             const wrapper = mountSelect({clearLabel: 'No fruit'});
-            const root = wrapper.find('.ui-select');
+            const control = wrapper.find('.ui-select__trigger');
             const trigger = () => wrapper.find('.ui-select__trigger');
 
-            await root.trigger('keydown', {key: 'ArrowDown'}); // open, nothing highlighted
+            await control.trigger('keydown', {key: 'ArrowDown'}); // open, nothing highlighted
             expect(trigger().attributes('aria-activedescendant')).toBeUndefined();
 
-            await root.trigger('keydown', {key: 'ArrowDown'}); // → the clear entry
+            await control.trigger('keydown', {key: 'ArrowDown'}); // → the clear entry
             expect(trigger().attributes('aria-activedescendant')).toBe('fruit-clear');
             expect(menu(wrapper).find('.ui-select__clear').classes()).toContain('is-active');
 
-            await root.trigger('keydown', {key: 'ArrowDown'}); // → index 0
+            await control.trigger('keydown', {key: 'ArrowDown'}); // → index 0
             expect(trigger().attributes('aria-activedescendant')).toBe('fruit-opt-0');
             expect(menu(wrapper).find('.ui-select__clear').classes()).not.toContain('is-active');
 
-            await root.trigger('keydown', {key: 'ArrowUp'}); // back up → the clear entry
+            await control.trigger('keydown', {key: 'ArrowUp'}); // back up → the clear entry
             expect(trigger().attributes('aria-activedescendant')).toBe('fruit-clear');
 
-            await root.trigger('keydown', {key: 'ArrowUp'}); // above the entry → nothing
+            await control.trigger('keydown', {key: 'ArrowUp'}); // above the entry → nothing
             expect(trigger().attributes('aria-activedescendant')).toBeUndefined();
             expect(menu(wrapper).exists()).toBe(true); // still open
         });
 
         it('commits null and closes on Enter', async () => {
             const wrapper = mountSelect({clearLabel: 'No fruit', modelValue: 3});
-            const root = wrapper.find('.ui-select');
+            const control = wrapper.find('.ui-select__trigger');
 
-            await root.trigger('keydown', {key: 'ArrowDown'}); // open
-            await root.trigger('keydown', {key: 'ArrowDown'}); // → the clear entry
-            await root.trigger('keydown', {key: 'Enter'});
+            await control.trigger('keydown', {key: 'ArrowDown'}); // open
+            await control.trigger('keydown', {key: 'ArrowDown'}); // → the clear entry
+            await control.trigger('keydown', {key: 'Enter'});
 
             expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([null]);
             expect(menu(wrapper).exists()).toBe(false);
@@ -467,11 +477,11 @@ describe('SingleSelect', () => {
 
         it('drops the highlight when clearLabel is withdrawn while the entry holds it', async () => {
             const wrapper = mountSelect({clearLabel: 'No fruit'});
-            const root = wrapper.find('.ui-select');
+            const control = wrapper.find('.ui-select__trigger');
             const trigger = () => wrapper.find('.ui-select__trigger');
 
-            await root.trigger('keydown', {key: 'ArrowDown'}); // open
-            await root.trigger('keydown', {key: 'ArrowDown'}); // → the clear entry
+            await control.trigger('keydown', {key: 'ArrowDown'}); // open
+            await control.trigger('keydown', {key: 'ArrowDown'}); // → the clear entry
             expect(trigger().attributes('aria-activedescendant')).toBe('fruit-clear');
 
             await wrapper.setProps({clearLabel: undefined});

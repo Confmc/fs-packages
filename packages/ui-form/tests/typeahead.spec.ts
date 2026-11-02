@@ -29,7 +29,7 @@ const SELECT_ONLY = [
                 props: {options: FRUITS, optionLabel: 'name', id: 'f', modelValue: null, alphabeticalSort: false},
                 attachTo: document.body,
             }),
-        keyTarget: '.ui-select',
+        keyTarget: '.ui-select__trigger',
     },
 ] as const;
 
@@ -206,7 +206,7 @@ describe('typeahead — a search starts after the committed value (native <selec
             attachTo: document.body,
         });
 
-        await wrapper.find('.ui-select').trigger('keydown', {key: 'b'});
+        await wrapper.find('.ui-select__trigger').trigger('keydown', {key: 'b'});
 
         expect(wrapper.find('[role="combobox"]').attributes('aria-activedescendant')).toBe('f-opt-3');
     });
@@ -216,10 +216,10 @@ describe('typeahead — a search starts after the committed value (native <selec
             props: {options: FRUITS, optionLabel: 'name', id: 'f', modelValue: banana, alphabeticalSort: false},
             attachTo: document.body,
         });
-        const root = wrapper.find('.ui-select');
+        const control = wrapper.find('.ui-select__trigger');
 
-        await root.trigger('keydown', {key: 'b'});
-        await root.trigger('keydown', {key: 'a'});
+        await control.trigger('keydown', {key: 'b'});
+        await control.trigger('keydown', {key: 'a'});
 
         expect(wrapper.find('[role="combobox"]').attributes('aria-activedescendant')).toBe('f-opt-2');
     });
@@ -240,9 +240,9 @@ describe('typeahead — a held key costs the same on its thousandth repeat as on
             props: {options: FRUITS, optionLabel: 'name', id: 'f', modelValue: null, alphabeticalSort: false},
             attachTo: document.body,
         });
-        const root = wrapper.find('.ui-select').element;
+        const control = wrapper.find('.ui-select__trigger').element;
         const press = (key: string): void => {
-            root.dispatchEvent(new KeyboardEvent('keydown', {key, bubbles: true, cancelable: true}));
+            control.dispatchEvent(new KeyboardEvent('keydown', {key, bubbles: true, cancelable: true}));
         };
         const hold = (repeats: number): number => {
             const started = performance.now();
@@ -301,9 +301,9 @@ describe('typeahead — the typed string stops growing at 64 characters', () => 
             props: {options: LONG, optionLabel: 'name', id: 'f', modelValue: null, alphabeticalSort: false},
             attachTo: document.body,
         });
-        const root = wrapper.find('.ui-select');
+        const control = wrapper.find('.ui-select__trigger');
 
-        for (const key of `${shared}b`) await root.trigger('keydown', {key});
+        for (const key of `${shared}b`) await control.trigger('keydown', {key});
 
         expect(wrapper.find('[role="combobox"]').attributes('aria-activedescendant')).toBe('f-opt-0');
     });
@@ -323,8 +323,8 @@ describe('typeahead — the typed string stops growing at 64 characters', () => 
             },
             attachTo: document.body,
         });
-        const root = wrapper.find('.ui-select');
-        for (const key of `${shared}🍒`) await root.trigger('keydown', {key});
+        const control = wrapper.find('.ui-select__trigger');
+        for (const key of `${shared}🍒`) await control.trigger('keydown', {key});
         return wrapper.find('[role="combobox"]').attributes('aria-activedescendant');
     };
 
@@ -351,8 +351,8 @@ describe('typeahead — a typed key and a label fold the same, whatever follows 
             },
             attachTo: document.body,
         });
-        const root = wrapper.find('.ui-select');
-        for (const key of keys) await root.trigger('keydown', {key});
+        const control = wrapper.find('.ui-select__trigger');
+        for (const key of keys) await control.trigger('keydown', {key});
         return wrapper.find('[role="combobox"]').attributes('aria-activedescendant');
     };
 
@@ -391,7 +391,7 @@ describe('typeahead — a named key is not a character', () => {
             attachTo: document.body,
         });
 
-        await wrapper.find('.ui-select').trigger('keydown', {key});
+        await wrapper.find('.ui-select__trigger').trigger('keydown', {key});
 
         expect(wrapper.find('[role="combobox"]').attributes('aria-activedescendant')).not.toBe('f-opt-1');
     });
@@ -423,7 +423,7 @@ describe('typeahead — the labels fold again when the options change', () => {
         });
         await wrapper.setProps({options: [...FRUITS, {id: 7, name: 'Damson'}]});
 
-        await wrapper.find('.ui-select').trigger('keydown', {key: 'd'});
+        await wrapper.find('.ui-select__trigger').trigger('keydown', {key: 'd'});
 
         expect(wrapper.find('[role="combobox"]').attributes('aria-activedescendant')).toBe('f-opt-6');
     });
@@ -435,10 +435,10 @@ describe('typeahead — an empty list', () => {
             props: {options: [] as Fruit[], optionLabel: 'name', id: 'f', modelValue: null},
             attachTo: document.body,
         });
-        const root = wrapper.find('.ui-select');
+        const control = wrapper.find('.ui-select__trigger');
 
-        await root.trigger('keydown', {key: 'ArrowDown'});
-        await root.trigger('keydown', {key: 'a'});
+        await control.trigger('keydown', {key: 'ArrowDown'});
+        await control.trigger('keydown', {key: 'a'});
 
         expect(wrapper.find('[role="combobox"]').attributes('aria-activedescendant')).toBeUndefined();
         expect(wrapper.find('[role="combobox"]').attributes('aria-expanded')).toBe('true');
