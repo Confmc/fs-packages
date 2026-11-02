@@ -23,7 +23,7 @@ export type {
     ValidationErrors,
 } from './form/types';
 export type {Path, PathsFor, PathsOf, PathValue} from './form/path';
-export type {BoundControls} from './form/kit';
+export type {BoundControls, BoundShell, BoundValueProps, FieldFrameSlots, NoAddonProps} from './form/kit';
 export type {FormDraft} from './form/draft';
 export type {BoundFormLabelProps, FormErrorComponent, FormLabelComponent} from './form/field';
 export type {FieldAria, FieldBinding} from './types';

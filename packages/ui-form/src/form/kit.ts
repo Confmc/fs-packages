@@ -12,7 +12,7 @@ import TextInput from '../components/TextInput.vue';
 type Wiring = keyof FieldBinding | 'modelValue' | 'onUpdate:modelValue';
 
 /** What every bound control takes itself: the field's name and its frame. */
-interface Shell<N> {
+export interface BoundShell<N> {
     /** the field, by its path in the form. */
     name: N;
     label?: string;
@@ -21,7 +21,7 @@ interface Shell<N> {
 }
 
 /** A bound control without addon texts refuses them: a template would otherwise take them as fallthrough attributes. */
-interface NoAddons {
+export interface NoAddonProps {
     prepend?: never;
     append?: never;
 }
@@ -30,32 +30,40 @@ interface NoAddons {
 type PropsOf<C> = C extends abstract new (...args: any) => {$props: infer P} ? P : never;
 
 /** A bound non-generic control of the form `D`: its shell, plus the control's own props minus the wiring. */
-type BoundControl<N, C, Value, Extra = NoAddons> = DefineSetupFnComponent<
-    Shell<N> & Extra & Omit<PropsOf<C>, Wiring | 'required' | 'label'> & ValueProps<Value>
+type BoundControl<N, C, Value, Extra = NoAddonProps> = DefineSetupFnComponent<
+    BoundShell<N> & Extra & Omit<PropsOf<C>, Wiring | 'required' | 'label'> & BoundValueProps<Value>
 >;
 /**
  * The value at the call site, typed by what the control reads and writes. On a form without a draft it is
  * the value; on a draft form it overrides the draft (a proxy that converts, such as hours shown for minutes
  * stored), and without it the draft is the value.
  */
-interface ValueProps<Value> {
+export interface BoundValueProps<Value> {
     modelValue?: Value;
     'onUpdate:modelValue'?: (value: Value) => void;
 }
 
-/** The form-bound controls of a form `D`: its names (free strings, or a union of them), or a draft named by its paths. */
+/**
+ * The form-bound controls of a form `D`: its names (free strings, or a union of them), or a draft named by
+ * its paths.
+ */
 export interface BoundControls<D> {
+    /**
+     * `TextInput` in a `FormField`, bound by name:
+     * `<TextField name="email" label="E-mail" placeholder="…" required />`. On a draft form the name is a
+     * path holding `string` or `string | null`.
+     */
     TextField: BoundControl<NamesFor<D, string | null, string>, typeof TextInput, string | null>;
     /**
      * The field frame by name, for a control the kit has no bound version of (your own, or one that edits
      * a derived value): the form's ids, label and message, and in its slot the field's wiring without
      * the value, so the control keeps its own `v-model`.
      */
-    FormField: DefineSetupFnComponent<Shell<D extends string ? D : Path<D>>, {}, FrameSlots>;
+    FormField: DefineSetupFnComponent<BoundShell<D extends string ? D : Path<D>>, {}, FieldFrameSlots>;
 }
 
 /** The slots of the field frame: the control gets the wiring. */
-type FrameSlots = SlotsType<{default: (scope: {field: FieldBinding; aria: FieldAria}) => VNode[]}>;
+export type FieldFrameSlots = SlotsType<{default: (scope: {field: FieldBinding; aria: FieldAria}) => VNode[]}>;
 
 /**
  * The names a bound control takes: on a form without a draft (`D` a string of names) any of its names; on a
@@ -73,7 +81,7 @@ type Message = (name: string) => string | undefined;
  */
 const bind = (field: Field, message: Message, control: Component, name: string) =>
     defineComponent(
-        (props: Shell<string>, {attrs, slots}) =>
+        (props: BoundShell<string>, {attrs, slots}) =>
             () => {
                 const {class: className, style, ...rest} = attrs;
                 const wiring = field(props.name);

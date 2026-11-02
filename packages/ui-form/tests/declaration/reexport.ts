@@ -9,3 +9,11 @@ import {useForm} from '@script-development/ui-form';
 export const {useForm: useAppForm} = {useForm};
 export const useContactForm = () => useForm<'email' | 'name'>({idPrefix: 'contact'});
 export const useContractForm = (draft: Ref<{name: string | null; code: string}>) => useForm({draft});
+
+// An app that hands out a form's bound controls itself: each must be nameable too.
+const contact = useForm<'email' | 'name'>();
+export const {TextField: ContactTextField, FormField: ContactFormField} = contact;
+export const useContractFields = (draft: Ref<{name: string | null}>) => {
+    const {TextField, FormField} = useForm({draft});
+    return {TextField, FormField};
+};
