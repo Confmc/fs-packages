@@ -81,10 +81,10 @@ describe('MultiSelect', () => {
     });
 
     it('renders chips for the committed values, has-value, required and invalid state', () => {
-        const wrapper = mountMulti({modelValue: [3, 1], required: true, invalid: true, describedby: 'fruit-error'});
+        const wrapper = mountMulti({modelValue: [1, 3], required: true, invalid: true, describedby: 'fruit-error'});
         const trigger = wrapper.find('.ui-multiselect__trigger');
 
-        // Chips follow the model array, not options order.
+        // Chips follow display order, whatever order the model arrived in.
         expect(wrapper.findAll('.ui-multiselect__chip').map((chip) => chip.text())).toEqual(['Mango', 'Watermelon']);
         expect(wrapper.find('.ui-multiselect__placeholder').exists()).toBe(false);
         expect(wrapper.find('.ui-multiselect__box').classes()).toContain('has-value');
@@ -118,7 +118,7 @@ describe('MultiSelect', () => {
         expect(menu(wrapper).exists()).toBe(true);
     });
 
-    it('toggles membership on click and stays open, keeping the model in the order the options are shown', async () => {
+    it('toggles membership on click and stays open, adding to the end of the model', async () => {
         const wrapper = mountMulti({modelValue: [3]}); // Mango committed
         await wrapper.find('.ui-multiselect__trigger').trigger('click');
 
@@ -127,7 +127,7 @@ describe('MultiSelect', () => {
         expect(apricot.classes()).toContain('is-active');
 
         await apricot.trigger('click');
-        expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[2, 3]]); // display order, not pick order
+        expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[3, 2]]); // appended
         expect(menu(wrapper).exists()).toBe(true); // stays open
     });
 
@@ -135,10 +135,10 @@ describe('MultiSelect', () => {
         const wrapper = mountMulti({modelValue: [1, 2]});
 
         const chips = wrapper.findAll('.ui-multiselect__chip');
-        expect(chips.map((chip) => chip.text())).toEqual(['Watermelon', 'Apricot']);
-        expect(chips[0].find('.ui-multiselect__chip-remove').attributes('aria-label')).toBe('Remove Watermelon');
+        expect(chips.map((chip) => chip.text())).toEqual(['Apricot', 'Watermelon']);
+        expect(chips[1].find('.ui-multiselect__chip-remove').attributes('aria-label')).toBe('Remove Watermelon');
 
-        await chips[0].find('.ui-multiselect__chip-remove').trigger('click');
+        await chips[1].find('.ui-multiselect__chip-remove').trigger('click');
         expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[2]]);
         expect(menu(wrapper).exists()).toBe(false); // chip remove ≠ open
     });
@@ -153,21 +153,21 @@ describe('MultiSelect', () => {
         // control would announce nothing — the sr-value span is the trigger's value surface.
         const wrapper = mountMulti({modelValue: [2, 1]});
         const srValue = wrapper.find('.ui-multiselect__trigger .ui-multiselect__sr-value');
-        expect(srValue.text()).toBe('Apricot, Watermelon'); // selection order, labels only
+        expect(srValue.text()).toBe('Apricot, Watermelon'); // display order, labels only
         expect(wrapper.find('.ui-multiselect__placeholder').exists()).toBe(false);
     });
 
-    it('pops the last committed value on Backspace at the trigger, and no-ops when empty', async () => {
-        const wrapper = mountMulti({modelValue: [2, 1]});
+    it('removes the last chip on Backspace at the trigger, and no-ops when empty', async () => {
+        const wrapper = mountMulti({modelValue: [1, 2]}); // chips: Apricot, Watermelon
         const trigger = wrapper.find('.ui-multiselect__trigger');
 
         await trigger.trigger('keydown', {key: 'Backspace'});
-        expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[2]]);
+        expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[2]]); // Watermelon, not the model's tail
         expect(menu(wrapper).exists()).toBe(false); // Backspace never opens
 
         await wrapper.setProps({modelValue: []});
         await trigger.trigger('keydown', {key: 'Backspace'});
-        // Only the first Backspace emitted — an empty model has nothing to pop.
+        // Only the first Backspace emitted — an empty model has no chip to remove.
         expect(wrapper.emitted('update:modelValue')).toHaveLength(1);
     });
 
@@ -311,10 +311,16 @@ describe('MultiSelect', () => {
                 .map((o) => o.text()),
         ).toEqual(['Watermelon', 'Apricot', 'Mango']);
 
-        // Backspace pops the unresolved id too — it is committed state, chip or not.
+        // Backspace removes the last chip, so the unresolved id it cannot show stays committed.
         await wrapper.setProps({modelValue: [3, 99]});
-        await wrapper.find('.ui-multiselect__trigger').trigger('keydown', {key: 'Backspace'});
-        expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[3]]);
+        const trigger = wrapper.find('.ui-multiselect__trigger');
+        await trigger.trigger('keydown', {key: 'Backspace'});
+        expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[99]]);
+
+        // With no chip shown, Backspace has nothing to remove.
+        await wrapper.setProps({modelValue: [99]});
+        await trigger.trigger('keydown', {key: 'Backspace'});
+        expect(wrapper.emitted('update:modelValue')).toHaveLength(1);
     });
 
     it('closes on Escape, Tab, and click-outside without committing, and toggles closed via the trigger', async () => {
@@ -399,7 +405,7 @@ describe('MultiSelect', () => {
 
         // Slotted content toggles exactly like the plain text — and the menu stays open.
         await menu(wrapper).findAll('.ui-multiselect__option')[0].trigger('click');
-        expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[2, 3]]); // + Apricot, in display order
+        expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[3, 2]]); // + Apricot
         expect(menu(wrapper).exists()).toBe(true);
     });
 
@@ -417,50 +423,82 @@ describe('MultiSelect', () => {
 });
 
 describe('MultiSelect model order', () => {
+    // Caller order: Banana(1), Apple(2), Cherry(3).
     const fruits = [
         {id: 1, name: 'Banana'},
         {id: 2, name: 'Apple'},
         {id: 3, name: 'Cherry'},
     ];
 
-    // Banana is committed and Apple picked: Apple comes after Banana in the caller's order and
-    // before it alphabetically, so the two orders give different models.
-    it.each([
-        ["the caller's order", false, 1, [1, 2]],
-        ['alphabetical order', true, 0, [2, 1]],
-    ])('keeps the model in %s when alphabeticalSort is %s', async (_, alphabeticalSort, apple, expected) => {
-        const wrapper = mount(MultiSelect, {
-            props: {options: fruits, optionLabel: 'name', id: 'fruit', modelValue: [1], alphabeticalSort},
+    const mountFruits = (modelValue: number[], alphabeticalSort = false) =>
+        mount(MultiSelect, {
+            props: {options: fruits, optionLabel: 'name', id: 'fruit', modelValue, alphabeticalSort},
             attachTo: document.body,
         });
-        await wrapper.find('.ui-multiselect__trigger').trigger('click');
-        await menu(wrapper).findAll('li[role="option"]')[apple].trigger('click');
 
-        expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([expected]);
+    it.each([
+        ["the caller's order", false, ['Banana', 'Apple', 'Cherry']],
+        ['alphabetical order', true, ['Apple', 'Banana', 'Cherry']],
+    ])(
+        'shows the chips in %s when alphabeticalSort is %s, whatever order the model arrived in',
+        (_, sort, expected) => {
+            const wrapper = mountFruits([3, 2, 1], sort);
+
+            expect(wrapper.findAll('.ui-multiselect__chip').map((chip) => chip.text())).toEqual(expected);
+            expect(wrapper.find('.ui-multiselect__sr-value').text()).toBe(expected.join(', '));
+            wrapper.unmount();
+        },
+    );
+
+    it('keeps the chips already shown in place when a pick adds one', async () => {
+        const wrapper = mountFruits([3, 1]);
+        await wrapper.find('.ui-multiselect__trigger').trigger('click');
+        await menu(wrapper).findAll('li[role="option"]')[1].trigger('click'); // Apple
+        await wrapper.setProps({modelValue: wrapper.emitted<number[][]>('update:modelValue')!.at(-1)![0]});
+
+        expect(wrapper.findAll('.ui-multiselect__chip').map((chip) => chip.text())).toEqual([
+            'Banana',
+            'Apple',
+            'Cherry',
+        ]);
         wrapper.unmount();
     });
 
-    it('keeps an id with no option yet (still loading) at the end', async () => {
-        const wrapper = mount(MultiSelect, {
-            props: {options: fruits, optionLabel: 'name', id: 'fruit', modelValue: [99, 3]},
-            attachTo: document.body,
-        });
+    // Cherry is the last chip, so all three paths drop it from the same membership.
+    it.each([
+        [
+            'its chip button',
+            async (wrapper: ReturnType<typeof mountFruits>) => {
+                await wrapper.findAll('.ui-multiselect__chip-remove')[2].trigger('click');
+            },
+        ],
+        [
+            'Backspace',
+            async (wrapper: ReturnType<typeof mountFruits>) => {
+                await wrapper.find('.ui-multiselect__trigger').trigger('keydown', {key: 'Backspace'});
+            },
+        ],
+        [
+            'the list',
+            async (wrapper: ReturnType<typeof mountFruits>) => {
+                await wrapper.find('.ui-multiselect__trigger').trigger('click');
+                await menu(wrapper).findAll('li[role="option"]')[2].trigger('click');
+            },
+        ],
+    ])("removing through %s drops the id in place, keeping the consumer's order", async (_, removeCherry) => {
+        const wrapper = mountFruits([2, 3, 99, 1]);
+        await removeCherry(wrapper);
+
+        expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[2, 99, 1]]);
+        wrapper.unmount();
+    });
+
+    it('adds a pick at the end of the model, after an id with no option yet', async () => {
+        const wrapper = mountFruits([99, 3]);
         await wrapper.find('.ui-multiselect__trigger').trigger('click');
         await menu(wrapper).findAll('li[role="option"]')[0].trigger('click');
 
-        expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[1, 3, 99]]);
-        wrapper.unmount();
-    });
-
-    it('drops an id and puts the rest in display order', async () => {
-        const wrapper = mount(MultiSelect, {
-            props: {options: fruits, optionLabel: 'name', id: 'fruit', modelValue: [3, 1, 2]},
-            attachTo: document.body,
-        });
-        await wrapper.find('.ui-multiselect__trigger').trigger('click');
-        await menu(wrapper).findAll('li[role="option"]')[1].trigger('click');
-
-        expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[1, 3]]);
+        expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[99, 3, 1]]);
         wrapper.unmount();
     });
 });

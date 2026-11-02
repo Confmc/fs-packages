@@ -172,7 +172,10 @@ defineSlots<{
     option?: (props: {option: T; index: number; selected: boolean; active: boolean}) => unknown;
 }>();
 
-/** The committed membership: an array of option ids. A toggle keeps it in the order the options are shown in. */
+/**
+ * The committed membership: an array of option ids. Its order is the consumer's: an add appends and a
+ * remove drops in place, so nothing the control shows depends on it.
+ */
 const model = defineModel<T['id'][]>({required: true});
 
 /** Resolve an option's display string from the `optionLabel` prop (property name or getter). */
@@ -185,17 +188,13 @@ const sorted = computed(() =>
     alphabeticalSort ? [...options].sort((a, b) => labelOf(a).localeCompare(labelOf(b))) : options,
 );
 
-// The chip bar renders the committed values in model order. An id whose option has not
-// arrived yet (the async-options edit-form window) has no label to show — it stays in the
-// model (Backspace still pops it) but renders no chip until its option loads.
-const chips = computed(() =>
-    model.value.flatMap((value) => {
-        const option = options.find((candidate) => candidate.id === value);
-        return option ? [option] : [];
-    }),
-);
+// The chip bar renders the committed options in display order, whatever order the model arrived
+// in, so a pick never moves the chips already there. An id whose option has not arrived yet (the
+// async-options edit-form window) has no label to show — it stays in the model but renders no
+// chip until its option loads.
+const chips = computed(() => sorted.value.filter((option) => model.value.includes(option.id)));
 
-/** The committed labels, in model order — the closed trigger's screen-reader value. */
+/** The committed labels, in display order — the closed trigger's screen-reader value. */
 const selectedSummary = computed(() => chips.value.map(labelOf).join(', '));
 
 // The index-based view OptionList renders — parallel arrays derived from `sorted`, which
@@ -217,17 +216,11 @@ const reference = useTemplateRef<HTMLElement>('reference');
 // The <ul> inside it is positioned by nothing.
 const floating = useTemplateRef<HTMLElement>('floating');
 
-/**
- * Toggle an id's membership — add when absent, drop when present. Always emits a fresh array, kept in
- * the order the options are shown in, so the model reads the same however it was picked. An id with no
- * option yet (options still loading) keeps its place at the end.
- */
+/** Toggle an id's membership — add when absent, drop when present. Always emits a fresh array. */
 const toggleValue = (value: T['id']): void => {
-    const next = model.value.includes(value)
+    model.value = model.value.includes(value)
         ? model.value.filter((member) => member !== value)
         : [...model.value, value];
-    const shown = sorted.value.map((option) => option.id).filter((member) => next.includes(member));
-    model.value = [...shown, ...next.filter((member) => !shown.includes(member))];
 };
 
 // Both keyboard (Enter via useListbox) and pointer (OptionList `commit`) funnel through this
@@ -263,9 +256,13 @@ const {open, pointer, listboxId, optionId, activeDescendant, floatingStyles, onK
 const remove = (value: T['id']): void => {
     model.value = model.value.filter((member) => member !== value);
 };
-/** Backspace on the focused trigger pops the LAST committed value (no-op when empty). */
-const popLast = (): void => {
-    if (model.value.length) model.value = model.value.slice(0, -1);
+/**
+ * Backspace on the focused trigger removes the LAST CHIP — the last one shown, never the model's tail,
+ * which can be an id with no chip yet. No-op when no chip shows.
+ */
+const removeLastChip = (): void => {
+    const last = chips.value.at(-1);
+    if (last) remove(last.id);
 };
 // Backspace is the multiselect analogue of clearing a text input; everything else follows
 // the shared listbox keyboard skeleton. The disabled guard mirrors the composable's own —
@@ -274,7 +271,7 @@ const popLast = (): void => {
 const onTriggerKey = (event: KeyboardEvent): void => {
     if (disabled) return;
     if (event.key === 'Backspace') {
-        popLast();
+        removeLastChip();
         return;
     }
     onKey(event);
