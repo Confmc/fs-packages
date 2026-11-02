@@ -70,10 +70,12 @@ export interface UseFormSubmit {
 /** Options for `useForm`: the validation options plus the scroll to the first invalid field. */
 export type UseFormOptions<T extends string = string> = UseValidationErrorsOptions<T> & {
     /**
-     * When this form takes a 422, scroll the first invalid field into view. Off unless you ask for it:
-     * the query is document-wide unless `scrollRoot` scopes it, so on a page with more than one form a
-     * field another form still marks can be the one scrolled to. Requires the controls to mark the
-     * errored field (the default target is `[aria-invalid="true"]`, which this package's controls render).
+     * When `handleSubmit` ends `'refused'`, scroll the first invalid field into view before it
+     * resolves; never on `take` alone, so a 422 caught outside a submit leaves the page where it is.
+     * Off unless you ask for it: the query is document-wide unless `scrollRoot` scopes it, so on a page
+     * with more than one form a field another form still marks can be the one scrolled to. Requires
+     * the controls to mark the errored field (the default target is `[aria-invalid="true"]`, which
+     * this package's controls render).
      * @default false
      */
     scrollToError?: boolean;

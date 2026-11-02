@@ -1,7 +1,9 @@
-import type {UseForm, UseFormOptions} from './types';
+import {nextTick} from 'vue';
+
+import type {SubmitOutcome, UseForm, UseFormOptions} from './types';
 
 import {useFormSubmit} from './form-submit';
-import {useScrollToFirstError} from './scroll-to-first-error';
+import {scrollToFirstError} from './scroll-to-first-error';
 import {useValidationErrors} from './validation-errors';
 
 /**
@@ -15,7 +17,8 @@ import {useValidationErrors} from './validation-errors';
  * 422 reject: one it catches itself never reaches the form. Reach for `useValidationErrors` /
  * `useFormSubmit` directly when you need one half without the other.
  *
- * With `scrollToError`, call it in a component's `setup()`: the scroll watcher stops on unmount.
+ * With `scrollToError`, a submit that ends `'refused'` scrolls the first invalid field into view before
+ * it resolves. Only a submit scrolls: a 422 handed to `take` or a cleared bag never moves the page.
  *
  * @param options `keyMapper`, `fields`, `scrollToError`, `scrollRoot`, `scrollTarget` — see `UseFormOptions`.
  */
@@ -24,7 +27,17 @@ export const useForm = <T extends string = string>(options: UseFormOptions<T> = 
     const validation = useValidationErrors<T>({keyMapper, fields});
     const submit = useFormSubmit(validation);
 
-    if (scrollToError) useScrollToFirstError(validation.errors, scrollRoot, scrollTarget);
+    const handleSubmit = async (action: () => Promise<unknown>): Promise<SubmitOutcome> => {
+        const outcome = await submit.handleSubmit(action);
 
-    return {...validation, ...submit};
+        if (outcome === 'refused' && scrollToError) {
+            // The refused fields are marked once the DOM shows the new bag.
+            await nextTick();
+            scrollToFirstError(validation.errors.value, scrollRoot, scrollTarget);
+        }
+
+        return outcome;
+    };
+
+    return {...validation, submitting: submit.submitting, handleSubmit};
 };

@@ -225,7 +225,6 @@ describe('useForm scroll-to-error', () => {
         const {wrapper, form} = mountFieldForm();
 
         await form().handleSubmit(refusedWith({email: ['Taken']}));
-        await nextTick();
 
         expect(scrollIntoView).toHaveBeenCalledExactlyOnceWith({behavior: 'smooth', block: 'center'});
         wrapper.unmount();
@@ -245,7 +244,6 @@ describe('useForm scroll-to-error', () => {
         );
 
         await form.handleSubmit(refusedWith({email: ['Taken']}));
-        await nextTick();
 
         const invalid = document.querySelectorAll('[aria-invalid="true"]');
         expect(invalid).toHaveLength(2);
@@ -261,36 +259,63 @@ describe('useForm scroll-to-error', () => {
         const {wrapper, form} = mountFieldForm(options);
 
         await form().handleSubmit(refusedWith({email: ['Taken']}));
-        await nextTick();
 
         expect(scrollIntoView).not.toHaveBeenCalled();
         wrapper.unmount();
     });
 
-    it('does not scroll to an independently invalid field once the bag is cleared', async () => {
+    // A form whose own field is marked while its bag holds errors, beside a field that stays invalid
+    // on its own, unrelated to this form's bag.
+    const mountBesideInvalid = (options?: UseFormOptions) => {
         let form!: UseForm;
         const wrapper = mount(
             defineComponent({
                 setup() {
-                    form = useForm({scrollToError: true});
-                    // The sibling stays invalid on its own, unrelated to this form's bag.
+                    form = useForm({scrollToError: true, ...options});
                     return () =>
                         h('div', [
-                            h('input', {'aria-invalid': invalidWhileRefused(form)}),
                             h('input', {'aria-invalid': 'true'}),
+                            h('input', {'aria-invalid': invalidWhileRefused(form)}),
                         ]);
                 },
             }),
             {attachTo: document.body},
         );
+        return {wrapper, form: () => form};
+    };
 
-        await form.handleSubmit(refusedWith({email: ['Taken']}));
-        await nextTick();
-        expect(scrollIntoView).toHaveBeenCalledOnce();
+    it('does not scroll for a 422 taken outside a submit', async () => {
+        const {wrapper, form} = mountFieldForm();
 
-        form.clearErrors();
+        form().take(requestError(422, {errors: {email: ['Taken']}}));
         await nextTick();
-        expect(scrollIntoView).toHaveBeenCalledOnce();
+
+        expect(document.querySelector('[aria-invalid="true"]')).not.toBeNull();
+        expect(scrollIntoView).not.toHaveBeenCalled();
+        wrapper.unmount();
+    });
+
+    it('does not scroll to another marked field when the refusal names none this form holds', async () => {
+        const {wrapper, form} = mountBesideInvalid({fields: ['password']});
+
+        await expect(form().handleSubmit(refusedWith({token: ['Expired']}))).resolves.toBe('refused');
+
+        expect(form().refusedUnnamed.value).toBe(true);
+        expect(scrollIntoView).not.toHaveBeenCalled();
+        wrapper.unmount();
+    });
+
+    it.each([
+        ["'sent'", async () => {}],
+        ["'cancelled'", async () => false],
+    ])('does not scroll again when the next submit ends %s', async (_, action) => {
+        const {wrapper, form} = mountBesideInvalid();
+        await form().handleSubmit(refusedWith({email: ['Taken']}));
+        scrollIntoView.mockClear();
+
+        await form().handleSubmit(action);
+
+        expect(scrollIntoView).not.toHaveBeenCalled();
         wrapper.unmount();
     });
 
@@ -298,7 +323,6 @@ describe('useForm scroll-to-error', () => {
         const {wrapper, form} = mountFieldForm(undefined, false);
 
         await form().handleSubmit(refusedWith({email: ['Taken']}));
-        await nextTick();
 
         expect(scrollIntoView).not.toHaveBeenCalled();
         wrapper.unmount();
@@ -308,7 +332,6 @@ describe('useForm scroll-to-error', () => {
         const {wrapper, form} = mountScopedForm(true);
 
         await form().handleSubmit(refusedWith({email: ['Taken']}));
-        await nextTick();
 
         expect(scrollIntoView).toHaveBeenCalledOnce();
         wrapper.unmount();
@@ -318,7 +341,6 @@ describe('useForm scroll-to-error', () => {
         const {wrapper, form} = mountScopedForm(false);
 
         await form().handleSubmit(refusedWith({email: ['Taken']}));
-        await nextTick();
 
         expect(scrollIntoView).not.toHaveBeenCalled();
         wrapper.unmount();
@@ -329,7 +351,6 @@ describe('useForm scroll-to-error', () => {
         const {wrapper, form} = mountFieldForm({scrollRoot: ref<HTMLElement | null>(null)});
 
         await form().handleSubmit(refusedWith({email: ['Taken']}));
-        await nextTick();
 
         expect(scrollIntoView).not.toHaveBeenCalled();
         wrapper.unmount();
@@ -340,7 +361,6 @@ describe('useForm scroll-to-error', () => {
         const {wrapper, form} = mountFieldForm();
 
         await form().handleSubmit(refusedWith({email: ['Taken']}));
-        await nextTick();
 
         expect(matchMedia).toHaveBeenCalledWith('(prefers-reduced-motion: reduce)');
         expect(scrollIntoView).toHaveBeenCalledExactlyOnceWith({behavior: 'auto', block: 'center'});
@@ -352,7 +372,6 @@ describe('useForm scroll-to-error', () => {
         const {wrapper, form} = mountFieldForm();
 
         await form().handleSubmit(refusedWith({email: ['Taken']}));
-        await nextTick();
 
         expect(scrollIntoView).toHaveBeenCalledExactlyOnceWith({behavior: 'smooth', block: 'center'});
         wrapper.unmount();
@@ -375,7 +394,6 @@ describe('useForm scroll-to-error', () => {
         );
 
         await form.handleSubmit(refusedWith({email: ['Taken']}));
-        await nextTick();
 
         expect(scrollIntoView).toHaveBeenCalledOnce();
         wrapper.unmount();
@@ -394,7 +412,6 @@ describe('useForm scroll-to-error', () => {
         );
 
         await form.handleSubmit(refusedWith({email: ['Taken']}));
-        await nextTick();
 
         expect(scrollIntoView).toHaveBeenCalledOnce();
         wrapper.unmount();
