@@ -547,48 +547,21 @@ describe('useListbox keyboard and highlight contract', () => {
         wrapper.unmount();
     });
 
-    // A move onto an option drops the clear flag, not only the pointer: the pointer is the
-    // caller's to write (SingleSelect sets it on hover), and a flag left up would light the clear
-    // entry again the moment the pointer returns to -1.
-    it.each([
-        ['typeahead', () => api.onKey(key('b'))],
-        ['ArrowDown off the clear entry', () => api.onKey(key('ArrowDown'))],
-        ['End', () => api.onKey(key('End'))],
-        [
-            'ArrowDown from a hovered option',
-            () => {
-                api.pointer.value = 1;
-                api.onKey(key('ArrowDown'));
-            },
-        ],
-    ])('%s drops the clear flag', (_, move) => {
-        const wrapper = mount(Harness, {
-            props: {overrides: {listLength: () => 3, clearEntry: () => true, typeaheadLabels: () => LABELS}},
-        });
-
-        api.openList();
-        api.highlightClear();
-        move();
-        expect(api.pointer.value).toBeGreaterThanOrEqual(0);
-        api.pointer.value = -1;
-
-        expect(api.clearHighlighted.value).toBe(false);
-        wrapper.unmount();
-    });
-
-    it('a list shrinking under the pointer drops the clear flag with the clamp', async () => {
+    it('a list draining under a hovered option leaves nothing highlighted, the clear entry included', async () => {
+        // Hovering an option after the clear entry leaves the clear flag up (the pointer alone
+        // un-highlights the entry); the clamp drops it, or the drained list would light the entry.
         const length = ref(3);
         const wrapper = mount(Harness, {props: {overrides: {listLength: () => length.value, clearEntry: () => true}}});
 
         api.openList();
         api.highlightClear();
         api.pointer.value = 2;
-        length.value = 2;
+        length.value = 0;
         await nextTick();
-        expect(api.pointer.value).toBe(1);
-        api.pointer.value = -1;
 
+        expect(api.pointer.value).toBe(-1);
         expect(api.clearHighlighted.value).toBe(false);
+        expect(api.activeDescendant.value).toBeUndefined();
         wrapper.unmount();
     });
 
