@@ -22,9 +22,9 @@ export interface FieldAria {
     'aria-describedby'?: string;
 }
 
-/** The minimal shape every option in a select must satisfy: a stable identity. */
+/** The minimal shape every option in a select must satisfy: a stable identity (a boolean for a yes/no pair). */
 export interface SelectItem {
-    id: string | number;
+    id: string | number | boolean;
     /** disables this option on its own (one that does not apply yet), where the control supports it. */
     disabled?: boolean;
 }
