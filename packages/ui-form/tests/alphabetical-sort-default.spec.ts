@@ -4,6 +4,7 @@
 import {mount} from '@vue/test-utils';
 import {afterEach, describe, expect, it} from 'vitest';
 
+import Combobox from '../src/components/Combobox.vue';
 import GroupSelect from '../src/components/GroupSelect.vue';
 import SingleSelect from '../src/components/SingleSelect.vue';
 
@@ -20,6 +21,7 @@ const SORTABLE = [
         component: GroupSelect,
         props: {groups: [{text: 'Fruit', options: CALLER_ORDER}], modelValue: null},
     },
+    {name: 'Combobox', component: Combobox, props: {options: CALLER_ORDER, modelValue: null}},
 ] as const;
 
 afterEach(() => {
