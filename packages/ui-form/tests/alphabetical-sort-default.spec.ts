@@ -4,6 +4,7 @@
 import {mount} from '@vue/test-utils';
 import {afterEach, describe, expect, it} from 'vitest';
 
+import Combobox from '../src/components/Combobox.vue';
 import MultiSelect from '../src/components/MultiSelect.vue';
 import SingleSelect from '../src/components/SingleSelect.vue';
 
@@ -16,6 +17,7 @@ const CALLER_ORDER = [
 const SORTABLE = [
     {name: 'SingleSelect', component: SingleSelect, modelValue: null, opener: 'button'},
     {name: 'MultiSelect', component: MultiSelect, modelValue: [], opener: '.ui-multiselect__trigger'},
+    {name: 'Combobox', component: Combobox, modelValue: null, opener: 'input'},
 ] as const;
 
 afterEach(() => {
