@@ -15,4 +15,4 @@ export type {
     UseValidationErrorsOptions,
     ValidationErrors,
 } from './form/types';
-export type {Path, PathValue} from './form/path';
+export type {Path, PathsFor, PathsOf, PathValue} from './form/path';

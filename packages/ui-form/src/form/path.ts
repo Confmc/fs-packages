@@ -31,3 +31,15 @@ export type PathValue<T, P extends string> = T extends readonly (infer U)[]
       : P extends keyof T
         ? T[P]
         : never;
+
+/**
+ * The paths of `T` a control can be bound to: it can read the value there (`Reads` takes it), and the
+ * value's type holds everything the control writes back (`Writes`). A date input reads `string | null`
+ * but writes only strings, so it binds a `string` path as well as a `string | null` one.
+ */
+export type PathsFor<T, Reads, Writes> = {
+    [P in Path<T>]: [PathValue<T, P>] extends [Reads] ? ([Writes] extends [PathValue<T, P>] ? P : never) : never;
+}[Path<T>];
+
+/** The paths of `T` whose value is exactly `V`: a control that reads and writes `V`. */
+export type PathsOf<T, V> = PathsFor<T, V, V>;

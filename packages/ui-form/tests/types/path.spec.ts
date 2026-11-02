@@ -2,7 +2,7 @@
 // line and every @ts-expect-error is an assertion; a loosened type fails the typecheck, not the run.
 import {describe, expectTypeOf, it} from 'vitest';
 
-import type {Path, PathValue} from '../../src';
+import type {Path, PathsFor, PathsOf, PathValue} from '../../src';
 
 interface Goal {
     title: string | null;
@@ -79,5 +79,42 @@ describe('PathValue', () => {
         expectTypeOf<PathValue<Draft, 'address.zip'>>().toBeNever();
         expectTypeOf<PathValue<Draft, 'learningGoals.first'>>().toBeNever();
         expectTypeOf<PathValue<Draft, 'learningGoals.first.title'>>().toBeNever();
+    });
+});
+
+interface Fields {
+    name: string | null;
+    code: string;
+    age: number | null;
+    count: number;
+    active: boolean;
+    ids: number[];
+    note: {text: string | null};
+}
+
+describe('PathsOf', () => {
+    it('picks the paths whose value is exactly the given type, at any depth', () => {
+        expectTypeOf<PathsOf<Fields, string | null>>().toEqualTypeOf<'name' | 'note.text'>();
+        expectTypeOf<PathsOf<Fields, number | null>>().toEqualTypeOf<'age'>();
+        expectTypeOf<PathsOf<Fields, boolean>>().toEqualTypeOf<'active'>();
+        expectTypeOf<PathsOf<Fields, number[]>>().toEqualTypeOf<'ids'>();
+        expectTypeOf<PathsOf<Fields, number>>().toEqualTypeOf<'count' | `ids.${number}`>();
+    });
+});
+
+describe('PathsFor', () => {
+    it('picks a path whose value takes everything written, though the control reads more', () => {
+        // a control that reads string | null but writes only strings binds a string path too
+        expectTypeOf<PathsFor<Fields, string | null, string>>().toEqualTypeOf<'name' | 'code' | 'note.text'>();
+    });
+
+    it('leaves out a path whose value the control cannot read', () => {
+        // a control that reads only strings cannot show a null
+        expectTypeOf<PathsFor<Fields, string, string>>().toEqualTypeOf<'code'>();
+    });
+
+    it('leaves out a path whose value cannot take what the control writes', () => {
+        // a control that writes null on clear cannot bind a never-empty number
+        expectTypeOf<PathsFor<Fields, number | null, number | null>>().toEqualTypeOf<'age'>();
     });
 });
