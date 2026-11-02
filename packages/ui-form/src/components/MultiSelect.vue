@@ -121,7 +121,7 @@ defineOptions({inheritAttrs: false});
 
 const {
     options,
-    label,
+    optionLabel,
     id,
     placeholder = 'Select…',
     disabled = false,
@@ -136,7 +136,7 @@ const {
 } = defineProps<{
     options: T[];
     /** property name or getter for an option's display string. */
-    label: LabelKey<T>;
+    optionLabel: LabelKey<T>;
     /** stable id — required so the trigger can pair with a label/error. */
     id: string;
     placeholder?: string;
@@ -151,7 +151,7 @@ const {
     /** accessible name for the listbox popup (`aria-label`). */
     optionsLabel?: string;
     /**
-     * verb prefixed to a chip's remove-button accessible name (`"${removeLabel} ${label}"`) —
+     * verb prefixed to a chip's remove-button accessible name (`"${removeLabel} ${option text}"`) —
      * a prop, not a literal, so Dutch territories can localise it (the `optionsLabel` ruling).
      */
     removeLabel?: string;
@@ -170,11 +170,11 @@ defineSlots<{
 /** The committed membership: an array of option ids, in selection order. */
 const model = defineModel<T['id'][]>({required: true});
 
-/** Resolve an option's display string from the `label` prop (property name or getter). */
+/** Resolve an option's display string from the `optionLabel` prop (property name or getter). */
 const labelOf = (option: T): string =>
-    typeof label === 'function'
-        ? label(option)
-        : String((option as Record<PropertyKey, unknown>)[label as PropertyKey]);
+    typeof optionLabel === 'function'
+        ? optionLabel(option)
+        : String((option as Record<PropertyKey, unknown>)[optionLabel as PropertyKey]);
 
 const sorted = computed(() =>
     alphabeticalSort ? [...options].sort((a, b) => labelOf(a).localeCompare(labelOf(b))) : options,

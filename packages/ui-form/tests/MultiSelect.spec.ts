@@ -21,7 +21,7 @@ const FRUITS: Fruit[] = [
 const mountMulti = (props: Record<string, unknown>, slots?: Record<string, unknown>) =>
     mount(MultiSelect as any, {
         // Sorted on purpose: the cases below index the sorted order (the default is caller order).
-        props: {options: FRUITS, label: 'name', id: 'fruit', modelValue: [], alphabeticalSort: true, ...props},
+        props: {options: FRUITS, optionLabel: 'name', id: 'fruit', modelValue: [], alphabeticalSort: true, ...props},
         slots,
         attachTo: document.body,
     });
@@ -255,7 +255,11 @@ describe('MultiSelect', () => {
             {id: 'b', title: 'beta'},
             {id: 'a', title: 'alpha'},
         ];
-        const wrapper = mountMulti({options: tags, label: (tag: Tag) => tag.title.toUpperCase(), modelValue: ['a']});
+        const wrapper = mountMulti({
+            options: tags,
+            optionLabel: (tag: Tag) => tag.title.toUpperCase(),
+            modelValue: ['a'],
+        });
 
         expect(wrapper.findAll('.ui-multiselect__chip').map((chip) => chip.text())).toEqual(['ALPHA']);
 
