@@ -1033,3 +1033,16 @@ answers; form/kit rules wait for landing.10).
 confirm; slice 6 (other bindings + `createUiForm`) once the controls are on main; Pressable/Disclosure after #332;
 the release PR last. No package DatePicker (decided). Machine notes: Chromium aliases 1243 and 1248 now point at 1252;
 pass `--maxWorkers=2` to vitest (the vitest guard hook is now scoped to emmie and emits valid JSON).
+
+**Working rules (memory is per machine; these are the ones the home box may not have yet):**
+- No new PRs until the reviewer reviews or merges more. Before changing anything because it looks easy, name the
+  evidence it bites (a grep in the consumer, the ADR line, the exact review words).
+- A hook whose output is not valid JSON shows its error only to Marcel; Claude sees nothing and the command runs. If
+  Marcel mentions a hook error, ask for the text. On the work box `~/.claude/hooks/guard-vitest.sh` was fixed
+  2026-11-02: it had a stray `}` in its hand-written deny JSON and fired outside emmie. Fix: exit early unless cwd or
+  command matches `/emmie(/|$|[[:space:]])|/worktrees/emmie-|soft-emmie` (as `emmie-install-folder-guard.sh` does),
+  and build the deny with `jq -n --arg reason … '{hookSpecificOutput:{…,permissionDecisionReason:$reason}}'`. If the
+  home box has the same hook, apply the same fix.
+- Pass `--maxWorkers=2` to vitest; run gates one at a time; Stryker with `--force` (incremental misreports).
+- Browser tests failing with "Executable doesn't exist … chromium_headless_shell-NNNN": never download; symlink the
+  cached revision (`ln -sfn chromium_headless_shell-<have> chromium_headless_shell-<want>` in ~/.cache/ms-playwright).
