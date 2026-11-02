@@ -30,20 +30,22 @@ interface NoAddons {
 type PropsOf<C> = C extends abstract new (...args: any) => {$props: infer P} ? P : never;
 
 /** A bound non-generic control of the form `D`: its shell, plus the control's own props minus the wiring. */
-type BoundControl<D, N, C, Value, Extra = NoAddons> = DefineSetupFnComponent<
-    Shell<N> & Extra & Omit<PropsOf<C>, Wiring | 'required' | 'label'> & ValueProps<D, Value>
+type BoundControl<N, C, Value, Extra = NoAddons> = DefineSetupFnComponent<
+    Shell<N> & Extra & Omit<PropsOf<C>, Wiring | 'required' | 'label'> & ValueProps<Value>
 >;
 /**
- * On a form without a draft (`D` its names, free strings or a union) the value comes from `v-model`; with
- * one, from the draft.
+ * The value at the call site, typed by what the control reads and writes. On a form without a draft it is
+ * the value; on a draft form it overrides the draft (a proxy that converts, such as hours shown for minutes
+ * stored), and without it the draft is the value.
  */
-type ValueProps<D, Value> = [D] extends [string]
-    ? {modelValue?: Value; 'onUpdate:modelValue'?: (value: Value) => void}
-    : {};
+interface ValueProps<Value> {
+    modelValue?: Value;
+    'onUpdate:modelValue'?: (value: Value) => void;
+}
 
 /** The form-bound controls of a form `D`: its names (free strings, or a union of them), or a draft named by its paths. */
 export interface BoundControls<D> {
-    TextField: BoundControl<D, NamesFor<D, string | null, string>, typeof TextInput, string | null>;
+    TextField: BoundControl<NamesFor<D, string | null, string>, typeof TextInput, string | null>;
     /**
      * The field frame by name, for a control the kit has no bound version of (your own, or one that edits
      * a derived value): the form's ids, label and message, and in its slot the field's wiring without

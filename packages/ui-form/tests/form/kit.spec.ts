@@ -180,6 +180,24 @@ describe('form-bound controls', () => {
         expect(wrapper.findAllComponents(TextInput)).toHaveLength(2);
     });
 
+    it('takes a v-model at the call site over the draft, so a proxy converts before the draft is written', async () => {
+        const shown = ref<string | null>('in uren');
+        const {wrapper, draft} = mountWith(({TextField}) =>
+            h(TextField, {
+                name: 'name',
+                placeholder: 'Vul in',
+                modelValue: shown.value,
+                'onUpdate:modelValue': (next: string | null) => (shown.value = next),
+            }),
+        );
+
+        expect((wrapper.find('input').element as HTMLInputElement).value).toBe('in uren');
+        await wrapper.find('input').setValue('8');
+
+        expect(shown.value).toBe('8');
+        expect(draft.value.name).toBe('Ann');
+    });
+
     it('takes its value from v-model on a form without a draft', async () => {
         const value = ref<string | null>('x');
         const wrapper = mount(

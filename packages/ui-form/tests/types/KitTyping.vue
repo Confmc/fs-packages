@@ -13,6 +13,10 @@
     <TextField label="x" placeholder="Vul in" />
     <!-- @vue-expect-error the control's own props stay typed -->
     <TextField name="name" :placeholder="1" />
+    <!-- a v-model at the call site overrides the draft (a proxy that converts), typed by the control's value -->
+    <TextField name="name" v-model="free" placeholder="Vul in" />
+    <!-- @vue-expect-error an override takes what the control writes -->
+    <TextField name="name" v-model="count" placeholder="Vul in" />
     <FormField v-slot="{field}" name="contractNumber" label="Nummer">
         <TextInput v-bind="field" v-model="free" placeholder="Vul in" />
     </FormField>
