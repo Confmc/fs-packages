@@ -9,6 +9,7 @@ export {default as NumberInput} from './components/NumberInput.vue';
 export {default as PasswordInput} from './components/PasswordInput.vue';
 export {default as RadioGroup} from './components/RadioGroup.vue';
 export {default as SearchInput} from './components/SearchInput.vue';
+export {default as SingleSelect} from './components/SingleSelect.vue';
 export {default as Switch} from './components/Switch.vue';
 export {default as Textarea} from './components/Textarea.vue';
 export {default as TextInput} from './components/TextInput.vue';
