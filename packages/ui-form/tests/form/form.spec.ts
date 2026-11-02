@@ -686,6 +686,29 @@ describe('client refusals share the bag', () => {
         expect(shown(wrapper)).toEqual(['Client zegt nee']);
     });
 
+    it('takes an empty refusal as none, so the server message on that field shows again', async () => {
+        const {form, wrapper} = mountRows(['name']);
+
+        await form.handleSubmit(refusedWith({name: ['Server zegt nee']}));
+        form.refuse('name', 'Client zegt nee');
+        form.refuse('name', '');
+        await nextTick();
+
+        expect(form.clientErrors.value).toEqual({});
+        expectMarked(wrapper, 'name', 'Server zegt nee');
+    });
+
+    it('assigns nothing for a refusal that is already standing, so a check per keystroke costs no render', () => {
+        const {form} = mountRows(['name']);
+
+        form.refuse('name', 'Vul een naam in');
+        const standing = form.clientErrors.value;
+        form.refuse('name', 'Vul een naam in');
+        form.refuse('url', '');
+
+        expect(form.clientErrors.value).toBe(standing);
+    });
+
     it('withdraws per field, and clears all client refusals at once', async () => {
         const {form, wrapper} = mountRows(['name', 'url', 'kvkNumber']);
 

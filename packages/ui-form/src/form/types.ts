@@ -112,7 +112,10 @@ export interface UseFormClient<T extends string = string> {
     clientErrors: Readonly<Ref<ValidationErrors<T>>>;
     /** What the fields show: the server's errors with the client refusals on top (client wins per key). */
     fieldErrors: ComputedRef<ValidationErrors<T>>;
-    /** Refuse a field from the client, e.g. a check that runs before the request is sent. */
+    /**
+     * Refuse a field from the client, e.g. a check that runs before the request is sent. An empty message is
+     * no refusal: it drops the field's own, so a server message on it shows again.
+     */
     refuse: (field: T, message: string) => void;
     /**
      * Set the client's whole verdict at once, e.g. the result of a pure `validate(draft)`: the bag

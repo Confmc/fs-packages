@@ -51,8 +51,15 @@ const useFormBody = <T extends string = string>(
     const client = ref({}) as Ref<ValidationErrors<T>>;
     const fieldErrors = computed(() => ({...validation.errors.value, ...client.value}));
 
+    // An empty message is no refusal (as in `setRefusals`): it drops the field's, so the server's shows again.
+    // A refusal already standing, or none dropped, assigns nothing: a check per keystroke costs no render.
     const refuse = (field: T, message: string): void => {
-        client.value = {...client.value, [field]: message};
+        if ((client.value[field] ?? '') === message) return;
+
+        const next = {...client.value};
+        if (message) next[field] = message;
+        else delete next[field];
+        client.value = next;
     };
 
     const setRefusals = (bag: ValidationErrors<T>): boolean => {
