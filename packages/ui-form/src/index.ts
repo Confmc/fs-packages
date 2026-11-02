@@ -19,3 +19,4 @@ export type {
     ValidationErrors,
 } from './form/types';
 export type {Path, PathsFor, PathsOf, PathValue} from './form/path';
+export type {FormDraft} from './form/draft';
