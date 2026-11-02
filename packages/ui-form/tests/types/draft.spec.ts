@@ -52,6 +52,11 @@ describe('FormDraft', () => {
         expectTypeOf<FormDraft<Contract>['attachment']>().toEqualTypeOf<File | null>();
     });
 
+    it('keeps a Map or a Set whole, nullable', () => {
+        expectTypeOf<FormDraft<{byId: Map<number, string>}>['byId']>().toEqualTypeOf<Map<number, string> | null>();
+        expectTypeOf<FormDraft<{chosen: Set<number>}>['chosen']>().toEqualTypeOf<Set<number> | null>();
+    });
+
     it('keeps a list a list that empties to []: of values as they are, of objects as drafts', () => {
         expectTypeOf<FormDraft<Contract>['careLegislationIds']>().toEqualTypeOf<number[]>();
         expectTypeOf<FormDraft<Contract>['tags']>().toEqualTypeOf<string[]>();

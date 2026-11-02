@@ -1,5 +1,4 @@
-/** A value a form edits as a whole, even when it is an object: its own members are not fields. */
-type Whole = Date | File | Blob | ((...args: never[]) => unknown);
+import type {Whole} from './path';
 
 /** One field's draft value: see `FormDraft`. */
 type DraftValue<V> = [NonNullable<V>] extends [boolean]

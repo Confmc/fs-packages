@@ -48,6 +48,15 @@ describe('Path', () => {
         expectTypeOf<'onSave.call'>().not.toExtend<Path<Draft>>();
     });
 
+    it('stops at a Map and a Set: their size and methods are not fields', () => {
+        interface Picks {
+            byId: Map<number, string>;
+            chosen: ReadonlySet<number>;
+        }
+
+        expectTypeOf<Path<Picks>>().toEqualTypeOf<'byId' | 'chosen'>();
+    });
+
     it('stops descending a recursive draft at a fixed depth', () => {
         expectTypeOf<'parent.parent.parent.parent.parent.parent.firstName'>().toExtend<Path<Draft>>();
         expectTypeOf<'parent.parent.parent.parent.parent.parent.parent.firstName'>().not.toExtend<Path<Draft>>();

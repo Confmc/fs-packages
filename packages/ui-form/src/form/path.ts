@@ -3,13 +3,22 @@
 /** How deep `Path` descends: a recursive draft type stops here instead of exploding the union. */
 type Depth = [never, 0, 1, 2, 3, 4, 5, 6];
 
-/** A value the path stops at, even though it is an object: its own keys are not fields. */
-type Leaf = Date | File | Blob | ((...args: never[]) => unknown);
+/**
+ * A value a form edits as a whole, even when it is an object: its own members are not fields, so a path
+ * stops at it and a draft keeps it as it is. Internal: shared with `FormDraft`, not exported by the package.
+ */
+export type Whole =
+    | Date
+    | File
+    | Blob
+    | ReadonlyMap<unknown, unknown>
+    | ReadonlySet<unknown>
+    | ((...args: never[]) => unknown);
 
 /** Every dotted path into `T`; an array index is any `${number}`. */
 export type Path<T, D extends number = 6> = [D] extends [never]
     ? never
-    : T extends Leaf
+    : T extends Whole
       ? never
       : T extends readonly (infer U)[]
         ? `${number}` | `${number}.${Path<U, Depth[D]>}`
