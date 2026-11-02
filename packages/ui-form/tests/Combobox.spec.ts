@@ -509,17 +509,37 @@ describe('Combobox', () => {
             expect(menu(wrapper).find('.ui-combobox__empty').exists()).toBe(true);
         });
 
-        it('drops the highlight while composing, so the Enter that confirms a candidate commits no option', async () => {
+        it('drops the highlight on a composing input', async () => {
             const wrapper = mountCombobox({});
             const input = wrapper.find('input');
 
             await input.trigger('keydown', {key: 'ArrowDown'}); // open
             await input.trigger('keydown', {key: 'ArrowDown'}); // → Apricot
+            expect(input.attributes('aria-activedescendant')).toBe('fruit-opt-0');
+
             input.element.dispatchEvent(new CompositionEvent('compositionstart', {bubbles: true}));
             compose(input.element, 'か');
-            await input.trigger('keydown', {key: 'Enter', isComposing: true});
+            await wrapper.vm.$nextTick();
+
+            expect(input.attributes('aria-activedescendant')).toBeUndefined();
+        });
+
+        it.each([
+            ['isComposing', {isComposing: true}],
+            ['keyCode 229', {keyCode: 229}],
+        ])('commits no highlighted option on an Enter flagged by %s', async (_, flag) => {
+            const wrapper = mountCombobox({});
+            const input = wrapper.find('input');
+
+            await input.trigger('keydown', {key: 'ArrowDown'}); // open
+            await input.trigger('keydown', {key: 'ArrowDown'}); // → Apricot
+            input.element.dispatchEvent(
+                new KeyboardEvent('keydown', {key: 'Enter', bubbles: true, cancelable: true, ...flag}),
+            );
+            await wrapper.vm.$nextTick();
 
             expect(wrapper.emitted('update:modelValue')).toBeUndefined();
+            expect(input.attributes('aria-activedescendant')).toBe('fruit-opt-0');
         });
 
         // Browsers flag a key that belongs to a composition with `isComposing`; some report only
