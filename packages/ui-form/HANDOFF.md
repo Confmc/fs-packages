@@ -824,3 +824,24 @@ no slice is cut until ui-form is ready.
 **Working notes:** worktrees live under the session scratchpad `s2-*` (they vanish between sessions; the fork has
 everything). Run gates one at a time (machine memory is tight); Stryker with `--force`. ui-form specs run with
 `Date` faked (`tests/fixed-date.ts` on #353) because WSL2's clock steps back every ~30 s and VTU events drop.
+
+### Loose ends recorded at the 2026-11-02 compaction
+
+- **Test packs:** latest is `landing.9` (`experiment/ui-form-landing` on fork; main + all open PRs + FormField + the
+  groups + SingleSelect). It does NOT yet hold MultiSelect, Combobox, GroupSelect, MultiCombobox, GroupCombobox or the
+  form chain slices. Next pack: merge those in (expect the family-spec and `useListbox` comment conflicts; take the
+  union), run oxfmt + the ui-form tests before committing, bump to `0.0.0-landing.10`. The emmie test bed
+  (`error-keys-raw`, worktree emmie-2, branch `ui-form-landing-test`, frozen, local only) has 7 scouted select screens:
+  DebtorForm, ContactModal, SchedulePlanDrawer (selects); MdoFormModal, UserForm, EditMeetingUserInvitees (MultiSelect,
+  placement). It compares with emmie as it was before the forms work (development @ 4ad9f14077).
+- **Decided in conversation, not to reopen:** SingleSelect's ArrowDown on open starts at the first option, not the
+  chosen one (emmie parity); a select's Escape only `preventDefault()`s, and emmie's window-level Escape listeners
+  (SchedulePlanDrawer.vue:469 and others) must skip a defaultPrevented Escape (an epic task, emmie's code); attributify
+  `w-*` lands on the control, a select's whole width is `class="w-*"`; `alphabeticalSort` stays opt-in (an app-wide
+  default could be a kit option).
+- **The porting brief that worked** (each select needed fewer review rounds once it had all of it): verbatim copy
+  commit with the diff loop, then one commit per change; the control's own listeners (incl. keydown) before
+  `v-bind="controlAttrs($attrs)"`, pinned by an it.each with a consumer `stopImmediatePropagation`, red first; tests
+  through real input only, never by writing state no user can reach; read the siblings' review fixes before starting
+  (a branch cut before a sibling's fixes repeats its mistakes); a separate read-only review agent per branch; gates one
+  at a time with `stryker run --force`; every red check done by applying the mutant by hand.
