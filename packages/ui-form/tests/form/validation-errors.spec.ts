@@ -8,7 +8,7 @@ import {useValidationErrors} from '../../src';
 // A caught request error the way axios (fs-http's transport) shapes it.
 const refusal = (status: number, data: unknown) => ({isAxiosError: true, response: {status, data}});
 
-const mountComposable = <T extends string = string>(options?: UseValidationErrorsOptions) => {
+const mountComposable = <T extends string = string>(options?: UseValidationErrorsOptions<T>) => {
     const result = useValidationErrors<T>(options);
     return {result: () => result};
 };
