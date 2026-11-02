@@ -705,3 +705,45 @@ the reviewer sees them meanwhile. Add a line when a rule settles; strike one tha
   middleware runs. Other string controls emit `''`. (2026-10-29, #341)
 - Toggle buttons keep one name and carry their state in `aria-pressed`; status notices are live regions that are
   always rendered, with only their text changing. (2026-10-29, #343)
+
+## State at 2026-11-02: the selects, and emmie's migration (read this section first)
+
+Nothing merged or reviewed since 10-26. Every open PR's CI goes red on `npm audit --audit-level=high` since advisories
+published over the weekend (follow-redirects 1.16.0-1.16.1 high via axios; qs moderate via Stryker): not our code.
+A lockfile-only fix (follow-redirects 1.16.2, qs 6.17.1) is committed on local branch `fix/audit-follow-redirects-qs`
+(`44c0e9a`), not pushed: it opens as its own PR against main only with Marcel's yes.
+
+| Branch (on `fork`) | Base | What | Opens |
+|---|---|---|---|
+| `ui-form/n-single-select` | main | SingleSelect + the listbox core; two review rounds in; keydown on the trigger; Stryker 96.46 | #353, draft until the audit fix is in and CI is green |
+| `ui-form/n-multi-select` | n-single-select | MultiSelect: chips in display order (as pre-forms emmie), the model keeps the consumer's order, `placement` (a given placement flips to the opposite side); Stryker 98.09 | after #353 merges |
+
+Tested on emmie (landing.9): SingleSelect on DebtorForm, ContactModal (clear entry), SchedulePlanDrawer (top layer,
+no clipping), disabled. Selects ignore `SelectItem.disabled` (pre-forms emmie's selects never disabled one option).
+`alphabeticalSort` defaults to the caller's order (settled 2026-10-03), so emmie's sorted sites add it. Attributify
+`w-*` lands on the control (by design); a select's whole width is `class="w-*"`.
+
+### emmie's migration (the test bed's analysis, emmie development @ 4763c744ab)
+
+- **Size:** 281 `.vue` files hold a control to convert; FormField 461 uses (161 files); `useForm(` in 146 files;
+  199 spec files import emmie's controls. Largest: TextInput 203, DatePickerField 72, SwitchBoxInput 67,
+  CheckBoxInput 62, SingleSelect 85.
+- **Screen by screen works.** ui-form installs beside ui-inputs 0.17 and fs-form; a ui-inputs FormField wraps a
+  ui-form control and the other way round; one token map serves both; specs move with their screen.
+- **Two all-at-once steps, both before the first converted screen:** (1) the stylesheet swap: ui-form's sheet ALONE
+  styles untouched 0.17 pages with no visual diff, both sheets together break padding and radii (the unlayered 0.17
+  `.ui-control` beats the layer); (2) the 422 key shape: emmie folds keys flat, ui-form's row errors need dotted
+  keys (error-keys-raw's phase 1).
+- **Also first:** the kit texts (`createUiForm({texts})`, or every select carries `options-label`); emmie's
+  window-level Escape listeners must skip a `defaultPrevented` Escape (SchedulePlanDrawer.vue:469 closes the drawer
+  when a select's list closes).
+- **Mechanical per call site:** imports, `optionLabel`, `alphabetical-sort`, `clear-label`, `class="w-*"`, the
+  FormField `field` slot, `invalid`. **Needs a person:** missing placeholders (17 NumberInputs, 13 Textareas: copy),
+  hand-built group headings, `emptyDisplayValue` for "Alle…"/"Geen" filters, AdditiveInput → InputGroup, `''`/`null`
+  readers, the specs.
+- **Order:** settings → finances → registrations → schedule → user → admin → client portal → user/client (77 files)
+  last; a page tree per slice, controls + form logic + specs together; emmie's own controls and fs-form deleted at
+  the end, then ui-inputs.
+- **Blockers:** no date picker (DatePickerField 72 uses, the biggest gap); Combobox/MultiCombobox (SearchableSelect,
+  `searchable`); GroupSelect/GroupCombobox; BooleanRadioGroup (RadioGroup over two options, or its own control: to
+  decide); the form kit for the 146 `useForm` files (not yet in any pack: the biggest unknown).
