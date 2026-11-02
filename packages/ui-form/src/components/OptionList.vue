@@ -102,9 +102,9 @@ import ListboxOption from './ListboxOption.vue';
  * Flat and grouped selects render through this single component: the ONLY difference is the
  * `rows` a parent hands down. A flat control (SingleSelect, Combobox) passes a run of all-option
  * rows (no headers, rendered flat); a grouped control (GroupSelect, GroupCombobox) interleaves
- * `header`/`boundary` rows and this component folds them into named `role="group"` runs. `boundary` closes the open run so a
- * `header:false` group after a named one renders flat instead of being absorbed into the
- * preceding group.
+ * `header`/`boundary` rows and this component folds them into named `role="group"` runs.
+ * `boundary` closes the open run so a `header:false` group after a named one renders flat
+ * instead of being absorbed into the preceding group.
  *
  * Entirely index-based, mirroring `useListbox`: the option type `T` never crosses this
  * boundary. The parent hands down `rows` + `keys` derived from ITS list (SingleSelect's

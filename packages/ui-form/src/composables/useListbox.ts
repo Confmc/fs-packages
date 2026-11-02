@@ -69,7 +69,8 @@ export interface UseListboxOptions {
      * Whether a committing CLEAR ENTRY currently renders above the option list (the
      * `clearLabel` feature on every select here). The entry lives OUTSIDE the index space —
      * indexes keep mapping to the caller's option list — and gets its own keyboard slot between
-     * "nothing highlighted" and index 0, plus its own activedescendant id (`${id}-clear`). A getter so it tracks the prop reactively.
+     * "nothing highlighted" and index 0, plus its own activedescendant id (`${id}-clear`). A
+     * getter so it tracks the prop reactively.
      */
     clearEntry?: () => boolean;
     /** Commit the clear entry; returns whether a commit happened (decides preventDefault). */

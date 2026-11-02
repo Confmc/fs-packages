@@ -83,7 +83,7 @@ describe('GroupCombobox', () => {
         expect(options.map((o) => o.text())).toEqual(['Mango', 'Kiwi', 'Apricot', 'Lime']);
     });
 
-    it('narrows each group as the user types, hides a group with no match, and shows all on an empty query', async () => {
+    it('narrows each group as the user types, hides one with no match, and shows all on an empty query', async () => {
         const wrapper = mountGroupCombobox({});
         const input = wrapper.find('input');
 
@@ -387,7 +387,7 @@ describe('GroupCombobox', () => {
         expect(wrapper.find('input').element.value).toBe('Lime');
     });
 
-    it("shows the committed label once a pre-set model's option arrives asynchronously (edit-form pattern)", async () => {
+    it("shows the committed label once a pre-set model's option arrives late (edit-form pattern)", async () => {
         const wrapper = mountGroupCombobox({modelValue: 1, groups: []});
         expect(wrapper.find('input').element.value).toBe('');
 
