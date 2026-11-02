@@ -3,7 +3,7 @@
         <input
             v-model="query"
             @input="onInput"
-            @keydown="onKey"
+            @keydown="onInputKey"
             @click="onClick"
             v-bind="controlAttrs($attrs)"
             :id="id"
@@ -290,6 +290,14 @@ const dismiss = (): void => {
 const onInput = (event: Event) => {
     resetHighlight();
     if (!(event as InputEvent).isComposing) openList();
+};
+// A key pressed during a composition belongs to the input method: it moves through its candidates
+// with the arrow keys and confirms one with Enter, so the list must not move or commit on them.
+// The keys inside a composition carry `isComposing`. The keydown that starts one fires before
+// `compositionstart`, so it carries `isComposing: false` and only keyCode 229 marks it.
+const onInputKey = (event: KeyboardEvent) => {
+    if (event.isComposing || event.keyCode === 229) return;
+    onKey(event);
 };
 // Clicking the (enabled) input opens the list. A disabled input never dispatches click.
 const onClick = openList;
