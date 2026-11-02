@@ -33,6 +33,15 @@ const mountCombobox = (props: Record<string, unknown>, slots?: Record<string, un
         attachTo: document.body,
     });
 
+// A user types into a focused field, and Combobox opens on typing only while the input has focus.
+const typeInto = async (
+    input: {element: HTMLElement; setValue: (value: string) => Promise<void>},
+    value: string,
+): Promise<void> => {
+    input.element.focus();
+    await input.setValue(value);
+};
+
 afterEach(() => {
     document.body.innerHTML = '';
 });
@@ -42,7 +51,7 @@ describe('Combobox', () => {
         const wrapper = mountCombobox({});
         const input = wrapper.find('input');
 
-        await input.setValue('m'); // filtered: Mango, Watermelon
+        await typeInto(input, 'm'); // filtered: Mango, Watermelon
         await input.trigger('keydown', {key: 'End'});
         expect(input.attributes('aria-activedescendant')).toBe('fruit-opt-1');
         await input.trigger('keydown', {key: 'Home'});
@@ -60,10 +69,10 @@ describe('Combobox', () => {
         await input.trigger('click');
         expect(region.text()).toBe(''); // open with options → silent
 
-        await input.setValue('zzz'); // typing drains the filtered list
+        await typeInto(input, 'zzz'); // typing drains the filtered list
         expect(region.text()).toBe('No match');
 
-        await input.setValue('m'); // matches return → the region empties again
+        await typeInto(input, 'm'); // matches return → the region empties again
         expect(region.text()).toBe('');
     });
 
@@ -128,7 +137,7 @@ describe('Combobox', () => {
         const wrapper = mountCombobox({});
         const input = wrapper.find('input');
 
-        await input.setValue('ap');
+        await typeInto(input, 'ap');
         expect(input.attributes('aria-expanded')).toBe('true'); // typing opens
         expect(
             menu(wrapper)
@@ -136,21 +145,21 @@ describe('Combobox', () => {
                 .map((o) => o.text()),
         ).toEqual(['Apricot']);
 
-        await input.setValue('m');
+        await typeInto(input, 'm');
         expect(
             menu(wrapper)
                 .findAll('.ui-combobox__option')
                 .map((o) => o.text()),
         ).toEqual(['Mango', 'Watermelon']);
 
-        await input.setValue('');
+        await typeInto(input, '');
         expect(
             menu(wrapper)
                 .findAll('.ui-combobox__option')
                 .map((o) => o.text()),
         ).toEqual(['Apricot', 'Mango', 'Watermelon']);
 
-        await input.setValue('zzz');
+        await typeInto(input, 'zzz');
         expect(menu(wrapper).findAll('.ui-combobox__option')).toHaveLength(0);
         expect(menu(wrapper).find('.ui-combobox__empty').exists()).toBe(true);
     });
@@ -159,7 +168,7 @@ describe('Combobox', () => {
         const wrapper = mountCombobox({});
         const input = wrapper.find('input');
 
-        await input.setValue('m'); // filtered: Mango, Watermelon
+        await typeInto(input, 'm'); // filtered: Mango, Watermelon
         await input.trigger('keydown', {key: 'ArrowDown'}); // pointer → 0 (Mango)
         expect(menu(wrapper).findAll('.ui-combobox__option')[0].classes()).toContain('is-active');
         expect(menu(wrapper).findAll('.ui-combobox__option')[0].attributes('aria-selected')).toBe('false');
@@ -270,7 +279,7 @@ describe('Combobox', () => {
         const input = wrapper.find('input');
 
         await input.trigger('click');
-        await input.setValue('zzz'); // no match
+        await typeInto(input, 'zzz'); // no match
         expect(menu(wrapper).find('.ui-combobox__empty').exists()).toBe(true);
         expect(input.element.value).toBe('zzz');
 
@@ -283,7 +292,7 @@ describe('Combobox', () => {
         const wrapper = mountCombobox({}); // no selection
         const input = wrapper.find('input');
 
-        await input.setValue('ap');
+        await typeInto(input, 'ap');
         expect(input.element.value).toBe('ap');
         expect(menu(wrapper).exists()).toBe(true);
 
@@ -378,6 +387,7 @@ describe('Combobox', () => {
             attachTo: document.body,
         });
 
+        wrapper.find('input').element.focus();
         await wrapper.find('input').trigger(type, init);
 
         expect(menu(wrapper).exists()).toBe(true);
@@ -401,7 +411,7 @@ describe('Combobox', () => {
     it('closes and reverts on Tab', async () => {
         const wrapper = mountCombobox({});
         const input = wrapper.find('input');
-        await input.setValue('zzz'); // open + half-typed non-match
+        await typeInto(input, 'zzz'); // open + half-typed non-match
         expect(menu(wrapper).exists()).toBe(true);
         await input.trigger('keydown', {key: 'Tab'});
         expect(menu(wrapper).exists()).toBe(false);
@@ -446,7 +456,7 @@ describe('Combobox', () => {
         const input = wrapper.find('input');
 
         await input.trigger('click');
-        await input.setValue('m'); // filtered + sorted: Mango, Watermelon
+        await typeInto(input, 'm'); // filtered + sorted: Mango, Watermelon
         expect(
             menu(wrapper)
                 .findAll('.swatch')
@@ -478,6 +488,7 @@ describe('Combobox', () => {
             const wrapper = mountCombobox({});
             const field = wrapper.find('input').element;
 
+            field.focus();
             field.dispatchEvent(new CompositionEvent('compositionstart', {bubbles: true}));
             compose(field, 'z');
             compose(field, 'm');
@@ -498,6 +509,7 @@ describe('Combobox', () => {
             const field = wrapper.find('input').element;
             const select = vi.spyOn(field, 'select');
 
+            field.focus();
             field.dispatchEvent(new CompositionEvent('compositionstart', {bubbles: true}));
             compose(field, 'Mangoか');
             await wrapper.vm.$nextTick();
@@ -569,6 +581,22 @@ describe('Combobox', () => {
             expect(menu(wrapper).exists()).toBe(true);
         });
 
+        it('does not open when a blur commits the composition after focus has left', async () => {
+            const wrapper = mountCombobox({});
+            const field = wrapper.find('input').element;
+            const outside = document.createElement('button');
+            document.body.append(outside);
+
+            field.focus();
+            field.dispatchEvent(new CompositionEvent('compositionstart', {bubbles: true}));
+            compose(field, 'm');
+            outside.focus();
+            field.dispatchEvent(new CompositionEvent('compositionend', {bubbles: true, data: 'm'}));
+            await wrapper.vm.$nextTick();
+
+            expect(menu(wrapper).exists()).toBe(false);
+        });
+
         it('keeps the candidate text in the field across a re-render while composing', async () => {
             const wrapper = mountCombobox({});
             const field = wrapper.find('input').element;
@@ -603,7 +631,7 @@ describe('Combobox', () => {
             const input = wrapper.find('input');
 
             await input.trigger('click');
-            await input.setValue('Man'); // diverged from the committed label → filter engages
+            await typeInto(input, 'Man'); // diverged from the committed label → filter engages
             expect(
                 menu(wrapper)
                     .findAll('.ui-combobox__option')
@@ -613,7 +641,7 @@ describe('Combobox', () => {
             // Retyping the EXACT committed label converges back to the full list — the
             // convention is equality, not a typed-once latch (MUI Autocomplete parity):
             // the committed label as a query carries no intent to narrow.
-            await input.setValue('Mango');
+            await typeInto(input, 'Mango');
             expect(
                 menu(wrapper)
                     .findAll('.ui-combobox__option')
@@ -664,7 +692,7 @@ describe('Combobox', () => {
             const input = wrapper.find('input');
             const select = vi.spyOn(input.element, 'select');
 
-            await input.setValue('Man'); // typing opens; the query has already diverged
+            await typeInto(input, 'Man'); // typing opens; the query has already diverged
             expect(select).not.toHaveBeenCalled(); // selecting now would eat the user's edit
         });
     });
@@ -674,13 +702,13 @@ describe('Combobox', () => {
             const wrapper = mountCombobox({clearLabel: 'No fruit'});
             const input = wrapper.find('input');
 
-            await input.setValue('zzz'); // no option matches — the entry still renders
+            await typeInto(input, 'zzz'); // no option matches — the entry still renders
             const clear = menu(wrapper).find('.ui-combobox__clear');
             expect(clear.text()).toBe('No fruit');
             expect(clear.attributes('id')).toBe('fruit-clear');
             expect(clear.attributes('aria-selected')).toBe('true'); // model is null
 
-            await input.setValue('m'); // option ids keep mapping to the FILTERED list only
+            await typeInto(input, 'm'); // option ids keep mapping to the FILTERED list only
             expect(
                 menu(wrapper)
                     .findAll('.ui-combobox__option')
@@ -708,7 +736,7 @@ describe('Combobox', () => {
             const input = wrapper.find('input');
             expect(input.element.value).toBe('Any fruit');
 
-            await input.setValue('zzz'); // half-typed non-match…
+            await typeInto(input, 'zzz'); // half-typed non-match…
             await input.trigger('keydown', {key: 'Escape'});
             expect(input.element.value).toBe('Any fruit'); // …reverts to the named empty state
         });
@@ -733,7 +761,7 @@ describe('Combobox', () => {
             expect(menu(wrapper).find('.ui-combobox__clear').classes()).toContain('is-active');
             expect(input.attributes('aria-activedescendant')).toBe('fruit-clear');
 
-            await input.setValue('m'); // typing must reset the highlight to "nothing"
+            await typeInto(input, 'm'); // typing must reset the highlight to "nothing"
             expect(menu(wrapper).find('.ui-combobox__clear').classes()).not.toContain('is-active');
             expect(input.attributes('aria-activedescendant')).toBeUndefined();
         });
