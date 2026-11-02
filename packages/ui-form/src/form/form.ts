@@ -187,8 +187,8 @@ const useFormBody = <T extends string = string>(
  * the page.
  *
  * With a `draft`, the field names are the draft's paths (`useForm({draft})` names `errors`, `fields` and
- * every name the form takes by `Path<D>`), and `field(name)` also carries the value at that path and writes changes back into the
- * draft; without one they are free strings, or the union given as `T`.
+ * every name the form takes by `Path<D>`), and `field(name)` also carries the value at that path and
+ * writes changes back into the draft; without one they are free strings, or the union given as `T`.
  *
  * Call `useForm` in a component's `setup()`: its ids end in a part from Vue's `useId()`, unless a fixed
  * `idPrefix` is given. `useId()` counts per app, so two Vue apps mounted on one page need their own

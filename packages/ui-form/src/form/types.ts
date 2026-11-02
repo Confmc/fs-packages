@@ -19,7 +19,10 @@ export interface UseValidationErrors<T extends string = string> {
      * `catch (error) { if (!form.take(error)) throw error; }`.
      */
     take: (error: unknown) => boolean;
-    /** `true` once a 422 has been taken, until `clearErrors` (which a `'sent'` submit calls). */
+    /**
+     * `true` once a 422 has been taken, until `clearErrors` (which a `'sent'` submit calls). The server's
+     * only: a form's own refusals (`validate`, `refuse`) never set it.
+     */
     refused: Readonly<Ref<boolean>>;
     /**
      * The mapped keys of the last taken 422 that `errors` does not hold: not named by
@@ -30,6 +33,8 @@ export interface UseValidationErrors<T extends string = string> {
     /**
      * The last taken 422 named no field this form holds (nothing to point at), so a caller can say so
      * after `outcome === 'refused'`. Decided when it is taken: dropping messages later never flips it.
+     * The server's only: after a submit its `validate` refused, the action never ran and this still
+     * describes the 422 before it.
      */
     refusedUnnamed: Readonly<Ref<boolean>>;
 }
@@ -52,9 +57,10 @@ export interface UseValidationErrorsOptions<T extends string = string> {
 }
 
 /**
- * How a `handleSubmit` call ended: the action ran to the end (`'sent'`), the server refused it with a
- * 422 (`'refused'`), the action resolved `false` because it sent nothing, such as a save the user
- * declined (`'cancelled'`), or it never ran because a submit was already in flight (`'ignored'`).
+ * How a `handleSubmit` call ended: the action ran to the end (`'sent'`); the server refused it with a
+ * 422, or `useForm`'s `validate` refused it before the action ran (`'refused'`); the action resolved
+ * `false` because it sent nothing, such as a save the user declined (`'cancelled'`); or it never ran
+ * because a submit was already in flight (`'ignored'`).
  */
 export type SubmitOutcome = 'sent' | 'refused' | 'cancelled' | 'ignored';
 
