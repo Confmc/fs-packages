@@ -116,9 +116,9 @@ import ListboxOption from './ListboxOption.vue';
  *
  * The single `<ul>` root is LOAD-BEARING: the floating element is the parent's
  * `.ui-menu-anchor` wrapper, promoted to the top layer in place (KD-1136) — floating-ui positions
- * the ANCHOR, and this `<ul>` is a static box inside it. That is what keeps `--ui-menu-min-width:
- * 100%` resolving against the trigger rather than against the viewport. This component renders no
- * positioning of its own and takes no floating-ui styles.
+ * the ANCHOR and sizes it to the trigger, and this `<ul>` is a static box inside it. That is what
+ * keeps `--ui-menu-min-width: 100%` resolving against the trigger rather than against the menu's
+ * own width. This component renders no positioning of its own and takes no floating-ui styles.
  */
 const {
     rows,
