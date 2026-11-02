@@ -111,6 +111,8 @@
 </template>
 
 <script setup lang="ts" generic="T extends SelectItem">
+import type {Placement} from '@floating-ui/vue';
+
 import {computed, ref, useTemplateRef} from 'vue';
 
 import type {GroupRow} from '../internal/group-rows';
@@ -138,6 +140,7 @@ const {
     optionsLabel = 'Options',
     removeLabel = 'Remove',
     mutedOptions,
+    placement,
 } = defineProps<{
     options: T[];
     /** property name or getter for an option's display string. */
@@ -163,6 +166,12 @@ const {
     removeLabel?: string;
     /** ids rendered visually muted (`.is-muted`) — still committable, still in the keyboard path. */
     mutedOptions?: T['id'][];
+    /**
+     * where the list opens against the box (default `'bottom-start'`). With no room it flips to the
+     * opposite side at the same alignment (`bottom-start` → `top-start`), never to the other
+     * alignment. Read once.
+     */
+    placement?: Placement;
 }>();
 
 defineSlots<{
@@ -282,6 +291,7 @@ const {open, pointer, listboxId, optionId, activeDescendant, floatingStyles, onK
         onCommit: commit,
         onDismiss: () => dismiss(),
         onOutside: () => dismiss(),
+        floatingOptions: {placement},
     });
 
 // Close-without-commit (Escape, Tab, click outside): the query clears back to the resting
