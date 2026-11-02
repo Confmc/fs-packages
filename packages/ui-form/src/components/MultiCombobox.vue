@@ -222,7 +222,7 @@ const chips = computed(() => sorted.value.filter((option) => model.value.include
 const selectedSummary = computed(() => chips.value.map(labelOf).join(', '));
 const selectionId = computed(() => `${id}-selection`);
 const describedbyWithSelection = computed(() =>
-    describedby === undefined ? selectionId.value : `${describedby} ${selectionId.value}`,
+    describedby ? `${describedby} ${selectionId.value}` : selectionId.value,
 );
 
 // The index-based view OptionList renders — parallel arrays derived from `filtered`, which

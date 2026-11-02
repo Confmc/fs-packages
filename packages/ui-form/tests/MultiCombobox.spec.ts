@@ -151,6 +151,15 @@ describe('MultiCombobox', () => {
         expect(wrapper.find('#fruit-selection').text()).toBe('Apricot, Watermelon'); // display order
     });
 
+    it.each([
+        ['absent', {}],
+        ['empty', {describedby: ''}],
+    ])('names only the selection summary when the consumer describedby is %s', (_, props) => {
+        const wrapper = mountMultiCombobox(props);
+
+        expect(wrapper.find('input').attributes('aria-describedby')).toBe('fruit-selection');
+    });
+
     it('filters the list as the user types, and an empty query shows all options', async () => {
         const wrapper = mountMultiCombobox({});
         const input = wrapper.find('input');
