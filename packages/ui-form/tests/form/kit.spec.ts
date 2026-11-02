@@ -135,6 +135,25 @@ describe('form-bound controls', () => {
         expect(draft.value.name).toBe('Ann');
     });
 
+    it('binds FormLabel and FormError by name, under stable component names, with nothing stray on the label', async () => {
+        const {wrapper, form} = mountWith((bound) =>
+            h('div', [
+                h(bound.FormLabel, {name: 'name', label: 'Naam', required: true}),
+                h(bound.FormError, {name: 'name'}),
+            ]),
+        );
+        form().refuse('name', 'Te kort');
+        await nextTick();
+        const label = wrapper.find('label');
+
+        expect(label.text()).toBe('Naam*');
+        expect(label.find('.ui-label__req').exists()).toBe(true);
+        expect(Object.keys(label.attributes())).toEqual(['class', 'for']);
+        expect(form().FormLabel.name).toBe('FormLabel');
+        expect(form().FormError.name).toBe('FormError');
+        expect(wrapper.findComponent({name: 'FormError'}).text()).toBe('Te kort');
+    });
+
     it('lets the call site override the wiring: invalid false shows the message without the mark', async () => {
         const {wrapper, form} = mountWith(({TextField}) =>
             h(TextField, {name: 'name', label: 'Naam', placeholder: 'Vul in', invalid: false}),
