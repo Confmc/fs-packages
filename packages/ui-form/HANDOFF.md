@@ -792,8 +792,11 @@ Pressable/Disclosure after #332. BooleanRadioGroup: decide (RadioGroup over two 
 
 **Date pickers in the migration:** emmie's `DatePickerField` already takes `id`/`invalid`/`describedby`, so
 `v-bind="field"` wires its errors. Its `:id="kebabCase(id)"` breaks FormField's `<label for>` (an emmie-side fix for the
-epic). The kit can't bind emmie's picker, so date fields stay hand-wired until a package DatePicker exists. A test-bed
-check of this was sent at day end; read its reply.
+epic; confirmed on ClientStartDateModal: with kebabCase the name falls back to the placeholder, without it the label names
+the input). Also for the epic: leave its own `label` off inside FormField, drop its dead `error` prop; `notNullable` →
+leave `clear-label` out (the package rule). Errors wire (aria-invalid, describedby → message); its popover works in a
+dialog; the model is YYYY-MM-DD, and it folds a Laravel ISO datetime itself. The kit can't bind emmie's picker, so date
+fields stay hand-wired until a package DatePicker exists.
 
 **422 key shape: settled, not open.** keyMapper identity; keys arrive as dotted camelCase paths; emmie's phase 1
 (collector `error-keys-raw`, docs/plans/fs-packages-ui-form/SLICES.md) does the casing in its error middleware;
