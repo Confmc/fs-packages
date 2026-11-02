@@ -23,7 +23,7 @@ export type Path<T, D extends number = 6> = [D] extends [never]
       : T extends readonly (infer U)[]
         ? `${number}` | `${number}.${Path<U, Depth[D]>}`
         : T extends object
-          ? {[K in keyof T & string]: K | `${K}.${Path<NonNullable<T[K]>, Depth[D]>}`}[keyof T & string]
+          ? {[K in keyof T & string]: K | `${K}.${Path<T[K], Depth[D]>}`}[keyof T & string]
           : never;
 
 /** The value at a dotted path into `T`. */
