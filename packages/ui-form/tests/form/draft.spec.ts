@@ -41,6 +41,23 @@ describe('useForm with a draft', () => {
         expect(wrapper.findAll('input')[1]!.element.value).toBe('Schrijven');
     });
 
+    it('shows a change made to the draft elsewhere', async () => {
+        const draft = ref<Draft>({firstName: 'Ann', learningGoals: []});
+        const wrapper = mount(
+            defineComponent({
+                setup: () => {
+                    const {field} = useForm({draft});
+                    return () => h(TextInput, {...field('firstName'), placeholder: 'Voornaam'});
+                },
+            }),
+        );
+
+        draft.value.firstName = 'Bo';
+        await nextTick();
+
+        expect(wrapper.find('input').element.value).toBe('Bo');
+    });
+
     it('carries only the wiring without a draft', () => {
         let props: object = {};
         mount(
