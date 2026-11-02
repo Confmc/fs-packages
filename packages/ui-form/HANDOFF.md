@@ -985,3 +985,51 @@ Nothing built goes against them; no amendment is needed now. What they still ask
   through real input only, never by writing state no user can reach; read the siblings' review fixes before starting
   (a branch cut before a sibling's fixes repeats its mistakes); a separate read-only review agent per branch; gates one
   at a time with `stryker run --force`; every red check done by applying the mutant by hand.
+
+## End of 2026-11-02, evening (read this first at home)
+
+Everything is on the fork (`Confmc/fs-packages`); nothing local is unpushed. Scratchpad worktrees vanish: recreate
+from the fork (`git worktree add -b <local> <path> fork/<branch>`, then `npm ci --ignore-scripts`).
+
+**Upstream.** #330 FormError merged 14:42 (first merge since 10-26); 15 open, all green except #353 (draft, audit step:
+waits on #354). All dry-merge cleanly into the new main. The reviewer has the review order and three questions
+(Mattermost): app defaults via `createUiForm`, Amendment 2 yes/no, the placeholder (Marcel asks). No answer yet.
+**Rule: no new PRs until he reviews or merges more** (#330 met it, but FormField still waits for #354, see below).
+
+**When #354 merges, one push per PR (one CI run each), in this order:**
+1. #353 out of draft once green.
+2. `hold/344-boolean-id` onto #344, `hold/333-spec-type` onto #333 (merge main in first; delete the hold branches).
+3. The audit fixes (section "Reviewer-lens audit" above): #339's `?.` removal on #335 #341 #342 #343; stale
+   descriptions (#353 #336 #332 #339); #333 "merges after #339"; #340 "WR-2715 recipes stay open". Check-context
+   items stay checks, not fixes.
+4. Then open FormField (`ui-form/n-form-field`, base now main) as the next PR, with Marcel's OK.
+
+**Prepared on fork, opens when its base merges:**
+- Selects: `n-multi-select`, `n-combobox`, `n-group-select` (on #353), `n-multi-combobox`, `n-group-combobox`.
+  GroupSelect/GroupCombobox PR bodies must name emmie's grouped selects (ADR § 6).
+- FormField + `n-field-label-after`, `n-field-hint`, `n-field-aside`; `n-checkbox-group` (on #332).
+- Form chain: `n-use-form` (2) → `n-form-paths` (3) → `n-field` (4) → `n-form-refusals` (4b) → `n-form-kit` (5:
+  TextField + FormField bound, slot `{field, aria, model}`, declaration check on the built package; base merges
+  n-form-field). All reviewed, fixes in.
+- `n-token-scope` (on #340): derived tokens resolved at the point of use. **Ordering note:** #338 InputGroup adds two
+  more derived tokens on `:root` (`--ui-addon-bg`, `--ui-addon-text`); whichever of #338 / token-scope lands second
+  converts them and raises the guard's count from 26 to 28 (landing.10 did exactly that).
+
+**Test bed (emmie-2, `error-keys-raw`).** Its handoff: emmie `docs/plans/fs-packages-ui-form/HANDOFF.md` § "State at
+2026-11-02" on `ui-form-landing-test` @ 907dcc5669 (pushed only with Marcel's yes). Next for it: convert on landing.10
+ContractFormDrawer/FinancingFormDrawer, the learning-goals rows, a dialog-service modal, and one drawer's area look
+as tokens; confirm or drop the shape review's paper findings 2, 4, 5 (1 and 3 are done).
+
+**landing.10:** `fork/experiment/ui-form-landing` @ f98f346 (main + open PRs + all selects + form chain through slice
+5 + token fix). The tgz is local to the work box (`.experiment-packs/` is git-excluded): at home rebuild with
+`npm ci --ignore-scripts`, then in `packages/ui-form` `npm run build && npm pack`, rename to
+`script-development-ui-form-landing.10.tgz`. The API reference and the shape review are copied to
+`packages/ui-form/reference/` on this branch.
+
+**Drafted, not sent:** `packages/ui-form/AMENDMENT-2.draft.md` (§ 1 placeholder and § 6 app defaults pending his
+answers; form/kit rules wait for landing.10).
+
+**Next for us, in order:** the #354 sequence above when it merges; the test bed's landing.10 results → fix what they
+confirm; slice 6 (other bindings + `createUiForm`) once the controls are on main; Pressable/Disclosure after #332;
+the release PR last. No package DatePicker (decided). Machine notes: Chromium aliases 1243 and 1248 now point at 1252;
+pass `--maxWorkers=2` to vitest (the vitest guard hook is now scoped to emmie and emits valid JSON).
