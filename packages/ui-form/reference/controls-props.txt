@@ -1,0 +1,622 @@
+=== TextInput @ origin/main
+} = defineProps<{
+    /** control id, pairing the input with its label and error; inside a `FormField` the field passes its own. */
+    id: string;
+    /** a password field is PasswordInput, a search field SearchInput. */
+    type?: 'text' | 'email' | 'tel' | 'url';
+    /** required, so no input goes without one. */
+    placeholder: string;
+    disabled?: boolean;
+    /** conveys the required state to assistive tech via `aria-required`. */
+    required?: boolean;
+    /** marks the input invalid, with the error icon; the field around it decides the message. */
+    invalid?: boolean;
+    /** id of the paired error element for `aria-describedby`. */
+    describedby?: string;
+    /**
+     * focus the input when it mounts. Done in script, not with the native attribute: the browser only
+     * honours `autofocus` on page load, so an input in a dialog that opens later would stay unfocused.
+     */
+    autofocus?: boolean;
+}>();
+const model = defineModel<string | null>({required: true});
+</script>
+=== FormLabel @ fork/ui-form/n-field-label-after
+defineProps<{
+    /** id of the control this label describes (`for` attribute). */
+    htmlFor: string;
+    /** render the required marker. */
+    required?: boolean;
+}>();
+<slot />
+<slot name="after" />
+=== FormError @ fork/ui-form/p02-form-error
+defineProps<{
+    /**
+     * the resolved error string. Supplied by the consumer — never read from a service. An empty or
+     * missing one renders nothing, so no empty `role="alert"` element is announced and a validation
+     * bag's `errors.x` binds as is.
+     */
+    error?: string;
+    /** id used to pair with a control's `aria-describedby`. */
+    id: string;
+}>();
+=== FormField @ fork/ui-form/n-form-field
+} = defineProps<{
+    /** label text; omit for an unlabelled field. */
+    label?: string;
+    required?: boolean;
+    /** resolved error string, supplied by the consumer (error-as-prop); empty means no error. */
+    error?: string;
+    /** the control's id; the label's `for` and the message's id follow from it. */
+    id: string;
+    /**
+     * field layout. `'vertical'` (default) stacks the label above the control; `'horizontal'`
+     * places the label in a fixed left column (width `--ui-field-label-width`) with the control
+     * to its right and the error beneath the control. An unlabelled field ignores it — there is
+     * no label to give a column to, so the control keeps the full width.
+     */
+    orientation?: 'vertical' | 'horizontal';
+}>();
+defineSlots<{
+    /** `field` for a control of this package, `aria` for a native element (a `role="group"` div). */
+    default?: (scope: {field: FieldBinding; aria: FieldAria}) => unknown;
+}>();
+<slot :field="field" :aria="aria" />
+=== Checkbox @ fork/ui-form/n-checkbox-switch
+} = defineProps<{
+    /** stable id — required so the control can pair with an external label/error. */
+    id: string;
+    /** label text rendered beside the box; the default slot overrides it. */
+    label?: string;
+    disabled?: boolean;
+    /** conveys the required state to assistive tech via `aria-required`. */
+    required?: boolean;
+    /** invalid styling + aria; drive it from the field's error. */
+    invalid?: boolean;
+    /** id of the paired error element for `aria-describedby`. */
+    describedby?: string;
+    /**
+     * visual "mixed" state (the element's `indeterminate` DOM property, drawn as a dash).
+     * Purely presentational — it never reads from or writes to the boolean model.
+     */
+    indeterminate?: boolean;
+}>();
+const model = defineModel<boolean>({required: true});
+// change (not input) is the native checkbox commit event. The browser has already flipped the input,
+// and a host that declines or decides later leaves the model where it was, so Vue never re-patches
+// `checked` (WR-1922): once the host has rendered, the input is set back to the model. That is why
+// this control binds `checked` and `change` by hand instead of `v-model`: Vue's checkbox v-model
+// re-syncs `checked` only when the component re-renders, which a declined change never causes.
+const onChange = (event: Event): void => {
+    const control = event.target as HTMLInputElement;
+    model.value = control.checked;
+    void nextTick(() => {
+        control.checked = model.value;
+    });
+<slot>
+=== Switch @ fork/ui-form/n-checkbox-switch
+} = defineProps<{
+    /** stable id — required so the control can pair with an external label/error. */
+    id: string;
+    /** label text rendered beside the track; the default slot overrides it. */
+    label?: string;
+    disabled?: boolean;
+    /** conveys the required state to assistive tech via `aria-required`. */
+    required?: boolean;
+    /** invalid styling + aria; drive it from the field's error. */
+    invalid?: boolean;
+    /** id of the paired error element for `aria-describedby`. */
+    describedby?: string;
+}>();
+const model = defineModel<boolean>({required: true});
+// change (not input) is the native checkbox commit event; the input follows the model once the host
+// has rendered, for the reason Checkbox gives (WR-1922), and that is also why it binds `checked` and
+// `change` by hand instead of `v-model`.
+const onChange = (event: Event): void => {
+    const control = event.target as HTMLInputElement;
+    model.value = control.checked;
+    void nextTick(() => {
+        control.checked = model.value;
+    });
+<slot>
+=== NumberInput @ fork/ui-form/n-number-input
+const {invalid = false, autofocus = false} = defineProps<{
+    /** control id, pairing the input with its label and error; inside a `FormField` the field passes its own. */
+    id: string;
+    /** required, so no input goes without one. */
+    placeholder: string;
+    disabled?: boolean;
+    min?: number;
+    max?: number;
+    step?: number;
+    /** conveys the required state to assistive tech via `aria-required`. */
+    required?: boolean;
+    /** marks the input invalid, with the error icon; the field around it decides the message. */
+    invalid?: boolean;
+    /** id of the paired error element for `aria-describedby`. */
+    describedby?: string;
+    /** focus the input when it mounts; in script, since the native attribute only acts on page load. */
+    autofocus?: boolean;
+}>();
+const model = defineModel<number | null>({required: true});
+// Own the empty-input coercion ONCE, so no consumer reinvents it: a native number
+// input yields NaN for an empty or unparseable value — map that to null so the
+// model is always a real number or an explicit "no value", never NaN. This is why
+// the input is bound by hand rather than with v-model.
+const onInput = (event: Event) => {
+    const {valueAsNumber} = event.target as HTMLInputElement;
+    model.value = Number.isNaN(valueAsNumber) ? null : valueAsNumber;
+};
+</script>
+=== DateInput @ fork/ui-form/n-date-input
+defineProps<{
+    /** control id, pairing the input with its label and error; inside a `FormField` the field passes its own. */
+    id: string;
+    disabled?: boolean;
+    /** ISO date bound (`YYYY-MM-DD`) for the native picker. */
+    min?: string;
+    max?: string;
+    /** conveys the required state to assistive tech via `aria-required`. */
+    required?: boolean;
+    /** marks the input invalid; the field around it decides the message. */
+    invalid?: boolean;
+    /** id of the paired error element for `aria-describedby`. */
+    describedby?: string;
+}>();
+const model = defineModel<string | null>({required: true});
+// A Laravel date cast arrives as an ISO datetime (`2026-09-05T00:00:00.000000Z`), which a native date input
+// shows as empty. The field shows its calendar date, as sent: no conversion to the browser's time zone, which
+// would move a midnight-UTC date a day back west of Greenwich. The model keeps what it holds until the user
+// picks a date, which then arrives as `YYYY-MM-DD`.
+const date = computed({get: () => model.value?.slice(0, 10) ?? null, set: (value) => (model.value = value)});
+=== Textarea @ fork/ui-form/n-textarea
+const {autogrow = false, maxRows} = defineProps<{
+    /** control id, pairing the textarea with its label and error; inside a `FormField` the field passes its own. */
+    id: string;
+    /** required, so no textarea goes without one. */
+    placeholder: string;
+    disabled?: boolean;
+    rows?: number;
+    /** conveys the required state to assistive tech via `aria-required`. */
+    required?: boolean;
+    /** marks the textarea invalid; the field around it decides the message. */
+    invalid?: boolean;
+    /** id of the paired error element for `aria-describedby`. */
+    describedby?: string;
+    /** grow with the text instead of scrolling: from `rows` upward, on mount and on every change. */
+    autogrow?: boolean;
+    /** with `autogrow`, stop growing at this many lines and scroll from there. */
+    maxRows?: number;
+}>();
+const model = defineModel<string | null>({required: true});
+// The textarea is its own (single) root, so every attribute, class and style included, lands on it.
+const textarea = useTemplateRef<HTMLTextAreaElement>('textarea');
+=== InputGroup @ fork/ui-form/n-input-group
+defineProps<{
+    /**
+     * the control's id. The addons take `${id}-prepend` / `${id}-append`; the control is read with them
+     * once its `describedby` names them, after the field's own message.
+     */
+    id: string;
+    /** text joined to the start of the control (`€`). */
+    prepend?: string;
+    /** text joined to the end of the control (`days`). */
+    append?: string;
+}>();
+<slot />
+=== TimeInput @ fork/ui-form/n-time-input
+} = defineProps<{
+    /** control id, pairing the input with its label and error; inside a `FormField` the field passes its own. */
+    id: string;
+    disabled?: boolean;
+    /** conveys the required state to assistive tech via `aria-required`. */
+    required?: boolean;
+    /** marks the input invalid, with the error icon; the field around it decides the message. */
+    invalid?: boolean;
+    /** id of the paired error element for `aria-describedby`. */
+    describedby?: string;
+    /** the minute step of the picker and the arrow keys (`15` for quarter hours). */
+    step?: number;
+    /** the clear button's accessible name: given, a clear button shows while there is a time. Leave it out for a time that must always be set. */
+    clearLabel?: string;
+    /** focus the input when it mounts; in script, since the native attribute only acts on page load. */
+    autofocus?: boolean;
+}>();
+const model = defineModel<string | null>({required: true});
+const onInput = (event: Event): void => {
+    model.value = (event.target as HTMLInputElement).value || null;
+};
+const showClear = computed(() => clearLabel !== undefined && !disabled && Boolean(model.value));
+=== SearchInput @ fork/ui-form/n-search-input
+} = defineProps<{
+    /** control id, pairing the input with its label and error; inside a `FormField` the field passes its own. */
+    id: string;
+    /** required, so no input goes without one. */
+    placeholder: string;
+    disabled?: boolean;
+    /** conveys the required state to assistive tech via `aria-required`. */
+    required?: boolean;
+    /** marks the input invalid, with the error icon; the field around it decides the message. */
+    invalid?: boolean;
+    /** id of the paired error element for `aria-describedby`. */
+    describedby?: string;
+    /** the clear button's accessible name: given, a clear button shows while there is text. */
+    clearLabel?: string;
+    /** focus the input when it mounts; in script, since the native attribute only acts on page load. */
+    autofocus?: boolean;
+}>();
+const model = defineModel<string | null>({required: true});
+const showClear = computed(() => clearLabel !== undefined && !disabled && Boolean(model.value));
+=== PasswordInput @ fork/ui-form/n-password-input
+} = defineProps<{
+    /** control id, pairing the input with its label and error; inside a `FormField` the field passes its own. */
+    id: string;
+    /** required, so no input goes without one. */
+    placeholder: string;
+    /** required: whether the browser offers the saved password or a new one to save is the form's call. */
+    autocomplete: 'current-password' | 'new-password';
+    disabled?: boolean;
+    /** conveys the required state to assistive tech via `aria-required`. */
+    required?: boolean;
+    /** marks the input invalid, with the error icon; the field around it decides the message. */
+    invalid?: boolean;
+    /** id of the paired error element for `aria-describedby`. */
+    describedby?: string;
+    /** the show/hide toggle's accessible name; whether it is on is its pressed state. */
+    showPasswordLabel?: string;
+    /** the notice shown once a key in the field says Caps Lock is on. */
+    capsLockText?: string;
+    /** focus the input when it mounts; in script, since the native attribute only acts on page load. */
+    autofocus?: boolean;
+}>();
+const model = defineModel<string | null>({required: true});
+const shown = ref(false);
+=== RadioGroup @ fork/hold/344-boolean-id
+} = defineProps<{
+    options: T[];
+    /**
+     * property name or getter for an option's display string (the family's labelOf
+     * convention — named optionLabel here because `label` is the group legend).
+     */
+    optionLabel: LabelKey<T>;
+    /** the group legend's text; the default slot overrides it, for a legend that carries more than text. */
+    label?: string;
+    /** stable id — on the fieldset, the shared radio `name`, and the member-id base. */
+    id: string;
+    disabled?: boolean;
+    /** conveys the required state to assistive tech via `aria-required` (radiogroup). */
+    required?: boolean;
+    /** invalid styling + aria; drive it from the field's error. */
+    invalid?: boolean;
+    /** id of the paired error element for `aria-describedby` (fieldset only). */
+    describedby?: string;
+}>();
+const model = defineModel<T['id'] | null>({required: true});
+/** Resolve an option's display string from the `optionLabel` prop (property name or getter). */
+const labelOf = (option: T): string =>
+    typeof optionLabel === 'function'
+        ? optionLabel(option)
+        : String((option as Record<PropertyKey, unknown>)[optionLabel as PropertyKey]);
+<slot>
+=== CheckboxGroup @ fork/ui-form/n-checkbox-group
+} = defineProps<{
+    options: T[];
+    /**
+     * property name or getter for an option's display string (the family's labelOf
+     * convention — named optionLabel here because `label` is the group legend).
+     */
+    optionLabel: LabelKey<T>;
+    /** the group legend's text; the default slot overrides it, for a legend that carries more than text. */
+    label?: string;
+    /** stable id — on the fieldset, and the base for position-keyed member ids. */
+    id: string;
+    disabled?: boolean;
+    /** conveys the required state at group level (legend marker + sr-only text). */
+    required?: boolean;
+    /** invalid styling + aria — mirrored onto the members so the boxes show it. */
+    invalid?: boolean;
+    /** id of the paired error element for `aria-describedby` (fieldset only). */
+    describedby?: string;
+    /**
+     * screen-reader-only required conveyance appended to the legend — a prop, not a
+     * literal, so Dutch territories can localise it (the `optionsLabel` ruling).
+     */
+    requiredLabel?: string;
+}>();
+const model = defineModel<T['id'][]>({required: true});
+/** Resolve an option's display string from the `optionLabel` prop (property name or getter). */
+const labelOf = (option: T): string =>
+    typeof optionLabel === 'function'
+        ? optionLabel(option)
+        : String((option as Record<PropertyKey, unknown>)[optionLabel as PropertyKey]);
+<slot>
+=== SingleSelect @ fork/ui-form/n-single-select
+} = defineProps<{
+    options: T[];
+    /** property name or getter for an option's display string. */
+    optionLabel: LabelKey<T>;
+    /** stable id — required so the trigger can pair with a label/error. */
+    id: string;
+    placeholder?: string;
+    disabled?: boolean;
+    /** sort the rendered options by display string — off by default, so the caller's order is kept. */
+    alphabeticalSort?: boolean;
+    /** conveys the required state to assistive tech via `aria-required`. */
+    required?: boolean;
+    invalid?: boolean;
+    describedby?: string;
+    emptyText?: string;
+    /** accessible name for the listbox popup (`aria-label`). */
+    optionsLabel?: string;
+    /** ids rendered visually muted (`.is-muted`) — still committable, still in the keyboard path. */
+    mutedOptions?: T['id'][];
+    /**
+     * display string of a committing CLEAR ENTRY rendered above the options — commits
+     * `null` and closes. Lives outside the option index space (its own keyboard slot
+     * above index 0, its own `${id}-clear` activedescendant id).
+     */
+    clearLabel?: string;
+    /** what the trigger renders when the model is null — as a VALUE, not muted placeholder text. */
+    emptyDisplayValue?: string;
+    /**
+     * where the list opens against the trigger (default `'bottom-start'`). With no room it flips to
+     * the opposite side at the same alignment (`bottom-start` → `top-start`), never to the other
+     * alignment. Read once.
+     */
+    placement?: Placement;
+}>();
+defineSlots<{
+    /**
+     * Per-option content (swatches, icons, rich labels). Highlight/selection chrome stays
+     * on the option row, outside the slot. Fallback: the plain display string.
+     */
+    option?: (props: {option: T; index: number; selected: boolean; active: boolean}) => unknown;
+}>();
+const model = defineModel<T['id'] | null>({required: true});
+/** Resolve an option's display string from the `optionLabel` prop (property name or getter). */
+const labelOf = (option: T): string =>
+    typeof optionLabel === 'function'
+        ? optionLabel(option)
+        : String((option as Record<PropertyKey, unknown>)[optionLabel as PropertyKey]);
+=== MultiSelect @ fork/ui-form/n-multi-select
+} = defineProps<{
+    options: T[];
+    /** property name or getter for an option's display string. */
+    optionLabel: LabelKey<T>;
+    /** stable id — required so the trigger can pair with a label/error. */
+    id: string;
+    placeholder?: string;
+    disabled?: boolean;
+    /** sort the rendered options by display string — off by default, so the caller's order is kept. */
+    alphabeticalSort?: boolean;
+    /** conveys the required state to assistive tech via `aria-required`. */
+    required?: boolean;
+    invalid?: boolean;
+    describedby?: string;
+    emptyText?: string;
+    /** accessible name for the listbox popup (`aria-label`). */
+    optionsLabel?: string;
+    /**
+     * verb prefixed to a chip's remove-button accessible name (`"${removeLabel} ${option text}"`) —
+     * a prop, not a literal, so a consumer can localise it; the default is English.
+     */
+    removeLabel?: string;
+    /** ids rendered visually muted (`.is-muted`) — still committable, still in the keyboard path. */
+    mutedOptions?: T['id'][];
+    /**
+     * where the list opens against the box (default `'bottom-start'`). With no room it flips to the
+     * opposite side at the same alignment (`bottom-start` → `top-start`), never to the other
+     * alignment. Read once.
+     */
+    placement?: Placement;
+}>();
+defineSlots<{
+    /**
+     * Per-option content (swatches, icons, rich labels). Highlight/selection chrome stays
+     * on the option row, outside the slot. Fallback: the plain display string.
+     */
+    option?: (props: {option: T; index: number; selected: boolean; active: boolean}) => unknown;
+}>();
+const model = defineModel<T['id'][]>({required: true});
+/** Resolve an option's display string from the `optionLabel` prop (property name or getter). */
+const labelOf = (option: T): string =>
+    typeof optionLabel === 'function'
+        ? optionLabel(option)
+        : String((option as Record<PropertyKey, unknown>)[optionLabel as PropertyKey]);
+=== Combobox @ fork/ui-form/n-combobox
+} = defineProps<{
+    options: T[];
+    /** property name or getter for an option's display string. */
+    optionLabel: LabelKey<T>;
+    /** stable id — required so the input can pair with a label/error. */
+    id: string;
+    placeholder?: string;
+    disabled?: boolean;
+    /** sort the rendered options by display string — off by default, so the caller's order is kept. */
+    alphabeticalSort?: boolean;
+    /** conveys the required state to assistive tech via `aria-required`. */
+    required?: boolean;
+    invalid?: boolean;
+    describedby?: string;
+    emptyText?: string;
+    /** accessible name for the listbox popup (`aria-label`). */
+    optionsLabel?: string;
+    /** ids rendered visually muted (`.is-muted`) — still committable, still in the keyboard path. */
+    mutedOptions?: T['id'][];
+    /**
+     * display string of a committing CLEAR ENTRY rendered above the (filtered) options —
+     * commits `null` and closes. Lives outside the option index space and outside the
+     * filter (it renders whatever the query says).
+     */
+    clearLabel?: string;
+    /** what the input renders when the model is null — a NAMED empty state instead of `''`. */
+    emptyDisplayValue?: string;
+    /**
+     * where the list opens against the input (default `'bottom-start'`). With no room it flips to the
+     * opposite side at the same alignment (`bottom-start` → `top-start`), never to the other
+     * alignment. Read once.
+     */
+    placement?: Placement;
+}>();
+defineSlots<{
+    /**
+     * Per-option content (swatches, icons, rich labels). Highlight/selection chrome stays
+     * on the option row, outside the slot. Fallback: the plain display string.
+     */
+    option?: (props: {option: T; index: number; selected: boolean; active: boolean}) => unknown;
+}>();
+const model = defineModel<T['id'] | null>({required: true});
+/** Resolve an option's display string from the `optionLabel` prop (property name or getter). */
+const labelOf = (option: T): string =>
+    typeof optionLabel === 'function'
+        ? optionLabel(option)
+        : String((option as Record<PropertyKey, unknown>)[optionLabel as PropertyKey]);
+=== GroupSelect @ fork/ui-form/n-group-select
+} = defineProps<{
+    /** caller-ordered groups, each with options and a display header. */
+    groups: {options: T[]; text: string; header?: boolean}[];
+    /** property name or getter for an option's display string. */
+    optionLabel: LabelKey<T>;
+    /** stable id — required so the trigger can pair with a label/error. */
+    id: string;
+    placeholder?: string;
+    disabled?: boolean;
+    /**
+     * sort each group's options by display string — off by default, so the caller's order is kept.
+     * The groups always keep the caller's order.
+     */
+    alphabeticalSort?: boolean;
+    /** conveys the required state to assistive tech via `aria-required`. */
+    required?: boolean;
+    invalid?: boolean;
+    describedby?: string;
+    emptyText?: string;
+    /** accessible name for the listbox popup (`aria-label`). */
+    optionsLabel?: string;
+    /** ids rendered visually muted (`.is-muted`) — still committable, still in the keyboard path. */
+    mutedOptions?: T['id'][];
+    /**
+     * display string of a committing CLEAR ENTRY rendered above the options — commits
+     * `null` and closes. Lives outside the option index space.
+     */
+    clearLabel?: string;
+    /** what the trigger renders when the model is null — as a VALUE, not muted placeholder text. */
+    emptyDisplayValue?: string;
+    /**
+     * where the list opens against the trigger (default `'bottom-start'`). With no room it flips to
+     * the opposite side at the same alignment (`bottom-start` → `top-start`), never to the other
+     * alignment. Read once.
+     */
+    placement?: Placement;
+}>();
+defineSlots<{
+    /**
+     * Per-option content (swatches, icons, rich labels). Highlight/selection chrome stays
+     * on the option row, outside the slot. Fallback: the plain display string.
+     */
+    option?: (props: {option: T; index: number; selected: boolean; active: boolean}) => unknown;
+}>();
+const model = defineModel<T['id'] | null>({required: true});
+/** Resolve an option's display string from the `optionLabel` prop (property name or getter). */
+const labelOf = (option: T): string =>
+    typeof optionLabel === 'function'
+        ? optionLabel(option)
+        : String((option as Record<PropertyKey, unknown>)[optionLabel as PropertyKey]);
+=== MultiCombobox @ fork/ui-form/n-multi-combobox
+} = defineProps<{
+    options: T[];
+    /** property name or getter for an option's display string. */
+    optionLabel: LabelKey<T>;
+    /** stable id — required so the input can pair with a label/error. */
+    id: string;
+    /** shown only while no chip shows — chips replace it, so an id whose option has not loaded yet leaves it up. */
+    placeholder?: string;
+    disabled?: boolean;
+    /** sort the rendered options by display string — off by default, so the caller's order is kept. */
+    alphabeticalSort?: boolean;
+    /** conveys the required state to assistive tech via `aria-required`. */
+    required?: boolean;
+    invalid?: boolean;
+    describedby?: string;
+    emptyText?: string;
+    /** accessible name for the listbox popup (`aria-label`). */
+    optionsLabel?: string;
+    /**
+     * verb prefixed to a chip's remove-button accessible name (`"${removeLabel} ${option text}"`) —
+     * a prop, not a literal, so a consumer can localise it; the default is English.
+     */
+    removeLabel?: string;
+    /** ids rendered visually muted (`.is-muted`) — still committable, still in the keyboard path. */
+    mutedOptions?: T['id'][];
+    /**
+     * where the list opens against the box (default `'bottom-start'`). With no room it flips to the
+     * opposite side at the same alignment (`bottom-start` → `top-start`), never to the other
+     * alignment. Read once.
+     */
+    placement?: Placement;
+}>();
+defineSlots<{
+    /**
+     * Per-option content (swatches, icons, rich labels). Highlight/selection chrome stays
+     * on the option row, outside the slot. Fallback: the plain display string.
+     */
+    option?: (props: {option: T; index: number; selected: boolean; active: boolean}) => unknown;
+}>();
+const model = defineModel<T['id'][]>({required: true});
+/** Resolve an option's display string from the `optionLabel` prop (property name or getter). */
+const labelOf = (option: T): string =>
+    typeof optionLabel === 'function'
+        ? optionLabel(option)
+        : String((option as Record<PropertyKey, unknown>)[optionLabel as PropertyKey]);
+=== GroupCombobox @ fork/ui-form/n-group-combobox
+} = defineProps<{
+    /** caller-ordered groups, each with options and a display header. */
+    groups: {options: T[]; text: string; header?: boolean}[];
+    /** property name or getter for an option's display string. */
+    optionLabel: LabelKey<T>;
+    /** stable id — required so the input can pair with a label/error. */
+    id: string;
+    placeholder?: string;
+    disabled?: boolean;
+    /**
+     * sort each group's options by display string — off by default, so the caller's order is kept.
+     * The groups always keep the caller's order.
+     */
+    alphabeticalSort?: boolean;
+    /** conveys the required state to assistive tech via `aria-required`. */
+    required?: boolean;
+    invalid?: boolean;
+    describedby?: string;
+    emptyText?: string;
+    /** accessible name for the listbox popup (`aria-label`). */
+    optionsLabel?: string;
+    /** ids rendered visually muted (`.is-muted`) — still committable, still in the keyboard path. */
+    mutedOptions?: T['id'][];
+    /**
+     * display string of a committing CLEAR ENTRY rendered above the (filtered) options —
+     * commits `null` and closes. Lives outside the option index space and outside the filter.
+     */
+    clearLabel?: string;
+    /** what the input renders when the model is null — a NAMED empty state instead of `''`. */
+    emptyDisplayValue?: string;
+    /**
+     * where the list opens against the input (default `'bottom-start'`). With no room it flips to the
+     * opposite side at the same alignment (`bottom-start` → `top-start`), never to the other
+     * alignment. Read once.
+     */
+    placement?: Placement;
+}>();
+defineSlots<{
+    /**
+     * Per-option content (swatches, icons, rich labels). Highlight/selection chrome stays
+     * on the option row, outside the slot. Fallback: the plain display string.
+     */
+    option?: (props: {option: T; index: number; selected: boolean; active: boolean}) => unknown;
+}>();
+const model = defineModel<T['id'] | null>({required: true});
+/** Resolve an option's display string from the `optionLabel` prop (property name or getter). */
+const labelOf = (option: T): string =>
+    typeof optionLabel === 'function'
+        ? optionLabel(option)
+        : String((option as Record<PropertyKey, unknown>)[optionLabel as PropertyKey]);
