@@ -71,6 +71,13 @@ const key = (name: string, modifiers?: KeyboardEventInit): KeyboardEvent =>
     new KeyboardEvent('keydown', {key: name, cancelable: true, ...modifiers});
 
 describe('useListbox floating options', () => {
+    it('uses fixed positioning, since the top-layer popup is placed against the viewport', () => {
+        const wrapper = mount(Harness);
+
+        expect(lastFloatingConfig()).toMatchObject({strategy: 'fixed'});
+        wrapper.unmount();
+    });
+
     it('applies the family layout policy by default (bottom-start, offset 4, top-start flip, shift 8)', () => {
         const wrapper = mount(Harness);
 
@@ -439,13 +446,6 @@ describe('useListbox without the optional hooks', () => {
 
 describe('useListbox keyboard and highlight contract', () => {
     const LABELS = ['Apple', 'Banana', 'Cherry'];
-
-    it('uses fixed positioning, since the top-layer popup is placed against the viewport', () => {
-        const wrapper = mount(Harness);
-
-        expect(lastFloatingConfig()).toMatchObject({strategy: 'fixed'});
-        wrapper.unmount();
-    });
 
     it('swallows a key that opens the closed list', () => {
         const wrapper = mount(Harness, {
