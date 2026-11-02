@@ -7,7 +7,7 @@ import type {Ref} from 'vue';
 import {describe, expectTypeOf, it} from 'vitest';
 import {ref, shallowRef} from 'vue';
 
-import type {FieldBinding, FieldModel, Path, UseDraftForm, UseForm, ValidationErrors} from '../../src';
+import type {BoundControls, FieldBinding, FieldModel, Path, UseDraftForm, UseForm, ValidationErrors} from '../../src';
 
 import {useForm} from '../../src/form/form';
 
@@ -23,8 +23,10 @@ const draft = ref<Draft>({firstName: null, born: new Date(), learningGoals: [], 
 describe('useForm with a draft', () => {
     it('returns the form named by the draft paths', () => {
         expectTypeOf(useForm({draft})).toEqualTypeOf<UseDraftForm<Draft>>();
-        // as the form named by the draft paths, but for field(), which also carries the value
-        expectTypeOf<Omit<UseDraftForm<Draft>, 'field'>>().toEqualTypeOf<Omit<UseForm<Path<Draft>>, 'field'>>();
+        // as the form named by the draft paths, but for field(), which also carries the value, and the bound
+        // controls, which take only the paths they can bind
+        type Own = 'field' | keyof BoundControls<Draft>;
+        expectTypeOf<Omit<UseDraftForm<Draft>, Own>>().toEqualTypeOf<Omit<UseForm<Path<Draft>>, Own>>();
     });
 
     it('keys the errors by the draft paths, nested, indexed and through a nullable branch', () => {

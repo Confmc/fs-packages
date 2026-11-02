@@ -15,6 +15,7 @@ import type {
 
 import {createFormError, createFormLabel, fieldId, messageId} from './field';
 import {useFormSubmit} from './form-submit';
+import {createBoundControls} from './kit';
 import {readPath, writePath} from './path';
 import {scrollToFirstError} from './scroll-to-first-error';
 import {useValidationErrors} from './validation-errors';
@@ -148,6 +149,11 @@ const useFormBody = <T extends string = string>(
         field,
         FormLabel: createFormLabel(id),
         FormError: createFormError(message, id),
+        // the bound controls name fields by any string at runtime; their types narrow the names
+        ...createBoundControls<T>(
+            field as (name: string) => FieldBinding & Partial<FieldModel<unknown>>,
+            message as (name: string) => string | undefined,
+        ),
         refuse,
         setRefusals,
         withdraw,

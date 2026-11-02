@@ -2,6 +2,7 @@ import type {ComputedRef, Ref} from 'vue';
 
 import type {FieldBinding} from '../types';
 import type {FormErrorComponent, FormLabelComponent} from './field';
+import type {BoundControls} from './kit';
 import type {Path, PathValue} from './path';
 
 /** Field-error bag: the first backend validation message per field key. */
@@ -172,7 +173,8 @@ export type UseForm<T extends string = string> = UseValidationErrors<T> &
     FormSubmit<T> &
     UseFormClient<T> &
     FormField<T> &
-    FormComponents<T>;
+    FormComponents<T> &
+    BoundControls<T>;
 
 /** What `field(name)` adds when the form has a draft: the value at that path, and the write back into it. */
 export interface FieldModel<V> {
@@ -211,4 +213,5 @@ export type UseDraftForm<D extends object> = UseValidationErrors<Path<D>> &
     FormSubmit<Path<D>> &
     UseFormClient<Path<D>> &
     DraftFormField<D> &
-    FormComponents<Path<D>>;
+    FormComponents<Path<D>> &
+    BoundControls<D>;
