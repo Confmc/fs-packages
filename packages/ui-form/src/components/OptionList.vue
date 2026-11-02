@@ -31,8 +31,8 @@
              gives the listbox its required option, while aria-disabled marks it non-selectable
              (the pointer never lands on it — useListbox has no navigable index when empty). -->
         <li v-if="!hasOptions" :class="`${variant}__empty`" role="option" aria-disabled="true">{{ emptyText }}</li>
-        <!-- The row sequence is `rows`: flat controls pass an all-option run (no headers); the
-             grouped controls interleave header/boundary rows. `groupedRuns` collapses that into
+        <!-- The row sequence is `rows`: flat controls pass an all-option run (no headers);
+             GroupSelect interleaves header/boundary rows. `groupedRuns` collapses that into
              named/headerless runs. APG listbox grouping pattern: a NAMED group uses role="group"
              + aria-label on the inner <ul> so the group name is announced to AT; the <li> wrapper
              carries role="presentation" (html-aria disallows role="group" on <li>), and the visual
@@ -101,14 +101,14 @@ import ListboxOption from './ListboxOption.vue';
  *
  * Flat and grouped selects render through this single component: the ONLY difference is the
  * `rows` a parent hands down. A flat control (SingleSelect, MultiSelect) passes a run of all-option rows (no
- * headers, rendered flat); a grouped control interleaves `header`/`boundary` rows and this
+ * headers, rendered flat); a grouped control (GroupSelect) interleaves `header`/`boundary` rows and this
  * component folds them into named `role="group"` runs. `boundary` closes the open run so a
  * `header:false` group after a named one renders flat instead of being absorbed into the
  * preceding group.
  *
  * Entirely index-based, mirroring `useListbox`: the option type `T` never crosses this
  * boundary. The parent hands down `rows` + `keys` derived from ITS list (a flat select's
- * `sorted`; a filtering select's filtered list; a grouped one's flattened groups) plus
+ * `sorted`; a filtering select's filtered list; GroupSelect's flattened groups) plus
  * index-keyed lookups, and receives `hover`/`commit` back by index — the parent stays the sole
  * owner of `pointer` and of the commit disposition. Per-option content flows through the
  * index-scoped `option` slot; the clear entry (`clear*` props) sits above the list, outside the

@@ -5,6 +5,7 @@ import {mount} from '@vue/test-utils';
 import {afterEach, beforeEach, describe, expect, it, onTestFinished, vi} from 'vitest';
 
 import Combobox from '../src/components/Combobox.vue';
+import GroupSelect from '../src/components/GroupSelect.vue';
 import MultiSelect from '../src/components/MultiSelect.vue';
 import SingleSelect from '../src/components/SingleSelect.vue';
 
@@ -47,6 +48,24 @@ const SELECT_ONLY = [
                 attachTo: document.body,
             }),
         keyTarget: '.ui-multiselect__trigger',
+    },
+    {
+        name: 'GroupSelect',
+        mountIt: () =>
+            mount(GroupSelect, {
+                props: {
+                    groups: [
+                        {text: 'A', options: FRUITS.slice(0, 2)},
+                        {text: 'B', options: FRUITS.slice(2, 5)},
+                        {text: 'C', options: FRUITS.slice(5)},
+                    ],
+                    optionLabel: 'name',
+                    id: 'f',
+                    modelValue: null,
+                },
+                attachTo: document.body,
+            }),
+        keyTarget: '.ui-groupselect__trigger',
     },
 ] as const;
 
@@ -239,6 +258,25 @@ describe('typeahead — a search starts after the committed value (native <selec
         });
 
         await wrapper.find('.ui-select__trigger').trigger('keydown', {key: 'b'});
+
+        expect(wrapper.find('[role="combobox"]').attributes('aria-activedescendant')).toBe('f-opt-3');
+    });
+
+    it('GroupSelect with Banana chosen: closed, b moves to Blue moon, not Banana again', async () => {
+        const wrapper = mount(GroupSelect, {
+            props: {
+                groups: [
+                    {text: 'A', options: FRUITS.slice(0, 2)},
+                    {text: 'B', options: FRUITS.slice(2)},
+                ],
+                optionLabel: 'name',
+                id: 'f',
+                modelValue: banana,
+            },
+            attachTo: document.body,
+        });
+
+        await wrapper.find('.ui-groupselect__trigger').trigger('keydown', {key: 'b'});
 
         expect(wrapper.find('[role="combobox"]').attributes('aria-activedescendant')).toBe('f-opt-3');
     });

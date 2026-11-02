@@ -5,6 +5,7 @@ import {mount} from '@vue/test-utils';
 import {afterEach, describe, expect, it} from 'vitest';
 
 import Combobox from '../src/components/Combobox.vue';
+import GroupSelect from '../src/components/GroupSelect.vue';
 import MultiSelect from '../src/components/MultiSelect.vue';
 import SingleSelect from '../src/components/SingleSelect.vue';
 
@@ -15,20 +16,31 @@ const CALLER_ORDER = [
 ];
 
 const SORTABLE = [
-    {name: 'SingleSelect', component: SingleSelect, modelValue: null, opener: 'button'},
-    {name: 'MultiSelect', component: MultiSelect, modelValue: [], opener: '.ui-multiselect__trigger'},
-    {name: 'Combobox', component: Combobox, modelValue: null, opener: 'input'},
+    {name: 'SingleSelect', component: SingleSelect, props: {options: CALLER_ORDER, modelValue: null}, opener: 'button'},
+    {
+        name: 'MultiSelect',
+        component: MultiSelect,
+        props: {options: CALLER_ORDER, modelValue: []},
+        opener: '.ui-multiselect__trigger',
+    },
+    {name: 'Combobox', component: Combobox, props: {options: CALLER_ORDER, modelValue: null}, opener: 'input'},
+    {
+        name: 'GroupSelect',
+        component: GroupSelect,
+        props: {groups: [{text: 'Fruit', options: CALLER_ORDER}], modelValue: null},
+        opener: '[role="combobox"]',
+    },
 ] as const;
 
 afterEach(() => {
     document.body.innerHTML = '';
 });
 
-describe.each(SORTABLE)('$name — option order', ({component, modelValue, opener}) => {
+describe.each(SORTABLE)('$name — option order', ({component, props, opener}) => {
     const renderedOrder = async (extra: Record<string, unknown>) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFCs through one mount
         const wrapper = mount(component as any, {
-            props: {options: CALLER_ORDER, optionLabel: 'name', id: 'f', modelValue, ...extra},
+            props: {optionLabel: 'name', id: 'f', ...props, ...extra},
             attachTo: document.body,
         });
         await wrapper.find(opener).trigger('click');
