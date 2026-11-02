@@ -167,7 +167,7 @@ defineSlots<{
     option?: (props: {option: T; index: number; selected: boolean; active: boolean}) => unknown;
 }>();
 
-/** The committed membership: an array of option ids, in selection order. */
+/** The committed membership: an array of option ids. A toggle keeps it in the order the options are shown in. */
 const model = defineModel<T['id'][]>({required: true});
 
 /** Resolve an option's display string from the `optionLabel` prop (property name or getter). */
@@ -180,7 +180,7 @@ const sorted = computed(() =>
     alphabeticalSort ? [...options].sort((a, b) => labelOf(a).localeCompare(labelOf(b))) : options,
 );
 
-// The chip bar renders the committed values in selection order. An id whose option has not
+// The chip bar renders the committed values in model order. An id whose option has not
 // arrived yet (the async-options edit-form window) has no label to show — it stays in the
 // model (Backspace still pops it) but renders no chip until its option loads.
 const chips = computed(() =>
@@ -190,7 +190,7 @@ const chips = computed(() =>
     }),
 );
 
-/** The committed labels, selection-ordered — the closed trigger's screen-reader value. */
+/** The committed labels, in model order — the closed trigger's screen-reader value. */
 const selectedSummary = computed(() => chips.value.map(labelOf).join(', '));
 
 // The index-based view OptionList renders — parallel arrays derived from `sorted`, which
@@ -211,11 +211,17 @@ const reference = useTemplateRef<HTMLElement>('reference');
 // the box click-outside treats as inside. The <ul> inside it is positioned by nothing.
 const floating = useTemplateRef<HTMLElement>('floating');
 
-/** Toggle an id's membership — add when absent, drop when present. Always emits a fresh array. */
+/**
+ * Toggle an id's membership — add when absent, drop when present. Always emits a fresh array, kept in
+ * the order the options are shown in, so the model reads the same however it was picked. An id with no
+ * option yet (options still loading) keeps its place at the end.
+ */
 const toggleValue = (value: T['id']): void => {
-    model.value = model.value.includes(value)
+    const next = model.value.includes(value)
         ? model.value.filter((member) => member !== value)
         : [...model.value, value];
+    const shown = sorted.value.map((option) => option.id).filter((member) => next.includes(member));
+    model.value = [...shown, ...next.filter((member) => !shown.includes(member))];
 };
 
 // Both keyboard (Enter via useListbox) and pointer (OptionList `commit`) funnel through this
