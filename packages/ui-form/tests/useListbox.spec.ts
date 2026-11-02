@@ -542,8 +542,10 @@ describe('useListbox keyboard and highlight contract', () => {
         api.openList();
         api.highlightClear();
         api.close();
+        api.openList();
 
         expect(api.clearHighlighted.value).toBe(false);
+        expect(api.activeDescendant.value).toBeUndefined();
         wrapper.unmount();
     });
 
