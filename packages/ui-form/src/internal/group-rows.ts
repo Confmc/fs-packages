@@ -9,8 +9,8 @@ export type GroupRow = {type: 'header'; text: string} | {type: 'boundary'} | {ty
 /**
  * Turn caller-ordered groups into the flat header/boundary/option row sequence `OptionList`
  * lays out — the single-site encoding of the `GroupRow` invariant. `GroupSelect` hands it its
- * groups as shown, and a grouped select that filters would hand it its filtered groups, so the
- * boundary rule lives in one place.
+ * groups as shown and `GroupCombobox` its filtered groups, so the boundary rule lives in one
+ * place.
  *
  * Only an option's PRESENCE, plus `text` and `header`, are read — never an option's contents —
  * so the caller keeps ownership of the option type. Option `index` runs across ALL groups in

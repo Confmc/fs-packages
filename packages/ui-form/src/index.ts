@@ -5,6 +5,7 @@ export {default as DateInput} from './components/DateInput.vue';
 export {default as FormError} from './components/FormError.vue';
 export {default as FormField} from './components/FormField.vue';
 export {default as FormLabel} from './components/FormLabel.vue';
+export {default as GroupCombobox} from './components/GroupCombobox.vue';
 export {default as GroupSelect} from './components/GroupSelect.vue';
 export {default as InputGroup} from './components/InputGroup.vue';
 export {default as MultiCombobox} from './components/MultiCombobox.vue';

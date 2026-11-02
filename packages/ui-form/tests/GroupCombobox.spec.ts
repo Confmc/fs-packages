@@ -1,0 +1,662 @@
+// @vitest-environment happy-dom
+import {useFloating} from '@floating-ui/vue';
+import {mount} from '@vue/test-utils';
+import {afterEach, describe, expect, it, vi} from 'vitest';
+import {h} from 'vue';
+
+import GroupCombobox from '../src/components/GroupCombobox.vue';
+import {menu} from './find-menu';
+
+// The real floating-ui, spied on so the placement case can read what GroupCombobox hands it.
+vi.mock('@floating-ui/vue', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('@floating-ui/vue')>();
+    return {...actual, useFloating: vi.fn(actual.useFloating)};
+});
+
+interface Fruit {
+    id: number;
+    name: string;
+}
+
+const GROUPS = [
+    {
+        options: [
+            {id: 1, name: 'Mango'},
+            {id: 2, name: 'Kiwi'},
+        ],
+        text: 'Tropical',
+    },
+    {
+        options: [
+            {id: 3, name: 'Apricot'},
+            {id: 4, name: 'Lime'},
+        ],
+        text: 'Stone',
+    },
+];
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFC + VTU mount inference
+const mountGroupCombobox = (props: Record<string, unknown>, slots?: Record<string, unknown>) =>
+    mount(GroupCombobox as any, {
+        props: {groups: GROUPS, optionLabel: 'name', id: 'fruit', modelValue: null, ...props},
+        slots,
+        attachTo: document.body,
+    });
+
+// A user types into a focused field, and GroupCombobox opens on typing only while the input has focus.
+const typeInto = async (
+    input: {element: HTMLElement; setValue: (value: string) => Promise<void>},
+    value: string,
+): Promise<void> => {
+    input.element.focus();
+    await input.setValue(value);
+};
+
+afterEach(() => {
+    document.body.innerHTML = '';
+});
+
+describe('GroupCombobox', () => {
+    it('renders an input with combobox role and no menu until opened', () => {
+        const wrapper = mountGroupCombobox({});
+        const input = wrapper.find('input');
+
+        expect(input.attributes('role')).toBe('combobox');
+        expect(input.attributes('aria-autocomplete')).toBe('list');
+        expect(input.attributes('aria-expanded')).toBe('false');
+        expect(input.attributes('aria-controls')).toBeUndefined();
+        expect(menu(wrapper).exists()).toBe(false);
+    });
+
+    it('opens on click and renders group headers + options', async () => {
+        const wrapper = mountGroupCombobox({});
+        await wrapper.find('input').trigger('click');
+
+        expect(wrapper.find('input').attributes('aria-expanded')).toBe('true');
+        const m = menu(wrapper);
+        expect(m.exists()).toBe(true);
+
+        const headers = m.findAll('.ui-groupcombobox__group-header');
+        expect(headers.map((h) => h.text())).toEqual(['Tropical', 'Stone']);
+
+        const options = m.findAll('.ui-groupcombobox__option');
+        expect(options.map((o) => o.text())).toEqual(['Mango', 'Kiwi', 'Apricot', 'Lime']);
+    });
+
+    it('narrows each group as the user types, hides one with no match, and shows all on an empty query', async () => {
+        const wrapper = mountGroupCombobox({});
+        const input = wrapper.find('input');
+
+        await typeInto(input, 'a'); // Mango (has 'a'), Apricot (has 'a') — Kiwi and Lime do not
+        expect(
+            menu(wrapper)
+                .findAll('.ui-groupcombobox__option')
+                .map((o) => o.text()),
+        ).toEqual(['Mango', 'Apricot']);
+        // Tropical still has Mango, Stone still has Apricot → both headers present
+        expect(
+            menu(wrapper)
+                .findAll('.ui-groupcombobox__group-header')
+                .map((h) => h.text()),
+        ).toEqual(['Tropical', 'Stone']);
+
+        await typeInto(input, 'ki'); // only Kiwi
+        expect(
+            menu(wrapper)
+                .findAll('.ui-groupcombobox__option')
+                .map((o) => o.text()),
+        ).toEqual(['Kiwi']);
+        // Stone has no match → its header is hidden
+        expect(
+            menu(wrapper)
+                .findAll('.ui-groupcombobox__group-header')
+                .map((h) => h.text()),
+        ).toEqual(['Tropical']);
+
+        await typeInto(input, '');
+        expect(menu(wrapper).findAll('.ui-groupcombobox__option')).toHaveLength(4);
+    });
+
+    it.each([
+        [{}, ['Mango', 'Kiwi', 'Apricot', 'Lime']],
+        [{alphabeticalSort: true}, ['Kiwi', 'Mango', 'Apricot', 'Lime']],
+    ])('with %o, keeps the groups in caller order and lists %s', async (props, options) => {
+        const wrapper = mountGroupCombobox(props);
+        await wrapper.find('input').trigger('click');
+
+        const headers = menu(wrapper).findAll('.ui-groupcombobox__group-header');
+        expect(headers.map((header) => header.text())).toEqual(['Tropical', 'Stone']);
+        expect(
+            menu(wrapper)
+                .findAll('.ui-groupcombobox__option')
+                .map((option) => option.text()),
+        ).toEqual(options);
+        wrapper.unmount();
+    });
+
+    it('commits by the order it shows when alphabeticalSort is set', async () => {
+        const wrapper = mountGroupCombobox({alphabeticalSort: true});
+        const input = wrapper.find('input');
+
+        await input.trigger('keydown', {key: 'ArrowDown'}); // open
+        await input.trigger('keydown', {key: 'ArrowDown'}); // → index 0 (Kiwi)
+        await input.trigger('keydown', {key: 'Enter'});
+
+        expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([2]); // Kiwi
+        wrapper.unmount();
+    });
+
+    it('commits on click, emits update:modelValue, closes, and snaps input to label', async () => {
+        const wrapper = mountGroupCombobox({});
+        await wrapper.find('input').trigger('click');
+
+        const options = menu(wrapper).findAll('.ui-groupcombobox__option');
+        await options[2].trigger('click'); // Apricot (index 2)
+        expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([3]);
+        expect(menu(wrapper).exists()).toBe(false);
+        expect(wrapper.find('input').element.value).toBe('Apricot');
+    });
+
+    it('shows the committed value label in the input on mount', () => {
+        const wrapper = mountGroupCombobox({modelValue: 2});
+        expect(wrapper.find('input').element.value).toBe('Kiwi');
+    });
+
+    it('opens with the FULL list when the input holds the committed label (WR-0576)', async () => {
+        const wrapper = mountGroupCombobox({modelValue: 1}); // Mango
+        const input = wrapper.find('input');
+        expect(input.element.value).toBe('Mango');
+
+        await input.trigger('click');
+        // Query equals committed label → filter must not engage.
+        expect(menu(wrapper).findAll('.ui-groupcombobox__option')).toHaveLength(4);
+    });
+
+    it('engages the filter once the query diverges from the committed label', async () => {
+        const wrapper = mountGroupCombobox({modelValue: 1}); // Mango
+        await wrapper.find('input').trigger('click');
+        await typeInto(wrapper.find('input'), 'Ki'); // diverged
+
+        expect(
+            menu(wrapper)
+                .findAll('.ui-groupcombobox__option')
+                .map((o) => o.text()),
+        ).toEqual(['Kiwi']);
+    });
+
+    it('reverts a half-typed query to the committed label on Escape', async () => {
+        const wrapper = mountGroupCombobox({modelValue: 3}); // Apricot
+        const input = wrapper.find('input');
+
+        await input.trigger('click');
+        await typeInto(input, 'zzz');
+        expect(input.element.value).toBe('zzz');
+
+        await input.trigger('keydown', {key: 'Escape'});
+        expect(menu(wrapper).exists()).toBe(false);
+        expect(input.element.value).toBe('Apricot');
+    });
+
+    it('reverts a half-typed query on a click outside', async () => {
+        const wrapper = mountGroupCombobox({});
+        const input = wrapper.find('input');
+
+        await typeInto(input, 'ap');
+        expect(input.element.value).toBe('ap');
+        expect(menu(wrapper).exists()).toBe(true);
+
+        document.body.dispatchEvent(new MouseEvent('click', {bubbles: true}));
+        await wrapper.vm.$nextTick();
+        expect(menu(wrapper).exists()).toBe(false);
+        expect(input.element.value).toBe('');
+    });
+
+    it('selects the input text when the popup opens holding the committed label (WR-0576)', async () => {
+        const wrapper = mountGroupCombobox({modelValue: 1}); // Mango
+        const input = wrapper.find('input');
+
+        await input.trigger('click');
+        expect(input.element.selectionStart).toBe(0);
+        expect(input.element.selectionEnd).toBe('Mango'.length);
+    });
+
+    it('does not select when typing is what opened the popup (WR-0576)', async () => {
+        const wrapper = mountGroupCombobox({modelValue: 1}); // Mango
+        const input = wrapper.find('input');
+        const select = vi.spyOn(input.element, 'select');
+
+        await typeInto(input, 'Ma'); // typing opens; query diverged before open watcher runs
+        expect(select).not.toHaveBeenCalled();
+    });
+
+    it('commits the option ArrowDown highlights on Enter', async () => {
+        const wrapper = mountGroupCombobox({});
+        const input = wrapper.find('input');
+
+        await input.trigger('keydown', {key: 'ArrowDown'}); // open, pointer -1
+        await input.trigger('keydown', {key: 'ArrowDown'}); // → 0 (Mango)
+        await input.trigger('keydown', {key: 'ArrowDown'}); // → 1 (Kiwi)
+        await input.trigger('keydown', {key: 'Enter'});
+
+        expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([2]); // Kiwi
+        expect(menu(wrapper).exists()).toBe(false);
+        expect(wrapper.find('input').element.value).toBe('Kiwi');
+    });
+
+    it('commits nothing on Enter with no option highlighted, and stays open', async () => {
+        const wrapper = mountGroupCombobox({});
+        const input = wrapper.find('input');
+
+        await input.trigger('keydown', {key: 'ArrowDown'}); // opens, nothing highlighted
+        await input.trigger('keydown', {key: 'Enter'});
+
+        expect(wrapper.emitted('update:modelValue')).toBeUndefined();
+        expect(menu(wrapper).exists()).toBe(true);
+        wrapper.unmount();
+    });
+
+    it('commits null from the clear entry on Enter and empties the input', async () => {
+        const wrapper = mountGroupCombobox({clearLabel: 'None', modelValue: 1});
+        const input = wrapper.find('input');
+
+        await input.trigger('keydown', {key: 'ArrowDown'}); // open
+        await input.trigger('keydown', {key: 'ArrowDown'}); // → clear entry
+        expect(input.attributes('aria-activedescendant')).toBe('fruit-clear');
+        await input.trigger('keydown', {key: 'Enter'});
+
+        expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([null]);
+        expect(menu(wrapper).exists()).toBe(false);
+        expect(input.element.value).toBe('');
+    });
+
+    it('starts on emptyDisplayValue when mounted with a null model, and reverts to it on dismiss', async () => {
+        const wrapper = mountGroupCombobox({clearLabel: 'None', emptyDisplayValue: 'Any fruit'});
+        const input = wrapper.find('input');
+        expect(input.element.value).toBe('Any fruit');
+
+        await typeInto(input, 'zzz'); // half-typed non-match…
+        await input.trigger('keydown', {key: 'Escape'});
+        expect(input.element.value).toBe('Any fruit'); // …reverts to the named empty state
+    });
+
+    it('commits null from the clear entry and snaps the input to emptyDisplayValue', async () => {
+        const wrapper = mountGroupCombobox({clearLabel: 'None', emptyDisplayValue: 'Any fruit', modelValue: 1});
+        const input = wrapper.find('input');
+        expect(input.element.value).toBe('Mango');
+
+        await input.trigger('keydown', {key: 'ArrowDown'}); // open
+        await input.trigger('keydown', {key: 'ArrowDown'}); // → clear entry
+        expect(input.attributes('aria-activedescendant')).toBe('fruit-clear');
+        await input.trigger('keydown', {key: 'Enter'});
+
+        expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([null]);
+        expect(menu(wrapper).exists()).toBe(false);
+        expect(input.element.value).toBe('Any fruit'); // the named empty state, not ''
+    });
+
+    it('does not filter by emptyDisplayValue when the committed-null rendering fills the input', async () => {
+        const wrapper = mountGroupCombobox({emptyDisplayValue: 'Any fruit'}); // model null → input 'Any fruit'
+        const input = wrapper.find('input');
+        expect(input.element.value).toBe('Any fruit');
+
+        await input.trigger('click');
+        // 'Any fruit' matches no option label, so the un-fixed filter would show an EMPTY list on open.
+        expect(menu(wrapper).findAll('.ui-groupcombobox__option')).toHaveLength(4);
+    });
+
+    it('points aria-activedescendant at the highlighted filtered option, never at a header', async () => {
+        const wrapper = mountGroupCombobox({});
+        const input = wrapper.find('input');
+
+        await input.trigger('keydown', {key: 'ArrowDown'}); // open
+        expect(input.attributes('aria-activedescendant')).toBeUndefined();
+
+        await input.trigger('keydown', {key: 'ArrowDown'}); // → 0 (Mango)
+        expect(input.attributes('aria-activedescendant')).toBe('fruit-opt-0');
+
+        await input.trigger('keydown', {key: 'ArrowDown'}); // → 1 (Kiwi)
+        expect(input.attributes('aria-activedescendant')).toBe('fruit-opt-1');
+
+        // Header rows carry no id.
+        const headerIds = menu(wrapper)
+            .findAll('.ui-groupcombobox__group-header')
+            .map((h) => h.attributes('id'));
+        expect(headerIds.every((id) => id === undefined)).toBe(true);
+    });
+
+    it('marks the committed option aria-selected', async () => {
+        const wrapper = mountGroupCombobox({modelValue: 3}); // Apricot
+        await wrapper.find('input').trigger('click');
+
+        const options = menu(wrapper).findAll('.ui-groupcombobox__option');
+        // Mango, Kiwi, Apricot, Lime — Apricot (index 2) is selected
+        expect(options.map((o) => o.attributes('aria-selected'))).toEqual(['false', 'false', 'true', 'false']);
+    });
+
+    it.each([
+        ['click', {}],
+        ['keydown', {key: 'ArrowDown'}],
+        ['input', {}],
+    ])("opens on %s before a consumer's listener runs, so that listener cannot hold it back", async (type, init) => {
+        // Merged listeners run in order; one calling stopImmediatePropagation skips the ones after it.
+        const listener = `on${type[0].toUpperCase()}${type.slice(1)}`;
+        const wrapper = mount(GroupCombobox as never, {
+            props: {groups: GROUPS, optionLabel: 'name', id: 'fruit', modelValue: null},
+            attrs: {[listener]: (event: Event) => event.stopImmediatePropagation()},
+            attachTo: document.body,
+        });
+
+        wrapper.find('input').element.focus();
+        await wrapper.find('input').trigger(type, init);
+
+        expect(menu(wrapper).exists()).toBe(true);
+        wrapper.unmount();
+    });
+
+    it('does not open when disabled', async () => {
+        const wrapper = mountGroupCombobox({disabled: true});
+        await wrapper.find('input').trigger('click');
+        expect(menu(wrapper).exists()).toBe(false);
+
+        // Dispatched by hand: VTU's trigger() skips a disabled element, and the keyboard guard is
+        // what is under test here.
+        wrapper
+            .find('input')
+            .element.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowDown', bubbles: true, cancelable: true}));
+        await wrapper.vm.$nextTick();
+        expect(menu(wrapper).exists()).toBe(false);
+    });
+
+    it('propagates required, invalid, and describedby to the input', () => {
+        const wrapper = mountGroupCombobox({required: true, invalid: true, describedby: 'fruit-error'});
+        const input = wrapper.find('input');
+
+        expect(input.attributes('aria-required')).toBe('true');
+        expect(input.attributes('aria-invalid')).toBe('true');
+        expect(input.attributes('aria-describedby')).toBe('fruit-error');
+    });
+
+    it('omits aria-required and aria-invalid when the flags are false', () => {
+        const input = mountGroupCombobox({}).find('input');
+        expect(input.attributes('aria-required')).toBeUndefined();
+        expect(input.attributes('aria-invalid')).toBeUndefined();
+    });
+
+    it('re-syncs the input to the committed label when the model changes from outside while idle', async () => {
+        const wrapper = mountGroupCombobox({});
+        expect(wrapper.find('input').element.value).toBe('');
+
+        await wrapper.setProps({modelValue: 4}); // Lime
+        expect(wrapper.find('input').element.value).toBe('Lime');
+    });
+
+    it("shows the committed label once a pre-set model's option arrives late (edit-form pattern)", async () => {
+        const wrapper = mountGroupCombobox({modelValue: 1, groups: []});
+        expect(wrapper.find('input').element.value).toBe('');
+
+        await wrapper.setProps({groups: GROUPS});
+        expect(wrapper.find('input').element.value).toBe('Mango');
+    });
+
+    it('does not yank the typed query when model changes from outside while open', async () => {
+        const wrapper = mountGroupCombobox({});
+        await wrapper.find('input').trigger('click');
+        await wrapper.setProps({modelValue: 1}); // external change while open
+        expect(wrapper.find('input').element.value).toBe('');
+    });
+
+    it('removes its document listener on unmount', async () => {
+        const wrapper = mountGroupCombobox({});
+        await wrapper.find('input').trigger('click');
+        wrapper.unmount();
+        // Exercises onBeforeUnmount cleanup — a stray document click must not throw.
+        document.body.dispatchEvent(new MouseEvent('click', {bubbles: true}));
+    });
+
+    it('shows emptyText when all groups are filtered out', async () => {
+        const wrapper = mountGroupCombobox({emptyText: 'No match'});
+        await typeInto(wrapper.find('input'), 'zzz');
+        expect(menu(wrapper).find('.ui-groupcombobox__empty').text()).toBe('No match');
+        expect(menu(wrapper).findAll('.ui-groupcombobox__option')).toHaveLength(0);
+    });
+
+    it('moves the highlight to a hovered option', async () => {
+        const wrapper = mountGroupCombobox({});
+        await wrapper.find('input').trigger('click');
+
+        await menu(wrapper).findAll('.ui-groupcombobox__option')[1].trigger('mouseover'); // Kiwi (index 1)
+        expect(wrapper.find('input').attributes('aria-activedescendant')).toBe('fruit-opt-1');
+    });
+
+    it('exposes an imperative focus() handle that moves DOM focus to the input', () => {
+        const wrapper = mountGroupCombobox({});
+        const inputEl = wrapper.find('input').element;
+        expect(document.activeElement).not.toBe(inputEl);
+
+        (wrapper.vm as unknown as {focus: () => void}).focus();
+        expect(document.activeElement).toBe(inputEl);
+    });
+
+    it('resolves the display string via a getter optionLabel function', () => {
+        const wrapper = mountGroupCombobox({optionLabel: (o: Fruit) => `${o.name}!`, modelValue: 1});
+        expect(wrapper.find('input').element.value).toBe('Mango!');
+    });
+
+    it('omits the header row for a group with header=false but still renders its options', async () => {
+        const wrapper = mountGroupCombobox({
+            groups: [
+                {options: [{id: 1, name: 'Mango'}], text: 'Tropical', header: false},
+                {options: [{id: 2, name: 'Apricot'}], text: 'Stone'},
+            ],
+        });
+        await wrapper.find('input').trigger('click');
+
+        expect(
+            menu(wrapper)
+                .findAll('.ui-groupcombobox__group-header')
+                .map((h) => h.text()),
+        ).toEqual(['Stone']);
+        expect(menu(wrapper).findAll('.ui-groupcombobox__option')).toHaveLength(2);
+    });
+
+    it('renders a header=false group AFTER a named group flat, not absorbed into the prior role="group"', async () => {
+        const wrapper = mountGroupCombobox({
+            groups: [
+                {options: [{id: 1, name: 'Mango'}], text: 'Tropical'},
+                {options: [{id: 2, name: 'Apricot'}], text: 'Stone', header: false},
+            ],
+        });
+        await wrapper.find('input').trigger('click');
+        const m = menu(wrapper);
+
+        // The named group's inner role="group" <ul> owns ONLY its own option — the boundary
+        // marker keeps the headerless group's option out of it.
+        const groupUl = m.find('.ui-groupcombobox__group ul[role="group"]');
+        expect(groupUl.findAll('.ui-groupcombobox__option')).toHaveLength(1);
+        expect(groupUl.find('.ui-groupcombobox__option').text()).toBe('Mango');
+
+        expect(m.findAll('.ui-groupcombobox__group-header').map((h) => h.text())).toEqual(['Tropical']);
+        expect(m.findAll(':scope > .ui-groupcombobox__option').map((o) => o.text())).toEqual(['Apricot']);
+    });
+
+    it('renders mutedOptions with .is-muted and keeps them committable', async () => {
+        const wrapper = mountGroupCombobox({mutedOptions: [2]}); // Kiwi
+        await wrapper.find('input').trigger('click');
+
+        const options = menu(wrapper).findAll('.ui-groupcombobox__option');
+        expect(options.map((o) => o.classes().includes('is-muted'))).toEqual([false, true, false, false]);
+
+        await options[1].trigger('click'); // Kiwi commits anyway
+        expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([2]);
+    });
+
+    it('renders per-option custom content through the #option scoped slot', async () => {
+        const wrapper = mountGroupCombobox(
+            {modelValue: 1},
+            {
+                option: (props: {option: Fruit; index: number; selected: boolean}) =>
+                    h('b', {class: 'swatch'}, `${props.option.name}#${props.index}${props.selected ? '*' : ''}`),
+            },
+        );
+        await wrapper.find('input').trigger('click');
+        await typeInto(wrapper.find('input'), 'ki'); // only Kiwi (index 0 after filter)
+
+        const swatches = menu(wrapper)
+            .findAll('.swatch')
+            .map((el) => el.text());
+        expect(swatches).toEqual(['Kiwi#0']);
+    });
+
+    // An IME composes a character through several `input` events. The query is bound with `v-model`,
+    // which ignores them until `compositionend`, so a candidate never filters the list. Neither
+    // happy-dom nor Chromium can be driven by a real IME from a test; these are the events one sends.
+    describe('IME composition', () => {
+        const compose = (field: HTMLInputElement, value: string): void => {
+            field.value = value;
+            field.dispatchEvent(new InputEvent('input', {bubbles: true, isComposing: true}));
+        };
+
+        it('opens and filters nothing while composing, then filters by the committed text', async () => {
+            const wrapper = mountGroupCombobox({});
+            const field = wrapper.find('input').element;
+
+            field.focus();
+            field.dispatchEvent(new CompositionEvent('compositionstart', {bubbles: true}));
+            compose(field, 'z');
+            compose(field, 'm');
+            await wrapper.vm.$nextTick();
+            expect(menu(wrapper).exists()).toBe(false);
+
+            field.dispatchEvent(new CompositionEvent('compositionend', {bubbles: true, data: 'm'}));
+            await wrapper.vm.$nextTick();
+            expect(
+                menu(wrapper)
+                    .findAll('.ui-groupcombobox__option')
+                    .map((o) => o.text()),
+            ).toEqual(['Mango', 'Lime']);
+            wrapper.unmount();
+        });
+
+        it('does not select the committed label when a composition starts on a closed combobox', async () => {
+            const wrapper = mountGroupCombobox({modelValue: 1}); // Mango
+            const field = wrapper.find('input').element;
+            const select = vi.spyOn(field, 'select');
+
+            field.focus();
+            field.dispatchEvent(new CompositionEvent('compositionstart', {bubbles: true}));
+            compose(field, 'Mangoか');
+            await wrapper.vm.$nextTick();
+            field.dispatchEvent(new CompositionEvent('compositionend', {bubbles: true, data: 'か'}));
+            await wrapper.vm.$nextTick();
+
+            // Selecting mid-composition would replace the text the IME is composing.
+            expect(select).not.toHaveBeenCalled();
+            expect(menu(wrapper).find('.ui-groupcombobox__empty').exists()).toBe(true);
+            wrapper.unmount();
+        });
+
+        it('drops the highlight on a composing input', async () => {
+            const wrapper = mountGroupCombobox({});
+            const input = wrapper.find('input');
+
+            await input.trigger('keydown', {key: 'ArrowDown'}); // open
+            await input.trigger('keydown', {key: 'ArrowDown'}); // → Mango
+            expect(input.attributes('aria-activedescendant')).toBe('fruit-opt-0');
+
+            input.element.dispatchEvent(new CompositionEvent('compositionstart', {bubbles: true}));
+            compose(input.element, 'か');
+            await wrapper.vm.$nextTick();
+
+            expect(input.attributes('aria-activedescendant')).toBeUndefined();
+            wrapper.unmount();
+        });
+
+        it.each([
+            ['isComposing', {isComposing: true}],
+            ['keyCode 229', {keyCode: 229}],
+        ])('commits no highlighted option on an Enter flagged by %s', async (_, flag) => {
+            const wrapper = mountGroupCombobox({});
+            const input = wrapper.find('input');
+
+            await input.trigger('keydown', {key: 'ArrowDown'}); // open
+            await input.trigger('keydown', {key: 'ArrowDown'}); // → Mango
+            input.element.dispatchEvent(
+                new KeyboardEvent('keydown', {key: 'Enter', bubbles: true, cancelable: true, ...flag}),
+            );
+            await wrapper.vm.$nextTick();
+
+            expect(wrapper.emitted('update:modelValue')).toBeUndefined();
+            expect(input.attributes('aria-activedescendant')).toBe('fruit-opt-0');
+            wrapper.unmount();
+        });
+
+        // The keys inside a composition carry `isComposing`; the keydown that starts one fires before
+        // `compositionstart` and carries only keyCode 229. An IME moves through its candidates with
+        // the arrow keys and confirms one with Enter, so neither may reach the list.
+        it.each([
+            ['isComposing', {isComposing: true}],
+            ['keyCode 229', {keyCode: 229}],
+        ])('leaves ArrowDown and Enter flagged by %s to the input method', async (_, flag) => {
+            const wrapper = mountGroupCombobox({});
+            const input = wrapper.find('input');
+            const press = (key: string): void => {
+                input.element.dispatchEvent(
+                    new KeyboardEvent('keydown', {key, bubbles: true, cancelable: true, ...flag}),
+                );
+            };
+
+            await input.trigger('keydown', {key: 'ArrowDown'}); // open
+            input.element.dispatchEvent(new CompositionEvent('compositionstart', {bubbles: true}));
+            compose(input.element, 'か');
+            press('ArrowDown');
+            press('Enter');
+            await wrapper.vm.$nextTick();
+
+            expect(input.attributes('aria-activedescendant')).toBeUndefined();
+            expect(wrapper.emitted('update:modelValue')).toBeUndefined();
+            expect(menu(wrapper).exists()).toBe(true);
+            wrapper.unmount();
+        });
+
+        it('does not open when a blur commits the composition after focus has left', async () => {
+            const wrapper = mountGroupCombobox({});
+            const field = wrapper.find('input').element;
+            const outside = document.createElement('button');
+            document.body.append(outside);
+
+            field.focus();
+            field.dispatchEvent(new CompositionEvent('compositionstart', {bubbles: true}));
+            compose(field, 'm');
+            outside.focus();
+            field.dispatchEvent(new CompositionEvent('compositionend', {bubbles: true, data: 'm'}));
+            await wrapper.vm.$nextTick();
+
+            expect(menu(wrapper).exists()).toBe(false);
+            wrapper.unmount();
+        });
+
+        it('keeps the candidate text in the field across a re-render while composing', async () => {
+            const wrapper = mountGroupCombobox({});
+            const field = wrapper.find('input').element;
+
+            field.dispatchEvent(new CompositionEvent('compositionstart', {bubbles: true}));
+            compose(field, 'か');
+            await wrapper.setProps({placeholder: 'Pick one'});
+
+            expect(field.value).toBe('か');
+            wrapper.unmount();
+        });
+    });
+});
+
+describe('GroupCombobox placement', () => {
+    it.each([
+        [undefined, 'bottom-start'],
+        ['top', 'top'],
+    ] as const)('hands floating-ui placement %s as %s', (placement, expected) => {
+        const wrapper = mountGroupCombobox(placement === undefined ? {} : {placement});
+
+        expect(vi.mocked(useFloating).mock.calls.at(-1)?.[2]).toMatchObject({placement: expected});
+        wrapper.unmount();
+    });
+});

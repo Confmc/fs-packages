@@ -5,6 +5,7 @@ import {mount} from '@vue/test-utils';
 import {afterEach, describe, expect, it} from 'vitest';
 
 import Combobox from '../src/components/Combobox.vue';
+import GroupCombobox from '../src/components/GroupCombobox.vue';
 import GroupSelect from '../src/components/GroupSelect.vue';
 import MultiCombobox from '../src/components/MultiCombobox.vue';
 import MultiSelect from '../src/components/MultiSelect.vue';
@@ -31,6 +32,12 @@ const SORTABLE = [
         component: GroupSelect,
         props: {groups: [{text: 'Fruit', options: CALLER_ORDER}], modelValue: null},
         opener: '[role="combobox"]',
+    },
+    {
+        name: 'GroupCombobox',
+        component: GroupCombobox,
+        props: {groups: [{text: 'Fruit', options: CALLER_ORDER}], modelValue: null},
+        opener: 'input',
     },
 ] as const;
 
