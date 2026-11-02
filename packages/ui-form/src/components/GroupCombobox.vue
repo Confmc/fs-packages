@@ -1,6 +1,7 @@
 <template>
     <div ref="root" v-bind="rootAttrs($attrs)" class="ui-groupcombobox">
         <input
+            v-model="query"
             @input="onInput"
             @keydown="onKey"
             @click="onClick"
@@ -21,7 +22,6 @@
             :aria-activedescendant="activeDescendant"
             :placeholder="placeholder"
             :disabled="disabled"
-            :value="query"
         />
 
         <!-- WR-0521: the empty state must be ANNOUNCED, not just painted — a persistent,
@@ -279,13 +279,17 @@ const dismiss = (): void => {
     close();
 };
 
-// Typing filters and opens; the raw value is bound through `query`, and every keystroke
-// resets the highlight (nothing is pre-selected — Enter with no highlight is a no-op).
-// `resetHighlight` (not a bare pointer write) so a hovered clear entry drops too.
+// Typing filters and opens. `v-model` writes `query` (its listener runs before this one), and
+// skips the `input` events an IME sends while composing, writing the committed text on
+// `compositionend`, so a candidate never filters the list. Every keystroke resets the highlight
+// (nothing is pre-selected — Enter with no highlight is a no-op), a composing one too, so the
+// Enter that confirms a candidate commits no option. `resetHighlight` (not a bare pointer write)
+// so a hovered clear entry drops too. Opening waits for the committed text: a composition started
+// on a closed list would otherwise open it on the unchanged query, and select-all-on-open (above)
+// would select the text the IME is composing.
 const onInput = (event: Event) => {
-    query.value = (event.target as HTMLInputElement).value;
-    openList();
     resetHighlight();
+    if (!(event as InputEvent).isComposing) openList();
 };
 // Clicking the (enabled) input opens the list. A disabled input never dispatches click.
 const onClick = openList;
