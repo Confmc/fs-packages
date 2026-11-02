@@ -873,6 +873,14 @@ and the release CHANGELOG. ui-inputs (emmie's `^0.17.2`) has the same 26 today: 
 (Amendment 1 § 5 allows fixes); its docs table `docs/packages/ui-inputs.md:482-487` lists the old defaults. Asked Marcel.
 Chromium: the `chromium_headless_shell-1248` alias now points at `-1252` (1247 was cleaned up 2026-11-02).
 
+**Amendment 2 draft:** `packages/ui-form/AMENDMENT-2.draft.md` on this branch. Not sent; § 1 (placeholder) and § 6
+(app defaults) wait on the reviewer's answers, and the amendment itself waits on his yes. Form/kit rules stay out
+until landing.10 confirms them.
+
+**Working rule from 2026-11-02:** no new PRs until the reviewer has reviewed or merged something; prepared work stays
+on fork branches. Before changing anything because it looks easy, check its context holds (today's counter-example:
+"emmie's area looks are broken in production" was wrong; emmie builds them with `:deep()` CSS, not tokens).
+
 **Held until #354 merges** (a push now reruns CI and the audit step reds a green PR), on fork as `hold/*`:
 `hold/344-boolean-id` @5107dd3 = #344 + `SelectItem.id: string | number | boolean` (spec: true/false/null round-trip);
 `hold/333-spec-type` @771edc0 = #333 + the spec helper typing fix (vue-tsc on `validation-errors.spec.ts:12`). After
