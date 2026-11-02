@@ -6,6 +6,7 @@ import {mount} from '@vue/test-utils';
 import {afterEach, describe, expect, it, vi} from 'vitest';
 
 import Combobox from '../src/components/Combobox.vue';
+import MultiCombobox from '../src/components/MultiCombobox.vue';
 import MultiSelect from '../src/components/MultiSelect.vue';
 import SingleSelect from '../src/components/SingleSelect.vue';
 
@@ -15,6 +16,7 @@ const FAMILY = [
     {name: 'SingleSelect', component: SingleSelect, props: {options: OPTIONS, modelValue: null}},
     {name: 'MultiSelect', component: MultiSelect, props: {options: OPTIONS, modelValue: []}},
     {name: 'Combobox', component: Combobox, props: {options: OPTIONS, modelValue: null}},
+    {name: 'MultiCombobox', component: MultiCombobox, props: {options: OPTIONS, modelValue: []}},
 ] as const;
 
 afterEach(() => {

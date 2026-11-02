@@ -5,6 +5,7 @@ import {mount} from '@vue/test-utils';
 import {afterEach, describe, expect, it} from 'vitest';
 
 import Combobox from '../src/components/Combobox.vue';
+import MultiCombobox from '../src/components/MultiCombobox.vue';
 import MultiSelect from '../src/components/MultiSelect.vue';
 import SingleSelect from '../src/components/SingleSelect.vue';
 
@@ -18,6 +19,7 @@ const SORTABLE = [
     {name: 'SingleSelect', component: SingleSelect, modelValue: null, opener: 'button'},
     {name: 'MultiSelect', component: MultiSelect, modelValue: [], opener: '.ui-multiselect__trigger'},
     {name: 'Combobox', component: Combobox, modelValue: null, opener: 'input'},
+    {name: 'MultiCombobox', component: MultiCombobox, modelValue: [], opener: 'input'},
 ] as const;
 
 afterEach(() => {
