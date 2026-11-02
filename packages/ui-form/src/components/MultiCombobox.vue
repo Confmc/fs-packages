@@ -3,7 +3,7 @@
         <div
             ref="box"
             class="ui-control ui-multicombobox__box"
-            :class="{'is-open': open, 'has-value': model.length > 0, 'is-invalid': invalid, 'is-disabled': disabled}"
+            :class="{'is-open': open, 'has-value': chips.length > 0, 'is-invalid': invalid, 'is-disabled': disabled}"
         >
             <!-- Chips render the committed values around the input (the APG editor-combobox
                  layout, stolen from our own MultiSelect). Removing must not open the menu:
@@ -53,7 +53,7 @@
                 :aria-describedby="describedbyWithSelection"
                 :aria-controls="open ? listboxId : undefined"
                 :aria-activedescendant="activeDescendant"
-                :placeholder="model.length ? undefined : placeholder"
+                :placeholder="chips.length ? undefined : placeholder"
                 :disabled="disabled"
             />
         </div>
@@ -147,7 +147,7 @@ const {
     optionLabel: LabelKey<T>;
     /** stable id — required so the input can pair with a label/error. */
     id: string;
-    /** shown only while nothing is committed — chips replace it, like MultiSelect. */
+    /** shown only while no chip shows — chips replace it, so an id whose option has not loaded yet leaves it up. */
     placeholder?: string;
     disabled?: boolean;
     /** sort the rendered options by display string — off by default, so the caller's order is kept. */

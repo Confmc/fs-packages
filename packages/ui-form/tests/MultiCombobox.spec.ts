@@ -135,6 +135,14 @@ describe('MultiCombobox', () => {
         expect(input.attributes('aria-describedby')).toBe('fruit-error fruit-selection');
     });
 
+    it('shows the placeholder and no has-value while no committed id has a chip yet', () => {
+        const wrapper = mountMultiCombobox({modelValue: [99], placeholder: 'Pick some'});
+
+        expect(wrapper.findAll('.ui-multicombobox__chip')).toHaveLength(0);
+        expect(wrapper.find('input').attributes('placeholder')).toBe('Pick some');
+        expect(wrapper.find('.ui-multicombobox__box').classes()).not.toContain('has-value');
+    });
+
     it('conveys the committed selection through an aria-describedby summary (the input-as-trigger value surface)', () => {
         const wrapper = mountMultiCombobox({modelValue: [2, 1]});
 
