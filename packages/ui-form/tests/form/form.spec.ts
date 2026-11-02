@@ -418,6 +418,14 @@ describe('useForm field()', () => {
         expect(form.field('learningGoals.0.title').id).toBe('f-learningGoals-0-title');
     });
 
+    it('treats an empty message as no message', () => {
+        const form = inSetup(() => useForm({idPrefix: 'f'}));
+
+        form.take(requestError(422, {errors: {email: ['']}}));
+
+        expect(form.field('email')).toEqual({id: 'f-email', invalid: false, describedby: undefined});
+    });
+
     it("puts the name first and appends each form's own part from useId, so same-named fields never share an id", () => {
         const ids: string[] = [];
         const Block = defineComponent({
@@ -438,6 +446,28 @@ describe('useForm field()', () => {
         const form = inSetup(() => useForm<'email'>({idPrefix: 'invoice'}));
 
         expect(form.field('email').id).toBe('invoice-email');
+    });
+    it('marks and describes the control it is bound to', async () => {
+        let form!: UseForm<'email'>;
+        const wrapper = mount(
+            defineComponent({
+                setup() {
+                    form = useForm<'email'>({idPrefix: 'f'});
+                    return () => h(TextInput, {...form.field('email'), placeholder: 'email', modelValue: ''});
+                },
+            }),
+        );
+        const input = () => wrapper.find('input');
+
+        expect(input().attributes('id')).toBe('f-email');
+        expect(input().attributes('aria-invalid')).toBeUndefined();
+        expect(input().attributes('aria-describedby')).toBeUndefined();
+
+        form.take(requestError(422, {errors: {email: ['Taken']}}));
+        await nextTick();
+
+        expect(input().attributes('aria-invalid')).toBe('true');
+        expect(input().attributes('aria-describedby')).toBe('f-email-error');
     });
 });
 
