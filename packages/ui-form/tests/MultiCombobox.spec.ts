@@ -103,7 +103,7 @@ describe('MultiCombobox', () => {
         });
         const input = wrapper.find('input');
 
-        // Chips follow SELECTION order (the model array), not options order.
+        // Chips follow the order the options are shown in, not the model's.
         expect(wrapper.findAll('.ui-multicombobox__chip').map((chip) => chip.text())).toEqual(['Mango', 'Watermelon']);
         expect(wrapper.find('.ui-multicombobox__box').classes()).toContain('has-value');
         expect(wrapper.find('.ui-multicombobox__box').classes()).toContain('is-invalid');
@@ -119,7 +119,7 @@ describe('MultiCombobox', () => {
 
         // No consumer describedby → the summary id stands alone.
         expect(wrapper.find('input').attributes('aria-describedby')).toBe('fruit-selection');
-        expect(wrapper.find('#fruit-selection').text()).toBe('Apricot, Watermelon'); // selection order
+        expect(wrapper.find('#fruit-selection').text()).toBe('Apricot, Watermelon'); // display order
     });
 
     it('filters the list as the user types, and an empty query shows all options', async () => {
@@ -235,10 +235,10 @@ describe('MultiCombobox', () => {
         const wrapper = mountMultiCombobox({modelValue: [1, 2], removeLabel: 'Verwijder'});
 
         const chips = wrapper.findAll('.ui-multicombobox__chip');
-        expect(chips.map((chip) => chip.text())).toEqual(['Watermelon', 'Apricot']);
-        expect(chips[0].find('.ui-multicombobox__chip-remove').attributes('aria-label')).toBe('Verwijder Watermelon');
+        expect(chips.map((chip) => chip.text())).toEqual(['Apricot', 'Watermelon']);
+        expect(chips[1].find('.ui-multicombobox__chip-remove').attributes('aria-label')).toBe('Verwijder Watermelon');
 
-        await chips[0].find('.ui-multicombobox__chip-remove').trigger('click');
+        await chips[1].find('.ui-multicombobox__chip-remove').trigger('click');
         expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[2]]);
         expect(menu(wrapper).exists()).toBe(false); // chip remove ≠ open
         // Removal unmounts the focused button — focus must land on the input, not the body
@@ -252,13 +252,13 @@ describe('MultiCombobox', () => {
         await wrapper.find('input').trigger('focus');
         expect(menu(wrapper).exists()).toBe(true);
 
-        await wrapper.find('.ui-multicombobox__chip-remove').trigger('click');
-        expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[2]]);
+        await wrapper.find('.ui-multicombobox__chip-remove').trigger('click'); // Apricot, shown first
+        expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[1]]);
         expect(menu(wrapper).exists()).toBe(true); // stays open
         expect(document.activeElement).toBe(wrapper.find('input').element);
     });
 
-    it('pops the last committed value on Backspace ONLY while the query is empty, and no-ops on an empty model', async () => {
+    it('removes the last chip on Backspace only while the query is empty, and does nothing with no chip', async () => {
         const wrapper = mountMultiCombobox({modelValue: [2, 1]});
         const input = wrapper.find('input');
 
@@ -276,14 +276,15 @@ describe('MultiCombobox', () => {
         expect(wrapper.emitted('update:modelValue')).toHaveLength(1); // nothing to pop
     });
 
-    it('keeps an unresolved id in the model (no chip) until its option arrives, and Backspace pops it too', async () => {
+    it('keeps an unresolved id in the model (no chip) until its option arrives, and Backspace leaves it', async () => {
         const wrapper = mountMultiCombobox({modelValue: [3, 99]});
 
         // id 99 has no option yet — no chip, but the model keeps it (async-options window).
         expect(wrapper.findAll('.ui-multicombobox__chip').map((chip) => chip.text())).toEqual(['Mango']);
 
+        // Backspace removes the last chip shown, never the model's tail.
         await wrapper.find('input').trigger('keydown', {key: 'Backspace'});
-        expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[3]]);
+        expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[99]]);
     });
 
     it('closes and clears the query on Escape, Tab, and click-outside — the resting state is empty + placeholder', async () => {
@@ -469,5 +470,101 @@ describe('MultiCombobox', () => {
 
         await input.setValue('m'); // matches return → the region empties again
         expect(region.text()).toBe('');
+    });
+});
+
+describe('MultiCombobox model order', () => {
+    // Caller order: Banana(1), Apple(2), Cherry(3).
+    const fruits = [
+        {id: 1, name: 'Banana'},
+        {id: 2, name: 'Apple'},
+        {id: 3, name: 'Cherry'},
+    ];
+
+    const mountFruits = (modelValue: number[], alphabeticalSort = false) =>
+        mount(MultiCombobox, {
+            props: {options: fruits, optionLabel: 'name', id: 'fruit', modelValue, alphabeticalSort},
+            attachTo: document.body,
+        });
+
+    it.each([
+        ["the caller's order", false, ['Banana', 'Apple', 'Cherry']],
+        ['alphabetical order', true, ['Apple', 'Banana', 'Cherry']],
+    ])(
+        'shows the chips in %s when alphabeticalSort is %s, whatever order the model arrived in',
+        (_, sort, expected) => {
+            const wrapper = mountFruits([3, 2, 1], sort);
+
+            expect(wrapper.findAll('.ui-multicombobox__chip').map((chip) => chip.text())).toEqual(expected);
+            expect(wrapper.find('#fruit-selection').text()).toBe(expected.join(', '));
+            wrapper.unmount();
+        },
+    );
+
+    it('keeps every chip while a typed query narrows the list', async () => {
+        const wrapper = mountFruits([3, 1]);
+        const input = wrapper.find('input');
+        input.element.focus();
+        await input.setValue('app');
+
+        expect(
+            menu(wrapper)
+                .findAll('li[role="option"]')
+                .map((option) => option.text()),
+        ).toEqual(['Apple']);
+        expect(wrapper.findAll('.ui-multicombobox__chip').map((chip) => chip.text())).toEqual(['Banana', 'Cherry']);
+        wrapper.unmount();
+    });
+
+    it('keeps the chips already shown in place when a pick adds one', async () => {
+        const wrapper = mountFruits([3, 1]);
+        await wrapper.find('input').trigger('click');
+        await menu(wrapper).findAll('li[role="option"]')[1].trigger('click'); // Apple
+        await wrapper.setProps({modelValue: wrapper.emitted<number[][]>('update:modelValue')!.at(-1)![0]});
+
+        expect(wrapper.findAll('.ui-multicombobox__chip').map((chip) => chip.text())).toEqual([
+            'Banana',
+            'Apple',
+            'Cherry',
+        ]);
+        wrapper.unmount();
+    });
+
+    // Cherry is the last chip, so all three paths drop it from the same membership.
+    it.each([
+        [
+            'its chip button',
+            async (wrapper: ReturnType<typeof mountFruits>) => {
+                await wrapper.findAll('.ui-multicombobox__chip-remove')[2].trigger('click');
+            },
+        ],
+        [
+            'Backspace',
+            async (wrapper: ReturnType<typeof mountFruits>) => {
+                await wrapper.find('input').trigger('keydown', {key: 'Backspace'});
+            },
+        ],
+        [
+            'the list',
+            async (wrapper: ReturnType<typeof mountFruits>) => {
+                await wrapper.find('input').trigger('click');
+                await menu(wrapper).findAll('li[role="option"]')[2].trigger('click');
+            },
+        ],
+    ])("removing through %s drops the id in place, keeping the consumer's order", async (_, removeCherry) => {
+        const wrapper = mountFruits([2, 3, 99, 1]);
+        await removeCherry(wrapper);
+
+        expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[2, 99, 1]]);
+        wrapper.unmount();
+    });
+
+    it('adds a pick at the end of the model, after an id with no option yet', async () => {
+        const wrapper = mountFruits([99, 3]);
+        await wrapper.find('input').trigger('click');
+        await menu(wrapper).findAll('li[role="option"]')[0].trigger('click');
+
+        expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[99, 3, 1]]);
+        wrapper.unmount();
     });
 });

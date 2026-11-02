@@ -173,7 +173,10 @@ defineSlots<{
     option?: (props: {option: T; index: number; selected: boolean; active: boolean}) => unknown;
 }>();
 
-/** The committed membership: an array of option ids, in selection order. */
+/**
+ * The committed membership: an array of option ids. Its order is the consumer's: an add appends and a
+ * remove drops in place, so nothing the control shows depends on it.
+ */
 const model = defineModel<T['id'][]>({required: true});
 
 /** Resolve an option's display string from the `optionLabel` prop (property name or getter). */
@@ -187,26 +190,26 @@ const labelOf = (option: T): string =>
 // toggle-commit so the full list is re-offered.
 const query = ref('');
 
-// The visible list = filter by the trimmed, case-folded query (empty query ⇒ all),
-// then the same optional alphabetical pass the siblings apply. Both aria-activedescendant
-// and Enter index into THIS filtered list, not the raw `options`.
-const filtered = computed(() => {
-    const needle = query.value.trim().toLowerCase();
-    const matched = needle ? options.filter((option) => labelOf(option).toLowerCase().includes(needle)) : options;
-    return alphabeticalSort ? [...matched].sort((a, b) => labelOf(a).localeCompare(labelOf(b))) : matched;
-});
-
-// The chip bar renders the committed values in selection order. An id whose option has not
-// arrived yet (the async-options edit-form window) has no label to show — it stays in the
-// model (Backspace still pops it) but renders no chip until its option loads.
-const chips = computed(() =>
-    model.value.flatMap((value) => {
-        const option = options.find((candidate) => candidate.id === value);
-        return option ? [option] : [];
-    }),
+// The options in display order: the same optional alphabetical pass the siblings apply.
+const sorted = computed(() =>
+    alphabeticalSort ? [...options].sort((a, b) => labelOf(a).localeCompare(labelOf(b))) : options,
 );
 
-/** The committed labels, selection-ordered — the aria-describedby selection surface. */
+// The visible list = the display order filtered by the trimmed, case-folded query (empty
+// query ⇒ all). Both aria-activedescendant and Enter index into THIS filtered list, not the
+// raw `options`.
+const filtered = computed(() => {
+    const needle = query.value.trim().toLowerCase();
+    return needle ? sorted.value.filter((option) => labelOf(option).toLowerCase().includes(needle)) : sorted.value;
+});
+
+// The chip bar renders the committed options in display order, whatever order the model arrived
+// in, so a pick never moves the chips already there; the query narrows the list, never the chips.
+// An id whose option has not arrived yet (the async-options edit-form window) has no label to
+// show — it stays in the model but renders no chip until its option loads.
+const chips = computed(() => sorted.value.filter((option) => model.value.includes(option.id)));
+
+/** The committed labels, in display order — the aria-describedby selection surface. */
 const selectedSummary = computed(() => chips.value.map(labelOf).join(', '));
 const selectionId = computed(() => `${id}-selection`);
 const describedbyWithSelection = computed(() =>
@@ -300,19 +303,23 @@ const remove = (value: T['id']): void => {
     ensureRefValueExists(input).focus();
     if (!wasOpen) close();
 };
-/** Backspace with an EMPTY query pops the LAST committed value (no-op when empty). */
-const popLast = (): void => {
-    if (model.value.length) model.value = model.value.slice(0, -1);
+/**
+ * Backspace with an EMPTY query removes the LAST CHIP — the last one shown, never the model's tail,
+ * which can be an id with no chip yet. No-op when no chip shows.
+ */
+const removeLastChip = (): void => {
+    const last = chips.value.at(-1);
+    if (last) remove(last.id);
 };
 
-// Backspace with an empty query is the chip-popping analogue of deleting text; with text in
+// Backspace with an empty query is the chip-removing analogue of deleting text; with text in
 // the query it stays native editing. Everything else follows the shared listbox keyboard
 // skeleton. The disabled guard mirrors the composable's own — the native :disabled blocks
 // focus in a real browser, but the guard keeps synthetic dispatch honest too.
 const onInputKey = (event: KeyboardEvent): void => {
     if (disabled) return;
     if (event.key === 'Backspace' && query.value === '') {
-        popLast();
+        removeLastChip();
         return;
     }
     onKey(event);
