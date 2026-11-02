@@ -114,7 +114,7 @@ describe('useForm with a draft', () => {
 describe('a write through field() keeps the messages', () => {
     const refusal = (data: unknown) => ({isAxiosError: true, response: {status: 422, data}});
 
-    it('leaves the server messages until the next submit, as without a draft', async () => {
+    it('leaves server messages and client refusals until the next submit, as without a draft', async () => {
         const draft = ref<Draft>({firstName: 'Ann', learningGoals: []});
         let form!: UseDraftForm<Draft>;
         const wrapper = mount(
@@ -126,11 +126,12 @@ describe('a write through field() keeps the messages', () => {
             }),
         );
         form.take(refusal({errors: {firstName: ['Minimaal 8 tekens']}}));
+        form.refuse('learningGoals', 'Kies een doel');
 
         await wrapper.find('input').setValue('B');
 
         expect(draft.value.firstName).toBe('B');
-        expect(form.errors.value).toEqual({firstName: 'Minimaal 8 tekens'});
+        expect(form.fieldErrors.value).toEqual({firstName: 'Minimaal 8 tekens', learningGoals: 'Kies een doel'});
         expect(wrapper.find('input').attributes('aria-invalid')).toBe('true');
     });
 });

@@ -13,6 +13,7 @@ export type {
     UseDraftForm,
     UseDraftFormOptions,
     UseForm,
+    UseFormClient,
     UseFormOptions,
     UseFormSubmit,
     UseValidationErrors,

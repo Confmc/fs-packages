@@ -369,10 +369,43 @@ describe('useForm scroll-to-error', () => {
         expect(scrollIntoView).not.toHaveBeenCalled();
     });
 
+    it("scrolls to the first field validate refuses, in document order, by the form's own id", async () => {
+        const {wrapper, form} = mountFields(['first', 'second']);
+
+        await expect(
+            form().handleSubmit(async () => {}, {validate: () => ({second: 'Required', first: 'Required'})}),
+        ).resolves.toBe('refused');
+
+        expect(scrollIntoView).toHaveBeenCalledOnce();
+        expect(scrollIntoView.mock.contexts[0]).toBe(wrapper.findAll('input')[0]!.element);
+    });
+
+    it('does nothing for a validate refusal it renders no element for, or an empty message', async () => {
+        const {form} = mountFields(['email']);
+
+        await expect(
+            form().handleSubmit(async () => {}, {validate: () => ({elsewhere: 'Not rendered', email: ''})}),
+        ).resolves.toBe('refused');
+
+        expect(scrollIntoView).not.toHaveBeenCalled();
+    });
+
+    it('never scrolls on refuse or setRefusals alone, so typing never jumps the page', async () => {
+        const {wrapper, form} = mountFields(['email']);
+
+        form().refuse('email', 'Taken');
+        form().setRefusals({email: 'Required'});
+        await nextTick();
+
+        expect(wrapper.find('input').attributes('aria-invalid')).toBe('true');
+        expect(scrollIntoView).not.toHaveBeenCalled();
+    });
+
     it('does not scroll when scrollToError is false', async () => {
         const {form} = mountFields(['email'], {scrollToError: false});
 
         await form().handleSubmit(refusedWith({email: ['Taken']}));
+        await form().handleSubmit(async () => {}, {validate: () => ({email: 'Required'})});
 
         expect(scrollIntoView).not.toHaveBeenCalled();
     });
@@ -522,5 +555,235 @@ describe('useForm FormLabel and FormError (form-bound)', () => {
         expect(message.exists()).toBe(true);
         expect(message.attributes('id')).toBe('client-firstName-error');
         expect(message.text()).toBe('');
+    });
+});
+
+describe('useForm handleSubmit validate', () => {
+    it('refuses without running the action when validate names a field', async () => {
+        const form = inSetup(() => useForm<'email'>());
+        const action = vi.fn(async () => {});
+
+        await expect(form.handleSubmit(action, {validate: () => ({email: 'Required'})})).resolves.toBe('refused');
+
+        expect(action).not.toHaveBeenCalled();
+        expect(form.clientErrors.value).toEqual({email: 'Required'});
+        expect(form.fieldErrors.value).toEqual({email: 'Required'});
+    });
+
+    it('clears the client refusals and runs the action when validate finds nothing', async () => {
+        const form = inSetup(() => useForm<'email'>());
+        form.refuse('email', 'Required');
+        const action = vi.fn(async () => {});
+
+        await expect(form.handleSubmit(action, {validate: () => ({email: ''})})).resolves.toBe('sent');
+
+        expect(action).toHaveBeenCalledOnce();
+        expect(form.clientErrors.value).toEqual({});
+    });
+
+    it('ignores a call while a submit is in flight, before validating', async () => {
+        const form = inSetup(() => useForm<'email'>());
+        const gate = deferred();
+        const validate = vi.fn(() => ({}));
+
+        const first = form.handleSubmit(() => gate.promise);
+        await expect(form.handleSubmit(async () => {}, {validate})).resolves.toBe('ignored');
+        expect(validate).not.toHaveBeenCalled();
+
+        gate.resolve();
+        await first;
+    });
+});
+
+describe('client refusals share the bag', () => {
+    // Each name as a control wired by field() and the form's FormError for it, attached to the document.
+    const mountRows = (names: string[]) => {
+        let form!: UseForm;
+        const wrapper = mount(
+            defineComponent({
+                setup() {
+                    form = useForm();
+                    return () =>
+                        h(
+                            'form',
+                            names.map((name) =>
+                                h('div', [
+                                    h(TextInput, {...form.field(name), placeholder: name, modelValue: ''}),
+                                    h(form.FormError, {name}),
+                                ]),
+                            ),
+                        );
+                },
+            }),
+            {attachTo: document.body},
+        );
+        return {wrapper, form};
+    };
+
+    // What a sighted and a screen-reader user both depend on, for one named field.
+    const expectMarked = (wrapper: ReturnType<typeof mount>, name: string, message: string) => {
+        const control = wrapper.find(`input[placeholder="${name}"]`);
+
+        expect(control.attributes('aria-invalid')).toBe('true');
+        expect(wrapper.find(`#${control.attributes('aria-describedby')}`).text()).toBe(message);
+    };
+
+    // The messages the form shows, one per refused field.
+    const shown = (wrapper: ReturnType<typeof mount>) =>
+        wrapper
+            .findAll('p.ui-error')
+            .map((message) => message.text())
+            .filter(Boolean);
+
+    it('shows a refusal the form made itself, before any request', async () => {
+        const {form, wrapper} = mountRows(['name', 'url']);
+
+        form.refuse('name', 'Vul een naam in');
+        await nextTick();
+
+        expectMarked(wrapper, 'name', 'Vul een naam in');
+        expect(shown(wrapper)).toEqual(['Vul een naam in']);
+    });
+
+    it('keeps client refusals through a submit, which clears only the server errors', async () => {
+        const {form, wrapper} = mountRows(['name', 'url']);
+
+        await form.handleSubmit(refusedWith({url: ['Ongeldige url']}));
+        form.refuse('name', 'Vul een naam in');
+        await form.handleSubmit(() => Promise.resolve());
+        await nextTick();
+
+        expect(form.errors.value).toEqual({});
+        expectMarked(wrapper, 'name', 'Vul een naam in');
+        expect(shown(wrapper)).toEqual(['Vul een naam in']);
+    });
+
+    it('lets the client refusal win over the server on the same field', async () => {
+        const {form, wrapper} = mountRows(['name']);
+
+        await form.handleSubmit(refusedWith({name: ['Server zegt nee']}));
+        form.refuse('name', 'Client zegt nee');
+        await nextTick();
+
+        expect(shown(wrapper)).toEqual(['Client zegt nee']);
+    });
+
+    it('withdraws per field, and clears all client refusals at once', async () => {
+        const {form, wrapper} = mountRows(['name', 'url', 'kvkNumber']);
+
+        form.refuse('name', 'Vul een naam in');
+        form.refuse('url', 'Ongeldige url');
+        form.refuse('kvkNumber', 'Ongeldig KvK-nummer');
+        form.withdraw('name', 'url');
+        await nextTick();
+
+        expect(form.clientErrors.value).toEqual({kvkNumber: 'Ongeldig KvK-nummer'});
+        expect(shown(wrapper)).toEqual(['Ongeldig KvK-nummer']);
+
+        form.setRefusals({});
+        await nextTick();
+
+        expect(shown(wrapper)).toEqual([]);
+    });
+
+    it("withdraws a field's server message too: the user acted on it", async () => {
+        const {form, wrapper} = mountRows(['clientId', 'date']);
+
+        await form.handleSubmit(refusedWith({clientId: ['Niet in deze caseload'], date: ['Vul een datum in']}));
+        form.withdraw('clientId');
+        await nextTick();
+
+        expect(form.fieldErrors.value).toEqual({date: 'Vul een datum in'});
+        expect(shown(wrapper)).toEqual(['Vul een datum in']);
+    });
+
+    it('sets the whole client verdict from a bag, and says whether it refused anything', async () => {
+        const {form, wrapper} = mountRows(['name', 'url', 'kvkNumber']);
+
+        expect(form.setRefusals({name: 'Vul een naam in', url: 'Ongeldige url', kvkNumber: ''})).toBe(true);
+        await nextTick();
+
+        expectMarked(wrapper, 'name', 'Vul een naam in');
+        expectMarked(wrapper, 'url', 'Ongeldige url');
+        expect(form.clientErrors.value).toEqual({name: 'Vul een naam in', url: 'Ongeldige url'});
+
+        // the next check replaces the verdict: the fixed field is no longer refused
+        expect(form.setRefusals({url: 'Ongeldige url'})).toBe(true);
+        await nextTick();
+        expect(form.clientErrors.value).toEqual({url: 'Ongeldige url'});
+        expect(shown(wrapper)).toEqual(['Ongeldige url']);
+
+        // a clean draft refuses nothing and clears the client layer
+        expect(form.setRefusals({})).toBe(false);
+        expect(form.setRefusals({name: undefined, url: ''})).toBe(false);
+        await nextTick();
+        expect(shown(wrapper)).toEqual([]);
+    });
+
+    it('leaves the server errors alone when it sets the client verdict', async () => {
+        const {form, wrapper} = mountRows(['name', 'url']);
+
+        await form.handleSubmit(refusedWith({url: ['Server zegt nee']}));
+        form.setRefusals({});
+        await nextTick();
+
+        expect(shown(wrapper)).toEqual(['Server zegt nee']);
+    });
+
+    it('still re-throws what is not a refusal', async () => {
+        const {form} = mountRows(['name']);
+        const error = requestError(500);
+
+        await expect(form.handleSubmit(() => Promise.reject(error))).rejects.toBe(error);
+        expect(form.fieldErrors.value).toEqual({});
+    });
+});
+
+describe('useForm withdraw', () => {
+    it('leaves both bags untouched when the field has nothing to withdraw, so a keystroke costs no re-render', () => {
+        const form = inSetup(() => useForm<'email' | 'name'>());
+        form.take(requestError(422, {errors: {email: ['Taken']}}));
+        form.refuse('email', 'Too short');
+        const errors = form.errors.value;
+        const client = form.clientErrors.value;
+
+        form.withdraw('name');
+
+        expect(form.errors.value).toBe(errors);
+        expect(form.clientErrors.value).toBe(client);
+    });
+
+    it('replaces only the bag that held the field', () => {
+        const form = inSetup(() => useForm<'email' | 'name'>());
+        form.take(requestError(422, {errors: {email: ['Taken']}}));
+        form.refuse('name', 'Required');
+        const errors = form.errors.value;
+
+        form.withdraw('name');
+
+        expect(form.errors.value).toBe(errors);
+        expect(form.clientErrors.value).toEqual({});
+    });
+
+    // A message is keyed by its path, index included: after a row is added or removed before it, it would
+    // sit on another row. The component that changes the list withdraws what was said about it.
+    it('withdraws everything under a path: the list itself and every row, nothing that merely shares the prefix', () => {
+        const form = inSetup(() => useForm());
+        form.take(
+            requestError(422, {
+                errors: {
+                    goals: ['Add a goal'],
+                    'goals.1.title': ['Fill in a title'],
+                    'goals.2.end': ['Too early'],
+                    goalsNote: ['Too long'],
+                },
+            }),
+        );
+        form.refuse('goals.0.title', 'Too short');
+
+        form.withdraw('goals');
+
+        expect(form.errors.value).toEqual({goalsNote: 'Too long'});
+        expect(form.clientErrors.value).toEqual({});
     });
 });
