@@ -4,7 +4,7 @@ import {afterEach, describe, expect, it, vi} from 'vitest';
 import {h} from 'vue';
 
 import GroupCombobox from '../src/components/GroupCombobox.vue';
-import {groupMenu} from './find-menu';
+import {menu} from './find-menu';
 
 interface Fruit {
     id: number;
@@ -49,7 +49,7 @@ describe('GroupCombobox', () => {
         expect(input.attributes('aria-autocomplete')).toBe('list');
         expect(input.attributes('aria-expanded')).toBe('false');
         expect(input.attributes('aria-controls')).toBeUndefined();
-        expect(groupMenu(wrapper).exists()).toBe(false);
+        expect(menu(wrapper).exists()).toBe(false);
     });
 
     it('opens on click and renders group headers + options', async () => {
@@ -57,7 +57,7 @@ describe('GroupCombobox', () => {
         await wrapper.find('input').trigger('click');
 
         expect(wrapper.find('input').attributes('aria-expanded')).toBe('true');
-        const m = groupMenu(wrapper);
+        const m = menu(wrapper);
         expect(m.exists()).toBe(true);
 
         const headers = m.findAll('.ui-groupcombobox__group-header');
@@ -73,42 +73,42 @@ describe('GroupCombobox', () => {
 
         await input.setValue('a'); // Mango (has 'a'), Apricot (has 'a') — Kiwi and Lime do not
         expect(
-            groupMenu(wrapper)
+            menu(wrapper)
                 .findAll('.ui-groupcombobox__option')
                 .map((o) => o.text()),
         ).toEqual(['Mango', 'Apricot']);
         // Tropical still has Mango, Stone still has Apricot → both headers present
         expect(
-            groupMenu(wrapper)
+            menu(wrapper)
                 .findAll('.ui-groupcombobox__group-header')
                 .map((h) => h.text()),
         ).toEqual(['Tropical', 'Stone']);
 
         await input.setValue('ki'); // only Kiwi
         expect(
-            groupMenu(wrapper)
+            menu(wrapper)
                 .findAll('.ui-groupcombobox__option')
                 .map((o) => o.text()),
         ).toEqual(['Kiwi']);
         // Stone has no match → its header is hidden
         expect(
-            groupMenu(wrapper)
+            menu(wrapper)
                 .findAll('.ui-groupcombobox__group-header')
                 .map((h) => h.text()),
         ).toEqual(['Tropical']);
 
         await input.setValue('');
-        expect(groupMenu(wrapper).findAll('.ui-groupcombobox__option')).toHaveLength(4);
+        expect(menu(wrapper).findAll('.ui-groupcombobox__option')).toHaveLength(4);
     });
 
     it('commits on click, emits update:modelValue, closes, and snaps input to label', async () => {
         const wrapper = mountGroupCombobox({});
         await wrapper.find('input').trigger('click');
 
-        const options = groupMenu(wrapper).findAll('.ui-groupcombobox__option');
+        const options = menu(wrapper).findAll('.ui-groupcombobox__option');
         await options[2].trigger('click'); // Apricot (index 2)
         expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([3]);
-        expect(groupMenu(wrapper).exists()).toBe(false);
+        expect(menu(wrapper).exists()).toBe(false);
         expect(wrapper.find('input').element.value).toBe('Apricot');
     });
 
@@ -124,7 +124,7 @@ describe('GroupCombobox', () => {
 
         await input.trigger('click');
         // Query equals committed label → filter must not engage.
-        expect(groupMenu(wrapper).findAll('.ui-groupcombobox__option')).toHaveLength(4);
+        expect(menu(wrapper).findAll('.ui-groupcombobox__option')).toHaveLength(4);
     });
 
     it('filter engages on divergence from the committed label', async () => {
@@ -133,7 +133,7 @@ describe('GroupCombobox', () => {
         await wrapper.find('input').setValue('Ki'); // diverged
 
         expect(
-            groupMenu(wrapper)
+            menu(wrapper)
                 .findAll('.ui-groupcombobox__option')
                 .map((o) => o.text()),
         ).toEqual(['Kiwi']);
@@ -149,7 +149,7 @@ describe('GroupCombobox', () => {
         expect(input.element.value).toBe('zzz');
 
         await root.trigger('keydown', {key: 'Escape'});
-        expect(groupMenu(wrapper).exists()).toBe(false);
+        expect(menu(wrapper).exists()).toBe(false);
         expect(input.element.value).toBe('Apricot');
     });
 
@@ -159,11 +159,11 @@ describe('GroupCombobox', () => {
 
         await input.setValue('ap');
         expect(input.element.value).toBe('ap');
-        expect(groupMenu(wrapper).exists()).toBe(true);
+        expect(menu(wrapper).exists()).toBe(true);
 
         document.body.dispatchEvent(new MouseEvent('click', {bubbles: true}));
         await wrapper.vm.$nextTick();
-        expect(groupMenu(wrapper).exists()).toBe(false);
+        expect(menu(wrapper).exists()).toBe(false);
         expect(input.element.value).toBe('');
     });
 
@@ -195,7 +195,7 @@ describe('GroupCombobox', () => {
         await root.trigger('keydown', {key: 'Enter'});
 
         expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([2]); // Kiwi
-        expect(groupMenu(wrapper).exists()).toBe(false);
+        expect(menu(wrapper).exists()).toBe(false);
         expect(wrapper.find('input').element.value).toBe('Kiwi');
     });
 
@@ -210,7 +210,7 @@ describe('GroupCombobox', () => {
         await root.trigger('keydown', {key: 'Enter'});
 
         expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([null]);
-        expect(groupMenu(wrapper).exists()).toBe(false);
+        expect(menu(wrapper).exists()).toBe(false);
         expect(input.element.value).toBe('');
     });
 
@@ -237,7 +237,7 @@ describe('GroupCombobox', () => {
         await root.trigger('keydown', {key: 'Enter'});
 
         expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([null]);
-        expect(groupMenu(wrapper).exists()).toBe(false);
+        expect(menu(wrapper).exists()).toBe(false);
         expect(input.element.value).toBe('Any fruit'); // the named empty state, not ''
     });
 
@@ -248,7 +248,7 @@ describe('GroupCombobox', () => {
 
         await input.trigger('click');
         // 'Any fruit' matches no option label, so the un-fixed filter would show an EMPTY list on open.
-        expect(groupMenu(wrapper).findAll('.ui-groupcombobox__option')).toHaveLength(4);
+        expect(menu(wrapper).findAll('.ui-groupcombobox__option')).toHaveLength(4);
     });
 
     it('aria-activedescendant tracks pointer through filtered options, not headers', async () => {
@@ -266,7 +266,7 @@ describe('GroupCombobox', () => {
         expect(input.attributes('aria-activedescendant')).toBe('fruit-opt-1');
 
         // Header rows carry no id.
-        const headerIds = groupMenu(wrapper)
+        const headerIds = menu(wrapper)
             .findAll('.ui-groupcombobox__group-header')
             .map((h) => h.attributes('id'));
         expect(headerIds.every((id) => id === undefined)).toBe(true);
@@ -276,7 +276,7 @@ describe('GroupCombobox', () => {
         const wrapper = mountGroupCombobox({modelValue: 3}); // Apricot
         await wrapper.find('input').trigger('click');
 
-        const options = groupMenu(wrapper).findAll('.ui-groupcombobox__option');
+        const options = menu(wrapper).findAll('.ui-groupcombobox__option');
         // Mango, Kiwi, Apricot, Lime — Apricot (index 2) is selected
         expect(options.map((o) => o.attributes('aria-selected'))).toEqual(['false', 'false', 'true', 'false']);
     });
@@ -284,10 +284,10 @@ describe('GroupCombobox', () => {
     it('does not open when disabled', async () => {
         const wrapper = mountGroupCombobox({disabled: true});
         await wrapper.find('input').trigger('click');
-        expect(groupMenu(wrapper).exists()).toBe(false);
+        expect(menu(wrapper).exists()).toBe(false);
 
         await wrapper.find('.ui-groupcombobox').trigger('keydown', {key: 'ArrowDown'});
-        expect(groupMenu(wrapper).exists()).toBe(false);
+        expect(menu(wrapper).exists()).toBe(false);
     });
 
     it('propagates required, invalid, and describedby to the input', () => {
@@ -338,15 +338,15 @@ describe('GroupCombobox', () => {
     it('shows emptyText when all groups are filtered out', async () => {
         const wrapper = mountGroupCombobox({emptyText: 'No match'});
         await wrapper.find('input').setValue('zzz');
-        expect(groupMenu(wrapper).find('.ui-groupcombobox__empty').text()).toBe('No match');
-        expect(groupMenu(wrapper).findAll('.ui-groupcombobox__option')).toHaveLength(0);
+        expect(menu(wrapper).find('.ui-groupcombobox__empty').text()).toBe('No match');
+        expect(menu(wrapper).findAll('.ui-groupcombobox__option')).toHaveLength(0);
     });
 
     it('hovering an option moves the pointer to it (aria-activedescendant updates)', async () => {
         const wrapper = mountGroupCombobox({});
         await wrapper.find('input').trigger('click');
 
-        await groupMenu(wrapper).findAll('.ui-groupcombobox__option')[1].trigger('mouseover'); // Kiwi (index 1)
+        await menu(wrapper).findAll('.ui-groupcombobox__option')[1].trigger('mouseover'); // Kiwi (index 1)
         expect(wrapper.find('input').attributes('aria-activedescendant')).toBe('fruit-opt-1');
     });
 
@@ -374,11 +374,11 @@ describe('GroupCombobox', () => {
         await wrapper.find('input').trigger('click');
 
         expect(
-            groupMenu(wrapper)
+            menu(wrapper)
                 .findAll('.ui-groupcombobox__group-header')
                 .map((h) => h.text()),
         ).toEqual(['Stone']);
-        expect(groupMenu(wrapper).findAll('.ui-groupcombobox__option')).toHaveLength(2);
+        expect(menu(wrapper).findAll('.ui-groupcombobox__option')).toHaveLength(2);
     });
 
     it('renders a header=false group AFTER a named group flat, not absorbed into the prior role="group"', async () => {
@@ -389,7 +389,7 @@ describe('GroupCombobox', () => {
             ],
         });
         await wrapper.find('input').trigger('click');
-        const m = groupMenu(wrapper);
+        const m = menu(wrapper);
 
         // The named group's inner role="group" <ul> owns ONLY its own option — the boundary
         // marker keeps the headerless group's option out of it.
@@ -405,7 +405,7 @@ describe('GroupCombobox', () => {
         const wrapper = mountGroupCombobox({mutedOptions: [2]}); // Kiwi
         await wrapper.find('input').trigger('click');
 
-        const options = groupMenu(wrapper).findAll('.ui-groupcombobox__option');
+        const options = menu(wrapper).findAll('.ui-groupcombobox__option');
         expect(options.map((o) => o.classes().includes('is-muted'))).toEqual([false, true, false, false]);
 
         await options[1].trigger('click'); // Kiwi commits anyway
@@ -423,7 +423,7 @@ describe('GroupCombobox', () => {
         await wrapper.find('input').trigger('click');
         await wrapper.find('input').setValue('ki'); // only Kiwi (index 0 after filter)
 
-        const swatches = groupMenu(wrapper)
+        const swatches = menu(wrapper)
             .findAll('.swatch')
             .map((el) => el.text());
         expect(swatches).toEqual(['Kiwi#0']);
