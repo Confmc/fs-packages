@@ -135,7 +135,11 @@ const {
     clearLabel?: string;
     /** what the input renders when the model is null — a NAMED empty state instead of `''`. */
     emptyDisplayValue?: string;
-    /** where the list opens against the input (default `'bottom-start'`); it flips to the opposite side when there is no room. Read once. */
+    /**
+     * where the list opens against the input (default `'bottom-start'`). With no room it flips to the
+     * opposite side at the same alignment (`bottom-start` → `top-start`), never to the other
+     * alignment. Read once.
+     */
     placement?: Placement;
 }>();
 
