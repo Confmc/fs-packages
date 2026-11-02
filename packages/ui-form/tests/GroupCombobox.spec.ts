@@ -207,6 +207,17 @@ describe('GroupCombobox', () => {
         expect(wrapper.find('input').element.value).toBe('Kiwi');
     });
 
+    it('commits nothing on Enter with no option highlighted, and stays open', async () => {
+        const wrapper = mountGroupCombobox({});
+        const input = wrapper.find('input');
+
+        await input.trigger('keydown', {key: 'ArrowDown'}); // opens, nothing highlighted
+        await input.trigger('keydown', {key: 'Enter'});
+
+        expect(wrapper.emitted('update:modelValue')).toBeUndefined();
+        expect(menu(wrapper).exists()).toBe(true);
+    });
+
     it('clearLabel: ArrowDown lands on clear entry; Enter commits null; input snaps to ""', async () => {
         const wrapper = mountGroupCombobox({clearLabel: 'None', modelValue: 1});
         const input = wrapper.find('input');
