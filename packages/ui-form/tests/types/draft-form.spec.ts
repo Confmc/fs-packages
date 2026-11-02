@@ -7,7 +7,7 @@ import type {Ref} from 'vue';
 import {describe, expectTypeOf, it} from 'vitest';
 import {ref, shallowRef} from 'vue';
 
-import type {FieldBinding, FieldModel, Path, UseDraftForm, UseForm} from '../../src';
+import type {FieldBinding, FieldModel, Path, UseDraftForm, UseForm, ValidationErrors} from '../../src';
 
 import {useForm} from '../../src/form/form';
 
@@ -54,6 +54,43 @@ describe('useForm with a draft', () => {
     });
 });
 
+describe('the client refusals on a form with a draft', () => {
+    it('take only the draft paths, nested, indexed and through a nullable branch', () => {
+        const {refuse, setRefusals, withdraw, handleSubmit} = useForm({draft});
+
+        refuse('parent.learningGoals.3.title', 'Required');
+        setRefusals({firstName: 'Required', 'learningGoals.0.title': ''});
+        withdraw('learningGoals', 'firstName');
+        void handleSubmit(async () => {}, {validate: () => ({born: 'Required'})});
+        // @ts-expect-error a validator declared on the draft paths names only those
+        const validate = (): ValidationErrors<Path<Draft>> => ({firstName: 'Required', frstName: 'Required'});
+        // @ts-expect-error not a path of the draft
+        refuse('frstName', 'Required');
+        // @ts-expect-error a leaf's own members are not paths
+        refuse('born.getTime', 'Required');
+        // @ts-expect-error not a path of the draft
+        setRefusals({frstName: 'Required'});
+        // @ts-expect-error not a path of the draft
+        withdraw('firstName', 'frstName');
+        // validate's bag is named by the draft paths. TypeScript checks no extra key on a literal a callback
+        // returns, so a misspelled name next to a right one passes there: a validator declared to return
+        // `ValidationErrors<Path<D>>` catches it.
+        expectTypeOf(handleSubmit)
+            .parameter(1)
+            .toEqualTypeOf<{validate?: () => ValidationErrors<Path<Draft>>} | undefined>();
+        void handleSubmit(async () => {}, {validate});
+    });
+
+    it('key clientErrors and fieldErrors by the draft paths', () => {
+        const {clientErrors, fieldErrors} = useForm({draft});
+
+        expectTypeOf(clientErrors.value['learningGoals.0.title']).toEqualTypeOf<string | undefined>();
+        expectTypeOf(fieldErrors.value['parent.firstName']).toEqualTypeOf<string | undefined>();
+        // @ts-expect-error not a path of the draft
+        void fieldErrors.value.frstName;
+    });
+});
+
 describe('field() on a form with a draft', () => {
     it('takes only the draft paths, nested, indexed and through a nullable branch', () => {
         const {field} = useForm({draft});
@@ -87,6 +124,27 @@ describe('useForm without a draft', () => {
         expectTypeOf(useForm()).toEqualTypeOf<UseForm<string>>();
         expectTypeOf(useForm({fields: ['email', 'password']})).toEqualTypeOf<UseForm<'email' | 'password'>>();
         expectTypeOf(useForm<'email'>().errors.value).toEqualTypeOf<Partial<Record<'email', string>>>();
+    });
+
+    it("takes only the form's names in the client refusals", () => {
+        const form = useForm<'email' | 'name'>();
+
+        form.refuse('email', 'Taken');
+        form.setRefusals({name: 'Required'});
+        form.withdraw('email', 'name');
+        void form.handleSubmit(async () => {}, {validate: () => ({email: 'Required'})});
+        expectTypeOf(form.fieldErrors.value).toEqualTypeOf<Partial<Record<'email' | 'name', string>>>();
+        // @ts-expect-error not one of the form's names
+        form.refuse('password', 'Required');
+        // @ts-expect-error not one of the form's names
+        form.setRefusals({password: 'Required'});
+        // @ts-expect-error not one of the form's names
+        form.withdraw('password');
+        expectTypeOf(form.handleSubmit)
+            .parameter(1)
+            .toEqualTypeOf<{validate?: () => ValidationErrors<'email' | 'name'>} | undefined>();
+        // free strings without a union
+        useForm().refuse('anything', 'Required');
     });
 
     it('wires a field by its name, with no value', () => {
