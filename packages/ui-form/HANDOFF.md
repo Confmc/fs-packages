@@ -694,6 +694,10 @@ the reviewer sees them meanwhile. Add a line when a rule settles; strike one tha
 - In-input buttons are keyboard-reachable, show the focus ring (and a forced-colors outline), and are a 24px target
   at least; a pointer press keeps focus in the field. (2026-10-29, #341 #342 #343)
 - A look is tokens on the wrapper's class, never a prop (emmie's `small` search pill). (2026-10-29, #342)
+- A look that tokens can't express is a missing token or hook: the package adds it with a neutral default and the
+  consumer sets it in its one token map. Component-scoped style blocks or lookalike components in a consumer are the
+  smell that a hook is missing, not the fix. Keeps the package agnostic while consumers keep one place for their look.
+  (2026-11-02)
 - Controls take `invalid` only; `id` required; `placeholder` required on text-like inputs (none on date/time,
   which show none); `v-model` on the inner element where it fits; `class`/`style` on the root. (settled 10-23/26)
 - The bound-control kit (K2): `useForm` hands out `<TextField name label required/>`, `required` written once.
