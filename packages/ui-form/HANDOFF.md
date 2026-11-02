@@ -778,7 +778,13 @@ CODEOWNERS requests the team automatically when a PR leaves draft).
   `n-multi-combobox` @1d7aac7, `n-group-combobox` @2fdd9bb (the whole select family is done).
 - on #333: `n-use-form` @e68a849 (form chain slice 2 of 5: useForm on #333's primitives, no HTTP service,
   `handleSubmit` → SubmitOutcome, scroll only after a 'refused' submit, `scrollToError` default false until slice 4's
-  id lookup; Stryker 100). **Its independent review was running at day end**: apply its findings, then wait for #333.
+  id lookup; Stryker 100). Reviewed: no defect. Its PR body must name the two changes emmie will feel: messages stay
+  up while a resubmit runs (fs-form cleared them at submit start), and a 422 the action catches itself no longer binds
+  (only what `handleSubmit` sees or `take()` is given). `action` returning a literal `false` = 'cancelled'.
+  Migration inventory (emmie): 127 files call `useForm(service, …)` and drop the first argument; 27 never call
+  `handleSubmit` and relied on the middleware: each moves to `handleSubmit` + outcome, or
+  `catch (e) { if (!form.take(e)) throw e; }`; 15 pass `scrollToError: true`, 3 pass `scrollRoot` (kept here, replaced
+  in slice 4); nobody uses `onlyWhileSubmitting`/`keyMapper`/the primitives directly.
 - on #330: `n-form-field` + hint/label-after/aside; on #332: `n-checkbox-group` @445c539. `n-radio-group` = #344.
 - All selects take the same props incl. `placement` (flips to the opposite side keeping alignment:
   `flip({fallbackPlacements, flipAlignment: false})`), own listeners (incl. keydown) on the control before the
