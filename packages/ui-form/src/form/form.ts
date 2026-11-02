@@ -6,10 +6,14 @@ import {useFormSubmit} from './form-submit';
 import {scrollToFirstError} from './scroll-to-first-error';
 import {useValidationErrors} from './validation-errors';
 
-// A draft typed `any` has every path, so its form would check no name: `never` instead, whose first use
-// is an error. That is what a shallowRef over a generic D gives, as TypeScript cannot read it as a Ref<D>;
-// name the type there: useForm<D>({draft}). For a generic D the type stays open and fits UseDraftForm<D>.
-type DraftFormOf<D extends object> = unknown extends D ? never : UseDraftForm<D>;
+// A draft typed `any` has every path, so its form would check no name. It gets `DraftTypeUnknown`
+// instead, every member `never`: reading a member's value, calling `handleSubmit` or assigning the form to
+// anything but a form is an error. It still fits `UseDraftForm` (as `never` did), because a helper generic
+// over D returns the unresolved `DraftFormOf<D>`, which TypeScript accepts only when both branches fit.
+// A shallowRef over a generic D is read as `any`, as TypeScript cannot read it as a Ref<D>; name the type
+// there: useForm<D>({draft}).
+type DraftTypeUnknown = {readonly [K in keyof UseForm]: never};
+type DraftFormOf<D extends object> = unknown extends D ? DraftTypeUnknown : UseDraftForm<D>;
 
 // Two call shapes: names are free strings, or, with a `draft`, the draft's paths. The overloads are a
 // type; the one implementation below is cast to it, since an arrow function cannot declare overloads.

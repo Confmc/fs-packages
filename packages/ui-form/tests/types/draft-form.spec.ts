@@ -70,9 +70,15 @@ describe('a helper generic over its draft', () => {
         const host = <D extends object>(model: D): UseDraftForm<D> => useForm<D>({draft: shallowRef(model)});
         const unnamed = <D extends object>(model: D) => {
             const form = useForm({draft: shallowRef(model)});
-            expectTypeOf(form).toBeNever();
-            // @ts-expect-error a draft read as `any` checks no name, so its form cannot be used
-            return form.errors;
+            // a draft read as `any` checks no name, so its form cannot be used:
+            // @ts-expect-error a member's value read
+            void form.errors.value;
+            const {handleSubmit} = form;
+            // @ts-expect-error submitted through
+            void handleSubmit(async () => {});
+            // @ts-expect-error assigned to anything but a form
+            const text: string = form;
+            return text;
         };
 
         expectTypeOf(host({firstName: 'Ann'})).toEqualTypeOf<UseDraftForm<{firstName: string}>>();
