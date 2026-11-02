@@ -816,13 +816,21 @@ in-branch fixes (`fix:` of its own first commit, a coverage repair) unfolded: no
 experiment's form: client refusals (`refuse`/`setRefusals`/`withdraw`/`clientErrors`/`fieldErrors`/`validate`) are
 **slice 4b**, next; the kit + `createUiForm({texts})` is slice 5.
 
+**Slice 4b reviewed, fixes in:** `ui-form/n-form-refusals` @43c0fa8 on fork (off `n-field`): `clientErrors`, `fieldErrors`
+(server with client on top, client wins), `refuse` (an empty message drops the refusal so the server's shows; an
+unchanged one assigns nothing), `setRefusals` (replaces, empty = none), `withdraw` (paths take their subtree),
+`handleSubmit(action, {validate})` (in-flight first; a refusing bag ends `'refused'` without the action and scrolls;
+its bag is typed so a misspelled key next to a right one fails), the form's `clearErrors` clears both bags (a `'sent'`
+submit only the server's). `refused`/`refusedUnnamed` are documented as server-only. The tick before the scroll is now
+pinned by a test (a validate refusal needs it), no Stryker disable. Stryker 98.89, form.ts 100.
+
 **Held until #354 merges** (a push now reruns CI and the audit step reds a green PR), on fork as `hold/*`:
 `hold/344-boolean-id` @5107dd3 = #344 + `SelectItem.id: string | number | boolean` (spec: true/false/null round-trip);
 `hold/333-spec-type` @771edc0 = #333 + the spec helper typing fix (vue-tsc on `validation-errors.spec.ts:12`). After
 #354: merge main into each, push to the PR branch, delete the hold branch. `n-checkbox-group` already has the same
 `types.ts` change (@da1f523, identical lines, merges clean).
 
-**Next, in order:** slice 4b (client refusals), 5 (the kit + `createUiForm({texts})`), each off the
+**Next, in order:** slice 5 (the kit + `createUiForm({texts})`), each off the
 previous, source = `experiment/ui-form-control`'s `src/form/` (built 10-19). Then Pressable/Disclosure after #332,
 then the release PR (fresh off main once everything merged; see "Release sequence"). **No package DatePicker**
 (decided 2026-11-02, see below). BooleanRadioGroup: decided (2026-11-02): no own control. emmie's Ja/Nee pairs use the package RadioGroup; `SelectItem.id`
