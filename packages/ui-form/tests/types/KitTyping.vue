@@ -20,6 +20,28 @@
     <FormField v-slot="{field}" name="contractNumber" label="Nummer">
         <TextInput v-bind="field" v-model="free" placeholder="Vul in" />
     </FormField>
+    <!-- the slot's model is the value at the frame's name: a text path binds a text input -->
+    <FormField v-slot="{field, model}" name="name" label="Naam" class="w-40">
+        <TextInput v-bind="{...field, ...model}" placeholder="Vul in" />
+    </FormField>
+    <FormField v-slot="{field, model}" name="goals.0.title" label="Doel">
+        <TextInput
+            v-bind="field"
+            :model-value="model.modelValue"
+            placeholder="Vul in"
+            @update:model-value="model['onUpdate:modelValue']"
+        />
+    </FormField>
+    <FormField v-slot="{field, model}" name="contractNumber" label="Nummer">
+        <!-- @vue-expect-error a number path's model on a text input -->
+        <TextInput v-bind="{...field, ...model}" placeholder="Vul in" />
+    </FormField>
+    <!-- a proxy that converts takes the field alone, with its own v-model -->
+    <FormField v-slot="{field}" name="contractNumber" label="Uren">
+        <TextInput v-bind="field" v-model="hours" placeholder="Vul in" />
+    </FormField>
+    <!-- @vue-expect-error no model on a form without a draft -->
+    <NamedFrame v-slot="{model}" name="email" label="E-mail">{{ model }}</NamedFrame>
     <!-- @vue-expect-error not a path of the draft -->
     <FormField name="nope" label="x" />
     <PlainText name="anything" v-model="free" placeholder="Vul in" />
@@ -55,4 +77,5 @@ const {TextField: PlainText} = useForm();
 const {TextField: NamedText, FormField: NamedFrame} = useForm<'email' | 'name'>();
 const free = ref<string | null>(null);
 const count = ref(1);
+const hours = ref<string | null>(null);
 </script>

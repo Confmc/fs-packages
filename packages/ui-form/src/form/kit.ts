@@ -1,9 +1,10 @@
-import type {Component, DefineSetupFnComponent, SlotsType, VNode} from 'vue';
+import type {AllowedComponentProps, Component, DefineSetupFnComponent, SlotsType, VNode, VNodeProps} from 'vue';
 
 import {defineComponent, h} from 'vue';
 
 import type {FieldAria, FieldBinding} from '../types';
-import type {Path, PathsFor} from './path';
+import type {Path, PathsFor, PathValue} from './path';
+import type {FieldModel} from './types';
 
 import FormField from '../components/FormField.vue';
 import TextInput from '../components/TextInput.vue';
@@ -56,14 +57,56 @@ export interface BoundControls<D> {
     TextField: BoundControl<NamesFor<D, string | null, string>, typeof TextInput, string | null>;
     /**
      * The field frame by name, for a control the kit has no bound version of (your own, or one that edits
-     * a derived value): the form's ids, label and message, and in its slot the field's wiring without
-     * the value, so the control keeps its own `v-model`.
+     * a derived value): the form's ids, label and message. Its slot hands out `field` and `aria`, the
+     * wiring without the value, and on a draft form `model`, the value at that name and its write-back
+     * into the draft, typed by the value at that path. A form without a draft has no value to hand out:
+     * there is no `model`, the control takes its own `v-model`. Bind the control from the slot, never with
+     * the form's `field()`: `<TextInput v-bind="{...field, ...model}" />`, or, for a proxy that converts,
+     * `<TextInput v-bind="field" v-model="hours" />` (with `model` bound too, both would be written).
      */
-    FormField: DefineSetupFnComponent<BoundShell<D extends string ? D : Path<D>>, {}, FieldFrameSlots>;
+    FormField: D extends string ? DefineSetupFnComponent<BoundShell<D>, {}, FieldFrameSlots> : BoundDraftFrame<D>;
 }
 
-/** The slots of the field frame: the control gets the wiring. */
-export type FieldFrameSlots = SlotsType<{default: (scope: {field: FieldBinding; aria: FieldAria}) => VNode[]}>;
+/**
+ * What the field frame's slot hands the control: `field` for a control of this package, `aria` for a native
+ * element.
+ */
+export interface FrameScope {
+    field: FieldBinding;
+    aria: FieldAria;
+}
+
+/** What the field frame's slot hands the control on a draft form: the wiring plus `model`, the value at its name. */
+export interface DraftFrameScope<V> extends FrameScope {
+    model: FieldModel<V>;
+}
+
+/** The slots of the field frame on a form without a draft: the control gets the wiring. */
+export type FieldFrameSlots = SlotsType<{default: (scope: FrameScope) => VNode[]}>;
+
+/**
+ * The field frame of a draft form: generic over its name, so the slot's `model` is typed by the value at
+ * that path. A functional component's call signature, the shape Vue's language tools read a generic
+ * component by (`__ctx` carries its props and slots to the template). That shape is what vue-tsc emits for
+ * `<script setup generic>`, not a published contract: `tests/types/KitTyping.vue` pins it, so a vue-tsc
+ * major that changes it fails there first.
+ */
+export interface BoundDraftFrame<D> {
+    <N extends Path<D>>(
+        props: BoundShell<N> & AllowedComponentProps & VNodeProps,
+        ctx?: unknown,
+    ): VNode & {__ctx?: DraftFrameContext<D, N>};
+    /** the component's name, `FormField`. */
+    name: string;
+}
+
+/** What a draft form's field frame declares for the name `N`: its props and its slot. Internal: vue-tsc's `__ctx`. */
+interface DraftFrameContext<D, N extends Path<D>> {
+    props: BoundShell<N> & AllowedComponentProps & VNodeProps;
+    slots: {default?: (scope: DraftFrameScope<PathValue<D, N>>) => VNode[]};
+    attrs: Record<string, unknown>;
+    emit: {};
+}
 
 /**
  * The names a bound control takes: on a form without a draft (`D` a string of names) any of its names; on a
@@ -104,13 +147,28 @@ const bind = (field: Field, message: Message, control: Component, name: string) 
 
 /**
  * The field frame by name: `FormField` with the form's id and message for that name; its slot gets the
- * wiring. Everything but the name (label, required, orientation, class) falls through to `FormField`.
+ * wiring, and on a draft form the value at that name as `model`. Everything but the name (label, required,
+ * orientation, class) falls through to `FormField`.
  */
 const bindFrame = (field: Field, message: Message) =>
     defineComponent(
         (props: {name: string}, {slots}) =>
-            () =>
-                h(FormField, {id: field(props.name).id, error: message(props.name)}, slots),
+            () => {
+                const wiring = field(props.name);
+                const frame = (scope: FrameScope) =>
+                    slots.default?.(
+                        'onUpdate:modelValue' in wiring
+                            ? {
+                                  ...scope,
+                                  model: {
+                                      modelValue: wiring.modelValue,
+                                      'onUpdate:modelValue': wiring['onUpdate:modelValue'],
+                                  },
+                              }
+                            : scope,
+                    );
+                return h(FormField, {id: wiring.id, error: message(props.name)}, {default: frame});
+            },
         {name: 'FormField', props: ['name']},
     );
 

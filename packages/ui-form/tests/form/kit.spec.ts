@@ -5,7 +5,7 @@ import {enableAutoUnmount, mount} from '@vue/test-utils';
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {defineComponent, h, mergeProps, nextTick, ref} from 'vue';
 
-import type {FieldBinding, UseDraftForm} from '../../src';
+import type {FieldBinding, FieldModel, UseDraftForm} from '../../src';
 
 import {TextInput, useForm} from '../../src';
 
@@ -142,6 +142,65 @@ describe('form-bound controls', () => {
 
         expect(own.value).toBe('Utrecht');
         expect(draft.value.name).toBe('Ann');
+    });
+
+    it("hands a bound FormField's slot the draft's value at its name as model, and writes it back", async () => {
+        let scope!: {field: FieldBinding; model?: FieldModel<string | null>};
+        const {wrapper, draft, form} = mountWith(({FormField}) =>
+            h(
+                FormField,
+                {name: 'name', label: 'Naam'},
+                {
+                    default: (slot: typeof scope) => {
+                        scope = slot;
+                        return h(
+                            TextInput as Component,
+                            mergeProps({...slot.field}, {...slot.model}, {placeholder: 'Vul in'}),
+                        );
+                    },
+                },
+            ),
+        );
+        const input = wrapper.find('input');
+
+        expect(input.element.value).toBe('Ann');
+        expect(Object.keys(scope)).toEqual(['field', 'aria', 'model']);
+        expect(scope.field).toEqual({id: form().field('name').id, invalid: false, describedby: undefined});
+
+        await input.setValue('Bo');
+        expect(draft.value.name).toBe('Bo');
+        expect(scope.model?.modelValue).toBe('Bo');
+    });
+
+    it('draws a bound FormField given no slot content: the frame alone', () => {
+        const {wrapper} = mountWith(({FormField}) => h(FormField, {name: 'name', label: 'Naam'}));
+
+        expect(wrapper.find('label').text()).toBe('Naam');
+        expect(wrapper.find('.ui-field__control').element.childElementCount).toBe(0);
+    });
+
+    it("hands no model to a bound FormField's slot on a form without a draft", () => {
+        let scope!: Record<string, unknown>;
+        mount(
+            defineComponent({
+                setup: () => {
+                    const {FormField} = useForm();
+                    return () =>
+                        h(
+                            FormField,
+                            {name: 'email', label: 'E-mail'},
+                            {
+                                default: (slot: Record<string, unknown>) => {
+                                    scope = slot;
+                                    return h('span');
+                                },
+                            },
+                        );
+                },
+            }),
+        );
+
+        expect(Object.keys(scope)).toEqual(['field', 'aria']);
     });
 
     it('binds FormLabel and FormError by name, under stable component names, with nothing stray on the label', async () => {

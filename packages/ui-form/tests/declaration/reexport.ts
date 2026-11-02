@@ -1,3 +1,4 @@
+import type {DraftFrameScope} from '@script-development/ui-form';
 import type {Ref} from 'vue';
 
 import {useForm} from '@script-development/ui-form';
@@ -17,3 +18,8 @@ export const useContractFields = (draft: Ref<{name: string | null}>) => {
     const {TextField, FormField} = useForm({draft});
     return {TextField, FormField};
 };
+
+// A draft form's FormField is generic over its name (its slot's `model` typed by the value there): an app
+// that hands it out, or names its slot's scope, must be able to write those types too.
+export const useContractFrame = (draft: Ref<{code: string; hours: number | null}>) => useForm({draft}).FormField;
+export type ContractHoursScope = DraftFrameScope<number | null>;
