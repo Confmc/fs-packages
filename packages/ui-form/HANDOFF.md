@@ -776,7 +776,7 @@ CODEOWNERS requests the team automatically when a PR leaves draft).
 **Prepared on fork (branch @ head), each reviewed with fixes in, opens when its base merges (merge main in first):**
 - on #353: `n-multi-select` @9226f10, `n-combobox` @dbf4029, `n-group-select` @59ca0d7; on two of those:
   `n-multi-combobox` @1d7aac7, `n-group-combobox` @2fdd9bb (the whole select family is done).
-- on #333: `n-use-form` @e68a849 (form chain slice 2 of 5: useForm on #333's primitives, no HTTP service,
+- on #333: `n-use-form` @215bc96 (form chain slice 2 of 5: useForm on #333's primitives, no HTTP service,
   `handleSubmit` → SubmitOutcome, scroll only after a 'refused' submit, `scrollToError` default false until slice 4's
   id lookup; Stryker 100). Reviewed: no defect. Its PR body must name the two changes emmie will feel: messages stay
   up while a resubmit runs (fs-form cleared them at submit start), and a 422 the action catches itself no longer binds
