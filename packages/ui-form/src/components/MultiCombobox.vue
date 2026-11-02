@@ -34,6 +34,7 @@
                  committed label to snap to, so Combobox's commit-snaps-query→label and
                  closed-state label re-sync are deliberately NOT ported. -->
             <input
+                v-model="query"
                 @input="onInput"
                 @click="onOpen"
                 @focus="onOpen"
@@ -54,7 +55,6 @@
                 :aria-activedescendant="activeDescendant"
                 :placeholder="model.length ? undefined : placeholder"
                 :disabled="disabled"
-                :value="query"
             />
         </div>
 
@@ -325,12 +325,15 @@ const onInputKey = (event: KeyboardEvent): void => {
     onKey(event);
 };
 
-// Typing filters and opens; the raw value is bound through `query`, and every keystroke
-// resets the highlight (nothing is pre-selected — Enter with no highlight is a no-op).
+// Typing filters and opens. `v-model` writes `query` (its listener runs before this one), and
+// skips the `input` events an IME sends while composing, writing the committed text on
+// `compositionend`, so a candidate never filters the list. Every keystroke resets the highlight
+// (nothing is pre-selected — Enter with no highlight is a no-op), a composing one too, so the
+// Enter that confirms a candidate commits no option. Opening waits for the committed text, so a
+// composition started on a closed list opens it on what the IME commits.
 const onInput = (event: Event) => {
-    query.value = (event.target as HTMLInputElement).value;
-    openList();
     resetHighlight();
+    if (!(event as InputEvent).isComposing) openList();
 };
 // Focusing or clicking the (enabled) input opens the list (kendo's searchable choreography —
 // focus is managed into the input, and the list is its context). A disabled input never

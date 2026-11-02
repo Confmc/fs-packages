@@ -471,6 +471,79 @@ describe('MultiCombobox', () => {
         await input.setValue('m'); // matches return → the region empties again
         expect(region.text()).toBe('');
     });
+
+    // An IME composes a character through several `input` events. The query is bound with `v-model`,
+    // which ignores them until `compositionend`, so a candidate never filters the list. Neither
+    // happy-dom nor Chromium can be driven by a real IME from a test; these are the events one sends.
+    describe('IME composition', () => {
+        const compose = (field: HTMLInputElement, value: string): void => {
+            field.value = value;
+            field.dispatchEvent(new InputEvent('input', {bubbles: true, isComposing: true}));
+        };
+
+        it('filters nothing while composing, then filters by the committed text', async () => {
+            const wrapper = mountMultiCombobox({});
+            const field = wrapper.find('input').element;
+            const shown = () =>
+                menu(wrapper)
+                    .findAll('.ui-multicombobox__option')
+                    .map((o) => o.text());
+
+            field.focus(); // opens
+            field.dispatchEvent(new CompositionEvent('compositionstart', {bubbles: true}));
+            compose(field, 'z');
+            compose(field, 'm');
+            await wrapper.vm.$nextTick();
+            expect(shown()).toEqual(['Apricot', 'Mango', 'Watermelon']);
+
+            field.dispatchEvent(new CompositionEvent('compositionend', {bubbles: true, data: 'm'}));
+            await wrapper.vm.$nextTick();
+            expect(shown()).toEqual(['Mango', 'Watermelon']);
+        });
+
+        it('opens nothing while composing on a closed list, then opens on the committed text', async () => {
+            const wrapper = mountMultiCombobox({});
+            const input = wrapper.find('input');
+            const field = input.element;
+
+            field.focus(); // opens
+            await input.trigger('keydown', {key: 'Escape'});
+            field.dispatchEvent(new CompositionEvent('compositionstart', {bubbles: true}));
+            compose(field, 'm');
+            await wrapper.vm.$nextTick();
+            expect(menu(wrapper).exists()).toBe(false);
+
+            field.dispatchEvent(new CompositionEvent('compositionend', {bubbles: true, data: 'm'}));
+            await wrapper.vm.$nextTick();
+            expect(menu(wrapper).exists()).toBe(true);
+        });
+
+        it('drops the highlight on a composing input', async () => {
+            const wrapper = mountMultiCombobox({});
+            const input = wrapper.find('input');
+
+            await input.trigger('keydown', {key: 'ArrowDown'}); // open
+            await input.trigger('keydown', {key: 'ArrowDown'}); // → Apricot
+            expect(input.attributes('aria-activedescendant')).toBe('fruit-opt-0');
+
+            input.element.dispatchEvent(new CompositionEvent('compositionstart', {bubbles: true}));
+            compose(input.element, 'か');
+            await wrapper.vm.$nextTick();
+
+            expect(input.attributes('aria-activedescendant')).toBeUndefined();
+        });
+
+        it('keeps the candidate text in the field across a re-render while composing', async () => {
+            const wrapper = mountMultiCombobox({});
+            const field = wrapper.find('input').element;
+
+            field.dispatchEvent(new CompositionEvent('compositionstart', {bubbles: true}));
+            compose(field, 'か');
+            await wrapper.setProps({placeholder: 'Pick some'});
+
+            expect(field.value).toBe('か');
+        });
+    });
 });
 
 describe('MultiCombobox model order', () => {
