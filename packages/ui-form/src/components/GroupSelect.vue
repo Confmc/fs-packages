@@ -86,6 +86,8 @@
 </template>
 
 <script setup lang="ts" generic="T extends SelectItem">
+import type {Placement} from '@floating-ui/vue';
+
 import {computed, useTemplateRef} from 'vue';
 
 import type {LabelKey, SelectItem} from '../types';
@@ -112,6 +114,7 @@ const {
     mutedOptions,
     clearLabel,
     emptyDisplayValue,
+    placement,
 } = defineProps<{
     /** caller-ordered groups, each with options and a display header. */
     groups: {options: T[]; text: string; header?: boolean}[];
@@ -137,6 +140,12 @@ const {
     clearLabel?: string;
     /** what the trigger renders when the model is null — as a VALUE, not muted placeholder text. */
     emptyDisplayValue?: string;
+    /**
+     * where the list opens against the trigger (default `'bottom-start'`). With no room it flips to
+     * the opposite side at the same alignment (`bottom-start` → `top-start`), never to the other
+     * alignment. Read once.
+     */
+    placement?: Placement;
 }>();
 
 defineSlots<{
@@ -226,5 +235,6 @@ const {
     committedIndex: () => flatOptions.value.findIndex((option) => option.id === model.value),
     clearEntry: () => clearLabel !== undefined,
     onClearCommit: commitClear,
+    floatingOptions: {placement},
 });
 </script>

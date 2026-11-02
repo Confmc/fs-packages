@@ -1,10 +1,17 @@
 // @vitest-environment happy-dom
+import {useFloating} from '@floating-ui/vue';
 import {mount} from '@vue/test-utils';
-import {afterEach, describe, expect, it} from 'vitest';
+import {afterEach, describe, expect, it, vi} from 'vitest';
 import {h} from 'vue';
 
 import GroupSelect from '../src/components/GroupSelect.vue';
 import {menu} from './find-menu';
+
+// The real floating-ui, spied on so the placement case can read what GroupSelect hands it.
+vi.mock('@floating-ui/vue', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('@floating-ui/vue')>();
+    return {...actual, useFloating: vi.fn(actual.useFloating)};
+});
 
 interface Fruit {
     id: number;
@@ -452,5 +459,17 @@ describe('GroupSelect', () => {
     it('resolves the display string via a getter optionLabel function', () => {
         const wrapper = mountGroupSelect({optionLabel: (o: Fruit) => `${o.name}!`, modelValue: 1});
         expect(wrapper.find('.ui-groupselect__value').text()).toBe('Mango!');
+    });
+});
+
+describe('GroupSelect placement', () => {
+    it.each([
+        [undefined, 'bottom-start'],
+        ['top', 'top'],
+    ] as const)('hands floating-ui placement %s as %s', (placement, expected) => {
+        const wrapper = mountGroupSelect(placement === undefined ? {} : {placement});
+
+        expect(vi.mocked(useFloating).mock.calls.at(-1)?.[2]).toMatchObject({placement: expected});
+        wrapper.unmount();
     });
 });
