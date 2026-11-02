@@ -223,9 +223,9 @@ const input = useTemplateRef<HTMLInputElement>('input');
 const floating = useTemplateRef<HTMLElement>('floating');
 
 // Both keyboard (Enter via useListbox) and pointer (OptionList `commit`) funnel through
-// this one guard. Read through a local rather than indexing blind: the clamp watcher normally
-// keeps `pointer` in range, but a keypress landing between a filter change and the watcher
-// flush would otherwise index off the end.
+// this one guard. Read through a local rather than indexing blind: Enter on an open list with
+// nothing highlighted hands it `commit(-1)`, and a keypress landing between a filter change
+// and the clamp watcher's flush would otherwise index off the end.
 const commit = (index: number): boolean => {
     const highlighted = filteredOptions.value[index];
     if (!highlighted) return false;
