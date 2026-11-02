@@ -710,8 +710,8 @@ the reviewer sees them meanwhile. Add a line when a rule settles; strike one tha
 
 Nothing merged or reviewed since 10-26. Every open PR's CI goes red on `npm audit --audit-level=high` since advisories
 published over the weekend (follow-redirects 1.16.0-1.16.1 high via axios; qs moderate via Stryker): not our code.
-A lockfile-only fix (follow-redirects 1.16.2, qs 6.17.1) is committed on local branch `fix/audit-follow-redirects-qs`
-(`44c0e9a`), not pushed: it opens as its own PR against main only with Marcel's yes.
+The lockfile-only fix (follow-redirects 1.16.2, qs 6.17.1) is #354, green, review it first. CI already green on a PR
+stays green; any new run (a push, merging main in) fails the audit step until #354 merges.
 
 | Branch (on `fork`) | Base | What | Opens |
 |---|---|---|---|
@@ -765,3 +765,40 @@ back (WSL2's time sync, every ~30 s) made VTU `trigger()` events drop at random.
 - **Blockers:** no date picker (DatePickerField 72 uses, the biggest gap); Combobox/MultiCombobox (SearchableSelect,
   `searchable`); GroupSelect/GroupCombobox; BooleanRadioGroup (RadioGroup over two options, or its own control: to
   decide); the form kit for the 146 `useForm` files (not yet in any pack: the biggest unknown).
+
+### End of 2026-11-02 (read this first after a compaction)
+
+**Open PRs (16), all ready unless noted:** #330 #332 #333 #335-#344, #353 (draft: SingleSelect + listbox core, green
+once #354 merges), #354 (audit fix). Review order sent to the reviewer on Mattermost: 1) #354; 2) #330 #332 #353 #340
+(they unblock prepared work); 3) the rest. Nothing merged since 10-26; the reviewer is the only one (no review bot;
+CODEOWNERS requests the team automatically when a PR leaves draft).
+
+**Prepared on fork (branch @ head), each reviewed with fixes in, opens when its base merges (merge main in first):**
+- on #353: `n-multi-select` @9226f10, `n-combobox` @dbf4029, `n-group-select` @59ca0d7; on two of those:
+  `n-multi-combobox` @1d7aac7, `n-group-combobox` @2fdd9bb (the whole select family is done).
+- on #333: `n-use-form` @e68a849 (form chain slice 2 of 5: useForm on #333's primitives, no HTTP service,
+  `handleSubmit` → SubmitOutcome, scroll only after a 'refused' submit, `scrollToError` default false until slice 4's
+  id lookup; Stryker 100). **Its independent review was running at day end**: apply its findings, then wait for #333.
+- on #330: `n-form-field` + hint/label-after/aside; on #332: `n-checkbox-group` @445c539. `n-radio-group` = #344.
+- All selects take the same props incl. `placement` (flips to the opposite side keeping alignment:
+  `flip({fallbackPlacements, flipAlignment: false})`), own listeners (incl. keydown) on the control before the
+  consumer's attrs, IME-safe comboboxes (v-model query, composition keys skip the listbox, no open after a blur).
+
+**Next, in order:** apply the useForm review; then form chain slice 3 (typed paths + draft), 4 (`field()` with bound
+FormLabel/FormError; `scrollToError` default true with id lookup), 5 (the kit + `createUiForm({texts})`), each off the
+previous, source = `experiment/ui-form-control`'s `src/form/` (built 10-19). Then a generic DatePicker (first shape:
+emmie's `DatePickerField` + `calendar/` grid under the package's rules; emmie's domain pickers stay emmie's). Then
+Pressable/Disclosure after #332. BooleanRadioGroup: decide (RadioGroup over two options, or its own control).
+
+**Date pickers in the migration:** emmie's `DatePickerField` already takes `id`/`invalid`/`describedby`, so
+`v-bind="field"` wires its errors. Its `:id="kebabCase(id)"` breaks FormField's `<label for>` (an emmie-side fix for the
+epic). The kit can't bind emmie's picker, so date fields stay hand-wired until a package DatePicker exists. A test-bed
+check of this was sent at day end; read its reply.
+
+**422 key shape: settled, not open.** keyMapper identity; keys arrive as dotted camelCase paths; emmie's phase 1
+(collector `error-keys-raw`, docs/plans/fs-packages-ui-form/SLICES.md) does the casing in its error middleware;
+no slice is cut until ui-form is ready.
+
+**Working notes:** worktrees live under the session scratchpad `s2-*` (they vanish between sessions; the fork has
+everything). Run gates one at a time (machine memory is tight); Stryker with `--force`. ui-form specs run with
+`Date` faked (`tests/fixed-date.ts` on #353) because WSL2's clock steps back every ~30 s and VTU events drop.
