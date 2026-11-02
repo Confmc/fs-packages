@@ -36,7 +36,8 @@
 
         <!-- WR-0521: the empty state must be ANNOUNCED, not just painted — a persistent,
              visually-hidden live region (mounted for the component's whole lifetime, so
-             the emptyText lands as a content CHANGE, the reliable live-region path). -->
+             the emptyText lands as a content CHANGE, the reliable live-region path). One
+             treatment, for every select in the family. -->
         <span class="ui-live-region" role="status" aria-live="polite">{{
             open && flatOptions.length === 0 ? emptyText : ''
         }}</span>
@@ -188,8 +189,8 @@ const selected = computed(() => flatOptions.value.find((option) => option.id ===
 // Stable `v-for` keys for OptionList, indexed by the flat option index `rows` navigates.
 const optionKeys = computed(() => flatOptions.value.map((option) => String(option.id)));
 
-// The mixed header/boundary/option row sequence — the encoding lives once in `buildGroupRows`
-// (shared with GroupCombobox), so the boundary/empty-group rules stay a single-site invariant.
+// The mixed header/boundary/option row sequence — the encoding lives once in `buildGroupRows`,
+// so the boundary/empty-group rules stay a single-site invariant.
 const rows = computed(() => buildGroupRows(shownGroups.value));
 
 /** `aria-selected` marks the COMMITTED value — OptionList only asks about rendered indices. */
@@ -200,12 +201,14 @@ const isMuted = (index: number): boolean =>
 
 const root = useTemplateRef<HTMLElement>('root');
 const reference = useTemplateRef<HTMLElement>('reference');
-// The teleported `.ui-menu-anchor` (null while closed) — floating-ui's floating element.
+// The `.ui-menu-anchor` (null while closed) — floating-ui's floating element, promoted to the
+// top layer in place, so it stays inside `root` and click-outside needs no check of its own.
+// The <ul> inside it is positioned by nothing.
 const floating = useTemplateRef<HTMLElement>('floating');
 
 // Both keyboard (Enter via useListbox) and pointer (OptionList `commit`) funnel through
 // this one guard. Read through a local rather than indexing blind: the clamp watcher normally
-// keeps `pointer` in range, but a keypress landing between an `groups` change and the watcher
+// keeps `pointer` in range, but a keypress landing between a `groups` change and the watcher
 // flush would otherwise index off the end.
 const commit = (index: number): boolean => {
     const highlighted = flatOptions.value[index];

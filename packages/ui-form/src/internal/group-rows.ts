@@ -8,24 +8,23 @@ export type GroupRow = {type: 'header'; text: string} | {type: 'boundary'} | {ty
 
 /**
  * Turn caller-ordered groups into the flat header/boundary/option row sequence `OptionList`
- * lays out — the single-site encoding of the `GroupRow` invariant, shared by `GroupSelect`
- * (raw `groups`) and `GroupCombobox` (its filtered groups) so the boundary rule can never
- * drift between the two again.
+ * lays out — the single-site encoding of the `GroupRow` invariant. `GroupSelect` hands it its
+ * groups as shown, and a grouped select that filters would hand it its filtered groups, so the
+ * boundary rule lives in one place.
  *
  * Only an option's PRESENCE, plus `text` and `header`, are read — never an option's contents —
  * so the caller keeps ownership of the option type. Option `index` runs across ALL groups in
  * order, matching the flat index every consumer (`pointer`, `isSelected`, the `#option` slot)
  * keys on.
  *
- * Both loops use `forEach`, which skips array HOLES exactly as the parents' `groups.flatMap((g)
- * => g.options)` does — so the option-row count is definitionally identical to the flattened
+ * Both loops use `forEach`, which skips array HOLES exactly as the parent's `flatMap((g) =>
+ * g.options)` does — so the option-row count is definitionally identical to the flattened
  * option list, and a sparse `T[]` can never emit a row index that `flatOptions` lacks (which
  * would throw when a consumer dereferences `flatOptions[index]`). `for...of` would visit holes
  * as `undefined` and reintroduce that divergence.
  *
  * A group with no options — none, or all holes — emits NOTHING: an empty group whose header
- * rendered would confuse users. (`GroupCombobox` pre-filters empty groups, so that guard is a
- * no-op on its path.)
+ * rendered would confuse users.
  */
 export const buildGroupRows = (
     groups: readonly {options: readonly unknown[]; text: string; header?: boolean}[],

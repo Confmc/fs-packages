@@ -42,9 +42,9 @@ export interface UseListboxOptions {
     id: () => string;
     /** whether the control is disabled — the keyboard path guards on it, as a getter so it stays live. */
     disabled: () => boolean;
-    /** length of the currently-rendered option list (SingleSelect's `sorted`, or a filtered list). */
+    /** length of the currently-rendered option list (SingleSelect's `sorted`, GroupSelect's flattened groups, or a filtered list). */
     listLength: () => number;
-    /** whether a key pressed while CLOSED should open the list (SingleSelect: Enter/ArrowDown/Space). */
+    /** whether a key pressed while CLOSED should open the list (SingleSelect and GroupSelect: Enter/ArrowDown/Space). */
     openKeys: (key: string) => boolean;
     /**
      * Commit the option at `index`; returns whether a commit actually happened, which is what
@@ -61,7 +61,7 @@ export interface UseListboxOptions {
     floatingOptions?: ListboxFloatingOptions;
     /**
      * Whether a committing CLEAR ENTRY currently renders above the option list (the
-     * `clearLabel` feature on SingleSelect). The entry lives OUTSIDE the index
+     * `clearLabel` feature on SingleSelect and GroupSelect). The entry lives OUTSIDE the index
      * space — indexes keep mapping to the caller's option list — and gets its own keyboard
      * slot between "nothing highlighted" and index 0, plus its own activedescendant id
      * (`${id}-clear`). A getter so it tracks the prop reactively.
@@ -99,7 +99,7 @@ const TYPEAHEAD_MAX_LENGTH = 64;
 const fold = (text: string): string => Array.from(text, (character) => character.toLocaleLowerCase()).join('');
 
 /**
- * The behavioural core shared by every ui-form listbox control (SingleSelect; the optional
+ * The behavioural core shared by every ui-form listbox control (SingleSelect, GroupSelect; the optional
  * hooks serve selects that filter or pick many). Entirely position/index-based, so the
  * option type `T` never crosses this boundary: the caller owns the derived list and hands back
  * only its length and index-keyed callbacks. Owns `open`/`pointer`, the position-keyed IDREFs,
