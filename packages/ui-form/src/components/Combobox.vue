@@ -317,7 +317,8 @@ const onInput = (event: Event) => {
 };
 // A key pressed during a composition belongs to the input method: it moves through its candidates
 // with the arrow keys and confirms one with Enter, so the list must not move or commit on them.
-// Browsers flag such a key with `isComposing`; some report only keyCode 229 instead.
+// The keys inside a composition carry `isComposing`. The keydown that starts one fires before
+// `compositionstart`, so it carries `isComposing: false` and only keyCode 229 marks it.
 const onInputKey = (event: KeyboardEvent) => {
     if (event.isComposing || event.keyCode === 229) return;
     onKey(event);

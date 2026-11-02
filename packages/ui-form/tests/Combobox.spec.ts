@@ -554,9 +554,9 @@ describe('Combobox', () => {
             expect(input.attributes('aria-activedescendant')).toBe('fruit-opt-0');
         });
 
-        // Browsers flag a key that belongs to a composition with `isComposing`; some report only
-        // keyCode 229 instead. An IME moves through its candidates with the arrow keys and confirms one
-        // with Enter, so neither may reach the list.
+        // The keys inside a composition carry `isComposing`; the keydown that starts one fires before
+        // `compositionstart` and carries only keyCode 229. An IME moves through its candidates with
+        // the arrow keys and confirms one with Enter, so neither may reach the list.
         it.each([
             ['isComposing', {isComposing: true}],
             ['keyCode 229', {keyCode: 229}],
