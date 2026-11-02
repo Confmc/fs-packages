@@ -54,6 +54,16 @@ describe('form-bound controls', () => {
         expect(wrapper.find(`#${wrapper.find('input').attributes('aria-describedby')}`).text()).toBe('Te kort');
     });
 
+    it('puts class and style on the field, not on the control', () => {
+        const {wrapper} = mountWith(({TextField}) =>
+            h(TextField, {name: 'name', label: 'Naam', placeholder: 'Vul in', class: 'w-40', style: 'width: 10rem'}),
+        );
+
+        expect(wrapper.find('.ui-field').attributes('style')).toBe('width: 10rem;');
+        expect(wrapper.find('.ui-input-wrap').attributes()).not.toHaveProperty('style');
+        expect(wrapper.find('.ui-input-wrap').classes()).not.toContain('w-40');
+    });
+
     it('keeps its own props off the control, and hands every other attribute to the control, not the field', () => {
         const {wrapper} = mountWith(({TextField}) =>
             h(TextField, {
