@@ -108,8 +108,13 @@ interface FormSubmit<T extends string = string> extends UseFormSubmit {
 
 /** The refusals a form makes itself, next to the server's. */
 export interface UseFormClient<T extends string = string> {
-    /** Refusals the form made itself (a check before sending). Only `handleSubmit`'s `validate` replaces them. */
+    /**
+     * Refusals the form made itself (a check before sending): set by `refuse`, `setRefusals` and `validate`,
+     * dropped by `withdraw` and `clearErrors`. A submit leaves them standing.
+     */
     clientErrors: Readonly<Ref<ValidationErrors<T>>>;
+    /** Clear every message the fields show: the server's and the client refusals (a form reset). */
+    clearErrors: () => void;
     /** What the fields show: the server's errors with the client refusals on top (client wins per key). */
     fieldErrors: ComputedRef<ValidationErrors<T>>;
     /**

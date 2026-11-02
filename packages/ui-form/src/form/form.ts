@@ -132,8 +132,15 @@ const useFormBody = <T extends string = string>(
         return outcome === 'refused' ? refused() : outcome;
     };
 
+    // A reset clears what every field shows; a 'sent' submit clears only the server's, through `validation`.
+    const clearErrors = (): void => {
+        validation.clearErrors();
+        if (Object.keys(client.value).length) client.value = {};
+    };
+
     return {
         ...validation,
+        clearErrors,
         submitting: submit.submitting,
         handleSubmit,
         clientErrors: readonly(client) as Readonly<Ref<ValidationErrors<T>>>,

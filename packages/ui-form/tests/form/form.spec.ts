@@ -709,6 +709,18 @@ describe('client refusals share the bag', () => {
         expect(form.clientErrors.value).toBe(standing);
     });
 
+    it("clears the client refusals with the server's on clearErrors, as a form reset expects", async () => {
+        const {form, wrapper} = mountRows(['name', 'url']);
+
+        await form.handleSubmit(refusedWith({url: ['Ongeldige url']}));
+        form.refuse('name', 'Vul een naam in');
+        form.clearErrors();
+        await nextTick();
+
+        expect(form.fieldErrors.value).toEqual({});
+        expect(shown(wrapper)).toEqual([]);
+    });
+
     it('withdraws per field, and clears all client refusals at once', async () => {
         const {form, wrapper} = mountRows(['name', 'url', 'kvkNumber']);
 
