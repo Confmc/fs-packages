@@ -717,12 +717,20 @@ A lockfile-only fix (follow-redirects 1.16.2, qs 6.17.1) is committed on local b
 |---|---|---|---|
 | `ui-form/n-single-select` | main | SingleSelect + the listbox core; two review rounds in; keydown on the trigger; Stryker 96.46 | #353, draft until the audit fix is in and CI is green |
 | `ui-form/n-combobox` | n-single-select | Combobox (searchable single): `v-model` query (an IME candidate filters nothing), keys of a composition left to the input method, no opening after a blur commit, `placement`; Stryker 96.76 | after #353 merges |
+| `ui-form/n-group-select` | n-single-select | GroupSelect: `buildGroupRows` back, `alphabeticalSort` (per group, as pre-forms emmie), `placement`; Stryker ~98 | after #353 merges |
+| `ui-form/n-multi-combobox` | n-multi-select + n-combobox | MultiCombobox: chips in display order, IME guards incl. Backspace mid-composition, placeholder until a chip shows | after #353 (and MultiSelect) merge |
+| `ui-form/n-group-combobox` | n-group-select + n-combobox | GroupCombobox: Combobox's input + GroupSelect's groups | after #353 (and GroupSelect, Combobox) merge |
 | `ui-form/n-multi-select` | n-single-select | MultiSelect: chips in display order (as pre-forms emmie), the model keeps the consumer's order, `placement` (a given placement flips to the opposite side); Stryker 98.09 | after #353 merges |
 
 Tested on emmie (landing.9): SingleSelect on DebtorForm, ContactModal (clear entry), SchedulePlanDrawer (top layer,
 no clipping), disabled. Selects ignore `SelectItem.disabled` (pre-forms emmie's selects never disabled one option).
 `alphabeticalSort` defaults to the caller's order (settled 2026-10-03), so emmie's sorted sites add it. Attributify
 `w-*` lands on the control (by design); a select's whole width is `class="w-*"`.
+
+Every select branch carries the same listbox core changes (flip keeping alignment, own listeners first, keydown on the
+control). #353 also adds `tests/fixed-date.ts`: specs run with `Date` faked (timers real), because a clock stepped
+back (WSL2's time sync, every ~30 s) made VTU `trigger()` events drop at random. On this machine run Stryker with
+`--force`: incremental mode misreports.
 
 ### emmie's migration (the test bed's analysis, emmie development @ 4763c744ab)
 
@@ -749,6 +757,10 @@ no clipping), disabled. Selects ignore `SelectItem.disabled` (pre-forms emmie's 
   its 2–3 option uses become SingleSelect, not Combobox; Combobox reverts to the committed label on every dismiss
   (emmie kept a stale search); the `noResult` slot becomes `emptyText`; emmie always sorted (pass
   `alphabetical-sort`).
+- **Grouped selects:** pre-forms GroupSelect always sorted within groups and showed "deselecteren" by itself: pass
+  `alphabetical-sort` and `clear-label`. A `searchable` use → GroupCombobox; a non-searchable or ≤ 3-option use →
+  GroupSelect. Arrow keys now skip group headers (emmie's stopped on them).
+- **MultiSelect:** chips follow display order (as pre-forms emmie); the model keeps the consumer's order.
 - **Placement** keeps its alignment when it flips (`bottom-start` → `top-start`), on every select.
 - **Blockers:** no date picker (DatePickerField 72 uses, the biggest gap); Combobox/MultiCombobox (SearchableSelect,
   `searchable`); GroupSelect/GroupCombobox; BooleanRadioGroup (RadioGroup over two options, or its own control: to
