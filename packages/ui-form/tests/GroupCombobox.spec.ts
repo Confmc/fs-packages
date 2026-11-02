@@ -131,6 +131,7 @@ describe('GroupCombobox', () => {
                 .findAll('.ui-groupcombobox__option')
                 .map((option) => option.text()),
         ).toEqual(options);
+        wrapper.unmount();
     });
 
     it('commits by the order it shows when alphabeticalSort is set', async () => {
@@ -142,6 +143,7 @@ describe('GroupCombobox', () => {
         await input.trigger('keydown', {key: 'Enter'});
 
         expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([2]); // Kiwi
+        wrapper.unmount();
     });
 
     it('commits on click, emits update:modelValue, closes, and snaps input to label', async () => {
@@ -250,6 +252,7 @@ describe('GroupCombobox', () => {
 
         expect(wrapper.emitted('update:modelValue')).toBeUndefined();
         expect(menu(wrapper).exists()).toBe(true);
+        wrapper.unmount();
     });
 
     it('commits null from the clear entry on Enter and empties the input', async () => {
@@ -531,6 +534,7 @@ describe('GroupCombobox', () => {
                     .findAll('.ui-groupcombobox__option')
                     .map((o) => o.text()),
             ).toEqual(['Mango', 'Lime']);
+            wrapper.unmount();
         });
 
         it('does not select the committed label when a composition starts on a closed combobox', async () => {
@@ -548,6 +552,7 @@ describe('GroupCombobox', () => {
             // Selecting mid-composition would replace the text the IME is composing.
             expect(select).not.toHaveBeenCalled();
             expect(menu(wrapper).find('.ui-groupcombobox__empty').exists()).toBe(true);
+            wrapper.unmount();
         });
 
         it('drops the highlight on a composing input', async () => {
@@ -563,6 +568,7 @@ describe('GroupCombobox', () => {
             await wrapper.vm.$nextTick();
 
             expect(input.attributes('aria-activedescendant')).toBeUndefined();
+            wrapper.unmount();
         });
 
         it.each([
@@ -581,6 +587,7 @@ describe('GroupCombobox', () => {
 
             expect(wrapper.emitted('update:modelValue')).toBeUndefined();
             expect(input.attributes('aria-activedescendant')).toBe('fruit-opt-0');
+            wrapper.unmount();
         });
 
         // The keys inside a composition carry `isComposing`; the keydown that starts one fires before
@@ -608,6 +615,7 @@ describe('GroupCombobox', () => {
             expect(input.attributes('aria-activedescendant')).toBeUndefined();
             expect(wrapper.emitted('update:modelValue')).toBeUndefined();
             expect(menu(wrapper).exists()).toBe(true);
+            wrapper.unmount();
         });
 
         it('does not open when a blur commits the composition after focus has left', async () => {
@@ -624,6 +632,7 @@ describe('GroupCombobox', () => {
             await wrapper.vm.$nextTick();
 
             expect(menu(wrapper).exists()).toBe(false);
+            wrapper.unmount();
         });
 
         it('keeps the candidate text in the field across a re-render while composing', async () => {
@@ -635,6 +644,7 @@ describe('GroupCombobox', () => {
             await wrapper.setProps({placeholder: 'Pick one'});
 
             expect(field.value).toBe('か');
+            wrapper.unmount();
         });
     });
 });
