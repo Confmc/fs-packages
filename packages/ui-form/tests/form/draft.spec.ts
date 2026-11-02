@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import type {Component} from 'vue';
+
 import {mount} from '@vue/test-utils';
 import {describe, expect, it} from 'vitest';
 import {defineComponent, h, mergeProps, nextTick, ref} from 'vue';
@@ -82,8 +84,9 @@ describe('useForm with a draft', () => {
                     const {field} = useForm({draft});
                     return () =>
                         h(
-                            TextInput,
-                            mergeProps(field('firstName'), {
+                            // mergeProps returns untyped props, which h() takes only for an untyped component
+                            TextInput as Component,
+                            mergeProps({...field('firstName')}, {
                                 placeholder: 'Voornaam',
                                 modelValue: other.value,
                                 'onUpdate:modelValue': (value: string | null) => (other.value = value),

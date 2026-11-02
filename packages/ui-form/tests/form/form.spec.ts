@@ -473,7 +473,7 @@ describe('useForm field()', () => {
 });
 
 describe('useForm FormLabel and FormError (form-bound)', () => {
-    const mountRow = (options?: UseFormOptions) => {
+    const mountRow = (options?: UseFormOptions<'firstName'>) => {
         let form!: UseForm<'firstName'>;
         const wrapper = mount(
             defineComponent({
