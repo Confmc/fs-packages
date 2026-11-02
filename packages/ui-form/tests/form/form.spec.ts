@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import {mount} from '@vue/test-utils';
+import {enableAutoUnmount, mount} from '@vue/test-utils';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {defineComponent, h, nextTick, ref} from 'vue';
 
@@ -34,6 +34,10 @@ const inSetup = <R>(use: () => R): R => {
     );
     return result;
 };
+
+// A failing test still unmounts: ids from useId() repeat across mounts, so a form left in the DOM
+// would be found in place of the next test's.
+enableAutoUnmount(afterEach);
 
 afterEach(() => {
     vi.restoreAllMocks();
@@ -246,7 +250,6 @@ describe('useForm scroll-to-error', () => {
 
         expect(scrollIntoView).toHaveBeenCalledExactlyOnceWith({behavior: 'smooth', block: 'center'});
         expect(scrollIntoView.mock.contexts[0]).toBe(wrapper.find('input').element);
-        wrapper.unmount();
     });
 
     it('passes over a field whose message is empty', async () => {
@@ -256,7 +259,6 @@ describe('useForm scroll-to-error', () => {
 
         expect(scrollIntoView).toHaveBeenCalledOnce();
         expect(scrollIntoView.mock.contexts[0]).toBe(wrapper.findAll('input')[1]!.element);
-        wrapper.unmount();
     });
 
     it.each([
@@ -270,7 +272,6 @@ describe('useForm scroll-to-error', () => {
         expect(Object.keys(form().errors.value)).toEqual(order);
         expect(scrollIntoView).toHaveBeenCalledOnce();
         expect(scrollIntoView.mock.contexts[0]).toBe(wrapper.findAll('input')[0]!.element);
-        wrapper.unmount();
     });
 
     it("falls back to the field's message element when no control carries the id", async () => {
@@ -280,7 +281,6 @@ describe('useForm scroll-to-error', () => {
 
         expect(scrollIntoView).toHaveBeenCalledOnce();
         expect(scrollIntoView.mock.contexts[0]).toBe(wrapper.find('p.ui-error').element);
-        wrapper.unmount();
     });
 
     it('prefers the control to the message when both are rendered', async () => {
@@ -303,7 +303,6 @@ describe('useForm scroll-to-error', () => {
 
         expect(scrollIntoView).toHaveBeenCalledOnce();
         expect(scrollIntoView.mock.contexts[0]).toBe(wrapper.find('input').element);
-        wrapper.unmount();
     });
 
     it('never scrolls to another form on the page that refused the same name', async () => {
@@ -326,18 +325,16 @@ describe('useForm scroll-to-error', () => {
 
         expect(scrollIntoView).toHaveBeenCalledOnce();
         expect(scrollIntoView.mock.contexts[0]).toBe(wrapper.findAll('input')[1]!.element);
-        wrapper.unmount();
     });
 
     it('does nothing for a refusal it renders no element for, or an empty message', async () => {
-        const {wrapper, form} = mountFields(['email']);
+        const {form} = mountFields(['email']);
 
         await expect(form().handleSubmit(refusedWith({elsewhere: ['Not rendered'], email: ['']}))).resolves.toBe(
             'refused',
         );
 
         expect(scrollIntoView).not.toHaveBeenCalled();
-        wrapper.unmount();
     });
 
     it('scrolls to the field it renders when the refusal also names one it renders no element for', async () => {
@@ -349,7 +346,6 @@ describe('useForm scroll-to-error', () => {
 
         expect(scrollIntoView).toHaveBeenCalledOnce();
         expect(scrollIntoView.mock.contexts[0]).toBe(wrapper.find('input').element);
-        wrapper.unmount();
     });
 
     it('does not scroll for a 422 taken outside a submit', async () => {
@@ -360,11 +356,10 @@ describe('useForm scroll-to-error', () => {
 
         expect(wrapper.find('input').attributes('aria-invalid')).toBe('true');
         expect(scrollIntoView).not.toHaveBeenCalled();
-        wrapper.unmount();
     });
 
     it("does not scroll when the next submit ends 'cancelled', though its messages still stand", async () => {
-        const {wrapper, form} = mountFields(['email']);
+        const {form} = mountFields(['email']);
         await form().handleSubmit(refusedWith({email: ['Taken']}));
         scrollIntoView.mockClear();
 
@@ -372,36 +367,32 @@ describe('useForm scroll-to-error', () => {
 
         expect(form().errors.value).toEqual({email: 'Taken'});
         expect(scrollIntoView).not.toHaveBeenCalled();
-        wrapper.unmount();
     });
 
     it('does not scroll when scrollToError is false', async () => {
-        const {wrapper, form} = mountFields(['email'], {scrollToError: false});
+        const {form} = mountFields(['email'], {scrollToError: false});
 
         await form().handleSubmit(refusedWith({email: ['Taken']}));
 
         expect(scrollIntoView).not.toHaveBeenCalled();
-        wrapper.unmount();
     });
 
     it('scrolls without animation under prefers-reduced-motion', async () => {
         vi.stubGlobal('matchMedia', (query: string) => ({matches: query === '(prefers-reduced-motion: reduce)'}));
-        const {wrapper, form} = mountFields(['email']);
+        const {form} = mountFields(['email']);
 
         await form().handleSubmit(refusedWith({email: ['Taken']}));
 
         expect(scrollIntoView).toHaveBeenCalledExactlyOnceWith({behavior: 'auto', block: 'center'});
-        wrapper.unmount();
     });
 
     it('scrolls with smooth behavior when the runtime has no matchMedia', async () => {
         vi.stubGlobal('matchMedia', undefined);
-        const {wrapper, form} = mountFields(['email']);
+        const {form} = mountFields(['email']);
 
         await form().handleSubmit(refusedWith({email: ['Taken']}));
 
         expect(scrollIntoView).toHaveBeenCalledExactlyOnceWith({behavior: 'smooth', block: 'center'});
-        wrapper.unmount();
     });
 });
 

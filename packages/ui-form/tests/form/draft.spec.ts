@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
 import type {Component} from 'vue';
 
-import {mount} from '@vue/test-utils';
-import {describe, expect, it} from 'vitest';
+import {enableAutoUnmount, mount} from '@vue/test-utils';
+import {afterEach, describe, expect, it} from 'vitest';
 import {defineComponent, h, mergeProps, nextTick, ref} from 'vue';
 
 import type {UseDraftForm} from '../../src';
@@ -14,6 +14,10 @@ interface Draft {
     firstName: string | null;
     learningGoals: {title: string | null}[];
 }
+
+// A failing test still unmounts: ids from useId() repeat across mounts, so a form left in the DOM
+// would be found in place of the next test's.
+enableAutoUnmount(afterEach);
 
 describe('useForm with a draft', () => {
     it('binds a control to the value at a path, nested and indexed, with no v-model', async () => {
