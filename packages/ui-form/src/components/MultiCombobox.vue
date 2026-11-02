@@ -337,10 +337,15 @@ const onInputKey = (event: KeyboardEvent): void => {
 // `compositionend`, so a candidate never filters the list. Every keystroke resets the highlight
 // (nothing is pre-selected — Enter with no highlight is a no-op), a composing one too, so the
 // Enter that confirms a candidate commits no option. Opening waits for the committed text, so a
-// composition started on a closed list opens it on what the IME commits.
+// composition started on a closed list opens it on what the IME commits. A blur commits a
+// composition too, with the plain `input` v-model sends on `compositionend` — after focus has
+// left, so the list stays shut then. The input's own root answers for focus, so a control inside a
+// shadow root reads it there.
 const onInput = (event: Event) => {
     resetHighlight();
-    if (!(event as InputEvent).isComposing) openList();
+    const field = event.target as HTMLInputElement;
+    const focused = (field.getRootNode() as Document | ShadowRoot).activeElement === field;
+    if (focused && !(event as InputEvent).isComposing) openList();
 };
 // Focusing or clicking the (enabled) input opens the list (kendo's searchable choreography —
 // focus is managed into the input, and the list is its context). A disabled input never

@@ -26,6 +26,15 @@ const mountMultiCombobox = (props: Record<string, unknown>, slots?: Record<strin
         attachTo: document.body,
     });
 
+// A user types into a focused field, and MultiCombobox opens on typing only while the input has focus.
+const typeInto = async (
+    input: {element: HTMLElement; setValue: (value: string) => Promise<void>},
+    value: string,
+): Promise<void> => {
+    input.element.focus();
+    await input.setValue(value);
+};
+
 afterEach(() => {
     document.body.innerHTML = '';
 });
@@ -75,6 +84,11 @@ describe('MultiCombobox', () => {
             attachTo: document.body,
         });
 
+        // A user acts on a focused field: start there, with the list the focus opened shut again by a
+        // click elsewhere, which reaches none of the input's listeners.
+        wrapper.find('input').element.focus();
+        document.body.dispatchEvent(new MouseEvent('click', {bubbles: true}));
+        await wrapper.vm.$nextTick();
         await wrapper.find('input').trigger(type, init);
 
         expect(menu(wrapper).exists()).toBe(true);
@@ -126,29 +140,29 @@ describe('MultiCombobox', () => {
         const wrapper = mountMultiCombobox({});
         const input = wrapper.find('input');
 
-        await input.setValue('ap');
-        expect(input.attributes('aria-expanded')).toBe('true'); // typing opens
+        await typeInto(input, 'ap');
+        expect(input.attributes('aria-expanded')).toBe('true');
         expect(
             menu(wrapper)
                 .findAll('.ui-multicombobox__option')
                 .map((o) => o.text()),
         ).toEqual(['Apricot']);
 
-        await input.setValue('m');
+        await typeInto(input, 'm');
         expect(
             menu(wrapper)
                 .findAll('.ui-multicombobox__option')
                 .map((o) => o.text()),
         ).toEqual(['Mango', 'Watermelon']);
 
-        await input.setValue('');
+        await typeInto(input, '');
         expect(
             menu(wrapper)
                 .findAll('.ui-multicombobox__option')
                 .map((o) => o.text()),
         ).toEqual(['Apricot', 'Mango', 'Watermelon']);
 
-        await input.setValue('zzz');
+        await typeInto(input, 'zzz');
         expect(menu(wrapper).findAll('.ui-multicombobox__option')).toHaveLength(0);
         expect(menu(wrapper).find('.ui-multicombobox__empty').exists()).toBe(true);
     });
@@ -157,7 +171,7 @@ describe('MultiCombobox', () => {
         const wrapper = mountMultiCombobox({});
         const input = wrapper.find('input');
 
-        await input.setValue('m'); // filtered: Mango, Watermelon
+        await typeInto(input, 'm'); // filtered: Mango, Watermelon
         await input.trigger('keydown', {key: 'ArrowDown'}); // pointer → 0 (Mango)
         expect(input.attributes('aria-activedescendant')).toBe('fruit-opt-0');
 
@@ -266,11 +280,11 @@ describe('MultiCombobox', () => {
         expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[2]]);
         expect(menu(wrapper).exists()).toBe(false); // Backspace never opens
 
-        await input.setValue('ap'); // now the query holds text…
+        await typeInto(input, 'ap'); // now the query holds text…
         await input.trigger('keydown', {key: 'Backspace'}); // …so Backspace stays native editing
         expect(wrapper.emitted('update:modelValue')).toHaveLength(1); // no second pop
 
-        await input.setValue('');
+        await typeInto(input, '');
         await wrapper.setProps({modelValue: []});
         await input.trigger('keydown', {key: 'Backspace'});
         expect(wrapper.emitted('update:modelValue')).toHaveLength(1); // nothing to pop
@@ -291,17 +305,17 @@ describe('MultiCombobox', () => {
         const wrapper = mountMultiCombobox({});
         const input = wrapper.find('input');
 
-        await input.setValue('ap'); // open + half-typed filter
+        await typeInto(input, 'ap'); // open + half-typed filter
         await input.trigger('keydown', {key: 'Escape'});
         expect(menu(wrapper).exists()).toBe(false);
         expect(input.element.value).toBe(''); // cleared, never a committed-label snap
 
-        await input.setValue('m');
+        await typeInto(input, 'm');
         await input.trigger('keydown', {key: 'Tab'});
         expect(menu(wrapper).exists()).toBe(false);
         expect(input.element.value).toBe('');
 
-        await input.setValue('zzz');
+        await typeInto(input, 'zzz');
         document.body.dispatchEvent(new MouseEvent('click', {bubbles: true}));
         await wrapper.vm.$nextTick();
         expect(menu(wrapper).exists()).toBe(false);
@@ -375,7 +389,7 @@ describe('MultiCombobox', () => {
         const input = wrapper.find('input');
 
         await input.trigger('click');
-        await input.setValue('m'); // filtered + sorted: Mango, Watermelon
+        await typeInto(input, 'm'); // filtered + sorted: Mango, Watermelon
         expect(
             menu(wrapper)
                 .findAll('.swatch')
@@ -465,10 +479,10 @@ describe('MultiCombobox', () => {
         await input.trigger('click');
         expect(region.text()).toBe(''); // open with options → silent
 
-        await input.setValue('zzz'); // typing drains the filtered list
+        await typeInto(input, 'zzz'); // typing drains the filtered list
         expect(region.text()).toBe('No match');
 
-        await input.setValue('m'); // matches return → the region empties again
+        await typeInto(input, 'm'); // matches return → the region empties again
         expect(region.text()).toBe('');
     });
 
@@ -580,6 +594,24 @@ describe('MultiCombobox', () => {
             expect(menu(wrapper).exists()).toBe(true);
         });
 
+        it('does not open when a blur commits the composition after focus has left', async () => {
+            const wrapper = mountMultiCombobox({});
+            const input = wrapper.find('input');
+            const field = input.element;
+            const outside = document.createElement('button');
+            document.body.append(outside);
+
+            field.focus(); // opens
+            await input.trigger('keydown', {key: 'Escape'});
+            field.dispatchEvent(new CompositionEvent('compositionstart', {bubbles: true}));
+            compose(field, 'm');
+            outside.focus();
+            field.dispatchEvent(new CompositionEvent('compositionend', {bubbles: true, data: 'm'}));
+            await wrapper.vm.$nextTick();
+
+            expect(menu(wrapper).exists()).toBe(false);
+        });
+
         it('keeps the candidate text in the field across a re-render while composing', async () => {
             const wrapper = mountMultiCombobox({});
             const field = wrapper.find('input').element;
@@ -624,8 +656,7 @@ describe('MultiCombobox model order', () => {
     it('keeps every chip while a typed query narrows the list', async () => {
         const wrapper = mountFruits([3, 1]);
         const input = wrapper.find('input');
-        input.element.focus();
-        await input.setValue('app');
+        await typeInto(input, 'app');
 
         expect(
             menu(wrapper)
