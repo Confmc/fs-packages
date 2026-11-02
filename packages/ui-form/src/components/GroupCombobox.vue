@@ -286,10 +286,14 @@ const dismiss = (): void => {
 // Enter that confirms a candidate commits no option. `resetHighlight` (not a bare pointer write)
 // so a hovered clear entry drops too. Opening waits for the committed text: a composition started
 // on a closed list would otherwise open it on the unchanged query, and select-all-on-open (above)
-// would select the text the IME is composing.
+// would select the text the IME is composing. A blur commits a composition too, with the plain
+// `input` v-model sends on `compositionend` — after focus has left, so the list stays shut then.
+// The input's own root answers for focus, so a control inside a shadow root reads it there.
 const onInput = (event: Event) => {
     resetHighlight();
-    if (!(event as InputEvent).isComposing) openList();
+    const field = event.target as HTMLInputElement;
+    const focused = (field.getRootNode() as Document | ShadowRoot).activeElement === field;
+    if (focused && !(event as InputEvent).isComposing) openList();
 };
 // A key pressed during a composition belongs to the input method: it moves through its candidates
 // with the arrow keys and confirms one with Enter, so the list must not move or commit on them.

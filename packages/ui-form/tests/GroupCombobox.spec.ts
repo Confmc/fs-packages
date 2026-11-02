@@ -36,6 +36,15 @@ const mountGroupCombobox = (props: Record<string, unknown>, slots?: Record<strin
         attachTo: document.body,
     });
 
+// A user types into a focused field, and GroupCombobox opens on typing only while the input has focus.
+const typeInto = async (
+    input: {element: HTMLElement; setValue: (value: string) => Promise<void>},
+    value: string,
+): Promise<void> => {
+    input.element.focus();
+    await input.setValue(value);
+};
+
 afterEach(() => {
     document.body.innerHTML = '';
 });
@@ -71,7 +80,7 @@ describe('GroupCombobox', () => {
         const wrapper = mountGroupCombobox({});
         const input = wrapper.find('input');
 
-        await input.setValue('a'); // Mango (has 'a'), Apricot (has 'a') — Kiwi and Lime do not
+        await typeInto(input, 'a'); // Mango (has 'a'), Apricot (has 'a') — Kiwi and Lime do not
         expect(
             menu(wrapper)
                 .findAll('.ui-groupcombobox__option')
@@ -84,7 +93,7 @@ describe('GroupCombobox', () => {
                 .map((h) => h.text()),
         ).toEqual(['Tropical', 'Stone']);
 
-        await input.setValue('ki'); // only Kiwi
+        await typeInto(input, 'ki'); // only Kiwi
         expect(
             menu(wrapper)
                 .findAll('.ui-groupcombobox__option')
@@ -97,7 +106,7 @@ describe('GroupCombobox', () => {
                 .map((h) => h.text()),
         ).toEqual(['Tropical']);
 
-        await input.setValue('');
+        await typeInto(input, '');
         expect(menu(wrapper).findAll('.ui-groupcombobox__option')).toHaveLength(4);
     });
 
@@ -130,7 +139,7 @@ describe('GroupCombobox', () => {
     it('filter engages on divergence from the committed label', async () => {
         const wrapper = mountGroupCombobox({modelValue: 1}); // Mango
         await wrapper.find('input').trigger('click');
-        await wrapper.find('input').setValue('Ki'); // diverged
+        await typeInto(wrapper.find('input'), 'Ki'); // diverged
 
         expect(
             menu(wrapper)
@@ -144,7 +153,7 @@ describe('GroupCombobox', () => {
         const input = wrapper.find('input');
 
         await input.trigger('click');
-        await input.setValue('zzz');
+        await typeInto(input, 'zzz');
         expect(input.element.value).toBe('zzz');
 
         await input.trigger('keydown', {key: 'Escape'});
@@ -156,7 +165,7 @@ describe('GroupCombobox', () => {
         const wrapper = mountGroupCombobox({});
         const input = wrapper.find('input');
 
-        await input.setValue('ap');
+        await typeInto(input, 'ap');
         expect(input.element.value).toBe('ap');
         expect(menu(wrapper).exists()).toBe(true);
 
@@ -180,7 +189,7 @@ describe('GroupCombobox', () => {
         const input = wrapper.find('input');
         const select = vi.spyOn(input.element, 'select');
 
-        await input.setValue('Ma'); // typing opens; query diverged before open watcher runs
+        await typeInto(input, 'Ma'); // typing opens; query diverged before open watcher runs
         expect(select).not.toHaveBeenCalled();
     });
 
@@ -217,7 +226,7 @@ describe('GroupCombobox', () => {
         const input = wrapper.find('input');
         expect(input.element.value).toBe('Any fruit');
 
-        await input.setValue('zzz'); // half-typed non-match…
+        await typeInto(input, 'zzz'); // half-typed non-match…
         await input.trigger('keydown', {key: 'Escape'});
         expect(input.element.value).toBe('Any fruit'); // …reverts to the named empty state
     });
@@ -357,7 +366,7 @@ describe('GroupCombobox', () => {
 
     it('shows emptyText when all groups are filtered out', async () => {
         const wrapper = mountGroupCombobox({emptyText: 'No match'});
-        await wrapper.find('input').setValue('zzz');
+        await typeInto(wrapper.find('input'), 'zzz');
         expect(menu(wrapper).find('.ui-groupcombobox__empty').text()).toBe('No match');
         expect(menu(wrapper).findAll('.ui-groupcombobox__option')).toHaveLength(0);
     });
@@ -441,7 +450,7 @@ describe('GroupCombobox', () => {
             },
         );
         await wrapper.find('input').trigger('click');
-        await wrapper.find('input').setValue('ki'); // only Kiwi (index 0 after filter)
+        await typeInto(wrapper.find('input'), 'ki'); // only Kiwi (index 0 after filter)
 
         const swatches = menu(wrapper)
             .findAll('.swatch')
@@ -553,6 +562,22 @@ describe('GroupCombobox', () => {
             expect(input.attributes('aria-activedescendant')).toBeUndefined();
             expect(wrapper.emitted('update:modelValue')).toBeUndefined();
             expect(menu(wrapper).exists()).toBe(true);
+        });
+
+        it('does not open when a blur commits the composition after focus has left', async () => {
+            const wrapper = mountGroupCombobox({});
+            const field = wrapper.find('input').element;
+            const outside = document.createElement('button');
+            document.body.append(outside);
+
+            field.focus();
+            field.dispatchEvent(new CompositionEvent('compositionstart', {bubbles: true}));
+            compose(field, 'm');
+            outside.focus();
+            field.dispatchEvent(new CompositionEvent('compositionend', {bubbles: true, data: 'm'}));
+            await wrapper.vm.$nextTick();
+
+            expect(menu(wrapper).exists()).toBe(false);
         });
 
         it('keeps the candidate text in the field across a re-render while composing', async () => {
