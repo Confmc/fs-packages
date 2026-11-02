@@ -1,8 +1,13 @@
-import {nextTick} from 'vue';
+import type {Ref} from 'vue';
 
-import type {SubmitOutcome, UseDraftForm, UseDraftFormOptions, UseForm, UseFormOptions} from './types';
+import {nextTick, useId} from 'vue';
 
+import type {FieldBinding} from '../types';
+import type {FieldModel, SubmitOutcome, UseDraftForm, UseDraftFormOptions, UseForm, UseFormOptions} from './types';
+
+import {createFormError, createFormLabel, fieldId, messageId} from './field';
 import {useFormSubmit} from './form-submit';
+import {readPath, writePath} from './path';
 import {scrollToFirstError} from './scroll-to-first-error';
 import {useValidationErrors} from './validation-errors';
 
@@ -28,10 +33,29 @@ export interface UseFormCall {
     <T extends string = string>(options?: UseFormOptions<T> & {draft?: never}): UseForm<T>;
 }
 
-const useFormBody = <T extends string = string>(options: UseFormOptions<T> = {}): UseForm<T> => {
-    const {keyMapper, fields, scrollToError = false, scrollRoot, scrollTarget} = options;
+const useFormBody = <T extends string = string>(
+    options: UseFormOptions<T> & {draft?: Ref<object>} = {},
+): UseForm<T> => {
+    const {keyMapper, fields, scrollToError = true, idPrefix, draft} = options;
     const validation = useValidationErrors<T>({keyMapper, fields});
     const submit = useFormSubmit(validation);
+
+    // Unique per form instance by default, so two forms with the same names never share an id.
+    const unique = idPrefix === undefined ? {suffix: useId()} : {prefix: idPrefix};
+    const id = (name: T): string => fieldId(name, unique);
+    const message = (name: T): string | undefined => validation.errors.value[name] || undefined;
+
+    const field = (name: T): FieldBinding | (FieldBinding & FieldModel<unknown>) => {
+        const error = message(name);
+        const wiring = {id: id(name), invalid: Boolean(error), describedby: error ? messageId(id(name)) : undefined};
+        if (!draft) return wiring;
+
+        return {
+            ...wiring,
+            modelValue: readPath(draft.value, name),
+            'onUpdate:modelValue': (value: unknown) => writePath(draft.value, name, value),
+        };
+    };
 
     const handleSubmit = async (action: () => Promise<unknown>): Promise<SubmitOutcome> => {
         const outcome = await submit.handleSubmit(action);
@@ -39,19 +63,27 @@ const useFormBody = <T extends string = string>(options: UseFormOptions<T> = {})
         if (outcome === 'refused' && scrollToError) {
             // The refused fields are marked once the DOM shows the new bag.
             await nextTick();
-            scrollToFirstError(validation.errors.value, scrollRoot, scrollTarget);
+            scrollToFirstError(validation.errors.value, id as (name: string) => string);
         }
 
         return outcome;
     };
 
-    return {...validation, submitting: submit.submitting, handleSubmit};
+    return {
+        ...validation,
+        submitting: submit.submitting,
+        handleSubmit,
+        field,
+        FormLabel: createFormLabel(id),
+        FormError: createFormError(message, id),
+    };
 };
 
 /**
  * One-call form composable. Wires `useValidationErrors` and `useFormSubmit` together so a page gets
  * the field-error bag, the refusal signal, the in-flight `submitting` (loading) flag, and a
- * validation-aware `handleSubmit` from a single call instead of composing two.
+ * validation-aware `handleSubmit` from a single call instead of composing two, plus everything that
+ * links a field to the form.
  *
  * It needs no HTTP service: `handleSubmit` takes the 422 its own action rejects with, so a form holds
  * exactly its own requests' refusals; a dialog's never lands in the page form behind it. A 422 caught
@@ -59,14 +91,25 @@ const useFormBody = <T extends string = string>(options: UseFormOptions<T> = {})
  * 422 reject: one it catches itself never reaches the form. Reach for `useValidationErrors` /
  * `useFormSubmit` directly when you need one half without the other.
  *
- * With `scrollToError`, a submit that ends `'refused'` scrolls the first invalid field into view before
- * it resolves. Only a submit scrolls: a 422 handed to `take` or a cleared bag never moves the page.
+ * `field(name)` is a field's link to the form: its id, whether it is invalid, and the message id its
+ * `aria-describedby` names while it has one: `<TextInput v-bind="field('email')" v-model="email" />` +
+ * `<FormError name="email" />`, with `<FormLabel name="email" label="E-mail" />` pointing at the same id.
+ * `field()` reads the form when it is called, so call it in the render (the template), not once in
+ * `setup()`: a result kept from setup never changes.
+ *
+ * Unless `scrollToError` is `false`, a submit that ends `'refused'` scrolls the first refused field into
+ * view before it resolves, found by this form's own ids. Only a submit scrolls: a 422 handed to `take` or
+ * a cleared bag never moves the page.
  *
  * With a `draft`, the field names are the draft's paths (`useForm({draft})` names `errors` and `fields` by
- * `Path<D>`); without one they are free strings, or the union given as `T`.
+ * `Path<D>`), and `field(name)` also carries the value at that path and writes changes back into the
+ * draft; without one they are free strings, or the union given as `T`.
  *
- * @param options `keyMapper`, `fields`, `scrollToError`, `scrollRoot`, `scrollTarget`, `draft` — see
- *                `UseFormOptions` and `UseDraftFormOptions`.
+ * Call `useForm` in a component's `setup()`: its ids end in a part from Vue's `useId()`, unless a fixed
+ * `idPrefix` is given.
+ *
+ * @param options `keyMapper`, `fields`, `scrollToError`, `idPrefix`, `draft` — see `UseFormOptions` and
+ *                `UseDraftFormOptions`.
  */
 // The cast sits here, apart from the body, so mutation testing reaches the body (Stryker does not
 // mutate inside a type assertion).

@@ -41,6 +41,22 @@ export type PathValue<T, P extends string> = T extends readonly (infer U)[]
         ? T[P]
         : never;
 
+type Indexable = Record<string, unknown>;
+
+/** Read a dotted path; a missing step on the way reads as `undefined`. */
+export const readPath = (target: unknown, path: string): unknown =>
+    path.split('.').reduce<unknown>((value, key) => (value == null ? undefined : (value as Indexable)[key]), target);
+
+/** Write a dotted path. The step before the last must exist: a missing parent is a loud error, never a guess. */
+export const writePath = (target: unknown, path: string, value: unknown): void => {
+    const keys = path.split('.');
+    const last = keys.pop() as string;
+    const parent = keys.length ? readPath(target, keys.join('.')) : target;
+    if (parent == null || typeof parent !== 'object')
+        throw new Error(`[ui-form] cannot write "${path}": "${keys.join('.')}" is ${String(parent)}`);
+    (parent as Indexable)[last] = value;
+};
+
 /**
  * The paths of `T` a control can be bound to: it can read the value there (`Reads` takes it), and the
  * value's type holds everything the control writes back (`Writes`). A date input reads `string | null`

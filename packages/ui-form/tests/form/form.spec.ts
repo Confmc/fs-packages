@@ -5,7 +5,7 @@ import {defineComponent, h, nextTick, ref} from 'vue';
 
 import type {UseForm, UseFormOptions} from '../../src';
 
-import {useForm} from '../../src';
+import {TextInput, useForm} from '../../src';
 
 // The shape of an axios error that the form reads (see src/form/http-contract.ts); no axios import needed.
 const requestError = (status: number, data: unknown = {}) => ({isAxiosError: true, response: {status, data}});
@@ -21,6 +21,20 @@ const deferred = () => {
     return {promise, resolve};
 };
 
+// useForm takes its ids' unique part from Vue's useId(), so it runs in a component's setup().
+const inSetup = <R>(use: () => R): R => {
+    let result!: R;
+    mount(
+        defineComponent({
+            setup() {
+                result = use();
+                return () => null;
+            },
+        }),
+    );
+    return result;
+};
+
 afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
@@ -28,7 +42,7 @@ afterEach(() => {
 
 describe('useForm', () => {
     it('hands out the validation bag, take, clearErrors, handleSubmit and submitting from one call', () => {
-        const form = useForm();
+        const form = inSetup(() => useForm());
 
         expect(form.errors.value).toEqual({});
         expect(form.refused.value).toBe(false);
@@ -41,7 +55,7 @@ describe('useForm', () => {
     });
 
     it("binds the 422 its own action rejects with and resolves 'refused'", async () => {
-        const form = useForm<'email'>();
+        const form = inSetup(() => useForm<'email'>());
 
         await expect(form.handleSubmit(refusedWith({email: ['Taken']}))).resolves.toBe('refused');
 
@@ -50,7 +64,7 @@ describe('useForm', () => {
     });
 
     it('keeps a dotted path as the backend sent it when no keyMapper is given', async () => {
-        const form = useForm();
+        const form = inSetup(() => useForm());
 
         await form.handleSubmit(refusedWith({'learningGoals.0.title': ['Required']}));
 
@@ -59,7 +73,7 @@ describe('useForm', () => {
 
     it('passes keyMapper through to the validation bag', async () => {
         const camel = (key: string) => key.replace(/_(\w)/g, (_, c: string) => c.toUpperCase());
-        const form = useForm({keyMapper: camel});
+        const form = inSetup(() => useForm({keyMapper: camel}));
 
         await form.handleSubmit(refusedWith({street_name: ['Required']}));
 
@@ -67,7 +81,7 @@ describe('useForm', () => {
     });
 
     it('passes the fields allow-list through to the validation bag', async () => {
-        const form = useForm({fields: ['email']});
+        const form = inSetup(() => useForm({fields: ['email']}));
 
         await form.handleSubmit(refusedWith({email: ['Taken'], token: ['Expired']}));
 
@@ -77,7 +91,7 @@ describe('useForm', () => {
     });
 
     it('signals a refusal that names no field the form holds', async () => {
-        const form = useForm({fields: ['password']});
+        const form = inSetup(() => useForm({fields: ['password']}));
 
         await expect(form.handleSubmit(refusedWith({token: ['Expired']}))).resolves.toBe('refused');
 
@@ -87,7 +101,7 @@ describe('useForm', () => {
     });
 
     it("toggles submitting around the action and clears the messages when it resolves ('sent')", async () => {
-        const form = useForm<'email'>();
+        const form = inSetup(() => useForm<'email'>());
         await form.handleSubmit(refusedWith({email: ['Taken']}));
         const gate = deferred();
 
@@ -103,7 +117,7 @@ describe('useForm', () => {
     });
 
     it("keeps the messages when the action resolves false ('cancelled')", async () => {
-        const form = useForm<'email'>();
+        const form = inSetup(() => useForm<'email'>());
         await form.handleSubmit(refusedWith({email: ['Taken']}));
 
         await expect(form.handleSubmit(async () => false)).resolves.toBe('cancelled');
@@ -112,7 +126,7 @@ describe('useForm', () => {
     });
 
     it("ignores a submit while one is in flight ('ignored')", async () => {
-        const form = useForm();
+        const form = inSetup(() => useForm());
         const gate = deferred();
         const action = vi.fn(() => gate.promise);
 
@@ -125,7 +139,7 @@ describe('useForm', () => {
     });
 
     it('re-throws any other rejection and leaves the messages as they were', async () => {
-        const form = useForm<'email'>();
+        const form = inSetup(() => useForm<'email'>());
         await form.handleSubmit(refusedWith({email: ['Taken']}));
         const error = requestError(500);
 
@@ -136,7 +150,7 @@ describe('useForm', () => {
     });
 
     it('holds nothing of a 422 its action catches itself', async () => {
-        const form = useForm();
+        const form = inSetup(() => useForm());
 
         await form.handleSubmit(() => refusedWith({email: ['Taken']})().catch(() => undefined));
 
@@ -145,7 +159,7 @@ describe('useForm', () => {
     });
 
     it('binds a 422 caught outside a submit through take', () => {
-        const form = useForm<'email'>();
+        const form = inSetup(() => useForm<'email'>());
 
         expect(form.take(requestError(422, {errors: {email: ['Taken']}}))).toBe(true);
 
@@ -153,8 +167,8 @@ describe('useForm', () => {
     });
 
     it('keeps one form out of another form’s refusals', async () => {
-        const page = useForm<'email'>();
-        const dialog = useForm<'email'>();
+        const page = inSetup(() => useForm<'email'>());
+        const dialog = inSetup(() => useForm<'email'>());
 
         await dialog.handleSubmit(refusedWith({email: ['Taken']}));
 
@@ -164,7 +178,7 @@ describe('useForm', () => {
     });
 
     it('clearErrors empties a filled bag', async () => {
-        const form = useForm<'email'>();
+        const form = inSetup(() => useForm<'email'>());
         await form.handleSubmit(refusedWith({email: ['Taken']}));
 
         form.clearErrors();
@@ -182,7 +196,7 @@ describe('useForm with a draft', () => {
 
     it('binds a 422 keyed by the draft paths and leaves the draft as it was', async () => {
         const draft = ref<Draft>({firstName: 'Ann', learningGoals: [{title: 'Lezen'}]});
-        const form = useForm({draft, fields: ['firstName', 'learningGoals.0.title']});
+        const form = inSetup(() => useForm({draft, fields: ['firstName', 'learningGoals.0.title']}));
 
         await expect(
             form.handleSubmit(refusedWith({'learningGoals.0.title': ['Required'], token: ['Expired']})),
@@ -201,39 +215,23 @@ describe('useForm scroll-to-error', () => {
         scrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {});
     });
 
-    const invalidWhileRefused = (form: UseForm) => (Object.keys(form.errors.value).length > 0 ? 'true' : 'false');
-
-    // Mounts (attached to the document) a form that renders one field marked `aria-invalid` while the
-    // error bag is non-empty: the shape the scroll queries for. The scroll is opt-in; these cases are
-    // about what it does once asked for.
-    const mountFieldForm = (options?: UseFormOptions, markInvalid = true) => {
+    // A form rendering `names` as controls wired by field(), in that order, attached to the document;
+    // or, with `control` false, as the form's own FormError for each name.
+    const mountFields = (names: string[], options: UseFormOptions = {}, control = true) => {
         let form!: UseForm;
         const wrapper = mount(
             defineComponent({
                 setup() {
-                    form = useForm({scrollToError: true, ...options});
-                    return () => h('input', {'aria-invalid': markInvalid ? invalidWhileRefused(form) : 'false'});
-                },
-            }),
-            {attachTo: document.body},
-        );
-        return {wrapper, form: () => form};
-    };
-
-    // Mounts (attached) a form whose invalid field sits inside or outside a `scrollRoot` element.
-    const mountScopedForm = (fieldInsideRoot: boolean) => {
-        const scrollRoot = ref<HTMLElement | null>(null);
-        let form!: UseForm;
-        const wrapper = mount(
-            defineComponent({
-                setup() {
-                    form = useForm({scrollToError: true, scrollRoot});
-                    const field = () => h('input', {'aria-invalid': invalidWhileRefused(form)});
+                    form = useForm(options);
                     return () =>
-                        h('div', [
-                            h('div', {ref: scrollRoot}, [fieldInsideRoot ? field() : null]),
-                            fieldInsideRoot ? null : field(),
-                        ]);
+                        h(
+                            'div',
+                            names.map((name) =>
+                                control
+                                    ? h(TextInput, {...form.field(name), placeholder: name, modelValue: ''})
+                                    : h(form.FormError, {name}),
+                            ),
+                        );
                 },
             }),
             {attachTo: document.body},
@@ -241,92 +239,93 @@ describe('useForm scroll-to-error', () => {
         return {wrapper, form: () => form};
     };
 
-    it('scrolls the first invalid field into view after a refusal', async () => {
-        const {wrapper, form} = mountFieldForm();
+    it("scrolls to the control of the first refused field, by the form's own id, when a submit is refused", async () => {
+        const {wrapper, form} = mountFields(['email']);
 
         await form().handleSubmit(refusedWith({email: ['Taken']}));
 
         expect(scrollIntoView).toHaveBeenCalledExactlyOnceWith({behavior: 'smooth', block: 'center'});
+        expect(scrollIntoView.mock.contexts[0]).toBe(wrapper.find('input').element);
         wrapper.unmount();
     });
 
-    it('scrolls to the first invalid field in document order when several are marked', async () => {
-        let form!: UseForm;
-        const wrapper = mount(
-            defineComponent({
-                setup() {
-                    form = useForm({scrollToError: true});
-                    const field = () => h('input', {'aria-invalid': invalidWhileRefused(form)});
-                    return () => h('div', [field(), field()]);
-                },
-            }),
-            {attachTo: document.body},
-        );
+    it('passes over a field whose message is empty', async () => {
+        const {wrapper, form} = mountFields(['first', 'second']);
 
-        await form.handleSubmit(refusedWith({email: ['Taken']}));
+        await form().handleSubmit(refusedWith({first: [''], second: ['Taken']}));
 
-        const invalid = document.querySelectorAll('[aria-invalid="true"]');
-        expect(invalid).toHaveLength(2);
         expect(scrollIntoView).toHaveBeenCalledOnce();
-        expect(scrollIntoView.mock.contexts[0]).toBe(invalid[0]);
+        expect(scrollIntoView.mock.contexts[0]).toBe(wrapper.findAll('input')[1]!.element);
         wrapper.unmount();
     });
 
-    it.each([
-        ['when scrollToError is left out', {scrollToError: undefined}],
-        ['when scrollToError is false', {scrollToError: false}],
-    ])('does not scroll %s', async (_, options) => {
-        const {wrapper, form} = mountFieldForm(options);
+    it('takes the first in document order, not the order the bag lists the fields in', async () => {
+        const {wrapper, form} = mountFields(['first', 'second']);
+
+        await form().handleSubmit(refusedWith({second: ['Required'], first: ['Required']}));
+
+        expect(scrollIntoView).toHaveBeenCalledOnce();
+        expect(scrollIntoView.mock.contexts[0]).toBe(wrapper.findAll('input')[0]!.element);
+        wrapper.unmount();
+    });
+
+    it("falls back to the field's message element when no control carries the id", async () => {
+        const {wrapper, form} = mountFields(['email'], {}, false);
 
         await form().handleSubmit(refusedWith({email: ['Taken']}));
+
+        expect(scrollIntoView).toHaveBeenCalledOnce();
+        expect(scrollIntoView.mock.contexts[0]).toBe(wrapper.find('p.ui-error').element);
+        wrapper.unmount();
+    });
+
+    it('never scrolls to another form on the page that refused the same name', async () => {
+        // one page is one app, so useId keeps the two forms' ids apart
+        const forms: UseForm[] = [];
+        const Block = defineComponent({
+            setup() {
+                const form = useForm();
+                forms.push(form);
+                return () => h(TextInput, {...form.field('email'), placeholder: 'email', modelValue: ''});
+            },
+        });
+        const wrapper = mount(defineComponent({setup: () => () => h('div', [h(Block), h(Block)])}), {
+            attachTo: document.body,
+        });
+        await forms[0]!.handleSubmit(refusedWith({email: ['Taken']}));
+        scrollIntoView.mockClear();
+
+        await forms[1]!.handleSubmit(refusedWith({email: ['Taken']}));
+
+        expect(scrollIntoView).toHaveBeenCalledOnce();
+        expect(scrollIntoView.mock.contexts[0]).toBe(wrapper.findAll('input')[1]!.element);
+        wrapper.unmount();
+    });
+
+    it('does nothing for a refusal it renders no element for, or an empty message', async () => {
+        const {wrapper, form} = mountFields(['email']);
+
+        await expect(form().handleSubmit(refusedWith({elsewhere: ['Not rendered'], email: ['']}))).resolves.toBe(
+            'refused',
+        );
 
         expect(scrollIntoView).not.toHaveBeenCalled();
         wrapper.unmount();
     });
 
-    // A form whose own field is marked while its bag holds errors, beside a field that stays invalid
-    // on its own, unrelated to this form's bag.
-    const mountBesideInvalid = (options?: UseFormOptions) => {
-        let form!: UseForm;
-        const wrapper = mount(
-            defineComponent({
-                setup() {
-                    form = useForm({scrollToError: true, ...options});
-                    return () =>
-                        h('div', [
-                            h('input', {'aria-invalid': 'true'}),
-                            h('input', {'aria-invalid': invalidWhileRefused(form)}),
-                        ]);
-                },
-            }),
-            {attachTo: document.body},
-        );
-        return {wrapper, form: () => form};
-    };
-
     it('does not scroll for a 422 taken outside a submit', async () => {
-        const {wrapper, form} = mountFieldForm();
+        const {wrapper, form} = mountFields(['email']);
 
         form().take(requestError(422, {errors: {email: ['Taken']}}));
         await nextTick();
 
-        expect(document.querySelector('[aria-invalid="true"]')).not.toBeNull();
-        expect(scrollIntoView).not.toHaveBeenCalled();
-        wrapper.unmount();
-    });
-
-    it('does not scroll to another marked field when the refusal names none this form holds', async () => {
-        const {wrapper, form} = mountBesideInvalid({fields: ['password']});
-
-        await expect(form().handleSubmit(refusedWith({token: ['Expired']}))).resolves.toBe('refused');
-
-        expect(form().refusedUnnamed.value).toBe(true);
+        expect(wrapper.find('input').attributes('aria-invalid')).toBe('true');
         expect(scrollIntoView).not.toHaveBeenCalled();
         wrapper.unmount();
     });
 
     it("does not scroll when the next submit ends 'cancelled', though its messages still stand", async () => {
-        const {wrapper, form} = mountBesideInvalid();
+        const {wrapper, form} = mountFields(['email']);
         await form().handleSubmit(refusedWith({email: ['Taken']}));
         scrollIntoView.mockClear();
 
@@ -337,37 +336,8 @@ describe('useForm scroll-to-error', () => {
         wrapper.unmount();
     });
 
-    it("does not scroll once a 'sent' submit empties the bag", async () => {
-        const {wrapper, form} = mountBesideInvalid();
-        await form().handleSubmit(refusedWith({email: ['Taken']}));
-        scrollIntoView.mockClear();
-
-        await expect(form().handleSubmit(async () => {})).resolves.toBe('sent');
-
-        expect(form().errors.value).toEqual({});
-        expect(scrollIntoView).not.toHaveBeenCalled();
-        wrapper.unmount();
-    });
-
-    // The current limitation: without `scrollRoot` the lookup is document-wide, so a form can scroll to a
-    // field another form marks. Looking the field up by the form's own ids ends this; the case flips then.
-    it("scrolls a dialog's refusal to the page form's field, as the lookup is document-wide without scrollRoot", async () => {
-        const page = mountFieldForm();
-        const dialog = mountFieldForm();
-        await page.form().handleSubmit(refusedWith({email: ['Taken']}));
-        scrollIntoView.mockClear();
-
-        await dialog.form().handleSubmit(refusedWith({email: ['Taken']}));
-
-        expect(scrollIntoView).toHaveBeenCalledOnce();
-        expect(scrollIntoView.mock.contexts[0]).toBe(page.wrapper.element);
-        expect(scrollIntoView.mock.contexts[0]).not.toBe(dialog.wrapper.element);
-        dialog.wrapper.unmount();
-        page.wrapper.unmount();
-    });
-
-    it('does nothing when a refusal marks no field invalid', async () => {
-        const {wrapper, form} = mountFieldForm(undefined, false);
+    it('does not scroll when scrollToError is false', async () => {
+        const {wrapper, form} = mountFields(['email'], {scrollToError: false});
 
         await form().handleSubmit(refusedWith({email: ['Taken']}));
 
@@ -375,92 +345,105 @@ describe('useForm scroll-to-error', () => {
         wrapper.unmount();
     });
 
-    it('scrolls to an invalid field inside scrollRoot', async () => {
-        const {wrapper, form} = mountScopedForm(true);
+    it('scrolls without animation under prefers-reduced-motion', async () => {
+        vi.stubGlobal('matchMedia', (query: string) => ({matches: query === '(prefers-reduced-motion: reduce)'}));
+        const {wrapper, form} = mountFields(['email']);
 
         await form().handleSubmit(refusedWith({email: ['Taken']}));
 
-        expect(scrollIntoView).toHaveBeenCalledOnce();
-        wrapper.unmount();
-    });
-
-    it('does not scroll to an invalid field outside scrollRoot', async () => {
-        const {wrapper, form} = mountScopedForm(false);
-
-        await form().handleSubmit(refusedWith({email: ['Taken']}));
-
-        expect(scrollIntoView).not.toHaveBeenCalled();
-        wrapper.unmount();
-    });
-
-    it('does not fall back to the document when scrollRoot is null', async () => {
-        // passed but never bound, so it stays null
-        const {wrapper, form} = mountFieldForm({scrollRoot: ref<HTMLElement | null>(null)});
-
-        await form().handleSubmit(refusedWith({email: ['Taken']}));
-
-        expect(scrollIntoView).not.toHaveBeenCalled();
-        wrapper.unmount();
-    });
-
-    it('scrolls with auto behavior under prefers-reduced-motion', async () => {
-        const matchMedia = vi.spyOn(window, 'matchMedia').mockReturnValue({matches: true} as MediaQueryList);
-        const {wrapper, form} = mountFieldForm();
-
-        await form().handleSubmit(refusedWith({email: ['Taken']}));
-
-        expect(matchMedia).toHaveBeenCalledWith('(prefers-reduced-motion: reduce)');
         expect(scrollIntoView).toHaveBeenCalledExactlyOnceWith({behavior: 'auto', block: 'center'});
         wrapper.unmount();
     });
 
     it('scrolls with smooth behavior when the runtime has no matchMedia', async () => {
         vi.stubGlobal('matchMedia', undefined);
-        const {wrapper, form} = mountFieldForm();
+        const {wrapper, form} = mountFields(['email']);
 
         await form().handleSubmit(refusedWith({email: ['Taken']}));
 
         expect(scrollIntoView).toHaveBeenCalledExactlyOnceWith({behavior: 'smooth', block: 'center'});
         wrapper.unmount();
     });
+});
 
-    it('scrolls after a child paints the mark from a prop', async () => {
-        const Field = defineComponent({
-            props: {invalid: {type: Boolean, required: true}},
-            setup: (props) => () => h('input', {'aria-invalid': props.invalid ? 'true' : 'false'}),
-        });
-        let form!: UseForm;
-        const wrapper = mount(
-            defineComponent({
-                setup() {
-                    form = useForm({scrollToError: true});
-                    return () => h(Field, {invalid: Object.keys(form.errors.value).length > 0});
-                },
-            }),
-            {attachTo: document.body},
-        );
+describe('useForm field()', () => {
+    it('links a control to the form: an id from the name, and the mark and describedby while it has a message', () => {
+        const form = inSetup(() => useForm<'email' | 'name' | 'learningGoals.0.title'>({idPrefix: 'f'}));
 
-        await form.handleSubmit(refusedWith({email: ['Taken']}));
+        expect(form.field('email')).toEqual({id: 'f-email', invalid: false, describedby: undefined});
 
-        expect(scrollIntoView).toHaveBeenCalledOnce();
-        wrapper.unmount();
+        form.take(requestError(422, {errors: {email: ['Taken']}}));
+
+        expect(form.field('email')).toEqual({id: 'f-email', invalid: true, describedby: 'f-email-error'});
+        expect(form.field('name')).toEqual({id: 'f-name', invalid: false, describedby: undefined});
+        expect(form.field('learningGoals.0.title').id).toBe('f-learningGoals-0-title');
     });
 
-    it('targets a custom scrollTarget selector instead of aria-invalid', async () => {
-        let form!: UseForm;
+    it("puts the name first and appends each form's own part from useId, so same-named fields never share an id", () => {
+        const ids: string[] = [];
+        const Block = defineComponent({
+            setup() {
+                ids.push(useForm<'email'>().field('email').id);
+                return () => null;
+            },
+        });
+        // one page (one app), two blocks that both have an `email`
+        mount(defineComponent({setup: () => () => h('div', [h(Block), h(Block)])}));
+
+        expect(ids[0]).toMatch(/^email-v-\S+$/);
+        expect(ids[1]).toMatch(/^email-v-\S+$/);
+        expect(ids[0]).not.toBe(ids[1]);
+    });
+
+    it('lets idPrefix replace the generated prefix, for an id something outside the form must know', () => {
+        const form = inSetup(() => useForm<'email'>({idPrefix: 'invoice'}));
+
+        expect(form.field('email').id).toBe('invoice-email');
+    });
+});
+
+describe('useForm FormLabel and FormError (form-bound)', () => {
+    const mountRow = (options?: UseFormOptions) => {
+        let form!: UseForm<'firstName'>;
         const wrapper = mount(
             defineComponent({
                 setup() {
-                    form = useForm({scrollToError: true, scrollTarget: '.field-error'});
-                    return () => h('input', {class: Object.keys(form.errors.value).length > 0 ? 'field-error' : ''});
+                    form = useForm<'firstName'>(options);
+                    return () =>
+                        h('div', [
+                            h(form.FormLabel, {name: 'firstName', label: 'Voornaam', required: true, class: 'w-40'}),
+                            h(TextInput, {...form.field('firstName'), placeholder: 'Voornaam', modelValue: ''}),
+                            h(form.FormError, {name: 'firstName'}),
+                        ]);
                 },
             }),
-            {attachTo: document.body},
         );
+        return {wrapper, form: () => form};
+    };
 
-        await form.handleSubmit(refusedWith({email: ['Taken']}));
+    it("labels the control field() wires, and fills the message the control's describedby names", async () => {
+        const {wrapper, form} = mountRow({idPrefix: 'client'});
+        const label = wrapper.find('label');
 
-        expect(scrollIntoView).toHaveBeenCalledOnce();
-        wrapper.unmount();
+        expect(label.attributes('for')).toBe('client-firstName');
+        expect(label.text()).toContain('Voornaam');
+        expect(label.find('.ui-label__req').exists()).toBe(true);
+        expect(label.classes()).toContain('w-40');
+
+        form().take(requestError(422, {errors: {firstName: ['Vul een voornaam in']}}));
+        await nextTick();
+
+        const message = wrapper.find(`#${wrapper.find('input').attributes('aria-describedby')}`);
+        expect(message.text()).toBe('Vul een voornaam in');
+        expect(message.attributes('role')).toBe('alert');
+    });
+
+    it("keeps the message's element in place, empty, while the field is clean", () => {
+        const {wrapper} = mountRow({idPrefix: 'client'});
+        const message = wrapper.find('p.ui-error');
+
+        expect(message.exists()).toBe(true);
+        expect(message.attributes('id')).toBe('client-firstName-error');
+        expect(message.text()).toBe('');
     });
 });

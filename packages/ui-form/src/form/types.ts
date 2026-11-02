@@ -1,6 +1,8 @@
 import type {Ref} from 'vue';
 
-import type {Path} from './path';
+import type {FieldBinding} from '../types';
+import type {FormErrorComponent, FormLabelComponent} from './field';
+import type {Path, PathValue} from './path';
 
 /** Field-error bag: the first backend validation message per field key. */
 export type ValidationErrors<T extends string = string> = Partial<Record<T, string>>;
@@ -69,47 +71,65 @@ export interface UseFormSubmit {
     submitting: Ref<boolean>;
 }
 
-/** Options for `useForm`: the validation options plus the scroll to the first invalid field. */
+/** Options for `useForm`: the validation options plus `useForm`-only behaviour. */
 export type UseFormOptions<T extends string = string> = UseValidationErrorsOptions<T> & {
     /**
-     * When `handleSubmit` ends `'refused'`, scroll the first invalid field into view before it
-     * resolves; never on `take` alone, so a 422 caught outside a submit leaves the page where it is.
-     * Off unless you ask for it: the query is document-wide unless `scrollRoot` scopes it, so on a page
-     * with more than one form a field another form still marks can be the one scrolled to. Requires
-     * the controls to mark the errored field (the default target is `[aria-invalid="true"]`, which
-     * this package's controls render).
-     * @default false
+     * When `handleSubmit` ends `'refused'`, scroll the first refused field into view, found by the ids
+     * this form hands out (`field(name)`'s control, else its `FormError`). Never on `take` alone, so a 422
+     * caught outside a submit leaves the page where it is.
+     * @default true
      */
     scrollToError?: boolean;
     /**
-     * Scopes the `scrollToError` query to one form's subtree; pass it when forms share a page.
-     * Omitted: document-wide. Provided but `null`: no scroll (never falls back to the document).
+     * A fixed prefix for every id `field()` derives, instead of the unique part each form takes from Vue's
+     * `useId()` by default (`firstName-v-3`): `idPrefix: 'invoice'` gives `invoice-firstName`. Only for an
+     * id something outside the form must know.
      */
-    scrollRoot?: Ref<HTMLElement | null>;
-    /**
-     * CSS selector for the invalid-field mark, used by `scrollToError`. Pass your own when your
-     * inputs mark errors differently (e.g. a class); the form marks nothing itself.
-     * @default '[aria-invalid="true"]'
-     */
-    scrollTarget?: string;
+    idPrefix?: string;
 };
+
+/** Everything that links one field to the form. */
+interface FormFields<T extends string = string> {
+    /**
+     * Everything that links one field to the form: `<TextInput v-bind="field('email')" v-model="email" />`
+     * plus `<FormError name="email" />`. The id is the name plus the form's unique part, so it is the same
+     * on every render and unique per form.
+     */
+    field: (name: T) => FieldBinding;
+    /** A label for one of this form's fields: `<FormLabel name="email" label="E-mail" required />`. */
+    FormLabel: FormLabelComponent<T>;
+    /** One field's message, its element always rendered: `<FormError name="email" />`. */
+    FormError: FormErrorComponent<T>;
+}
 
 /**
  * Everything `useForm` returns: the field-error bag, `take` and `clearErrors` from
- * `useValidationErrors`, plus `handleSubmit` and the `submitting` loading flag from `useFormSubmit`.
+ * `useValidationErrors`, `handleSubmit` and the `submitting` loading flag from `useFormSubmit`, and the
+ * field wiring. Type a child component's `form` prop with it (or with `UseDraftForm<D>` for a form over a
+ * draft).
  */
-export type UseForm<T extends string = string> = UseValidationErrors<T> & UseFormSubmit;
+export type UseForm<T extends string = string> = UseValidationErrors<T> & UseFormSubmit & FormFields<T>;
+
+/** What `field(name)` adds when the form has a draft: the value at that path, and the write back into it. */
+export interface FieldModel<V> {
+    modelValue: V;
+    'onUpdate:modelValue': (value: V) => void;
+}
 
 /** `useForm`'s options when it points at the component's draft: the field names are the draft's paths. */
 export type UseDraftFormOptions<D extends object> = UseFormOptions<Path<D>> & {
     /**
      * The component's own draft (a ref; stores and adapters stay untouched). Its dotted paths
      * (`learningGoals.0.title`) are the form's field names: `errors`' keys and the `fields` allow-list
-     * are typed on them, so a misspelled or vanished field is a type error. The form only types names
-     * by it: it neither reads nor writes `draft.value`.
+     * are typed on them, so a misspelled or vanished field is a type error. With it, `field(name)` also
+     * carries the value at that path and writes changes back into `draft.value`, so
+     * `<TextInput v-bind="field('firstName')" />` needs no `v-model`. Messages stay until the next submit.
      */
     draft: Ref<D>;
 };
 
 /** Everything `useForm` returns for a form with a draft: as `UseForm`, named by the draft's paths. */
-export type UseDraftForm<D extends object> = UseForm<Path<D>>;
+export type UseDraftForm<D extends object> = Omit<UseForm<Path<D>>, 'field'> & {
+    /** The wiring plus the value: `modelValue` is typed as the value at that path. */
+    field: <P extends Path<D>>(name: P) => FieldBinding & FieldModel<PathValue<D, P>>;
+};

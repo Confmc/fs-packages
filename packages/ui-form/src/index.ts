@@ -8,6 +8,7 @@ export type {UseFormCall} from './form/form';
 export {useFormSubmit} from './form/form-submit';
 export {useValidationErrors} from './form/validation-errors';
 export type {
+    FieldModel,
     SubmitOutcome,
     UseDraftForm,
     UseDraftFormOptions,
@@ -20,3 +21,5 @@ export type {
 } from './form/types';
 export type {Path, PathsFor, PathsOf, PathValue} from './form/path';
 export type {FormDraft} from './form/draft';
+export type {BoundFormLabelProps, FormErrorComponent, FormLabelComponent} from './form/field';
+export type {FieldBinding} from './types';
