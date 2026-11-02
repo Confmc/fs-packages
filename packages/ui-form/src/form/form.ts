@@ -15,8 +15,12 @@ import {useValidationErrors} from './validation-errors';
 type DraftTypeUnknown = {readonly [K in keyof UseForm]: never};
 type DraftFormOf<D extends object> = unknown extends D ? DraftTypeUnknown : UseDraftForm<D>;
 
-// Two call shapes: names are free strings, or, with a `draft`, the draft's paths. The overloads are a
-// type; the one implementation below is cast to it, since an arrow function cannot declare overloads.
+/**
+ * The type of `useForm`: two call shapes, names as free strings, or, with a `draft`, the draft's paths.
+ * Exported so a wrapper that configures `useForm` can be typed as `useForm` itself, keeping both shapes.
+ */
+// The overloads are a type; the one implementation below is cast to it, since an arrow function cannot
+// declare overloads.
 export interface UseFormCall {
     <D extends object>(options: UseDraftFormOptions<D>): DraftFormOf<D>;
     // `draft` refused here: a draft the first overload cannot take (not a ref) is an error, even from a
