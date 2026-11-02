@@ -428,3 +428,19 @@ describe('typeahead — the labels fold again when the options change', () => {
         expect(wrapper.find('[role="combobox"]').attributes('aria-activedescendant')).toBe('f-opt-6');
     });
 });
+
+describe('typeahead — an empty list', () => {
+    it('a character typed over an empty list moves nothing', async () => {
+        const wrapper = mount(SingleSelect, {
+            props: {options: [] as Fruit[], optionLabel: 'name', id: 'f', modelValue: null},
+            attachTo: document.body,
+        });
+        const root = wrapper.find('.ui-select');
+
+        await root.trigger('keydown', {key: 'ArrowDown'});
+        await root.trigger('keydown', {key: 'a'});
+
+        expect(wrapper.find('[role="combobox"]').attributes('aria-activedescendant')).toBeUndefined();
+        expect(wrapper.find('[role="combobox"]').attributes('aria-expanded')).toBe('true');
+    });
+});
