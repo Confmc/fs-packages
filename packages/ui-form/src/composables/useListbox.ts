@@ -21,7 +21,10 @@ export interface ListboxFloatingOptions {
     placement?: Placement;
     /** `offset()` main-axis distance between reference and popup, in px (default `4`). */
     offset?: number;
-    /** `flip()` fallback placements tried when the primary placement overflows (default `['top-start']`). */
+    /**
+     * `flip()` fallback placements tried when the primary placement overflows (default `['top-start']`
+     * when no `placement` is given; with one, none, so `flip()` tries the opposite side).
+     */
     fallbackPlacements?: Placement[];
     /** `shift()` viewport padding, in px (default `8`). */
     shiftPadding?: number;
@@ -406,7 +409,13 @@ export const useListbox = (options: UseListboxOptions) => {
         placement: floatingOptions.placement ?? 'bottom-start',
         middleware: [
             offset(floatingOptions.offset ?? 4),
-            flip({fallbackPlacements: floatingOptions.fallbackPlacements ?? ['top-start']}),
+            // A given list replaces flip()'s own opposite-side fallback, so the family default only
+            // goes with the family placement: `top` must still be able to flip below.
+            flip({
+                fallbackPlacements:
+                    floatingOptions.fallbackPlacements ??
+                    (floatingOptions.placement === undefined ? ['top-start'] : undefined),
+            }),
             shift({padding: floatingOptions.shiftPadding ?? 8}),
             // `elements.floating` is the `.ui-menu-anchor` box, not the <ul>. Sizing it to the
             // trigger is what keeps `--ui-menu-min-width: 100%` meaning "as wide as the

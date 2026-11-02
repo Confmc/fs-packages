@@ -160,7 +160,7 @@ const {
     removeLabel?: string;
     /** ids rendered visually muted (`.is-muted`) — still committable, still in the keyboard path. */
     mutedOptions?: T['id'][];
-    /** where the list opens against the box (default `'bottom-start'`; it still flips when there is no room). Read once. */
+    /** where the list opens against the box (default `'bottom-start'`); it flips to the opposite side when there is no room. Read once. */
     placement?: Placement;
 }>();
 
