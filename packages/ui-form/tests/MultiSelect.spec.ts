@@ -80,6 +80,14 @@ describe('MultiSelect', () => {
         expect(menu(wrapper).attributes('aria-multiselectable')).toBe('true');
     });
 
+    it('shows the placeholder and no has-value while no committed id has a chip yet', () => {
+        const wrapper = mountMulti({modelValue: [99], placeholder: 'Pick some'});
+
+        expect(wrapper.findAll('.ui-multiselect__chip')).toHaveLength(0);
+        expect(wrapper.find('.ui-multiselect__placeholder').text()).toBe('Pick some');
+        expect(wrapper.find('.ui-multiselect__box').classes()).not.toContain('has-value');
+    });
+
     it('renders chips for the committed values, has-value, required and invalid state', () => {
         const wrapper = mountMulti({modelValue: [1, 3], required: true, invalid: true, describedby: 'fruit-error'});
         const trigger = wrapper.find('.ui-multiselect__trigger');

@@ -2,7 +2,7 @@
     <div ref="root" v-bind="rootAttrs($attrs)" class="ui-multiselect">
         <div
             class="ui-control ui-multiselect__box"
-            :class="{'is-open': open, 'has-value': model.length > 0, 'is-invalid': invalid, 'is-disabled': disabled}"
+            :class="{'is-open': open, 'has-value': chips.length > 0, 'is-invalid': invalid, 'is-disabled': disabled}"
         >
             <!-- Chips are OUTSIDE the trigger button (a button may not nest a button), inside
                  the flex box that carries the control chrome. Removing must not open the menu:
@@ -46,7 +46,7 @@
                 :aria-controls="open ? listboxId : undefined"
                 :aria-activedescendant="activeDescendant"
             >
-                <span v-if="!model.length" class="ui-multiselect__placeholder">{{ placeholder }}</span>
+                <span v-if="!chips.length" class="ui-multiselect__placeholder">{{ placeholder }}</span>
                 <!-- The trigger's accessible VALUE (WCAG 4.1.2): the chips render OUTSIDE this
                      button (a button may not nest the chip-remove buttons), which would leave a
                      populated closed control announcing nothing. This visually-hidden span gives
