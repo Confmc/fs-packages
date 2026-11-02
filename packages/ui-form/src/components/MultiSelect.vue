@@ -25,7 +25,7 @@
 
             <!-- The trigger flexes over all remaining space, so clicking the empty part of the
                  chip bar is clicking the trigger. Keyboard listens HERE (not on the root, unlike
-                 the sibling controls): the chip-remove buttons are focusable children of the
+                 SingleSelect): the chip-remove buttons are focusable children of the
                  root, and Enter on one must remove the chip — never leak into the listbox
                  skeleton and open the menu. -->
             <button
@@ -62,7 +62,7 @@
         <!-- WR-0521: the empty state must be ANNOUNCED, not just painted — a persistent,
              visually-hidden live region (mounted for the component's whole lifetime, so
              the emptyText lands as a content CHANGE, the reliable live-region path). One
-             treatment, applied uniformly across the whole select family. -->
+             treatment, for every select in the family. -->
         <span class="ui-live-region" role="status" aria-live="polite">{{
             open && optionLabels.length === 0 ? emptyText : ''
         }}</span>
@@ -155,7 +155,7 @@ const {
     optionsLabel?: string;
     /**
      * verb prefixed to a chip's remove-button accessible name (`"${removeLabel} ${option text}"`) —
-     * a prop, not a literal, so Dutch territories can localise it (the `optionsLabel` ruling).
+     * a prop, not a literal, so a consumer can localise it; the default is English.
      */
     removeLabel?: string;
     /** ids rendered visually muted (`.is-muted`) — still committable, still in the keyboard path. */
@@ -203,7 +203,7 @@ const selectedSummary = computed(() => chips.value.map(labelOf).join(', '));
 const optionLabels = computed(() => sorted.value.map(labelOf));
 const optionKeys = computed(() => sorted.value.map((option) => String(option.id)));
 // A flat control renders one headerless run — an all-option row sequence OptionList lays out
-// flat (no group wrappers), the same component the grouped controls feed a header/option mix.
+// flat (no group wrappers), the same component a grouped select feeds a header/option mix.
 const rows = computed<GroupRow[]>(() => sorted.value.map((_, index) => ({type: 'option', index})));
 /** `aria-selected` marks committed MEMBERSHIP — the pointer is conveyed by aria-activedescendant. */
 const isSelected = (index: number): boolean => model.value.includes(sorted.value[index].id);
@@ -212,8 +212,9 @@ const isMuted = (index: number): boolean => mutedOptions !== undefined && mutedO
 
 const root = useTemplateRef<HTMLElement>('root');
 const reference = useTemplateRef<HTMLElement>('reference');
-// The teleported `.ui-menu-anchor` (null while closed) — floating-ui's floating element, and
-// the box click-outside treats as inside. The <ul> inside it is positioned by nothing.
+// The `.ui-menu-anchor` (null while closed) — floating-ui's floating element, promoted to the
+// top layer in place, so it stays inside `root` and click-outside needs no check of its own.
+// The <ul> inside it is positioned by nothing.
 const floating = useTemplateRef<HTMLElement>('floating');
 
 /**
