@@ -158,12 +158,22 @@ const useFormBody = <T extends string = string>(
  * `field()` reads the form when it is called, so call it in the render (the template), not once in
  * `setup()`: a result kept from setup never changes.
  *
- * Unless `scrollToError` is `false`, a submit that ends `'refused'` scrolls the first refused field into
- * view before it resolves, found by this form's own ids. Only a submit scrolls: a 422 handed to `take` or
- * a cleared bag never moves the page.
+ * The form refuses fields itself too, next to the server: `refuse(name, message)` refuses one field,
+ * `setRefusals(bag)` sets the client's whole verdict (replacing the last one), and
+ * `handleSubmit(action, {validate})` checks before it sends: a bag with a message refuses the submit
+ * without running the action, an empty one clears the client's refusals and sends. `fieldErrors` is what
+ * the fields show, the server's `errors` with `clientErrors` on top (the client's message wins on a field
+ * both name); `field()`, `FormError` and the scroll read it. A sent submit clears only the server's
+ * messages. `withdraw(...names)` drops both kinds for those fields now, everything under their paths
+ * included, e.g. when picking a value answers what a message said; nothing calls it for you.
  *
- * With a `draft`, the field names are the draft's paths (`useForm({draft})` names `errors` and `fields` by
- * `Path<D>`), and `field(name)` also carries the value at that path and writes changes back into the
+ * Unless `scrollToError` is `false`, a submit that ends `'refused'` (the server's 422 or `validate`'s
+ * refusals) scrolls the first refused field into view before it resolves, found by this form's own ids.
+ * Only a submit scrolls: a 422 handed to `take`, a `refuse` or `setRefusals`, or a cleared bag never moves
+ * the page.
+ *
+ * With a `draft`, the field names are the draft's paths (`useForm({draft})` names `errors`, `fields` and
+ * every name the form takes by `Path<D>`), and `field(name)` also carries the value at that path and writes changes back into the
  * draft; without one they are free strings, or the union given as `T`.
  *
  * Call `useForm` in a component's `setup()`: its ids end in a part from Vue's `useId()`, unless a fixed
