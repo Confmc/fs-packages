@@ -17,10 +17,12 @@ type DraftValue<V> = [NonNullable<V>] extends [boolean]
  * The form state for a record `T`: what a form's draft holds while the user edits it. Every value a
  * control can clear is nullable (`string | null`, `number | null`, a select's `id | null`), whatever
  * the record type says, because the controls' models are nullable and a number input or a clearable
- * select writes `null` back on clear; the server's validation decides what is required. A boolean stays `boolean` (a checkbox is on or off), a
- * list stays a list (an id list empties to `[]`, a list of objects holds drafts), a nested object stays
- * an object with drafted fields, and `readonly` goes (a draft is edited).
+ * select writes `null` back on clear; the server's validation decides what is required. An optional
+ * member is present in the draft (`null` until filled), so a control can bind it. A boolean stays
+ * `boolean` (a checkbox is on or off), a list stays a list (an id list empties to `[]`, a list of
+ * objects holds drafts), a nested object stays an object with drafted fields, and `readonly` goes (a
+ * draft is edited).
  *
  * `const draft = ref<FormDraft<Contract>>(…); useForm({draft})`.
  */
-export type FormDraft<T> = {-readonly [K in keyof T]: DraftValue<T[K]>};
+export type FormDraft<T> = {-readonly [K in keyof T]-?: DraftValue<T[K]>};

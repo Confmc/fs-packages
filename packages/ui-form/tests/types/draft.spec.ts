@@ -43,6 +43,16 @@ describe('FormDraft', () => {
         expectTypeOf<FormDraft<Contract>['debtorId']>().toEqualTypeOf<number | null>();
     });
 
+    it('holds an optional member as a present, nullable field a control can bind', () => {
+        interface Note {
+            title: string;
+            remark?: string;
+        }
+
+        expectTypeOf<FormDraft<Note>>().toEqualTypeOf<{title: string | null; remark: string | null}>();
+        expectTypeOf<PathsOf<FormDraft<Note>, string | null>>().toEqualTypeOf<'title' | 'remark'>();
+    });
+
     it('keeps a boolean a boolean: a checkbox is on or off', () => {
         expectTypeOf<FormDraft<Contract>['active']>().toEqualTypeOf<boolean>();
     });
