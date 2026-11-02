@@ -8,14 +8,13 @@ import type {UseListboxOptions} from '../src/composables/useListbox';
 
 import {useListbox} from '../src/composables/useListbox';
 
-// The component suites (SingleSelect's, MultiSelect's and Combobox's) exercise the composable's
-// behaviour against the REAL floating-ui. This suite pins the things they cannot see: the exact
-// layout policy handed to floating-ui (the family defaults, and the `floatingOptions`
-// overrides), the hide()-middleware visibility gate (driven off a controlled `middlewareData`),
-// and the clear-entry option combinations no component produces (a rendered entry without a
-// commit callback). Middleware factories return opaque objects, so each is mocked to a marker
-// recording its args (vi.mock is hoisted above the imports, so the top-level import gets the
-// mock too).
+// The component suites (SingleSelect's, MultiSelect's, Combobox's and MultiCombobox's) exercise the
+// composable's behaviour against the REAL floating-ui. This suite pins the things they cannot see:
+// the exact layout policy handed to floating-ui (the family defaults, and the `floatingOptions`
+// overrides), the hide()-middleware visibility gate (driven off a controlled `middlewareData`), and
+// the clear-entry option combinations no component produces (a rendered entry without a commit
+// callback). Middleware factories return opaque objects, so each is mocked to a marker recording
+// its args (vi.mock is hoisted above the imports, so the top-level import gets the mock too).
 const floatingMock = vi.hoisted(() => ({
     styles: {position: 'absolute', top: '0px'} as Record<string, string>,
     middlewareData: {} as Record<string, unknown>,
@@ -326,8 +325,8 @@ describe('useListbox click-outside across shadow boundaries (KD-1136)', () => {
 
     // At a DOCUMENT listener a click inside a shadow root is retargeted to the HOST, which is
     // an ancestor of `root` rather than a descendant — `root.contains(target)` rejects it and
-    // every option click would read as outside (MultiSelect would close instead of
-    // toggling). `composedPath()` carries the true chain across the boundary.
+    // every option click would read as outside (MultiSelect and MultiCombobox would close
+    // instead of toggling). `composedPath()` carries the true chain across the boundary.
     it('treats a composed click from inside a shadow root as inside', () => {
         const onOutside = vi.fn();
         const host = document.createElement('div');
@@ -387,9 +386,9 @@ describe('useListbox size middleware — the anchor tracks the trigger width', (
 });
 
 describe('useListbox without the optional hooks', () => {
-    // SingleSelect passes every hook, MultiSelect all but committedIndex and the clear entry, and
-    // Combobox all but typeaheadLabels and committedIndex; what the composable does without each
-    // is pinned here, apart from any one control.
+    // SingleSelect passes every hook, MultiSelect all but committedIndex and the clear entry,
+    // Combobox all but typeaheadLabels and committedIndex, and MultiCombobox all but those and the
+    // clear entry; what the composable does without each is pinned here, apart from any one control.
     it('closed, a key openKeys rejects opens nothing and is not swallowed', () => {
         const wrapper = mount(Harness, {props: {overrides: {listLength: () => 3}}});
 

@@ -99,12 +99,12 @@ import ListboxOption from './ListboxOption.vue';
  * by the class-prefix `variant`, so the `role="listbox"` / `role="option"` / position-keyed
  * `optionId` / committed-value `aria-selected` semantics stay byte-identical across the family.
  *
- * Flat and grouped selects render through this single component: the ONLY difference is the
- * `rows` a parent hands down. A flat control (SingleSelect, MultiSelect) passes a run of all-option rows (no
+ * Flat and grouped selects render through this single component: the ONLY difference is the `rows`
+ * a parent hands down. A flat control (every select here) passes a run of all-option rows (no
  * headers, rendered flat); a grouped control interleaves `header`/`boundary` rows and this
  * component folds them into named `role="group"` runs. `boundary` closes the open run so a
- * `header:false` group after a named one renders flat instead of being absorbed into the
- * preceding group.
+ * `header:false` group after a named one renders flat instead of being absorbed into the preceding
+ * group.
  *
  * Entirely index-based, mirroring `useListbox`: the option type `T` never crosses this
  * boundary. The parent hands down `rows` + `keys` derived from ITS list (a flat select's
@@ -165,7 +165,7 @@ const {
     optionsLabel: string;
     /** shown when there are no navigable options. */
     emptyText: string;
-    /** marks the listbox `aria-multiselectable` (MultiSelect) — absent, not "false", otherwise. */
+    /** marks the listbox `aria-multiselectable` (MultiSelect, MultiCombobox) — absent, not "false", otherwise. */
     multiselectable?: boolean;
     /** display string of the committing clear entry — absent means no entry renders. */
     clearLabel?: string;
