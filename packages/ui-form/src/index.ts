@@ -1,4 +1,5 @@
 export {default as FormLabel} from './components/FormLabel.vue';
+export {default as GroupSelect} from './components/GroupSelect.vue';
 export {default as SingleSelect} from './components/SingleSelect.vue';
 export {default as TextInput} from './components/TextInput.vue';
 
