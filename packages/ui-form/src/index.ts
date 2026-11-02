@@ -19,14 +19,38 @@ export {default as Switch} from './components/Switch.vue';
 export {default as Textarea} from './components/Textarea.vue';
 export {default as TextInput} from './components/TextInput.vue';
 export {default as TimeInput} from './components/TimeInput.vue';
+
+// Form state (ported from @script-development/fs-form): the validation bag, the submit it binds, and
+// useForm, which wires the two in one call.
+export {useForm} from './form/form';
+export type {UseFormCall} from './form/form';
 export {useFormSubmit} from './form/form-submit';
 export {useValidationErrors} from './form/validation-errors';
 
 export type {FieldAria, FieldBinding, LabelKey, SelectItem} from './types';
 export type {
+    FieldModel,
     SubmitOutcome,
+    UseDraftForm,
+    UseDraftFormOptions,
+    UseForm,
+    UseFormClient,
+    UseFormOptions,
     UseFormSubmit,
     UseValidationErrors,
     UseValidationErrorsOptions,
     ValidationErrors,
 } from './form/types';
+export type {Path, PathsFor, PathsOf, PathValue} from './form/path';
+export type {
+    BoundControls,
+    BoundDraftFrame,
+    BoundShell,
+    BoundValueProps,
+    DraftFrameScope,
+    FieldFrameSlots,
+    FrameScope,
+    NoAddonProps,
+} from './form/kit';
+export type {FormDraft} from './form/draft';
+export type {BoundFormLabelProps, FormErrorComponent, FormLabelComponent} from './form/field';

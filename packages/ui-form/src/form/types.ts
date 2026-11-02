@@ -1,4 +1,9 @@
-import type {Ref} from 'vue';
+import type {ComputedRef, Ref} from 'vue';
+
+import type {FieldBinding} from '../types';
+import type {FormErrorComponent, FormLabelComponent} from './field';
+import type {BoundControls} from './kit';
+import type {Path, PathValue} from './path';
 
 /** Field-error bag: the first backend validation message per field key. */
 export type ValidationErrors<T extends string = string> = Partial<Record<T, string>>;
@@ -15,7 +20,10 @@ export interface UseValidationErrors<T extends string = string> {
      * `catch (error) { if (!form.take(error)) throw error; }`.
      */
     take: (error: unknown) => boolean;
-    /** `true` once a 422 has been taken, until `clearErrors` (which a `'sent'` submit calls). */
+    /**
+     * `true` once a 422 has been taken, until `clearErrors` (which a `'sent'` submit calls). The server's
+     * only: a form's own refusals (`validate`, `refuse`) never set it.
+     */
     refused: Readonly<Ref<boolean>>;
     /**
      * The mapped keys of the last taken 422 that `errors` does not hold: not named by
@@ -26,6 +34,8 @@ export interface UseValidationErrors<T extends string = string> {
     /**
      * The last taken 422 named no field this form holds (nothing to point at), so a caller can say so
      * after `outcome === 'refused'`. Decided when it is taken: dropping messages later never flips it.
+     * The server's only: after a submit its `validate` refused, the action never ran and this still
+     * describes the 422 before it.
      */
     refusedUnnamed: Readonly<Ref<boolean>>;
 }
@@ -48,9 +58,10 @@ export interface UseValidationErrorsOptions<T extends string = string> {
 }
 
 /**
- * How a `handleSubmit` call ended: the action ran to the end (`'sent'`), the server refused it with a
- * 422 (`'refused'`), the action resolved `false` because it sent nothing, such as a save the user
- * declined (`'cancelled'`), or it never ran because a submit was already in flight (`'ignored'`).
+ * How a `handleSubmit` call ended: the action ran to the end (`'sent'`); the server refused it with a
+ * 422, or `useForm`'s `validate` refused it before the action ran (`'refused'`); the action resolved
+ * `false` because it sent nothing, such as a save the user declined (`'cancelled'`); or it never ran
+ * because a submit was already in flight (`'ignored'`).
  */
 export type SubmitOutcome = 'sent' | 'refused' | 'cancelled' | 'ignored';
 
@@ -66,3 +77,142 @@ export interface UseFormSubmit {
     /** `true` while a submit action is in flight — the form's loading state. */
     submitting: Ref<boolean>;
 }
+
+/** Options for `useForm`: the validation options plus `useForm`-only behaviour. */
+export type UseFormOptions<T extends string = string> = UseValidationErrorsOptions<T> & {
+    /**
+     * When `handleSubmit` ends `'refused'` (the server's 422, or `validate`'s refusals), scroll the
+     * first refused field into view, found by the ids this form hands out (`field(name)`'s control, else
+     * its `FormError`). Never on `take`, `refuse` or `setRefusals` alone, so a 422 caught outside a submit
+     * leaves the page where it is, and typing never scrolls.
+     * @default true
+     */
+    scrollToError?: boolean;
+    /**
+     * A fixed prefix for every id `field()` derives, instead of the unique part each form takes from Vue's
+     * `useId()` by default (`firstName-v-3`): `idPrefix: 'invoice'` gives `invoice-firstName`. Only for an
+     * id something outside the form must know.
+     */
+    idPrefix?: string;
+};
+
+// The form's parts are interfaces, each named by its type arguments, so a form's type reached through a
+// generic call (`useForm({draft})`, a helper generic over D) stays identical to the one written out.
+
+/** The form's submit: `useFormSubmit`'s, plus a check before sending. */
+interface FormSubmit<T extends string = string> extends UseFormSubmit {
+    /**
+     * `useFormSubmit`'s `handleSubmit`, plus two steps. `validate` runs first: a bag with a message
+     * becomes the client refusals (`setRefusals`) and the call ends `'refused'` without running the
+     * action; an empty one clears them and the action runs. On `'refused'` (either way) the first
+     * refused field scrolls into view, unless `scrollToError` is off.
+     */
+    handleSubmit: <B extends ValidationErrors<T>>(
+        action: () => Promise<unknown>,
+        // `B` is the bag as written, so a key that is not one of the form's names is `never`: TypeScript checks
+        // no extra key on a literal a callback returns, and a misspelled name next to a right one would pass.
+        options?: {validate?: () => B & {[K in Exclude<keyof B, T>]: never}},
+    ) => Promise<SubmitOutcome>;
+}
+
+/** The refusals a form makes itself, next to the server's. */
+export interface UseFormClient<T extends string = string> {
+    /**
+     * Refusals the form made itself (a check before sending): set by `refuse`, `setRefusals` and `validate`,
+     * dropped by `withdraw` and `clearErrors`. A submit leaves them standing.
+     */
+    clientErrors: Readonly<Ref<ValidationErrors<T>>>;
+    /** Clear every message the fields show: the server's and the client refusals (a form reset). */
+    clearErrors: () => void;
+    /** What the fields show: the server's errors with the client refusals on top (client wins per key). */
+    fieldErrors: ComputedRef<ValidationErrors<T>>;
+    /**
+     * Refuse a field from the client, e.g. a check that runs before the request is sent. An empty message is
+     * no refusal: it drops the field's own, so a server message on it shows again.
+     */
+    refuse: (field: T, message: string) => void;
+    /**
+     * Set the client's whole verdict at once, e.g. the result of a pure `validate(draft)`: the bag
+     * REPLACES every earlier client refusal, so a field fixed since the last check is no longer
+     * refused. Empty messages are no refusal. Returns `true` when it refused anything, so a save can
+     * stop with `if (setRefusals(validate(draft))) return;`. The server's errors are untouched.
+     */
+    setRefusals: (bag: ValidationErrors<T>) => boolean;
+    /**
+     * Drop these fields' server messages and client refusals now, instead of at the next submit — e.g.
+     * when picking a value answers what the message said. Nothing calls it for you.
+     */
+    withdraw: (...fields: T[]) => void;
+}
+
+/** A form's bound label and message, for its fields. */
+interface FormComponents<T extends string = string> {
+    /** A label for one of this form's fields: `<FormLabel name="email" label="E-mail" required />`. */
+    FormLabel: FormLabelComponent<T>;
+    /** One field's message, its element always rendered: `<FormError name="email" />`. */
+    FormError: FormErrorComponent<T>;
+}
+
+/** `field` on a form without a draft. */
+interface FormField<T extends string = string> {
+    /**
+     * Everything that links one field to the form: `<TextInput v-bind="field('email')" v-model="email" />`
+     * plus `<FormError name="email" />`. The id is the name plus the form's unique part, so it is the same
+     * on every render and unique per form.
+     */
+    field: (name: T) => FieldBinding;
+}
+
+/**
+ * Everything `useForm` returns: the field-error bag, `take` and `clearErrors` from
+ * `useValidationErrors`, `handleSubmit` and the `submitting` loading flag from `useFormSubmit`, the
+ * refusals the form makes itself (`UseFormClient`), the field wiring and the bound controls
+ * (`BoundControls`). Type a child component's `form` prop with it (or with `UseDraftForm<D>` for a form
+ * over a draft).
+ */
+export type UseForm<T extends string = string> = UseValidationErrors<T> &
+    FormSubmit<T> &
+    UseFormClient<T> &
+    FormField<T> &
+    FormComponents<T> &
+    BoundControls<T>;
+
+/** What `field(name)` adds when the form has a draft: the value at that path, and the write back into it. */
+export interface FieldModel<V> {
+    modelValue: V;
+    'onUpdate:modelValue': (value: V) => void;
+}
+
+/** `useForm`'s options when it points at the component's draft: the field names are the draft's paths. */
+export type UseDraftFormOptions<D extends object> = UseFormOptions<Path<D>> & {
+    /**
+     * The component's own draft (a ref; stores and adapters stay untouched). Its dotted paths
+     * (`learningGoals.0.title`) are the form's field names: `errors`' keys and the `fields` allow-list
+     * are typed on them, so a misspelled or vanished field is a type error. With it, `field(name)` also
+     * carries the value at that path and writes changes back into `draft.value`, so
+     * `<TextInput v-bind="field('firstName')" />` needs no `v-model`. Messages stay until the next
+     * submit, as everywhere else; `withdraw(name)` drops one sooner where a form wants that.
+     */
+    // D is read from the ref's value only: a `ref<Draft>` also takes `Draft` in its setter, which would
+    // make D the union `Draft | UnwrapRef<Draft>`.
+    draft: Ref<D, unknown>;
+};
+
+/** `field` on a form with a draft: the wiring plus the value, `modelValue` typed as the value at that path. */
+interface DraftField<D extends object> {
+    <P extends Path<D>>(name: P): FieldBinding & FieldModel<PathValue<D, P>>;
+}
+
+/** `field` on a form with a draft. */
+interface DraftFormField<D extends object> {
+    /** The wiring plus the value: `modelValue` is typed as the value at that path. */
+    field: DraftField<D>;
+}
+
+/** Everything `useForm` returns for a form with a draft: as `UseForm`, named by the draft's paths. */
+export type UseDraftForm<D extends object> = UseValidationErrors<Path<D>> &
+    FormSubmit<Path<D>> &
+    UseFormClient<Path<D>> &
+    DraftFormField<D> &
+    FormComponents<Path<D>> &
+    BoundControls<D>;
