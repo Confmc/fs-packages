@@ -182,8 +182,11 @@ const useFormBody = <T extends string = string>(
  * around `TextInput`, wired by `field(name)`: `<form.TextField name="email" label="E-mail" placeholder="…"
  * required />`; the control's own props and attributes pass through and win over the wiring, `class` and
  * `style` land on the field. `FormField` is the frame by name for any other control: the form's id, label
- * and message, and in its slot the wiring without the value, so the control keeps its own `v-model`. With
- * a draft, a bound control takes only a path its control can read and write.
+ * and message, and in its slot `field` and `aria` (the wiring without the value) and, with a draft, `model`
+ * (the value at that name and its write-back, typed by the path). Inside `form.FormField` bind the control
+ * from the slot, never with `field()`: `<TextInput v-bind="{...field, ...model}" />`, or `v-bind="field"`
+ * with your own `v-model` for a proxy that converts (`model` bound as well would write the draft too).
+ * With a draft, a bound control takes only a path its control can read and write.
  *
  * The form refuses fields itself too, next to the server: `refuse(name, message)` refuses one field,
  * `setRefusals(bag)` sets the client's whole verdict (replacing the last one), and
