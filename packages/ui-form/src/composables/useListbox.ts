@@ -42,9 +42,15 @@ export interface UseListboxOptions {
     id: () => string;
     /** whether the control is disabled — the keyboard path guards on it, as a getter so it stays live. */
     disabled: () => boolean;
-    /** length of the currently-rendered option list (SingleSelect's `sorted`, GroupSelect's flattened groups, Combobox's filtered list, GroupCombobox's flattened filtered groups). */
+    /**
+     * length of the currently-rendered option list (SingleSelect's `sorted`, GroupSelect's
+     * flattened groups, Combobox's filtered list, GroupCombobox's flattened filtered groups).
+     */
     listLength: () => number;
-    /** whether a key pressed while CLOSED should open the list (SingleSelect and GroupSelect: Enter/ArrowDown/Space; Combobox and GroupCombobox: ArrowDown). */
+    /**
+     * whether a key pressed while CLOSED should open the list (SingleSelect and GroupSelect:
+     * Enter/ArrowDown/Space; Combobox and GroupCombobox: ArrowDown).
+     */
     openKeys: (key: string) => boolean;
     /**
      * Commit the option at `index`; returns whether a commit actually happened, which is what

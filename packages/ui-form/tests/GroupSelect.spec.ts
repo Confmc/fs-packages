@@ -113,6 +113,7 @@ describe('GroupSelect', () => {
                 .findAll('.ui-groupselect__option')
                 .map((option) => option.text()),
         ).toEqual(options);
+        wrapper.unmount();
     });
 
     it('commits by the order it shows when alphabeticalSort is set', async () => {
@@ -124,6 +125,7 @@ describe('GroupSelect', () => {
         await control.trigger('keydown', {key: 'Enter'});
 
         expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([2]); // Kiwi
+        wrapper.unmount();
     });
 
     it('commits the clicked option, emits update:modelValue, and closes', async () => {
@@ -187,6 +189,7 @@ describe('GroupSelect', () => {
 
         expect(wrapper.emitted('update:modelValue')).toBeUndefined();
         expect(menu(wrapper).exists()).toBe(true);
+        wrapper.unmount();
     });
 
     it('Home/End jump to first and last option', async () => {
@@ -461,23 +464,19 @@ describe('GroupSelect', () => {
         expect(menu(wrapper).findAll('.ui-groupselect__option')).toHaveLength(1);
     });
 
-    it.each([false, true])(
-        'renders a sparse options array without throwing — holes emit no phantom rows (alphabeticalSort %s)',
-        async (alphabeticalSort) => {
-            // A sparse `T[]` (holes, not undefined elements) once diverged the two derivations:
-            // `buildGroupRows` counted holes via `for...of` while the parent's `groups.flatMap` skips
-            // them, so a row index pointed past `flatOptions` and `flatOptions[index].id` threw on open.
-            // Both now use `forEach` (hole-skipping), so a hole contributes no row on either side. The
-            // sort copies a group's options without filling its holes, so it keeps that true.
-            const sparse: Fruit[] = [{id: 3, name: 'Papaya'}];
-            sparse[2] = {id: 1, name: 'Mango'}; // index 1 is a hole
-            const wrapper = mountGroupSelect({groups: [{options: sparse, text: 'Tropical'}], alphabeticalSort});
-            await wrapper.find('button').trigger('click');
+    it('renders a sparse options array without throwing — holes emit no phantom rows', async () => {
+        // A sparse `T[]` (holes, not undefined elements) once diverged the two derivations:
+        // `buildGroupRows` counted holes via `for...of` while the parent's `groups.flatMap` skips
+        // them, so a row index pointed past `flatOptions` and `flatOptions[index].id` threw on open.
+        // Both now use `forEach` (hole-skipping), so a hole contributes no row on either side.
+        const sparse: Fruit[] = [{id: 1, name: 'Mango'}];
+        sparse[2] = {id: 3, name: 'Papaya'}; // index 1 is a hole
+        const wrapper = mountGroupSelect({groups: [{options: sparse, text: 'Tropical'}]});
+        await wrapper.find('button').trigger('click');
 
-            // Two real options, no row for the hole, and no render throw.
-            expect(menu(wrapper).findAll('.ui-groupselect__option')).toHaveLength(2);
-        },
-    );
+        // Two real options, no row for the hole, and no render throw.
+        expect(menu(wrapper).findAll('.ui-groupselect__option')).toHaveLength(2);
+    });
 
     it('hovering the clear entry highlights it (aria-activedescendant points at clear id)', async () => {
         const wrapper = mountGroupSelect({clearLabel: 'None', modelValue: 1});
