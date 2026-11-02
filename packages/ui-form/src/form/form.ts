@@ -109,7 +109,8 @@ const useFormBody = <T extends string = string>(
  * draft; without one they are free strings, or the union given as `T`.
  *
  * Call `useForm` in a component's `setup()`: its ids end in a part from Vue's `useId()`, unless a fixed
- * `idPrefix` is given.
+ * `idPrefix` is given. `useId()` counts per app, so two Vue apps mounted on one page need their own
+ * `app.config.idPrefix` to keep their forms' ids apart.
  *
  * @param options `keyMapper`, `fields`, `scrollToError`, `idPrefix`, `draft` — see `UseFormOptions` and
  *                `UseDraftFormOptions`.
