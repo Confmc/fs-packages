@@ -189,7 +189,7 @@ const filtered = computed(() => {
 const optionLabels = computed(() => filtered.value.map(labelOf));
 const optionKeys = computed(() => filtered.value.map((option) => String(option.id)));
 // A flat control renders one headerless run — an all-option row sequence OptionList lays out
-// flat (no group wrappers), the same component the grouped controls feed a header/option mix.
+// flat (no group wrappers), the same component a grouped select feeds a header/option mix.
 const rows = computed<GroupRow[]>(() => filtered.value.map((_, index) => ({type: 'option', index})));
 /** `aria-selected` marks the COMMITTED value — OptionList only asks about rendered indices. */
 const isSelected = (index: number): boolean => filtered.value[index].id === model.value;
@@ -201,8 +201,9 @@ const root = useTemplateRef<HTMLElement>('root');
 // The input is both the floating-ui reference and the target of the imperative focus
 // handle isms's command-palette focus trap (WR-0448) consumes.
 const input = useTemplateRef<HTMLInputElement>('input');
-// The teleported `.ui-menu-anchor` (null while closed) — floating-ui's floating element, and
-// the box click-outside treats as inside. The <ul> inside it is positioned by nothing.
+// The `.ui-menu-anchor` (null while closed) — floating-ui's floating element, promoted to the
+// top layer in place, so it stays inside `root` and click-outside needs no check of its own.
+// The <ul> inside it is positioned by nothing.
 const floating = useTemplateRef<HTMLElement>('floating');
 
 // Both keyboard (Enter via useListbox) and pointer (OptionList `commit`) funnel through this

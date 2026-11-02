@@ -8,7 +8,7 @@ import type {UseListboxOptions} from '../src/composables/useListbox';
 
 import {useListbox} from '../src/composables/useListbox';
 
-// The component suites (SingleSelect's) exercise the composable's behaviour against
+// The component suites (SingleSelect's and Combobox's) exercise the composable's behaviour against
 // the REAL floating-ui. This suite pins the things they cannot see: the exact layout policy
 // handed to floating-ui (the family defaults, and the `floatingOptions` overrides), the
 // hide()-middleware visibility gate (driven off a controlled `middlewareData`), and the
@@ -377,8 +377,9 @@ describe('useListbox size middleware — the anchor tracks the trigger width', (
 });
 
 describe('useListbox without the optional hooks', () => {
-    // SingleSelect passes every hook; the controls that leave one out are not in this package yet,
-    // so what the composable does without each is pinned here.
+    // SingleSelect passes every hook and Combobox all but typeaheadLabels and committedIndex; no
+    // control here passes typeahead labels without committedIndex or leaves out the clear-entry
+    // hooks, so what the composable does without each is pinned here.
     it('closed, a key openKeys rejects opens nothing and is not swallowed', () => {
         const wrapper = mount(Harness, {props: {overrides: {listLength: () => 3}}});
 

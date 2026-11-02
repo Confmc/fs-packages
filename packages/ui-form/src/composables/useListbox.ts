@@ -60,7 +60,7 @@ export interface UseListboxOptions {
     floatingOptions?: ListboxFloatingOptions;
     /**
      * Whether a committing CLEAR ENTRY currently renders above the option list (the
-     * `clearLabel` feature on SingleSelect). The entry lives OUTSIDE the index
+     * `clearLabel` feature on SingleSelect and Combobox). The entry lives OUTSIDE the index
      * space — indexes keep mapping to the caller's option list — and gets its own keyboard
      * slot between "nothing highlighted" and index 0, plus its own activedescendant id
      * (`${id}-clear`). A getter so it tracks the prop reactively.
@@ -327,10 +327,10 @@ export const useListbox = (options: UseListboxOptions) => {
             case 'End':
                 // WR-0521: jump to the first/last option. APG marks Home/End optional on
                 // editable comboboxes (they trade away caret jumps while the popup is open);
-                // the family takes the option-jump reading uniformly — one skeleton, four
-                // controls. The option-jump reading belongs to UNMODIFIED keys only:
-                // Shift/Ctrl/Meta variants are text-SELECTION shortcuts on the input-triggered
-                // controls' query field and must fall through to native editing (#185 review).
+                // the family takes the option-jump reading uniformly — one skeleton for every
+                // control. The option-jump reading belongs to UNMODIFIED keys only:
+                // Shift/Ctrl/Meta variants are text-SELECTION shortcuts on Combobox's query
+                // field and must fall through to native editing (#185 review).
                 if (event.shiftKey || event.ctrlKey || event.metaKey) return;
                 // A clear-entry highlight drops (the jump lands on an OPTION); an empty list
                 // leaves the highlight untouched, but the unmodified key is still swallowed
