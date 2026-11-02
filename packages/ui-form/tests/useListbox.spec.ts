@@ -94,6 +94,18 @@ describe('useListbox floating options', () => {
         wrapper.unmount();
     });
 
+    // flip() tries a given fallback list instead of the opposite side, so a list defaulted beside a
+    // chosen placement would keep it from flipping across: `top` would only ever try `top-start`.
+    it('passes flip no fallback list for a given placement, so it flips to the opposite side', () => {
+        const wrapper = mount(Harness, {props: {overrides: {floatingOptions: {placement: 'top'}}}});
+
+        expect(lastFloatingConfig()).toMatchObject({
+            placement: 'top',
+            middleware: expect.arrayContaining([{name: 'flip', config: {fallbackPlacements: undefined}}]),
+        });
+        wrapper.unmount();
+    });
+
     it('honours every floatingOptions override', () => {
         const wrapper = mount(Harness, {
             props: {
