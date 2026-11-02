@@ -4,6 +4,7 @@
 import {mount} from '@vue/test-utils';
 import {afterEach, describe, expect, it} from 'vitest';
 
+import Combobox from '../src/components/Combobox.vue';
 import SingleSelect from '../src/components/SingleSelect.vue';
 
 const CALLER_ORDER = [
@@ -12,7 +13,10 @@ const CALLER_ORDER = [
     {id: 3, name: 'Mango'},
 ];
 
-const SORTABLE = [{name: 'SingleSelect', component: SingleSelect, modelValue: null, opener: 'button'}] as const;
+const SORTABLE = [
+    {name: 'SingleSelect', component: SingleSelect, modelValue: null, opener: 'button'},
+    {name: 'Combobox', component: Combobox, modelValue: null, opener: 'input'},
+] as const;
 
 afterEach(() => {
     document.body.innerHTML = '';

@@ -4,6 +4,7 @@
 import {mount} from '@vue/test-utils';
 import {afterEach, beforeEach, describe, expect, it, onTestFinished, vi} from 'vitest';
 
+import Combobox from '../src/components/Combobox.vue';
 import SingleSelect from '../src/components/SingleSelect.vue';
 
 interface Fruit {
@@ -194,6 +195,21 @@ describe.each(SELECT_ONLY)('$name — typeahead', ({mountIt, keyTarget}) => {
 
         // Without the drop this reads "bl" and lands on Blue moon.
         expect(active()).toBeUndefined();
+    });
+});
+
+describe('Combobox — typeahead belongs to the text input', () => {
+    it('NEGATIVE PIN — typing filters the query and never jumps the highlight', async () => {
+        const wrapper = mount(Combobox, {
+            props: {options: FRUITS, optionLabel: 'name', id: 'f', modelValue: null, alphabeticalSort: false},
+            attachTo: document.body,
+        });
+        const input = wrapper.find('input');
+
+        await input.trigger('keydown', {key: 'ArrowDown'});
+        await input.trigger('keydown', {key: 'c'});
+
+        expect(input.attributes('aria-activedescendant')).toBeUndefined();
     });
 });
 
