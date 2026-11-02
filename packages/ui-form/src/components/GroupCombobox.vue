@@ -290,6 +290,8 @@ watch(selectedLabel, (lbl) => {
 // input, select the text so the first keystroke REPLACES it and starts a fresh filter.
 // Guarded on equality, NOT on mere non-emptiness: when TYPING is what opened the popup
 // (`onInput`), the query has already diverged and selecting would eat the user's edit.
+// A `pre`-flush watcher runs after the opening event handler (so it wins over the click's
+// own caret placement) and before render; the input is mounted whenever `open` can flip.
 watch(open, (isOpen) => {
     if (isOpen && query.value !== '' && query.value === selectedLabel.value) {
         ensureRefValueExists(input).select();
