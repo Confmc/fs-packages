@@ -319,6 +319,23 @@ describe('useForm scroll-to-error', () => {
         wrapper.unmount();
     });
 
+    // The current limitation: without `scrollRoot` the lookup is document-wide, so a form can scroll to a
+    // field another form marks. Looking the field up by the form's own ids ends this; the case flips then.
+    it("scrolls a dialog's refusal to the page form's field, as the lookup is document-wide without scrollRoot", async () => {
+        const page = mountFieldForm();
+        const dialog = mountFieldForm();
+        await page.form().handleSubmit(refusedWith({email: ['Taken']}));
+        scrollIntoView.mockClear();
+
+        await dialog.form().handleSubmit(refusedWith({email: ['Taken']}));
+
+        expect(scrollIntoView).toHaveBeenCalledOnce();
+        expect(scrollIntoView.mock.contexts[0]).toBe(page.wrapper.element);
+        expect(scrollIntoView.mock.contexts[0]).not.toBe(dialog.wrapper.element);
+        dialog.wrapper.unmount();
+        page.wrapper.unmount();
+    });
+
     it('does nothing when a refusal marks no field invalid', async () => {
         const {wrapper, form} = mountFieldForm(undefined, false);
 
