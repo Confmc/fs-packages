@@ -766,7 +766,7 @@ back (WSL2's time sync, every ~30 s) made VTU `trigger()` events drop at random.
   GroupSelect. Arrow keys now skip group headers (emmie's stopped on them).
 - **MultiSelect:** chips follow display order (as pre-forms emmie); the model keeps the consumer's order.
 - **Placement** keeps its alignment when it flips (`bottom-start` → `top-start`), on every select.
-- **Blockers:** no date picker (DatePickerField 72 uses, the biggest gap); Combobox/MultiCombobox (SearchableSelect,
+- **Blockers:** (date picker: none needed, emmie's stays, see "No package DatePicker"); Combobox/MultiCombobox (SearchableSelect,
   `searchable`); GroupSelect/GroupCombobox; BooleanRadioGroup (RadioGroup over two options, or its own control: to
   decide); the form kit for the 146 `useForm` files (not yet in any pack: the biggest unknown).
 
@@ -823,9 +823,9 @@ experiment's form: client refusals (`refuse`/`setRefusals`/`withdraw`/`clientErr
 `types.ts` change (@da1f523, identical lines, merges clean).
 
 **Next, in order:** slice 4b (client refusals), 5 (the kit + `createUiForm({texts})`), each off the
-previous, source = `experiment/ui-form-control`'s `src/form/` (built 10-19). Then a generic DatePicker (first shape:
-emmie's `DatePickerField` + `calendar/` grid under the package's rules; emmie's domain pickers stay emmie's). Then
-Pressable/Disclosure after #332. BooleanRadioGroup: decided (2026-11-02): no own control. emmie's Ja/Nee pairs use the package RadioGroup; `SelectItem.id`
+previous, source = `experiment/ui-form-control`'s `src/form/` (built 10-19). Then Pressable/Disclosure after #332,
+then the release PR (fresh off main once everything merged; see "Release sequence"). **No package DatePicker**
+(decided 2026-11-02, see below). BooleanRadioGroup: decided (2026-11-02): no own control. emmie's Ja/Nee pairs use the package RadioGroup; `SelectItem.id`
 widens to `string | number | boolean` so `{id: true, name: 'Ja'}` types. Do it on #344 (and the checkbox-group branch,
 which shares `types.ts`), with a spec proving a boolean model round-trips (true, false, null).
 
@@ -834,8 +834,17 @@ which shares `types.ts`), with a spec proving a boolean model round-trips (true,
 epic; confirmed on ClientStartDateModal: with kebabCase the name falls back to the placeholder, without it the label names
 the input). Also for the epic: leave its own `label` off inside FormField, drop its dead `error` prop; `notNullable` →
 leave `clear-label` out (the package rule). Errors wire (aria-invalid, describedby → message); its popover works in a
-dialog; the model is YYYY-MM-DD, and it folds a Laravel ISO datetime itself. The kit can't bind emmie's picker, so date
-fields stay hand-wired until a package DatePicker exists.
+dialog; the model is YYYY-MM-DD, and it folds a Laravel ISO datetime itself. Date fields are wired with `field()`:
+`<form.FormField name="endDate" label="…" v-slot="{field}"><DatePickerField v-bind="form.field('endDate')" /></form.FormField>`
+(`field()` over a draft carries the value and the write-back too); emmie may wrap that in a component of its own.
+
+**No package DatePicker (decided 2026-11-02).** The package ships controls any consumer wants in the same shape; domain
+pickers and consumer-styled widgets stay the consumer's, bound through `field()` (the contract: `id`, `invalid`,
+`describedby`, `modelValue`, `onUpdate:modelValue`). DateInput (native) is the package's date control. emmie keeps its
+own pickers, heavily modified and domain-bound (range, week, period, attendance); a package picker would be ~1100 lines +
+a keyboard grid for one consumer. Revisit when a second consumer needs a calendar picker: design it from two real uses;
+adopting it then is targeted (swap per call site), so waiting grows nothing. Known gap, emmie's to fix in its own picker:
+its `role="grid"` month grid has no arrow-key navigation (every day is a Tab stop).
 
 **422 key shape: settled, not open.** keyMapper identity; keys arrive as dotted camelCase paths; emmie's phase 1
 (collector `error-keys-raw`, docs/plans/fs-packages-ui-form/SLICES.md) does the casing in its error middleware;
