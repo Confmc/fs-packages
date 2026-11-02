@@ -854,6 +854,30 @@ no slice is cut until ui-form is ready.
 everything). Run gates one at a time (machine memory is tight); Stryker with `--force`. ui-form specs run with
 `Date` faked (`tests/fixed-date.ts` on #353) because WSL2's clock steps back every ~30 s and VTU events drop.
 
+### ADR check (2026-11-02, against adrs.script.nl: ADR-0043 + Amendment 1 Accepted 2026-10-26, ADR-0048, ADR-0037)
+
+Nothing built goes against them; no amendment is needed now. What they still ask of us, and where it lands:
+- **§ 6 scope rule:** a control comes in because a consumer needs it, and its PR names that consumer. GroupSelect and
+  GroupCombobox are NOT ui-inputs controls: their PR bodies must name emmie's grouped selects (pre-forms GroupSelect,
+  `searchable` uses). The rest are ui-inputs controls or the four named in § 6.
+- **Mutation of `.vue` logic is "settled before the form code lands":** #339 answers it, so #339 should merge before
+  #333 (the first form code). Mention when the order comes up again.
+- **§ 7 declaration check** ("the package's typecheck also runs a declaration check"): the experiment has
+  `tests/declaration` (in its `typecheck` script); slices 2-4 do not. It lands in slice 5 with the bound controls.
+- **Before first publish (release PR or just before it):** a layer order per stack in the docs (UnoCSS with
+  `@unocss/reset`, Tailwind v4), each pinned by a browser fixture with a positive control (WR-2715; #340 pins the
+  layer's rules, not the per-stack recipes); the deprecation notices in fs-form's and ui-inputs' READMEs and docs pages
+  (`npm deprecate` itself is the publisher's); § 5's open point (what "removed" means) is the reviewer's call then.
+- **Date picker:** "stays deferred" in § 6: our no-package-DatePicker decision matches it.
+- **Scroll by id (slice 4):** the amendment's Decision wires the bound layer "by the form's own ids"; its Context still
+  names the old `[aria-invalid]` query as the seam (history, not a rule).
+- The original ADR's "lint rule rejecting non-`--ui-*` colours" never existed for ui-inputs either; the amendment's
+  enforcement table makes neutral defaults "review only". Not ours to add.
+- **New ADR:** the candidates list above goes to the reviewer as one proposal once the rules stop moving (after the
+  test bed has run landing.10, before the release PR). Add: the package ships controls any consumer wants in the same
+  shape; a consumer's own control (emmie's pickers) binds through `field()`'s contract (`id`, `invalid`,
+  `describedby`, `modelValue`, `onUpdate:modelValue`).
+
 ### Loose ends recorded at the 2026-11-02 compaction
 
 - **Test packs:** latest is `landing.9` (`experiment/ui-form-landing` on fork; main + all open PRs + FormField + the
