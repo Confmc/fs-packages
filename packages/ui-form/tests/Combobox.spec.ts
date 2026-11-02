@@ -33,13 +33,12 @@ afterEach(() => {
 describe('Combobox', () => {
     it('jumps to the first/last FILTERED option on Home/End while open (WR-0521)', async () => {
         const wrapper = mountCombobox({});
-        const root = wrapper.find('.ui-combobox');
         const input = wrapper.find('input');
 
         await input.setValue('m'); // filtered: Mango, Watermelon
-        await root.trigger('keydown', {key: 'End'});
+        await input.trigger('keydown', {key: 'End'});
         expect(input.attributes('aria-activedescendant')).toBe('fruit-opt-1');
-        await root.trigger('keydown', {key: 'Home'});
+        await input.trigger('keydown', {key: 'Home'});
         expect(input.attributes('aria-activedescendant')).toBe('fruit-opt-0');
     });
 
@@ -151,17 +150,16 @@ describe('Combobox', () => {
 
     it('navigates the filtered list with the keyboard and commits the highlighted option on Enter', async () => {
         const wrapper = mountCombobox({});
-        const root = wrapper.find('.ui-combobox');
         const input = wrapper.find('input');
 
         await input.setValue('m'); // filtered: Mango, Watermelon
-        await root.trigger('keydown', {key: 'ArrowDown'}); // pointer → 0 (Mango)
+        await input.trigger('keydown', {key: 'ArrowDown'}); // pointer → 0 (Mango)
         expect(menu(wrapper).findAll('.ui-combobox__option')[0].classes()).toContain('is-active');
         expect(menu(wrapper).findAll('.ui-combobox__option')[0].attributes('aria-selected')).toBe('false');
 
-        await root.trigger('keydown', {key: 'ArrowDown'}); // pointer → 1 (Watermelon)
-        await root.trigger('keydown', {key: 'ArrowUp'}); // pointer → 0 (Mango)
-        await root.trigger('keydown', {key: 'Enter'});
+        await input.trigger('keydown', {key: 'ArrowDown'}); // pointer → 1 (Watermelon)
+        await input.trigger('keydown', {key: 'ArrowUp'}); // pointer → 0 (Mango)
+        await input.trigger('keydown', {key: 'Enter'});
 
         expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([3]); // Mango
         expect(menu(wrapper).exists()).toBe(false); // closed
@@ -170,25 +168,24 @@ describe('Combobox', () => {
 
     it('exposes the keyboard-focused filtered option via aria-activedescendant', async () => {
         const wrapper = mountCombobox({});
-        const root = wrapper.find('.ui-combobox');
         const input = () => wrapper.find('input');
 
         // Closed: nothing owned, nothing focused.
         expect(input().attributes('aria-controls')).toBeUndefined();
         expect(input().attributes('aria-activedescendant')).toBeUndefined();
 
-        await root.trigger('keydown', {key: 'ArrowDown'}); // opens, pointer stays -1
+        await input().trigger('keydown', {key: 'ArrowDown'}); // opens, pointer stays -1
         expect(input().attributes('aria-controls')).toBe('fruit-listbox');
         expect(menu(wrapper).attributes('id')).toBe('fruit-listbox');
         expect(input().attributes('aria-activedescendant')).toBeUndefined(); // open, nothing highlighted
 
-        await root.trigger('keydown', {key: 'ArrowDown'}); // → Apricot (position 0)
+        await input().trigger('keydown', {key: 'ArrowDown'}); // → Apricot (position 0)
         expect(input().attributes('aria-activedescendant')).toBe('fruit-opt-0');
 
-        await root.trigger('keydown', {key: 'ArrowDown'}); // → Mango (position 1)
+        await input().trigger('keydown', {key: 'ArrowDown'}); // → Mango (position 1)
         expect(input().attributes('aria-activedescendant')).toBe('fruit-opt-1');
 
-        await root.trigger('keydown', {key: 'ArrowUp'}); // back to Apricot
+        await input().trigger('keydown', {key: 'ArrowUp'}); // back to Apricot
         expect(input().attributes('aria-activedescendant')).toBe('fruit-opt-0');
 
         const ids = menu(wrapper)
@@ -197,26 +194,25 @@ describe('Combobox', () => {
         expect(ids).toEqual(['fruit-opt-0', 'fruit-opt-1', 'fruit-opt-2']);
         expect(new Set(ids).size).toBe(ids.length);
 
-        await root.trigger('keydown', {key: 'Escape'});
+        await input().trigger('keydown', {key: 'Escape'});
         expect(input().attributes('aria-activedescendant')).toBeUndefined();
         expect(input().attributes('aria-controls')).toBeUndefined();
     });
 
     it('clamps the pointer when the option list shrinks under it while open', async () => {
         const wrapper = mountCombobox({});
-        const root = wrapper.find('.ui-combobox');
         const input = wrapper.find('input');
 
-        await root.trigger('keydown', {key: 'ArrowDown'}); // open, pointer -1
-        await root.trigger('keydown', {key: 'ArrowDown'}); // → 0
-        await root.trigger('keydown', {key: 'ArrowDown'}); // → 1
+        await input.trigger('keydown', {key: 'ArrowDown'}); // open, pointer -1
+        await input.trigger('keydown', {key: 'ArrowDown'}); // → 0
+        await input.trigger('keydown', {key: 'ArrowDown'}); // → 1
 
         // A shrink that stays clear of the pointer must leave the highlight alone.
         await wrapper.setProps({options: FRUITS.slice(0, 2)}); // Watermelon, Apricot → sorted Apricot, Watermelon
         expect(input.attributes('aria-activedescendant')).toBe('fruit-opt-1');
 
         await wrapper.setProps({options: FRUITS});
-        await root.trigger('keydown', {key: 'ArrowDown'}); // → 2 (last)
+        await input.trigger('keydown', {key: 'ArrowDown'}); // → 2 (last)
         expect(input.attributes('aria-activedescendant')).toBe('fruit-opt-2');
 
         // A narrowing that lands under the pointer must clamp, not dangle.
@@ -226,21 +222,21 @@ describe('Combobox', () => {
         if (active !== undefined) expect(menu(wrapper).find(`#${active}`).exists()).toBe(true);
 
         // Enter must commit the surviving option rather than index off the end.
-        await root.trigger('keydown', {key: 'Enter'});
+        await input.trigger('keydown', {key: 'Enter'});
         expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([FRUITS[0].id]);
     });
 
     it('empties the highlight when options drain to nothing while open', async () => {
         const wrapper = mountCombobox({});
-        const root = wrapper.find('.ui-combobox');
+        const input = wrapper.find('input');
 
-        await root.trigger('keydown', {key: 'ArrowDown'}); // open
-        await root.trigger('keydown', {key: 'ArrowDown'}); // → 0
+        await input.trigger('keydown', {key: 'ArrowDown'}); // open
+        await input.trigger('keydown', {key: 'ArrowDown'}); // → 0
 
         await wrapper.setProps({options: []});
 
         expect(wrapper.find('input').attributes('aria-activedescendant')).toBeUndefined();
-        await root.trigger('keydown', {key: 'Enter'}); // no-op, not a crash
+        await input.trigger('keydown', {key: 'Enter'}); // no-op, not a crash
         expect(wrapper.emitted('update:modelValue')).toBeUndefined();
     });
 
@@ -265,14 +261,13 @@ describe('Combobox', () => {
     it('reverts a half-typed non-match to the committed label on Escape and shows empty text meanwhile', async () => {
         const wrapper = mountCombobox({modelValue: 3}); // Mango
         const input = wrapper.find('input');
-        const root = wrapper.find('.ui-combobox');
 
         await input.trigger('click');
         await input.setValue('zzz'); // no match
         expect(menu(wrapper).find('.ui-combobox__empty').exists()).toBe(true);
         expect(input.element.value).toBe('zzz');
 
-        await root.trigger('keydown', {key: 'Escape'});
+        await input.trigger('keydown', {key: 'Escape'});
         expect(menu(wrapper).exists()).toBe(false);
         expect(input.element.value).toBe('Mango'); // reverted to the committed label
     });
@@ -323,29 +318,29 @@ describe('Combobox', () => {
 
     it('does nothing on Enter with no highlight, and ignores unhandled keys while open', async () => {
         const wrapper = mountCombobox({});
-        const root = wrapper.find('.ui-combobox');
+        const input = wrapper.find('input');
 
-        await root.trigger('keydown', {key: 'ArrowDown'}); // opens, pointer -1
-        await root.trigger('keydown', {key: 'Enter'}); // pointer < 0 → no commit
+        await input.trigger('keydown', {key: 'ArrowDown'}); // opens, pointer -1
+        await input.trigger('keydown', {key: 'Enter'}); // pointer < 0 → no commit
         expect(wrapper.emitted('update:modelValue')).toBeUndefined();
         expect(menu(wrapper).exists()).toBe(true);
 
-        await root.trigger('keydown', {key: 'ArrowRight'}); // unhandled → no state change
+        await input.trigger('keydown', {key: 'ArrowRight'}); // unhandled → no state change
         expect(menu(wrapper).exists()).toBe(true);
     });
 
     it('ignores a non-opening key while closed', async () => {
         const wrapper = mountCombobox({});
-        await wrapper.find('.ui-combobox').trigger('keydown', {key: 'ArrowRight'});
+        await wrapper.find('input').trigger('keydown', {key: 'ArrowRight'});
         expect(menu(wrapper).exists()).toBe(false);
     });
 
     it('closes and reverts on Escape', async () => {
         const wrapper = mountCombobox({});
-        const root = wrapper.find('.ui-combobox');
-        await root.trigger('keydown', {key: 'ArrowDown'});
+        const input = wrapper.find('input');
+        await input.trigger('keydown', {key: 'ArrowDown'});
         expect(menu(wrapper).exists()).toBe(true);
-        await root.trigger('keydown', {key: 'Escape'});
+        await input.trigger('keydown', {key: 'Escape'});
         expect(menu(wrapper).exists()).toBe(false);
     });
 
@@ -363,22 +358,45 @@ describe('Combobox', () => {
         expect(wrapper.find('input').element.value).toBe('Mango');
     });
 
+    it.each([
+        ['click', {}],
+        ['keydown', {key: 'ArrowDown'}],
+        ['input', {}],
+    ])("opens on %s before a consumer's listener runs, so that listener cannot hold it back", async (type, init) => {
+        // Merged listeners run in order; one calling stopImmediatePropagation skips the ones after it.
+        const listener = `on${type[0].toUpperCase()}${type.slice(1)}`;
+        const wrapper = mount(Combobox as never, {
+            props: {options: FRUITS, optionLabel: 'name', id: 'fruit', modelValue: null},
+            attrs: {[listener]: (event: Event) => event.stopImmediatePropagation()},
+            attachTo: document.body,
+        });
+
+        await wrapper.find('input').trigger(type, init);
+
+        expect(menu(wrapper).exists()).toBe(true);
+        wrapper.unmount();
+    });
+
     it('does not open when disabled, by click or by keyboard', async () => {
         const wrapper = mountCombobox({disabled: true});
         await wrapper.find('input').trigger('click');
         expect(menu(wrapper).exists()).toBe(false);
 
-        await wrapper.find('.ui-combobox').trigger('keydown', {key: 'ArrowDown'});
+        // Dispatched by hand: VTU's trigger() skips a disabled element, and the keyboard guard is
+        // what is under test here.
+        wrapper
+            .find('input')
+            .element.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowDown', bubbles: true, cancelable: true}));
+        await wrapper.vm.$nextTick();
         expect(menu(wrapper).exists()).toBe(false);
     });
 
     it('closes and reverts on Tab', async () => {
         const wrapper = mountCombobox({});
-        const root = wrapper.find('.ui-combobox');
         const input = wrapper.find('input');
         await input.setValue('zzz'); // open + half-typed non-match
         expect(menu(wrapper).exists()).toBe(true);
-        await root.trigger('keydown', {key: 'Tab'});
+        await input.trigger('keydown', {key: 'Tab'});
         expect(menu(wrapper).exists()).toBe(false);
         expect(input.element.value).toBe(''); // reverted
     });
@@ -549,14 +567,13 @@ describe('Combobox', () => {
 
         it('commits null on Enter, closes, and snaps the input to emptyDisplayValue', async () => {
             const wrapper = mountCombobox({clearLabel: 'No fruit', emptyDisplayValue: 'Any fruit', modelValue: 3});
-            const root = wrapper.find('.ui-combobox');
             const input = wrapper.find('input');
             expect(input.element.value).toBe('Mango');
 
-            await root.trigger('keydown', {key: 'ArrowDown'}); // open
-            await root.trigger('keydown', {key: 'ArrowDown'}); // → the clear entry
+            await input.trigger('keydown', {key: 'ArrowDown'}); // open
+            await input.trigger('keydown', {key: 'ArrowDown'}); // → the clear entry
             expect(input.attributes('aria-activedescendant')).toBe('fruit-clear');
-            await root.trigger('keydown', {key: 'Enter'});
+            await input.trigger('keydown', {key: 'Enter'});
 
             expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([null]);
             expect(menu(wrapper).exists()).toBe(false);
@@ -565,12 +582,11 @@ describe('Combobox', () => {
 
         it('starts on emptyDisplayValue when mounted with a null model, and reverts to it on dismiss', async () => {
             const wrapper = mountCombobox({clearLabel: 'No fruit', emptyDisplayValue: 'Any fruit'});
-            const root = wrapper.find('.ui-combobox');
             const input = wrapper.find('input');
             expect(input.element.value).toBe('Any fruit');
 
             await input.setValue('zzz'); // half-typed non-match…
-            await root.trigger('keydown', {key: 'Escape'});
+            await input.trigger('keydown', {key: 'Escape'});
             expect(input.element.value).toBe('Any fruit'); // …reverts to the named empty state
         });
 

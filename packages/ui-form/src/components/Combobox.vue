@@ -1,6 +1,9 @@
 <template>
-    <div ref="root" v-bind="rootAttrs($attrs)" class="ui-combobox" @keydown="onKey">
+    <div ref="root" v-bind="rootAttrs($attrs)" class="ui-combobox">
         <input
+            @input="onInput"
+            @keydown="onKey"
+            @click="onClick"
             v-bind="controlAttrs($attrs)"
             :id="id"
             ref="input"
@@ -19,8 +22,6 @@
             :placeholder="placeholder"
             :disabled="disabled"
             :value="query"
-            @input="onInput"
-            @click="onClick"
         />
 
         <!-- WR-0521: the empty state must be ANNOUNCED, not just painted — a persistent,
