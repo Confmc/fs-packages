@@ -259,11 +259,15 @@ describe('useForm scroll-to-error', () => {
         wrapper.unmount();
     });
 
-    it('takes the first in document order, not the order the bag lists the fields in', async () => {
+    it.each([
+        ['after', ['second', 'first']],
+        ['before', ['first', 'second']],
+    ])('takes the first in document order, the bag listing it %s the other', async (_, order) => {
         const {wrapper, form} = mountFields(['first', 'second']);
 
-        await form().handleSubmit(refusedWith({second: ['Required'], first: ['Required']}));
+        await form().handleSubmit(refusedWith(Object.fromEntries(order.map((name) => [name, ['Required']]))));
 
+        expect(Object.keys(form().errors.value)).toEqual(order);
         expect(scrollIntoView).toHaveBeenCalledOnce();
         expect(scrollIntoView.mock.contexts[0]).toBe(wrapper.findAll('input')[0]!.element);
         wrapper.unmount();
