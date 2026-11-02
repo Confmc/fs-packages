@@ -802,14 +802,27 @@ present nullable field (`-?`), so a control can bind it; a form over a draft typ
 members, not `never` (which any variable took), and still fits `UseDraftForm` for helpers generic over D; a tuple reads
 as its array (documented, not modelled). `readPath`/`writePath` wait for slice 4.
 
+**Slice 4 ported, reviewed, fixes in:** `ui-form/n-field` @d1f62e8 on fork (off `n-form-paths`): `form.field(name)` →
+`{id, invalid, describedby}`, plus `modelValue`/`onUpdate:modelValue` at the path over a `draft` (typed by `PathValue`;
+`readPath`/`writePath` internal); ids from `useId()` per form, or `idPrefix`; form-bound `FormLabel` (no slot yet: the
+package FormLabel's `after` slot lands with `n-form-field`, add the note slot then) and `FormError` (element always
+rendered); scroll after a refused submit by the form's own ids (control, else message, document order), `scrollToError`
+default true, `scrollRoot`/`scrollTarget` gone. `draft` is `Ref<D, unknown>` (a Vue 3.5 `Ref<Draft>` otherwise infers
+`Draft | UnwrapRef<Draft>`); `UseForm`/`UseDraftForm` are built from named interfaces. `FieldBinding` sits in `src/types.ts`
+as on `n-form-field` (JSDoc reworded to `field()`: a one-line union on merge). `tsconfig.types.json` now type-checks
+`tests/form` (with #333's spec fix, identical line). The tick before the scroll is unpinnable (Vue flushes while the submit
+awaits) and stays, Stryker-disabled with the reason. Stryker 98.63 (3 equivalent string survivors). Its commits keep two
+in-branch fixes (`fix:` of its own first commit, a coverage repair) unfolded: no history rewrite. Split from the
+experiment's form: client refusals (`refuse`/`setRefusals`/`withdraw`/`clientErrors`/`fieldErrors`/`validate`) are
+**slice 4b**, next; the kit + `createUiForm({texts})` is slice 5.
+
 **Held until #354 merges** (a push now reruns CI and the audit step reds a green PR), on fork as `hold/*`:
 `hold/344-boolean-id` @5107dd3 = #344 + `SelectItem.id: string | number | boolean` (spec: true/false/null round-trip);
 `hold/333-spec-type` @771edc0 = #333 + the spec helper typing fix (vue-tsc on `validation-errors.spec.ts:12`). After
 #354: merge main into each, push to the PR branch, delete the hold branch. `n-checkbox-group` already has the same
 `types.ts` change (@da1f523, identical lines, merges clean).
 
-**Next, in order:** slice 4 (`field()` with bound
-FormLabel/FormError; `scrollToError` default true with id lookup), 5 (the kit + `createUiForm({texts})`), each off the
+**Next, in order:** slice 4b (client refusals), 5 (the kit + `createUiForm({texts})`), each off the
 previous, source = `experiment/ui-form-control`'s `src/form/` (built 10-19). Then a generic DatePicker (first shape:
 emmie's `DatePickerField` + `calendar/` grid under the package's rules; emmie's domain pickers stay emmie's). Then
 Pressable/Disclosure after #332. BooleanRadioGroup: decided (2026-11-02): no own control. emmie's Ja/Nee pairs use the package RadioGroup; `SelectItem.id`
