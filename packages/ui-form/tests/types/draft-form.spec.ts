@@ -1,0 +1,81 @@
+// Type test (see path.spec.ts): useForm with a draft names its fields by the draft's paths.
+import type {Ref} from 'vue';
+
+import {describe, expectTypeOf, it} from 'vitest';
+import {ref, shallowRef} from 'vue';
+
+import type {Path, UseDraftForm, UseForm} from '../../src';
+
+// useForm from its module, not the barrel: the barrel also loads the SFCs, which this spec does not render.
+import {useForm} from '../../src/form/form';
+
+interface Draft {
+    firstName: string | null;
+    born: Date;
+    learningGoals: {title: string | null}[];
+    parent: Draft | null;
+}
+
+const draft = ref<Draft>({firstName: null, born: new Date(), learningGoals: [], parent: null});
+
+describe('useForm with a draft', () => {
+    it('returns the form named by the draft paths', () => {
+        expectTypeOf(useForm({draft})).toEqualTypeOf<UseDraftForm<Draft>>();
+        expectTypeOf(useForm({draft})).toEqualTypeOf<UseForm<Path<Draft>>>();
+    });
+
+    it('keys the errors by the draft paths, nested, indexed and through a nullable branch', () => {
+        const {errors} = useForm({draft});
+
+        expectTypeOf(errors.value.firstName).toEqualTypeOf<string | undefined>();
+        expectTypeOf(errors.value['learningGoals.0.title']).toEqualTypeOf<string | undefined>();
+        expectTypeOf(errors.value['parent.learningGoals.3.title']).toEqualTypeOf<string | undefined>();
+        // @ts-expect-error not a path of the draft
+        void errors.value.frstName;
+        // @ts-expect-error a leaf's own members are not paths
+        void errors.value['born.getTime'];
+    });
+
+    it('takes only draft paths in the fields allow-list', () => {
+        useForm({draft, fields: ['firstName', 'learningGoals.0.title']});
+        // @ts-expect-error not a path of the draft
+        useForm({draft, fields: ['frstName']});
+    });
+
+    it('refuses a draft that is not a ref', () => {
+        // @ts-expect-error the draft is the component's ref, not a plain object
+        useForm({draft: draft.value});
+        const options = {draft: draft.value, scrollToError: true};
+        // @ts-expect-error the same from a variable, where no excess-property check would catch it
+        useForm(options);
+    });
+});
+
+describe('useForm without a draft', () => {
+    it('names its fields by free strings, or by the union it is given', () => {
+        expectTypeOf(useForm()).toEqualTypeOf<UseForm<string>>();
+        expectTypeOf(useForm({fields: ['email', 'password']})).toEqualTypeOf<UseForm<'email' | 'password'>>();
+        expectTypeOf(useForm<'email'>().errors.value).toEqualTypeOf<Partial<Record<'email', string>>>();
+    });
+});
+
+describe('a helper generic over its draft', () => {
+    it('gets the draft form from a Ref<D> without spelling out D', () => {
+        const host = <D extends object>(model: Ref<D>): UseDraftForm<D> => useForm({draft: model});
+
+        expectTypeOf(host(draft)).toEqualTypeOf<UseDraftForm<Draft>>();
+    });
+
+    it('names D for a generic shallowRef, which TypeScript cannot read as a Ref<D>', () => {
+        const host = <D extends object>(model: D): UseDraftForm<D> => useForm<D>({draft: shallowRef(model)});
+        const unnamed = <D extends object>(model: D) => {
+            const form = useForm({draft: shallowRef(model)});
+            expectTypeOf(form).toBeNever();
+            // @ts-expect-error a draft read as `any` checks no name, so its form cannot be used
+            return form.errors;
+        };
+
+        expectTypeOf(host({firstName: 'Ann'})).toEqualTypeOf<UseDraftForm<{firstName: string}>>();
+        void unnamed;
+    });
+});

@@ -174,6 +174,26 @@ describe('useForm', () => {
     });
 });
 
+describe('useForm with a draft', () => {
+    interface Draft {
+        firstName: string | null;
+        learningGoals: {title: string | null}[];
+    }
+
+    it('binds a 422 keyed by the draft paths and leaves the draft as it was', async () => {
+        const draft = ref<Draft>({firstName: 'Ann', learningGoals: [{title: 'Lezen'}]});
+        const form = useForm({draft, fields: ['firstName', 'learningGoals.0.title']});
+
+        await expect(
+            form.handleSubmit(refusedWith({'learningGoals.0.title': ['Required'], token: ['Expired']})),
+        ).resolves.toBe('refused');
+
+        expect(form.errors.value).toEqual({'learningGoals.0.title': 'Required'});
+        expect(form.unmapped.value).toEqual(['token']);
+        expect(draft.value).toEqual({firstName: 'Ann', learningGoals: [{title: 'Lezen'}]});
+    });
+});
+
 describe('useForm scroll-to-error', () => {
     let scrollIntoView: ReturnType<typeof vi.spyOn>;
 

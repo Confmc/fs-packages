@@ -1,5 +1,7 @@
 import type {Ref} from 'vue';
 
+import type {Path} from './path';
+
 /** Field-error bag: the first backend validation message per field key. */
 export type ValidationErrors<T extends string = string> = Partial<Record<T, string>>;
 
@@ -97,3 +99,17 @@ export type UseFormOptions<T extends string = string> = UseValidationErrorsOptio
  * `useValidationErrors`, plus `handleSubmit` and the `submitting` loading flag from `useFormSubmit`.
  */
 export type UseForm<T extends string = string> = UseValidationErrors<T> & UseFormSubmit;
+
+/** `useForm`'s options when it points at the component's draft: the field names are the draft's paths. */
+export type UseDraftFormOptions<D extends object> = UseFormOptions<Path<D>> & {
+    /**
+     * The component's own draft (a ref; stores and adapters stay untouched). Its dotted paths
+     * (`learningGoals.0.title`) are the form's field names: `errors`' keys and the `fields` allow-list
+     * are typed on them, so a misspelled or vanished field is a type error. The form only types names
+     * by it: it neither reads nor writes `draft.value`.
+     */
+    draft: Ref<D>;
+};
+
+/** Everything `useForm` returns for a form with a draft: as `UseForm`, named by the draft's paths. */
+export type UseDraftForm<D extends object> = UseForm<Path<D>>;
