@@ -311,12 +311,10 @@ export const useListbox = (options: UseListboxOptions) => {
                 event.preventDefault();
                 break;
             case 'ArrowUp':
-                if (clearHighlighted.value) {
-                    // Leaving the clear entry upward lands on "nothing highlighted".
-                    clearActive.value = false;
-                } else if (pointer.value === 0 && (clearEntry?.() ?? false)) {
+                if (pointer.value === 0 && (clearEntry?.() ?? false)) {
                     highlightClear();
                 } else {
+                    // From the clear entry (pointer -1) this lands on "nothing highlighted".
                     clearActive.value = false;
                     pointer.value = Math.max(pointer.value - 1, -1);
                 }
