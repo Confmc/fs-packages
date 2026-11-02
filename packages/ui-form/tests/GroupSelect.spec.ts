@@ -4,7 +4,7 @@ import {afterEach, describe, expect, it} from 'vitest';
 import {h} from 'vue';
 
 import GroupSelect from '../src/components/GroupSelect.vue';
-import {groupMenu} from './find-menu';
+import {menu} from './find-menu';
 
 interface Fruit {
     id: number;
@@ -50,7 +50,7 @@ describe('GroupSelect', () => {
         expect(button.attributes('aria-haspopup')).toBe('listbox');
         expect(button.find('.ui-groupselect__placeholder').text()).toBe('Select…');
         expect(button.attributes('aria-controls')).toBeUndefined();
-        expect(groupMenu(wrapper).exists()).toBe(false);
+        expect(menu(wrapper).exists()).toBe(false);
     });
 
     it('opens on click and renders group headers with role="group" + aria-label and options with role="option"', async () => {
@@ -58,7 +58,7 @@ describe('GroupSelect', () => {
         await wrapper.find('button').trigger('click');
 
         expect(wrapper.find('button').attributes('aria-expanded')).toBe('true');
-        const m = groupMenu(wrapper);
+        const m = menu(wrapper);
         expect(m.exists()).toBe(true);
 
         // APG listbox grouping: role="group" + aria-label live on the inner <ul> so the group
@@ -81,7 +81,7 @@ describe('GroupSelect', () => {
         const wrapper = mountGroupSelect({});
         await wrapper.find('button').trigger('click');
 
-        const m = groupMenu(wrapper);
+        const m = menu(wrapper);
         const items = m.findAll('li');
         // Tropical group-li, Mango, Kiwi, Stone group-li, Apricot, Lime
         expect(items[0].classes()).toContain('ui-groupselect__group');
@@ -96,10 +96,10 @@ describe('GroupSelect', () => {
         const wrapper = mountGroupSelect({});
         await wrapper.find('button').trigger('click');
 
-        const options = groupMenu(wrapper).findAll('.ui-groupselect__option');
+        const options = menu(wrapper).findAll('.ui-groupselect__option');
         await options[2].trigger('click'); // Apricot (index 2)
         expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([3]);
-        expect(groupMenu(wrapper).exists()).toBe(false);
+        expect(menu(wrapper).exists()).toBe(false);
     });
 
     it('shows the committed value label in the trigger, not the placeholder', () => {
@@ -121,9 +121,9 @@ describe('GroupSelect', () => {
         const wrapper = mountGroupSelect({clearLabel: 'None', modelValue: 1});
         await wrapper.find('button').trigger('click');
 
-        await groupMenu(wrapper).find('.ui-groupselect__clear').trigger('click');
+        await menu(wrapper).find('.ui-groupselect__clear').trigger('click');
         expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([null]);
-        expect(groupMenu(wrapper).exists()).toBe(false);
+        expect(menu(wrapper).exists()).toBe(false);
     });
 
     it('commits the highlighted option on Enter and closes; Escape closes without commit', async () => {
@@ -135,13 +135,13 @@ describe('GroupSelect', () => {
         await root.trigger('keydown', {key: 'Enter'});
 
         expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([1]); // Mango
-        expect(groupMenu(wrapper).exists()).toBe(false);
+        expect(menu(wrapper).exists()).toBe(false);
 
         // Reopen and Escape
         await root.trigger('keydown', {key: 'ArrowDown'});
-        expect(groupMenu(wrapper).exists()).toBe(true);
+        expect(menu(wrapper).exists()).toBe(true);
         await root.trigger('keydown', {key: 'Escape'});
-        expect(groupMenu(wrapper).exists()).toBe(false);
+        expect(menu(wrapper).exists()).toBe(false);
     });
 
     it('Home/End jump to first and last option', async () => {
@@ -171,7 +171,7 @@ describe('GroupSelect', () => {
         expect(button.attributes('aria-activedescendant')).toBe('fruit-opt-1');
 
         // Headers have no id and are role="presentation" — the pointer only lands on options.
-        const headerIds = groupMenu(wrapper)
+        const headerIds = menu(wrapper)
             .findAll('.ui-groupselect__group-header')
             .map((h) => h.attributes('id'));
         expect(headerIds.every((id) => id === undefined)).toBe(true);
@@ -187,7 +187,7 @@ describe('GroupSelect', () => {
         expect(button.attributes('aria-activedescendant')).toBe('fruit-opt-0');
 
         await button.trigger('click'); // close via toggle
-        expect(groupMenu(wrapper).exists()).toBe(false);
+        expect(menu(wrapper).exists()).toBe(false);
 
         await button.trigger('click'); // reopen via toggle
         expect(button.attributes('aria-activedescendant')).toBeUndefined();
@@ -197,7 +197,7 @@ describe('GroupSelect', () => {
         const wrapper = mountGroupSelect({modelValue: 1}); // Mango
         await wrapper.find('button').trigger('click');
 
-        const options = groupMenu(wrapper).findAll('.ui-groupselect__option');
+        const options = menu(wrapper).findAll('.ui-groupselect__option');
         expect(options.map((o) => o.attributes('aria-selected'))).toEqual(['true', 'false', 'false', 'false']);
 
         await options[2].trigger('mouseover'); // hover Apricot
@@ -207,10 +207,10 @@ describe('GroupSelect', () => {
     it('does not open when disabled, by click or by keyboard', async () => {
         const wrapper = mountGroupSelect({disabled: true});
         await wrapper.find('button').trigger('click');
-        expect(groupMenu(wrapper).exists()).toBe(false);
+        expect(menu(wrapper).exists()).toBe(false);
 
         await wrapper.find('.ui-groupselect').trigger('keydown', {key: 'ArrowDown'});
-        expect(groupMenu(wrapper).exists()).toBe(false);
+        expect(menu(wrapper).exists()).toBe(false);
     });
 
     it('propagates required, invalid, and describedby to the trigger', () => {
@@ -226,8 +226,8 @@ describe('GroupSelect', () => {
         const wrapper = mountGroupSelect({groups: [], emptyText: 'Nothing here'});
         await wrapper.find('button').trigger('click');
 
-        expect(groupMenu(wrapper).find('.ui-groupselect__empty').text()).toBe('Nothing here');
-        expect(groupMenu(wrapper).findAll('.ui-groupselect__option')).toHaveLength(0);
+        expect(menu(wrapper).find('.ui-groupselect__empty').text()).toBe('Nothing here');
+        expect(menu(wrapper).findAll('.ui-groupselect__option')).toHaveLength(0);
     });
 
     it('omits the header row for a group with header=false but still renders its options', async () => {
@@ -239,9 +239,9 @@ describe('GroupSelect', () => {
         });
         await wrapper.find('button').trigger('click');
 
-        const headers = groupMenu(wrapper).findAll('.ui-groupselect__group-header');
+        const headers = menu(wrapper).findAll('.ui-groupselect__group-header');
         expect(headers.map((h) => h.text())).toEqual(['Stone']); // only the second header
-        expect(groupMenu(wrapper).findAll('.ui-groupselect__option')).toHaveLength(2);
+        expect(menu(wrapper).findAll('.ui-groupselect__option')).toHaveLength(2);
     });
 
     it('hovers and commits an option inside a header=false (headerless-run) group', async () => {
@@ -262,13 +262,13 @@ describe('GroupSelect', () => {
 
         // The header=false group renders its options flat (no group wrapper), through
         // OptionList's v-else headerless-run branch — hover then click land on that branch.
-        const options = groupMenu(wrapper).findAll('.ui-groupselect__option');
+        const options = menu(wrapper).findAll('.ui-groupselect__option');
         await options[1].trigger('mouseover'); // hover Kiwi (index 1)
         expect(wrapper.find('button').attributes('aria-activedescendant')).toBe('fruit-opt-1');
 
         await options[1].trigger('click'); // commit Kiwi
         expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([2]);
-        expect(groupMenu(wrapper).exists()).toBe(false);
+        expect(menu(wrapper).exists()).toBe(false);
     });
 
     it('renders a header=false group AFTER a named group flat, not absorbed into the prior role="group"', async () => {
@@ -279,7 +279,7 @@ describe('GroupSelect', () => {
             ],
         });
         await wrapper.find('button').trigger('click');
-        const m = groupMenu(wrapper);
+        const m = menu(wrapper);
 
         // The named group's inner role="group" <ul> owns ONLY its own option — the headerless
         // group's option must not be pulled into it (the boundary marker breaks the run).
@@ -299,7 +299,7 @@ describe('GroupSelect', () => {
         const wrapper = mountGroupSelect({mutedOptions: [2]}); // Kiwi
         await wrapper.find('button').trigger('click');
 
-        const options = groupMenu(wrapper).findAll('.ui-groupselect__option');
+        const options = menu(wrapper).findAll('.ui-groupselect__option');
         expect(options.map((o) => o.classes().includes('is-muted'))).toEqual([false, true, false, false]);
 
         await options[1].trigger('click'); // Kiwi commits anyway
@@ -316,7 +316,7 @@ describe('GroupSelect', () => {
         );
         await wrapper.find('button').trigger('click');
 
-        const swatches = groupMenu(wrapper)
+        const swatches = menu(wrapper)
             .findAll('.swatch')
             .map((el) => el.text());
         expect(swatches).toEqual(['Mango#0*', 'Kiwi#1', 'Apricot#2', 'Lime#3']);
@@ -326,14 +326,14 @@ describe('GroupSelect', () => {
         const wrapper = mountGroupSelect({clearLabel: 'None'});
         await wrapper.find('button').trigger('click');
 
-        const clear = groupMenu(wrapper).find('.ui-groupselect__clear');
+        const clear = menu(wrapper).find('.ui-groupselect__clear');
         expect(clear.text()).toBe('None');
         expect(clear.attributes('id')).toBe('fruit-clear');
         expect(clear.attributes('aria-selected')).toBe('true'); // model is null
 
         // Options keep their own index space independent of the clear entry.
         expect(
-            groupMenu(wrapper)
+            menu(wrapper)
                 .findAll('.ui-groupselect__option')
                 .map((o) => o.attributes('id')),
         ).toEqual(['fruit-opt-0', 'fruit-opt-1', 'fruit-opt-2', 'fruit-opt-3']);
@@ -350,23 +350,23 @@ describe('GroupSelect', () => {
         await root.trigger('keydown', {key: 'Enter'});
 
         expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([null]);
-        expect(groupMenu(wrapper).exists()).toBe(false);
+        expect(menu(wrapper).exists()).toBe(false);
     });
 
     it('uses optionsLabel as the listbox aria-label', async () => {
         const wrapper = mountGroupSelect({optionsLabel: 'Fruits'});
         await wrapper.find('button').trigger('click');
-        expect(groupMenu(wrapper).attributes('aria-label')).toBe('Fruits');
+        expect(menu(wrapper).attributes('aria-label')).toBe('Fruits');
     });
 
     it('closes on a click outside', async () => {
         const wrapper = mountGroupSelect({});
         await wrapper.find('button').trigger('click');
-        expect(groupMenu(wrapper).exists()).toBe(true);
+        expect(menu(wrapper).exists()).toBe(true);
 
         document.body.dispatchEvent(new MouseEvent('click', {bubbles: true}));
         await wrapper.vm.$nextTick();
-        expect(groupMenu(wrapper).exists()).toBe(false);
+        expect(menu(wrapper).exists()).toBe(false);
     });
 
     it('removes its document listener on unmount — no throw on post-unmount click', async () => {
@@ -386,11 +386,11 @@ describe('GroupSelect', () => {
         await wrapper.find('button').trigger('click');
 
         expect(
-            groupMenu(wrapper)
+            menu(wrapper)
                 .findAll('.ui-groupselect__group-header')
                 .map((h) => h.text()),
         ).toEqual(['Tropical']);
-        expect(groupMenu(wrapper).findAll('.ui-groupselect__option')).toHaveLength(1);
+        expect(menu(wrapper).findAll('.ui-groupselect__option')).toHaveLength(1);
     });
 
     it('renders a sparse options array without throwing — holes emit no phantom rows', async () => {
@@ -404,14 +404,14 @@ describe('GroupSelect', () => {
         await wrapper.find('button').trigger('click');
 
         // Two real options, no row for the hole, and no render throw.
-        expect(groupMenu(wrapper).findAll('.ui-groupselect__option')).toHaveLength(2);
+        expect(menu(wrapper).findAll('.ui-groupselect__option')).toHaveLength(2);
     });
 
     it('hovering the clear entry highlights it (aria-activedescendant points at clear id)', async () => {
         const wrapper = mountGroupSelect({clearLabel: 'None', modelValue: 1});
         await wrapper.find('button').trigger('click');
 
-        await groupMenu(wrapper).find('.ui-groupselect__clear').trigger('mouseover');
+        await menu(wrapper).find('.ui-groupselect__clear').trigger('mouseover');
         expect(wrapper.find('button').attributes('aria-activedescendant')).toBe('fruit-clear');
     });
 
