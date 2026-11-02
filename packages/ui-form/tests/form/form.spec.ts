@@ -283,6 +283,29 @@ describe('useForm scroll-to-error', () => {
         wrapper.unmount();
     });
 
+    it('prefers the control to the message when both are rendered', async () => {
+        let form!: UseForm;
+        const wrapper = mount(
+            defineComponent({
+                setup() {
+                    form = useForm();
+                    return () =>
+                        h('div', [
+                            h(form.FormError, {name: 'email'}),
+                            h(TextInput, {...form.field('email'), placeholder: 'email', modelValue: ''}),
+                        ]);
+                },
+            }),
+            {attachTo: document.body},
+        );
+
+        await form.handleSubmit(refusedWith({email: ['Taken']}));
+
+        expect(scrollIntoView).toHaveBeenCalledOnce();
+        expect(scrollIntoView.mock.contexts[0]).toBe(wrapper.find('input').element);
+        wrapper.unmount();
+    });
+
     it('never scrolls to another form on the page that refused the same name', async () => {
         // one page is one app, so useId keeps the two forms' ids apart
         const forms: UseForm[] = [];
