@@ -22,6 +22,7 @@ describe('listbox open state has one owner', () => {
         // Without this the guard passes over an empty list — a clean report from a scan that never ran.
         expect(LISTBOX_HOSTS.map(({name}) => name).sort()).toEqual([
             'Combobox.vue',
+            'MultiCombobox.vue',
             'MultiSelect.vue',
             'SingleSelect.vue',
         ]);
