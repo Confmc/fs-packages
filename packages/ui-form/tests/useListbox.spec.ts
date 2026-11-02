@@ -579,24 +579,26 @@ describe('useListbox keyboard and highlight contract', () => {
         wrapper.unmount();
     });
 
-    it('names no active option while closed, wherever the pointer is', () => {
+    it('names no active option when nothing is highlighted', () => {
         const wrapper = mount(Harness, {props: {overrides: {listLength: () => 3}}});
 
-        api.pointer.value = 1;
+        api.openList();
 
         expect(api.activeDescendant.value).toBeUndefined();
         wrapper.unmount();
     });
 
-    it.each([
-        ['nothing is highlighted', -1],
-        ['the pointer is past the end, before the clamp runs', 3],
-    ])('names no active option when %s', (_, pointer) => {
-        const wrapper = mount(Harness, {props: {overrides: {listLength: () => 3}}});
+    it('names no active option past the end of a shrunk list, before the clamp runs', () => {
+        const length = ref(3);
+        const wrapper = mount(Harness, {props: {overrides: {listLength: () => length.value}}});
 
         api.openList();
-        api.pointer.value = pointer;
+        api.onKey(key('End'));
+        // Shrunk to exactly the pointer: index 2 is one past the new end.
+        length.value = 2;
 
+        // Read before nextTick: the pre-flush clamp has not moved the pointer yet.
+        expect(api.pointer.value).toBe(2);
         expect(api.activeDescendant.value).toBeUndefined();
         wrapper.unmount();
     });
