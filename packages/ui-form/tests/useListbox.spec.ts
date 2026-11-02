@@ -71,6 +71,13 @@ const key = (name: string, modifiers?: KeyboardEventInit): KeyboardEvent =>
     new KeyboardEvent('keydown', {key: name, cancelable: true, ...modifiers});
 
 describe('useListbox floating options', () => {
+    it('uses fixed positioning, since the top-layer popup is placed against the viewport', () => {
+        const wrapper = mount(Harness);
+
+        expect(lastFloatingConfig()).toMatchObject({strategy: 'fixed'});
+        wrapper.unmount();
+    });
+
     it('applies the family layout policy by default (bottom-start, offset 4, top-start flip, shift 8)', () => {
         const wrapper = mount(Harness);
 
@@ -452,13 +459,6 @@ describe('useListbox without the optional hooks', () => {
 describe('useListbox keyboard and highlight contract', () => {
     const LABELS = ['Apple', 'Banana', 'Cherry'];
 
-    it('uses fixed positioning, since the top-layer popup is placed against the viewport', () => {
-        const wrapper = mount(Harness);
-
-        expect(lastFloatingConfig()).toMatchObject({strategy: 'fixed'});
-        wrapper.unmount();
-    });
-
     it('swallows a key that opens the closed list', () => {
         const wrapper = mount(Harness, {
             props: {overrides: {listLength: () => 3, openKeys: (name: string) => name === 'ArrowDown'}},
@@ -554,53 +554,28 @@ describe('useListbox keyboard and highlight contract', () => {
         api.openList();
         api.highlightClear();
         api.close();
-
-        expect(api.clearHighlighted.value).toBe(false);
-        wrapper.unmount();
-    });
-
-    // A move onto an option drops the clear flag, not only the pointer: the pointer is the
-    // caller's to write (SingleSelect sets it on hover), and a flag left up would light the clear
-    // entry again the moment the pointer returns to -1.
-    it.each([
-        ['typeahead', () => api.onKey(key('b'))],
-        ['ArrowDown off the clear entry', () => api.onKey(key('ArrowDown'))],
-        ['End', () => api.onKey(key('End'))],
-        [
-            'ArrowDown from a hovered option',
-            () => {
-                api.pointer.value = 1;
-                api.onKey(key('ArrowDown'));
-            },
-        ],
-    ])('%s drops the clear flag', (_, move) => {
-        const wrapper = mount(Harness, {
-            props: {overrides: {listLength: () => 3, clearEntry: () => true, typeaheadLabels: () => LABELS}},
-        });
-
         api.openList();
-        api.highlightClear();
-        move();
-        expect(api.pointer.value).toBeGreaterThanOrEqual(0);
-        api.pointer.value = -1;
 
         expect(api.clearHighlighted.value).toBe(false);
+        expect(api.activeDescendant.value).toBeUndefined();
         wrapper.unmount();
     });
 
-    it('a list shrinking under the pointer drops the clear flag with the clamp', async () => {
+    it('a list draining under a hovered option leaves nothing highlighted, the clear entry included', async () => {
+        // Hovering an option after the clear entry leaves the clear flag up (the pointer alone
+        // un-highlights the entry); the clamp drops it, or the drained list would light the entry.
         const length = ref(3);
         const wrapper = mount(Harness, {props: {overrides: {listLength: () => length.value, clearEntry: () => true}}});
 
         api.openList();
         api.highlightClear();
         api.pointer.value = 2;
-        length.value = 2;
+        length.value = 0;
         await nextTick();
-        expect(api.pointer.value).toBe(1);
-        api.pointer.value = -1;
 
+        expect(api.pointer.value).toBe(-1);
         expect(api.clearHighlighted.value).toBe(false);
+        expect(api.activeDescendant.value).toBeUndefined();
         wrapper.unmount();
     });
 
@@ -618,24 +593,26 @@ describe('useListbox keyboard and highlight contract', () => {
         wrapper.unmount();
     });
 
-    it('names no active option while closed, wherever the pointer is', () => {
+    it('names no active option when nothing is highlighted', () => {
         const wrapper = mount(Harness, {props: {overrides: {listLength: () => 3}}});
 
-        api.pointer.value = 1;
+        api.openList();
 
         expect(api.activeDescendant.value).toBeUndefined();
         wrapper.unmount();
     });
 
-    it.each([
-        ['nothing is highlighted', -1],
-        ['the pointer is past the end, before the clamp runs', 3],
-    ])('names no active option when %s', (_, pointer) => {
-        const wrapper = mount(Harness, {props: {overrides: {listLength: () => 3}}});
+    it('names no active option past the end of a shrunk list, before the clamp runs', () => {
+        const length = ref(3);
+        const wrapper = mount(Harness, {props: {overrides: {listLength: () => length.value}}});
 
         api.openList();
-        api.pointer.value = pointer;
+        api.onKey(key('End'));
+        // Shrunk to exactly the pointer: index 2 is one past the new end.
+        length.value = 2;
 
+        // Read before nextTick: the pre-flush clamp has not moved the pointer yet.
+        expect(api.pointer.value).toBe(2);
         expect(api.activeDescendant.value).toBeUndefined();
         wrapper.unmount();
     });

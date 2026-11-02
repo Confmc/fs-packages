@@ -314,12 +314,10 @@ export const useListbox = (options: UseListboxOptions) => {
                 event.preventDefault();
                 break;
             case 'ArrowUp':
-                if (clearHighlighted.value) {
-                    // Leaving the clear entry upward lands on "nothing highlighted".
-                    clearActive.value = false;
-                } else if (pointer.value === 0 && (clearEntry?.() ?? false)) {
+                if (pointer.value === 0 && (clearEntry?.() ?? false)) {
                     highlightClear();
                 } else {
+                    // From the clear entry (pointer -1) this lands on "nothing highlighted".
                     clearActive.value = false;
                     pointer.value = Math.max(pointer.value - 1, -1);
                 }
@@ -419,10 +417,11 @@ export const useListbox = (options: UseListboxOptions) => {
             shift({padding: floatingOptions.shiftPadding ?? 8}),
             // `elements.floating` is the `.ui-menu-anchor` box, not the <ul>. Sizing it to the
             // trigger is what keeps `--ui-menu-min-width: 100%` meaning "as wide as the
-            // trigger" in the top layer — the menu's percentage resolves against this box.
-            // Without it the percentage would measure the viewport, and every menu would paint
-            // viewport-wide. `min-width`, not `width`: styles.css gives the anchor
-            // `width: max-content` so it still grows when the menu outgrows the trigger.
+            // trigger" — the menu's percentage resolves against this box. Without it the
+            // anchor is sized by its content (`width: max-content`), so the percentage resolves
+            // to the menu's own width and a list of short options paints narrower than its
+            // trigger. `min-width`, not `width`, so the anchor still grows when the menu
+            // outgrows the trigger.
             size({
                 apply({rects, elements}) {
                     elements.floating.style.minWidth = `${rects.reference.width}px`;
