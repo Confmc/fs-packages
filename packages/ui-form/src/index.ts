@@ -1,3 +1,5 @@
+export {default as FormError} from './components/FormError.vue';
+export {default as FormField} from './components/FormField.vue';
 export {default as FormLabel} from './components/FormLabel.vue';
 export {default as TextInput} from './components/TextInput.vue';
 
@@ -23,4 +25,4 @@ export type {
 export type {Path, PathsFor, PathsOf, PathValue} from './form/path';
 export type {FormDraft} from './form/draft';
 export type {BoundFormLabelProps, FormErrorComponent, FormLabelComponent} from './form/field';
-export type {FieldBinding} from './types';
+export type {FieldAria, FieldBinding} from './types';
