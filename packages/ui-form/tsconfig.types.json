@@ -1,1 +1,5 @@
-{"extends": "./tsconfig.json", "compilerOptions": {"noEmit": true, "rootDir": "."}, "include": ["src", "tests/types"]}
+{
+    "extends": "./tsconfig.json",
+    "compilerOptions": {"noEmit": true, "rootDir": "."},
+    "include": ["src", "tests/types", "tests/form"]
+}
