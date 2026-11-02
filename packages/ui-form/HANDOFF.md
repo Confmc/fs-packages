@@ -801,7 +801,9 @@ vue-tsc (CI doesn't type-check specs).
 FormLabel/FormError; `scrollToError` default true with id lookup), 5 (the kit + `createUiForm({texts})`), each off the
 previous, source = `experiment/ui-form-control`'s `src/form/` (built 10-19). Then a generic DatePicker (first shape:
 emmie's `DatePickerField` + `calendar/` grid under the package's rules; emmie's domain pickers stay emmie's). Then
-Pressable/Disclosure after #332. BooleanRadioGroup: decide (RadioGroup over two options, or its own control).
+Pressable/Disclosure after #332. BooleanRadioGroup: decided (2026-11-02): no own control. emmie's Ja/Nee pairs use the package RadioGroup; `SelectItem.id`
+widens to `string | number | boolean` so `{id: true, name: 'Ja'}` types. Do it on #344 (and the checkbox-group branch,
+which shares `types.ts`), with a spec proving a boolean model round-trips (true, false, null).
 
 **Date pickers in the migration:** emmie's `DatePickerField` already takes `id`/`invalid`/`describedby`, so
 `v-bind="field"` wires its errors. Its `:id="kebabCase(id)"` breaks FormField's `<label for>` (an emmie-side fix for the
