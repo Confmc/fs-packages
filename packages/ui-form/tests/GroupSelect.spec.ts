@@ -31,7 +31,7 @@ const GROUPS = [
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFC + VTU mount inference
 const mountGroupSelect = (props: Record<string, unknown>, slots?: Record<string, unknown>) =>
     mount(GroupSelect as any, {
-        props: {groups: GROUPS, label: 'name', id: 'fruit', modelValue: null, ...props},
+        props: {groups: GROUPS, optionLabel: 'name', id: 'fruit', modelValue: null, ...props},
         slots,
         attachTo: document.body,
     });
@@ -415,8 +415,8 @@ describe('GroupSelect', () => {
         expect(wrapper.find('button').attributes('aria-activedescendant')).toBe('fruit-clear');
     });
 
-    it('resolves the display string via a getter label function', () => {
-        const wrapper = mountGroupSelect({label: (o: Fruit) => `${o.name}!`, modelValue: 1});
+    it('resolves the display string via a getter optionLabel function', () => {
+        const wrapper = mountGroupSelect({optionLabel: (o: Fruit) => `${o.name}!`, modelValue: 1});
         expect(wrapper.find('.ui-groupselect__value').text()).toBe('Mango!');
     });
 });
