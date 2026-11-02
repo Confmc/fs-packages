@@ -1,10 +1,12 @@
+// @vitest-environment happy-dom
+// useForm loads the form-bound FormLabel's SFC: under node it is compiled for SSR, a second copy the
+// coverage report cannot merge with the one the component specs render.
 // Type test (see path.spec.ts): FormDraft<T> turns a record into the form state a draft holds.
 import {describe, expectTypeOf, it} from 'vitest';
 import {ref} from 'vue';
 
 import type {FormDraft, PathsOf, UseDraftForm} from '../../src';
 
-// useForm from its module, not the barrel: the barrel also loads the SFCs, which this spec does not render.
 import {useForm} from '../../src/form/form';
 
 interface Contract {
