@@ -317,6 +317,18 @@ describe('useForm scroll-to-error', () => {
         wrapper.unmount();
     });
 
+    it('scrolls to the field it renders when the refusal also names one it renders no element for', async () => {
+        const {wrapper, form} = mountFields(['email']);
+
+        await expect(form().handleSubmit(refusedWith({elsewhere: ['Not rendered'], email: ['Taken']}))).resolves.toBe(
+            'refused',
+        );
+
+        expect(scrollIntoView).toHaveBeenCalledOnce();
+        expect(scrollIntoView.mock.contexts[0]).toBe(wrapper.find('input').element);
+        wrapper.unmount();
+    });
+
     it('does not scroll for a 422 taken outside a submit', async () => {
         const {wrapper, form} = mountFields(['email']);
 
