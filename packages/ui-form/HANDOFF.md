@@ -794,14 +794,21 @@ CODEOWNERS requests the team automatically when a PR leaves draft).
   `flip({fallbackPlacements, flipAlignment: false})`), own listeners (incl. keydown) on the control before the
   consumer's attrs, IME-safe comboboxes (v-model query, composition keys skip the listbox, no open after a blur).
 
-**Slice 3 ported, not yet reviewed:** `ui-form/n-form-paths` @8429c66 on fork (off `n-use-form`): `Path`/`PathValue`,
+**Slice 3 reviewed, fixes in:** `ui-form/n-form-paths` @c79903f on fork (off `n-use-form`): `Path`/`PathValue`,
 `PathsFor`/`PathsOf`, `useForm({draft})` typing names (runtime use of the draft comes with `field()` in slice 4),
-`FormDraft<T>`; type tests in `tests/types` via `tsconfig.types.json` (added to the package `typecheck` script);
-a generic draft now errors at first use instead of silently typing names as `any`; `readPath`/`writePath` wait for
-slice 4. **Next step: its independent review.** Follow-up on #333: `tests/form/validation-errors.spec.ts:12` fails
-vue-tsc (CI doesn't type-check specs).
+`FormDraft<T>`; type tests in `tests/types` via `tsconfig.types.json` (in the package `typecheck` script, so CI runs
+them). Review fixes: Map/Set are whole values (one shared internal `Whole`); `FormDraft` holds an optional member as a
+present nullable field (`-?`), so a control can bind it; a form over a draft typed `any` is an object of `never`
+members, not `never` (which any variable took), and still fits `UseDraftForm` for helpers generic over D; a tuple reads
+as its array (documented, not modelled). `readPath`/`writePath` wait for slice 4.
 
-**Next, in order:** slice 3's review; 4 (`field()` with bound
+**Held until #354 merges** (a push now reruns CI and the audit step reds a green PR), on fork as `hold/*`:
+`hold/344-boolean-id` @5107dd3 = #344 + `SelectItem.id: string | number | boolean` (spec: true/false/null round-trip);
+`hold/333-spec-type` @771edc0 = #333 + the spec helper typing fix (vue-tsc on `validation-errors.spec.ts:12`). After
+#354: merge main into each, push to the PR branch, delete the hold branch. `n-checkbox-group` already has the same
+`types.ts` change (@da1f523, identical lines, merges clean).
+
+**Next, in order:** slice 4 (`field()` with bound
 FormLabel/FormError; `scrollToError` default true with id lookup), 5 (the kit + `createUiForm({texts})`), each off the
 previous, source = `experiment/ui-form-control`'s `src/form/` (built 10-19). Then a generic DatePicker (first shape:
 emmie's `DatePickerField` + `calendar/` grid under the package's rules; emmie's domain pickers stay emmie's). Then
