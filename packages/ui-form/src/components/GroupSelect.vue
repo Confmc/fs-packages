@@ -1,6 +1,8 @@
 <template>
-    <div ref="root" v-bind="rootAttrs($attrs)" class="ui-groupselect" @keydown="onKey">
+    <div ref="root" v-bind="rootAttrs($attrs)" class="ui-groupselect">
         <button
+            @click="toggle"
+            @keydown="onKey"
             v-bind="controlAttrs($attrs)"
             :id="id"
             ref="reference"
@@ -16,7 +18,6 @@
             :aria-describedby="describedby"
             :aria-controls="open ? listboxId : undefined"
             :aria-activedescendant="activeDescendant"
-            @click="toggle"
         >
             <span
                 v-if="selected === undefined && emptyDisplayValue === undefined"

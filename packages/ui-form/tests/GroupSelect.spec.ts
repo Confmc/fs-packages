@@ -128,46 +128,46 @@ describe('GroupSelect', () => {
 
     it('commits the highlighted option on Enter and closes; Escape closes without commit', async () => {
         const wrapper = mountGroupSelect({});
-        const root = wrapper.find('.ui-groupselect');
+        const control = wrapper.find('.ui-groupselect__trigger');
 
-        await root.trigger('keydown', {key: 'ArrowDown'}); // open
-        await root.trigger('keydown', {key: 'ArrowDown'}); // → index 0 (Mango)
-        await root.trigger('keydown', {key: 'Enter'});
+        await control.trigger('keydown', {key: 'ArrowDown'}); // open
+        await control.trigger('keydown', {key: 'ArrowDown'}); // → index 0 (Mango)
+        await control.trigger('keydown', {key: 'Enter'});
 
         expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([1]); // Mango
         expect(menu(wrapper).exists()).toBe(false);
 
         // Reopen and Escape
-        await root.trigger('keydown', {key: 'ArrowDown'});
+        await control.trigger('keydown', {key: 'ArrowDown'});
         expect(menu(wrapper).exists()).toBe(true);
-        await root.trigger('keydown', {key: 'Escape'});
+        await control.trigger('keydown', {key: 'Escape'});
         expect(menu(wrapper).exists()).toBe(false);
     });
 
     it('Home/End jump to first and last option', async () => {
         const wrapper = mountGroupSelect({});
-        const root = wrapper.find('.ui-groupselect');
+        const control = wrapper.find('.ui-groupselect__trigger');
         const button = wrapper.find('button');
 
-        await root.trigger('keydown', {key: 'ArrowDown'}); // open
-        await root.trigger('keydown', {key: 'End'});
+        await control.trigger('keydown', {key: 'ArrowDown'}); // open
+        await control.trigger('keydown', {key: 'End'});
         expect(button.attributes('aria-activedescendant')).toBe('fruit-opt-3'); // Lime (last)
-        await root.trigger('keydown', {key: 'Home'});
+        await control.trigger('keydown', {key: 'Home'});
         expect(button.attributes('aria-activedescendant')).toBe('fruit-opt-0'); // Mango (first)
     });
 
     it('aria-activedescendant tracks the pointer across options and skips headers', async () => {
         const wrapper = mountGroupSelect({});
-        const root = wrapper.find('.ui-groupselect');
+        const control = wrapper.find('.ui-groupselect__trigger');
         const button = wrapper.find('button');
 
-        await root.trigger('keydown', {key: 'ArrowDown'}); // open, pointer -1
+        await control.trigger('keydown', {key: 'ArrowDown'}); // open, pointer -1
         expect(button.attributes('aria-activedescendant')).toBeUndefined();
 
-        await root.trigger('keydown', {key: 'ArrowDown'}); // → 0 (Mango)
+        await control.trigger('keydown', {key: 'ArrowDown'}); // → 0 (Mango)
         expect(button.attributes('aria-activedescendant')).toBe('fruit-opt-0');
 
-        await root.trigger('keydown', {key: 'ArrowDown'}); // → 1 (Kiwi)
+        await control.trigger('keydown', {key: 'ArrowDown'}); // → 1 (Kiwi)
         expect(button.attributes('aria-activedescendant')).toBe('fruit-opt-1');
 
         // Headers have no id and are role="presentation" — the pointer only lands on options.
@@ -179,11 +179,11 @@ describe('GroupSelect', () => {
 
     it('closing via trigger click resets pointer so reopening has no stale aria-activedescendant', async () => {
         const wrapper = mountGroupSelect({});
-        const root = wrapper.find('.ui-groupselect');
+        const control = wrapper.find('.ui-groupselect__trigger');
         const button = wrapper.find('button');
 
-        await root.trigger('keydown', {key: 'ArrowDown'}); // open
-        await root.trigger('keydown', {key: 'ArrowDown'}); // → index 0 (Mango)
+        await control.trigger('keydown', {key: 'ArrowDown'}); // open
+        await control.trigger('keydown', {key: 'ArrowDown'}); // → index 0 (Mango)
         expect(button.attributes('aria-activedescendant')).toBe('fruit-opt-0');
 
         await button.trigger('click'); // close via toggle
@@ -204,12 +204,35 @@ describe('GroupSelect', () => {
         expect(options.map((o) => o.attributes('aria-selected'))).toEqual(['true', 'false', 'false', 'false']);
     });
 
+    it.each([
+        ['click', {}],
+        ['keydown', {key: 'ArrowDown'}],
+    ])("opens on %s before a consumer's listener runs, so that listener cannot hold it back", async (type, init) => {
+        // Merged listeners run in order; one calling stopImmediatePropagation skips the ones after it.
+        const listener = `on${type[0].toUpperCase()}${type.slice(1)}`;
+        const wrapper = mount(GroupSelect as never, {
+            props: {groups: GROUPS, optionLabel: 'name', id: 'fruit', modelValue: null},
+            attrs: {[listener]: (event: Event) => event.stopImmediatePropagation()},
+            attachTo: document.body,
+        });
+
+        await wrapper.find('.ui-groupselect__trigger').trigger(type, init);
+
+        expect(menu(wrapper).exists()).toBe(true);
+        wrapper.unmount();
+    });
+
     it('does not open when disabled, by click or by keyboard', async () => {
         const wrapper = mountGroupSelect({disabled: true});
         await wrapper.find('button').trigger('click');
         expect(menu(wrapper).exists()).toBe(false);
 
-        await wrapper.find('.ui-groupselect').trigger('keydown', {key: 'ArrowDown'});
+        // Dispatched by hand: VTU's trigger() skips a disabled element, and the keyboard guard is
+        // what is under test here.
+        wrapper
+            .find('.ui-groupselect__trigger')
+            .element.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowDown', bubbles: true, cancelable: true}));
+        await wrapper.vm.$nextTick();
         expect(menu(wrapper).exists()).toBe(false);
     });
 
@@ -341,13 +364,13 @@ describe('GroupSelect', () => {
 
     it('ArrowDown lands on clear entry first, then options; Enter commits null', async () => {
         const wrapper = mountGroupSelect({clearLabel: 'None', modelValue: 1});
-        const root = wrapper.find('.ui-groupselect');
+        const control = wrapper.find('.ui-groupselect__trigger');
         const button = wrapper.find('button');
 
-        await root.trigger('keydown', {key: 'ArrowDown'}); // open
-        await root.trigger('keydown', {key: 'ArrowDown'}); // → clear entry
+        await control.trigger('keydown', {key: 'ArrowDown'}); // open
+        await control.trigger('keydown', {key: 'ArrowDown'}); // → clear entry
         expect(button.attributes('aria-activedescendant')).toBe('fruit-clear');
-        await root.trigger('keydown', {key: 'Enter'});
+        await control.trigger('keydown', {key: 'Enter'});
 
         expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([null]);
         expect(menu(wrapper).exists()).toBe(false);
