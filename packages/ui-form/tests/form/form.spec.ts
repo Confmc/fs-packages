@@ -305,16 +305,26 @@ describe('useForm scroll-to-error', () => {
         wrapper.unmount();
     });
 
-    it.each([
-        ["'sent'", async () => {}],
-        ["'cancelled'", async () => false],
-    ])('does not scroll again when the next submit ends %s', async (_, action) => {
+    it("does not scroll when the next submit ends 'cancelled', though its messages still stand", async () => {
         const {wrapper, form} = mountBesideInvalid();
         await form().handleSubmit(refusedWith({email: ['Taken']}));
         scrollIntoView.mockClear();
 
-        await form().handleSubmit(action);
+        await expect(form().handleSubmit(async () => false)).resolves.toBe('cancelled');
 
+        expect(form().errors.value).toEqual({email: 'Taken'});
+        expect(scrollIntoView).not.toHaveBeenCalled();
+        wrapper.unmount();
+    });
+
+    it("does not scroll once a 'sent' submit empties the bag", async () => {
+        const {wrapper, form} = mountBesideInvalid();
+        await form().handleSubmit(refusedWith({email: ['Taken']}));
+        scrollIntoView.mockClear();
+
+        await expect(form().handleSubmit(async () => {})).resolves.toBe('sent');
+
+        expect(form().errors.value).toEqual({});
         expect(scrollIntoView).not.toHaveBeenCalled();
         wrapper.unmount();
     });
