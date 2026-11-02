@@ -166,8 +166,9 @@ interface FormField<T extends string = string> {
 /**
  * Everything `useForm` returns: the field-error bag, `take` and `clearErrors` from
  * `useValidationErrors`, `handleSubmit` and the `submitting` loading flag from `useFormSubmit`, the
- * refusals the form makes itself (`UseFormClient`), and the field wiring. Type a child component's `form`
- * prop with it (or with `UseDraftForm<D>` for a form over a draft).
+ * refusals the form makes itself (`UseFormClient`), the field wiring and the bound controls
+ * (`BoundControls`). Type a child component's `form` prop with it (or with `UseDraftForm<D>` for a form
+ * over a draft).
  */
 export type UseForm<T extends string = string> = UseValidationErrors<T> &
     FormSubmit<T> &

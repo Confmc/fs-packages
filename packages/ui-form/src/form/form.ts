@@ -178,6 +178,13 @@ const useFormBody = <T extends string = string>(
  * `field()` reads the form when it is called, so call it in the render (the template), not once in
  * `setup()`: a result kept from setup never changes.
  *
+ * The form also hands out its fields bound by name. `TextField` is the whole field in one tag: `FormField`
+ * around `TextInput`, wired by `field(name)`: `<form.TextField name="email" label="E-mail" placeholder="…"
+ * required />`; the control's own props and attributes pass through and win over the wiring, `class` and
+ * `style` land on the field. `FormField` is the frame by name for any other control: the form's id, label
+ * and message, and in its slot the wiring without the value, so the control keeps its own `v-model`. With
+ * a draft, a bound control takes only a path its control can read and write.
+ *
  * The form refuses fields itself too, next to the server: `refuse(name, message)` refuses one field,
  * `setRefusals(bag)` sets the client's whole verdict (replacing the last one), and
  * `handleSubmit(action, {validate})` checks before it sends: a bag with a message refuses the submit
