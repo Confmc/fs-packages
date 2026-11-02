@@ -195,6 +195,24 @@ describe('MultiSelect', () => {
         expect(new Set(ids).size).toBe(ids.length);
     });
 
+    it.each([
+        ['click', {}],
+        ['keydown', {key: 'ArrowDown'}],
+    ])("opens on %s before a consumer's listener runs, so that listener cannot hold it back", async (type, init) => {
+        // Merged listeners run in order; one calling stopImmediatePropagation skips the ones after it.
+        const listener = `on${type[0].toUpperCase()}${type.slice(1)}`;
+        const wrapper = mount(MultiSelect as never, {
+            props: {options: FRUITS, optionLabel: 'name', id: 'fruit', modelValue: []},
+            attrs: {[listener]: (event: Event) => event.stopImmediatePropagation()},
+            attachTo: document.body,
+        });
+
+        await wrapper.find('.ui-multiselect__trigger').trigger(type, init);
+
+        expect(menu(wrapper).exists()).toBe(true);
+        wrapper.unmount();
+    });
+
     it('does not open when disabled — click, keyboard, chip remove, and Backspace all inert', async () => {
         const wrapper = mountMulti({modelValue: [1], disabled: true});
         const trigger = wrapper.find('.ui-multiselect__trigger');
