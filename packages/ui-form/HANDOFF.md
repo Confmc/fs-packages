@@ -824,13 +824,43 @@ its bag is typed so a misspelled key next to a right one fails), the form's `cle
 submit only the server's). `refused`/`refusedUnnamed` are documented as server-only. The tick before the scroll is now
 pinned by a test (a validate refusal needs it), no Stryker disable. Stryker 98.89, form.ts 100.
 
+**Slice 5 (kit machinery) reviewed, fixes in:** `ui-form/n-form-kit` @89ab545 on fork. Base = a merge of
+`n-form-refusals` and `n-form-field` (opens after both). `form.TextField` (FormField around TextInput, bound by name,
+typed to draft paths holding `string | null`/`string`, or the form's names) and `form.FormField` (the frame by name,
+slot gets the wiring). A call-site `v-model` overrides the draft and is typed by the control's value (proxies that
+convert). Public: `BoundControls`, `BoundShell`, `NoAddonProps`, `BoundValueProps`, `FieldFrameSlots` (an app can
+export bound controls; TS4023 otherwise). § 7 declaration check in `typecheck`, reading the BUILT package (build first).
+Fixed from the experiment: a union-named form's bound v-model was untyped. Stryker 99.66.
+Not in slice 5, waiting on `n-field-label-after`/`n-field-hint`/`n-field-aside`: the frame slots (label-after, hint,
+aside) and the bound FormLabel's `after` pass-through. Open for slice 6: the input gets no `name` attribute (autofill);
+decide pass-through or document `autocomplete`.
+**Slice 6** (after every control is on main): the other 16 bindings, `UiTexts`, `createUiForm`, texted bare controls.
+
+**The shape review** (test bed, paper, 9 emmie templates: `.experiment-packs/ui-form-reference/shape-review.md`,
+reference README next to it). Proposed handling, awaiting Marcel: (1) derived tokens resolve on `:root`, so a scoped
+override half applies: VERIFIED (26 on `:where(:root)`); fix off main, resolve at the point of use with fallbacks;
+(2) one control for two names (range picker): `field([...])`, slice 6; (3) the bound FormField's slot should hand out
+`field` (wiring incl. hint) and `model` separately (a v-bind of `form.field()` plus a proxy v-model writes the draft
+twice): fold into slice 5; (4) an "optional" marker, word from app texts: with the label-after branch; (5) a combobox
+`filter` prop (ContractSelect matches the route name): on the combobox branches. Also: `placeholder=""` 34x in 16 emmie
+files (evidence for optional placeholder, asked of the reviewer by Marcel); a 422's extra payload is only reachable via
+`take()`.
+
+**Amendment 2 (draft pending Marcel's yes):** the control rules already in open PRs (clearLabel, in-input buttons,
+looks as tokens/missing-token rule, id/placeholder/class rules, option `disabled`, time null, aria-pressed, sort
+opt-in) PLUS three changes found for emmie: app-wide defaults via `createUiForm` (`alphabeticalSort` once, not ~80
+sites); clear buttons by control type (`createUiForm` gives TimeInput/SearchInput a default `clearLabel`, a site opts
+out with `clear-label=""`); `placeholder` optional again (the reviewer's "mag wel required" on #328 was permissive;
+Marcel is asking him). Pre-forms emmie counts: ~100 selects sorted by default, 17 opt-outs; TimeInput clearable unless
+`notNullable` (17), SearchInput always (14), selects opt-in (14); ~30 inputs without a placeholder.
+
 **Held until #354 merges** (a push now reruns CI and the audit step reds a green PR), on fork as `hold/*`:
 `hold/344-boolean-id` @5107dd3 = #344 + `SelectItem.id: string | number | boolean` (spec: true/false/null round-trip);
 `hold/333-spec-type` @771edc0 = #333 + the spec helper typing fix (vue-tsc on `validation-errors.spec.ts:12`). After
 #354: merge main into each, push to the PR branch, delete the hold branch. `n-checkbox-group` already has the same
 `types.ts` change (@da1f523, identical lines, merges clean).
 
-**Next, in order:** slice 5 (the kit + `createUiForm({texts})`), each off the
+**Next, in order:** the shape-review fixes Marcel approves; slice 6 after the controls merge; slice 5 (the kit + `createUiForm({texts})`), each off the
 previous, source = `experiment/ui-form-control`'s `src/form/` (built 10-19). Then Pressable/Disclosure after #332,
 then the release PR (fresh off main once everything merged; see "Release sequence"). **No package DatePicker**
 (decided 2026-11-02, see below). BooleanRadioGroup: decided (2026-11-02): no own control. emmie's Ja/Nee pairs use the package RadioGroup; `SelectItem.id`
