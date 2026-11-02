@@ -61,7 +61,10 @@ const useFormBody = <T extends string = string>(
         const outcome = await submit.handleSubmit(action);
 
         if (outcome === 'refused' && scrollToError) {
-            // The refused fields are marked once the DOM shows the new bag.
+            // The lookup is by id, so a message element rendered only once refused must be in the DOM
+            // first. Today Vue's flush already ran while the submit awaited, so no test can see this
+            // tick go; it stays so the scroll never depends on that microtask order.
+            // Stryker disable next-line all: equivalent while the flush precedes the resume (see above)
             await nextTick();
             scrollToFirstError(validation.errors.value, id as (name: string) => string);
         }
