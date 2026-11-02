@@ -113,6 +113,7 @@ describe('GroupSelect', () => {
                 .findAll('.ui-groupselect__option')
                 .map((option) => option.text()),
         ).toEqual(options);
+        wrapper.unmount();
     });
 
     it('commits by the order it shows when alphabeticalSort is set', async () => {
@@ -124,6 +125,7 @@ describe('GroupSelect', () => {
         await control.trigger('keydown', {key: 'Enter'});
 
         expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([2]); // Kiwi
+        wrapper.unmount();
     });
 
     it('commits the clicked option, emits update:modelValue, and closes', async () => {
@@ -187,6 +189,7 @@ describe('GroupSelect', () => {
 
         expect(wrapper.emitted('update:modelValue')).toBeUndefined();
         expect(menu(wrapper).exists()).toBe(true);
+        wrapper.unmount();
     });
 
     it('Home/End jump to first and last option', async () => {
