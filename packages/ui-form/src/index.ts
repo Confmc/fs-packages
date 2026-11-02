@@ -5,6 +5,7 @@ export {default as FormError} from './components/FormError.vue';
 export {default as FormField} from './components/FormField.vue';
 export {default as FormLabel} from './components/FormLabel.vue';
 export {default as InputGroup} from './components/InputGroup.vue';
+export {default as MultiSelect} from './components/MultiSelect.vue';
 export {default as NumberInput} from './components/NumberInput.vue';
 export {default as PasswordInput} from './components/PasswordInput.vue';
 export {default as RadioGroup} from './components/RadioGroup.vue';

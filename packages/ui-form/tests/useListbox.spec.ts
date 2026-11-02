@@ -8,7 +8,7 @@ import type {UseListboxOptions} from '../src/composables/useListbox';
 
 import {useListbox} from '../src/composables/useListbox';
 
-// The component suites (SingleSelect's) exercise the composable's behaviour against
+// The component suites (SingleSelect's and MultiSelect's) exercise the composable's behaviour against
 // the REAL floating-ui. This suite pins the things they cannot see: the exact layout policy
 // handed to floating-ui (the family defaults, and the `floatingOptions` overrides), the
 // hide()-middleware visibility gate (driven off a controlled `middlewareData`), and the
@@ -78,18 +78,40 @@ describe('useListbox floating options', () => {
         wrapper.unmount();
     });
 
-    it('applies the family layout policy by default (bottom-start, offset 4, top-start flip, shift 8)', () => {
+    it('applies the family layout policy by default (bottom-start, offset 4, same-alignment flip, shift 8)', () => {
         const wrapper = mount(Harness);
 
         expect(lastFloatingConfig()).toMatchObject({
             placement: 'bottom-start',
             middleware: [
                 {name: 'offset', value: 4},
-                {name: 'flip', config: {fallbackPlacements: ['top-start']}},
+                {name: 'flip', config: {fallbackPlacements: undefined, flipAlignment: false}},
                 {name: 'shift', config: {padding: 8}},
                 {name: 'size', config: {apply: expect.any(Function)}},
                 {name: 'hide'},
             ],
+        });
+        wrapper.unmount();
+    });
+
+    // With no fallback list and flipAlignment off, flip() tries only the opposite side at the same
+    // alignment: the default bottom-start falls back to top-start, and a given top-start to
+    // bottom-start. A given list would keep `top` from flipping below; flipAlignment left on would
+    // try top-end before bottom-start, so a given bottom-start would lay out unlike the default.
+    it.each([
+        [undefined, 'bottom-start'],
+        ['top-start', 'top-start'],
+        ['top', 'top'],
+    ] as const)('flips placement %s only to the opposite side, keeping its alignment', (placement, expected) => {
+        const wrapper = mount(Harness, {
+            props: {overrides: placement === undefined ? {} : {floatingOptions: {placement}}},
+        });
+
+        const config = lastFloatingConfig();
+        expect(config?.placement).toBe(expected);
+        expect(config?.middleware?.find((middleware) => middleware?.name === 'flip')).toEqual({
+            name: 'flip',
+            config: {fallbackPlacements: undefined, flipAlignment: false},
         });
         wrapper.unmount();
     });
@@ -112,7 +134,7 @@ describe('useListbox floating options', () => {
             placement: 'top-end',
             middleware: [
                 {name: 'offset', value: 12},
-                {name: 'flip', config: {fallbackPlacements: ['bottom-end']}},
+                {name: 'flip', config: {fallbackPlacements: ['bottom-end'], flipAlignment: false}},
                 {name: 'shift', config: {padding: 2}},
                 {name: 'size', config: {apply: expect.any(Function)}},
                 {name: 'hide'},
@@ -304,7 +326,7 @@ describe('useListbox click-outside across shadow boundaries (KD-1136)', () => {
 
     // At a DOCUMENT listener a click inside a shadow root is retargeted to the HOST, which is
     // an ancestor of `root` rather than a descendant — `root.contains(target)` rejects it and
-    // every option click would read as outside (a multi-select would close instead of
+    // every option click would read as outside (MultiSelect would close instead of
     // toggling). `composedPath()` carries the true chain across the boundary.
     it('treats a composed click from inside a shadow root as inside', () => {
         const onOutside = vi.fn();
@@ -365,8 +387,8 @@ describe('useListbox size middleware — the anchor tracks the trigger width', (
 });
 
 describe('useListbox without the optional hooks', () => {
-    // SingleSelect passes every hook; the controls that leave one out are not in this package yet,
-    // so what the composable does without each is pinned here.
+    // SingleSelect passes every hook and MultiSelect all but committedIndex and the clear entry; no
+    // control here leaves out the others, so what the composable does without each is pinned here.
     it('closed, a key openKeys rejects opens nothing and is not swallowed', () => {
         const wrapper = mount(Harness, {props: {overrides: {listLength: () => 3}}});
 

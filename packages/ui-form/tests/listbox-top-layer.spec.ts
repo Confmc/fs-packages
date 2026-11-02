@@ -2,6 +2,7 @@
 import {mount} from '@vue/test-utils';
 import {afterEach, describe, expect, it} from 'vitest';
 
+import MultiSelect from '../src/components/MultiSelect.vue';
 import SingleSelect from '../src/components/SingleSelect.vue';
 
 interface Fruit {
@@ -17,11 +18,12 @@ const FRUITS: Fruit[] = [
 
 const FAMILY = [
     {name: 'SingleSelect', component: SingleSelect, menuClass: '.ui-select__menu', modelValue: null},
+    {name: 'MultiSelect', component: MultiSelect, menuClass: '.ui-multiselect__menu', modelValue: []},
 ] as const;
 
 const mountOpen = (
     component: (typeof FAMILY)[number]['component'],
-    modelValue: number | null,
+    modelValue: number | null | number[],
     attachTo: Element = document.body,
 ) => mount(component as never, {props: {options: FRUITS, optionLabel: 'name', id: 'fruit', modelValue}, attachTo});
 

@@ -21,7 +21,11 @@ export interface ListboxFloatingOptions {
     placement?: Placement;
     /** `offset()` main-axis distance between reference and popup, in px (default `4`). */
     offset?: number;
-    /** `flip()` fallback placements tried when the primary placement overflows (default `['top-start']`). */
+    /**
+     * `flip()` fallback placements tried when the primary placement overflows. Default: only the
+     * opposite side at the same alignment (`bottom-start` → `top-start`, `top` → `bottom`), so a
+     * given placement lays out as the default one does; the other alignment is never tried.
+     */
     fallbackPlacements?: Placement[];
     /** `shift()` viewport padding, in px (default `8`). */
     shiftPadding?: number;
@@ -38,20 +42,20 @@ export interface UseListboxOptions {
     id: () => string;
     /** whether the control is disabled — the keyboard path guards on it, as a getter so it stays live. */
     disabled: () => boolean;
-    /** length of the currently-rendered option list (SingleSelect's `sorted`, or a filtered list). */
+    /** length of the currently-rendered option list (SingleSelect's and MultiSelect's `sorted`, or a filtered list). */
     listLength: () => number;
-    /** whether a key pressed while CLOSED should open the list (SingleSelect: Enter/ArrowDown/Space). */
+    /** whether a key pressed while CLOSED should open the list (SingleSelect and MultiSelect: Enter/ArrowDown/Space). */
     openKeys: (key: string) => boolean;
     /**
      * Commit the option at `index`; returns whether a commit actually happened, which is what
      * decides whether Enter is `preventDefault`-ed. The callback owns the read-through-a-local
      * race guard (the array read) AND the close decision — the composable NEVER closes on commit,
-     * so a multi-select callback can toggle membership and stay open while SingleSelect's closes.
+     * so MultiSelect's callback can toggle membership and stay open while SingleSelect's closes.
      */
     onCommit: (index: number) => boolean;
-    /** dismiss the list (Escape / Tab). SingleSelect closes; a combobox may revert its text first. */
+    /** dismiss the list (Escape / Tab). The selects close; a combobox may revert its text first. */
     onDismiss: () => void;
-    /** click-outside disposition. SingleSelect closes; a combobox may revert its text first. */
+    /** click-outside disposition. The selects close; a combobox may revert its text first. */
     onOutside: () => void;
     /** floating-ui layout-policy overrides — layout is the caller's business, not the core's. */
     floatingOptions?: ListboxFloatingOptions;
@@ -95,8 +99,8 @@ const TYPEAHEAD_MAX_LENGTH = 64;
 const fold = (text: string): string => Array.from(text, (character) => character.toLocaleLowerCase()).join('');
 
 /**
- * The behavioural core shared by every ui-form listbox control (SingleSelect; the optional
- * hooks serve selects that filter or pick many). Entirely position/index-based, so the
+ * The behavioural core shared by every ui-form listbox control (SingleSelect and MultiSelect;
+ * the optional hooks serve selects that filter too). Entirely position/index-based, so the
  * option type `T` never crosses this boundary: the caller owns the derived list and hands back
  * only its length and index-keyed callbacks. Owns `open`/`pointer`, the position-keyed IDREFs,
  * `aria-activedescendant`, the clamp watcher, click-outside, floating-ui, and the keyboard-nav
@@ -150,7 +154,7 @@ export const useListbox = (options: UseListboxOptions) => {
     // Owned here so a future consumer cannot forget the `-1` — a stale pointer would resurface
     // as a phantom highlight (and a phantom aria-activedescendant) on the next open. The
     // composable still never calls this on commit: closing after a commit stays the caller's
-    // decision (`onCommit` — a multi-select toggles and stays open).
+    // decision (`onCommit` — MultiSelect toggles and stays open).
     let typed = '';
     // The first key, folded. Not `typed[0]`: a fold can be two code units (İ → i̇).
     let first = '';
@@ -360,7 +364,7 @@ export const useListbox = (options: UseListboxOptions) => {
     // `composedPath()`, never `event.target`: at a DOCUMENT listener a click inside a shadow
     // root is retargeted to the shadow HOST, which is an ancestor of `root` rather than a
     // descendant, so `root.contains(target)` rejects it and every option click would read as
-    // outside — a multi-select would close instead of toggling. The composed
+    // outside — MultiSelect would close instead of toggling. The composed
     // path carries the true chain across shadow boundaries. The popup needs no separate check:
     // it is promoted to the top layer IN PLACE, so it never leaves `root`.
     const onDocumentPointer = (event: MouseEvent) => {
@@ -404,7 +408,10 @@ export const useListbox = (options: UseListboxOptions) => {
         placement: floatingOptions.placement ?? 'bottom-start',
         middleware: [
             offset(floatingOptions.offset ?? 4),
-            flip({fallbackPlacements: floatingOptions.fallbackPlacements ?? ['top-start']}),
+            // With no list, flip() falls back to the opposite side; `flipAlignment: false` keeps it
+            // from trying the other alignment first (top-end before bottom-start for `top-start`),
+            // so the default `bottom-start` falls back to `top-start` exactly as a given one does.
+            flip({fallbackPlacements: floatingOptions.fallbackPlacements, flipAlignment: false}),
             shift({padding: floatingOptions.shiftPadding ?? 8}),
             // `elements.floating` is the `.ui-menu-anchor` box, not the <ul>. Sizing it to the
             // trigger is what keeps `--ui-menu-min-width: 100%` meaning "as wide as the
