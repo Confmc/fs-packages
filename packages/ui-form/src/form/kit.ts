@@ -29,18 +29,21 @@ interface NoAddons {
 // oxlint-disable-next-line typescript/no-explicit-any -- matches any component constructor
 type PropsOf<C> = C extends abstract new (...args: any) => {$props: infer P} ? P : never;
 
-/** A bound non-generic control: its shell, plus the control's own props minus the wiring. */
-type BoundControl<N, C, Value, Extra = NoAddons> = DefineSetupFnComponent<
-    Shell<N> & Extra & Omit<PropsOf<C>, Wiring | 'required' | 'label'> & ValueProps<N, Value>
+/** A bound non-generic control of the form `D`: its shell, plus the control's own props minus the wiring. */
+type BoundControl<D, N, C, Value, Extra = NoAddons> = DefineSetupFnComponent<
+    Shell<N> & Extra & Omit<PropsOf<C>, Wiring | 'required' | 'label'> & ValueProps<D, Value>
 >;
-/** On a form without a draft the value comes from `v-model`; with one, from the draft. */
-type ValueProps<N, Value> = string extends N
+/**
+ * On a form without a draft (`D` its names, free strings or a union) the value comes from `v-model`; with
+ * one, from the draft.
+ */
+type ValueProps<D, Value> = [D] extends [string]
     ? {modelValue?: Value; 'onUpdate:modelValue'?: (value: Value) => void}
     : {};
 
-/** The form-bound controls for a form named by `N` (free strings) or by the paths of a draft `D`. */
+/** The form-bound controls of a form `D`: its names (free strings, or a union of them), or a draft named by its paths. */
 export interface BoundControls<D> {
-    TextField: BoundControl<NamesFor<D, string | null, string>, typeof TextInput, string | null>;
+    TextField: BoundControl<D, NamesFor<D, string | null, string>, typeof TextInput, string | null>;
     /**
      * The field frame by name, for a control the kit has no bound version of (your own, or one that edits
      * a derived value): the form's ids, label and message, and in its slot the field's wiring without

@@ -20,6 +20,8 @@
     <FormField name="nope" label="x" />
     <PlainText name="anything" v-model="free" placeholder="Vul in" />
     <NamedText name="email" v-model="free" placeholder="Vul in" />
+    <!-- @vue-expect-error the value is what the control writes, on a form named by a union too -->
+    <NamedText name="email" v-model="count" placeholder="Vul in" />
     <!-- @vue-expect-error the value is what the control writes -->
     <PlainText name="email" v-model="count" placeholder="Vul in" />
     <!-- @vue-expect-error not one of the form's names -->
