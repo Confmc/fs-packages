@@ -834,6 +834,16 @@ Fixed from the experiment: a union-named form's bound v-model was untyped. Stryk
 Not in slice 5, waiting on `n-field-label-after`/`n-field-hint`/`n-field-aside`: the frame slots (label-after, hint,
 aside) and the bound FormLabel's `after` pass-through. Open for slice 6: the input gets no `name` attribute (autofill);
 decide pass-through or document `autocomplete`.
+**Slot split (shape review #3), in slice 5:** the draft form's `form.FormField` slot hands out `{field, aria, model}`
+(`model` typed by the path's value through a generic call signature, `BoundDraftFrame<D>`; none without a draft). Use
+`v-bind="{...field, ...model}"` (two `v-bind`s are a compile error), or `v-bind="field" v-model="proxy"` for a converting
+proxy: never `form.field()` inside a frame. Known gap, for later across the string controls: their model is declared
+`string | null`, so its update emits `string | null` in the types and `model` of a plain-`string` draft path does not
+type onto TextInput (FormDraft makes those paths nullable, so it is rare); fix with defineModel's setter type param.
+The ui-inputs token patch is NOT needed: emmie sets no `--ui-*` on an area today (its area looks are `:deep()` CSS).
+Amendment 2 also gets: fs-form follows ui-inputs' interim rule (§ 5 names only ui-inputs); note for first publish that
+a state-only app (town-crier) would carry the kit's components, since `useForm` references them.
+
 **Slice 6** (after every control is on main): the other 16 bindings, `UiTexts`, `createUiForm`, texted bare controls.
 
 **The shape review** (test bed, paper, 9 emmie templates: `.experiment-packs/ui-form-reference/shape-review.md`,
