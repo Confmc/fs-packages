@@ -878,6 +878,22 @@ new main (`git merge-tree`). #332 still shows CHANGES_REQUESTED from 10-26 (fixe
 10-29). Unblocked: `n-form-field` (FormField) can open as the next PR; wait for #354 so it isn't red on the audit step
 from its first run. Its branches (label-after, hint, aside, n-form-kit) already contain #330's head.
 
+**Reviewer-lens audit (2026-11-02, report only; his own comments on #328/#330/#331/#332 as the checklist).** Only
+those four PRs carry his comments. To do once #354 merges, bundled with the held pushes (one CI run per PR):
+- **#339's `?.` removal on four PRs:** `input.value?.focus()`-style chains leave an unkillable mutant once #339 lands:
+  NumberInput.vue:55, TimeInput.vue:105,116,120, SearchInput.vue:83,87, PasswordInput.vue:114. Apply #339's change.
+- **Stale descriptions:** #353 (commit/line counts, mutation score from before the last commits; name emmie's
+  MultiSelect screens for `placement`), #336 (row for 49f4a9b, the ISO-datetime date), #332 (bd8b100 row names files
+  that are gone), #339 ("main's components" predates FormError on main).
+- **#333** says it merges after #339 (ADR: `.vue` mutation settled before form code). **#340** says WR-2715's per-stack
+  recipes (`@unocss/reset` in `layer(base)`, Tailwind v4) stay open.
+- **Check context first, not yet findings:** #344 `RadioGroup.vue:106` per-option `disabledOf` check only stops
+  dispatched events (his #332 ruling) BUT he wrote "the groups need the disabled guard" in that same ruling: read
+  before touching. #343 `--ui-warning-text: #b45309` new hue (say why in the description). #338 `describedby` is the
+  caller's until the bound fields (say so).
+- **Settled, do not reopen:** selects ignore `SelectItem.disabled`; `placement`; TimeInput `step` in minutes,
+  `catch {}` around `showPicker`, Textarea's ResizeObserver, SingleSelect's `'Select…'` default (only if he raises them).
+
 **Amendment 2 draft:** `packages/ui-form/AMENDMENT-2.draft.md` on this branch. Not sent; § 1 (placeholder) and § 6
 (app defaults) wait on the reviewer's answers, and the amendment itself waits on his yes. Form/kit rules stay out
 until landing.10 confirms them.
