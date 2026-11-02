@@ -61,6 +61,39 @@ describe('MultiCombobox', () => {
         expect(menu(wrapper).exists()).toBe(true);
     });
 
+    it.each([
+        ['click', {}],
+        ['focus', {}],
+        ['keydown', {key: 'ArrowDown'}],
+        ['input', {}],
+    ])("opens on %s before a consumer's listener runs, so that listener cannot hold it back", async (type, init) => {
+        // Merged listeners run in order; one calling stopImmediatePropagation skips the ones after it.
+        const listener = `on${type[0].toUpperCase()}${type.slice(1)}`;
+        const wrapper = mount(MultiCombobox as never, {
+            props: {options: FRUITS, optionLabel: 'name', id: 'fruit', modelValue: []},
+            attrs: {[listener]: (event: Event) => event.stopImmediatePropagation()},
+            attachTo: document.body,
+        });
+
+        await wrapper.find('input').trigger(type, init);
+
+        expect(menu(wrapper).exists()).toBe(true);
+        wrapper.unmount();
+    });
+
+    it("removes the last chip on Backspace before a consumer's keydown listener runs", async () => {
+        const wrapper = mount(MultiCombobox as never, {
+            props: {options: FRUITS, optionLabel: 'name', id: 'fruit', modelValue: [2]},
+            attrs: {onKeydown: (event: Event) => event.stopImmediatePropagation()},
+            attachTo: document.body,
+        });
+
+        await wrapper.find('input').trigger('keydown', {key: 'Backspace'});
+
+        expect(wrapper.emitted('update:modelValue')).toEqual([[[]]]);
+        wrapper.unmount();
+    });
+
     it('renders chips for the committed values, has-value, required and invalid state, no placeholder', () => {
         const wrapper = mountMultiCombobox({
             modelValue: [3, 1],
