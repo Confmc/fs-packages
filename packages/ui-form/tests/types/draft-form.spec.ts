@@ -21,7 +21,8 @@ const draft = ref<Draft>({firstName: null, born: new Date(), learningGoals: [], 
 describe('useForm with a draft', () => {
     it('returns the form named by the draft paths', () => {
         expectTypeOf(useForm({draft})).toEqualTypeOf<UseDraftForm<Draft>>();
-        expectTypeOf(useForm({draft})).toEqualTypeOf<UseForm<Path<Draft>>>();
+        // as the form named by the draft paths, but for field(), which also carries the value
+        expectTypeOf<Omit<UseDraftForm<Draft>, 'field'>>().toEqualTypeOf<Omit<UseForm<Path<Draft>>, 'field'>>();
     });
 
     it('keys the errors by the draft paths, nested, indexed and through a nullable branch', () => {
@@ -63,7 +64,12 @@ describe('a helper generic over its draft', () => {
     it('gets the draft form from a Ref<D> without spelling out D', () => {
         const host = <D extends object>(model: Ref<D>): UseDraftForm<D> => useForm({draft: model});
 
-        expectTypeOf(host(draft)).toEqualTypeOf<UseDraftForm<Draft>>();
+        const form = host(draft);
+
+        // From a `ref<Draft>`, a Ref<D> reads D as `Draft | UnwrapRef<Draft>` (the ref's getter and setter
+        // types), which only TypeScript's identity check tells apart from Draft: the form fits both ways.
+        expectTypeOf(form).toExtend<UseDraftForm<Draft>>();
+        expectTypeOf<UseDraftForm<Draft>>().toExtend<typeof form>();
     });
 
     it('names D for a generic shallowRef, which TypeScript cannot read as a Ref<D>', () => {

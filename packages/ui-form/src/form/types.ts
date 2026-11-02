@@ -88,18 +88,25 @@ export type UseFormOptions<T extends string = string> = UseValidationErrorsOptio
     idPrefix?: string;
 };
 
-/** Everything that links one field to the form. */
-interface FormFields<T extends string = string> {
+// The form's parts are interfaces, each named by its type arguments, so a form's type reached through a
+// generic call (`useForm({draft})`, a helper generic over D) stays identical to the one written out.
+
+/** A form's bound label and message, for its fields. */
+interface FormComponents<T extends string = string> {
+    /** A label for one of this form's fields: `<FormLabel name="email" label="E-mail" required />`. */
+    FormLabel: FormLabelComponent<T>;
+    /** One field's message, its element always rendered: `<FormError name="email" />`. */
+    FormError: FormErrorComponent<T>;
+}
+
+/** `field` on a form without a draft. */
+interface FormField<T extends string = string> {
     /**
      * Everything that links one field to the form: `<TextInput v-bind="field('email')" v-model="email" />`
      * plus `<FormError name="email" />`. The id is the name plus the form's unique part, so it is the same
      * on every render and unique per form.
      */
     field: (name: T) => FieldBinding;
-    /** A label for one of this form's fields: `<FormLabel name="email" label="E-mail" required />`. */
-    FormLabel: FormLabelComponent<T>;
-    /** One field's message, its element always rendered: `<FormError name="email" />`. */
-    FormError: FormErrorComponent<T>;
 }
 
 /**
@@ -108,7 +115,10 @@ interface FormFields<T extends string = string> {
  * field wiring. Type a child component's `form` prop with it (or with `UseDraftForm<D>` for a form over a
  * draft).
  */
-export type UseForm<T extends string = string> = UseValidationErrors<T> & UseFormSubmit & FormFields<T>;
+export type UseForm<T extends string = string> = UseValidationErrors<T> &
+    UseFormSubmit &
+    FormField<T> &
+    FormComponents<T>;
 
 /** What `field(name)` adds when the form has a draft: the value at that path, and the write back into it. */
 export interface FieldModel<V> {
@@ -125,11 +135,24 @@ export type UseDraftFormOptions<D extends object> = UseFormOptions<Path<D>> & {
      * carries the value at that path and writes changes back into `draft.value`, so
      * `<TextInput v-bind="field('firstName')" />` needs no `v-model`. Messages stay until the next submit.
      */
-    draft: Ref<D>;
+    // D is read from the ref's value only: a `ref<Draft>` also takes `Draft` in its setter, which would
+    // make D the union `Draft | UnwrapRef<Draft>`.
+    draft: Ref<D, unknown>;
 };
 
-/** Everything `useForm` returns for a form with a draft: as `UseForm`, named by the draft's paths. */
-export type UseDraftForm<D extends object> = Omit<UseForm<Path<D>>, 'field'> & {
+/** `field` on a form with a draft: the wiring plus the value, `modelValue` typed as the value at that path. */
+interface DraftField<D extends object> {
+    <P extends Path<D>>(name: P): FieldBinding & FieldModel<PathValue<D, P>>;
+}
+
+/** `field` on a form with a draft. */
+interface DraftFormField<D extends object> {
     /** The wiring plus the value: `modelValue` is typed as the value at that path. */
-    field: <P extends Path<D>>(name: P) => FieldBinding & FieldModel<PathValue<D, P>>;
-};
+    field: DraftField<D>;
+}
+
+/** Everything `useForm` returns for a form with a draft: as `UseForm`, named by the draft's paths. */
+export type UseDraftForm<D extends object> = UseValidationErrors<Path<D>> &
+    UseFormSubmit &
+    DraftFormField<D> &
+    FormComponents<Path<D>>;
