@@ -4,6 +4,7 @@
 import {mount} from '@vue/test-utils';
 import {afterEach, describe, expect, it} from 'vitest';
 
+import GroupSelect from '../src/components/GroupSelect.vue';
 import SingleSelect from '../src/components/SingleSelect.vue';
 
 const CALLER_ORDER = [
@@ -12,20 +13,27 @@ const CALLER_ORDER = [
     {id: 3, name: 'Mango'},
 ];
 
-const SORTABLE = [{name: 'SingleSelect', component: SingleSelect, modelValue: null, opener: 'button'}] as const;
+const SORTABLE = [
+    {name: 'SingleSelect', component: SingleSelect, props: {options: CALLER_ORDER, modelValue: null}},
+    {
+        name: 'GroupSelect',
+        component: GroupSelect,
+        props: {groups: [{text: 'Fruit', options: CALLER_ORDER}], modelValue: null},
+    },
+] as const;
 
 afterEach(() => {
     document.body.innerHTML = '';
 });
 
-describe.each(SORTABLE)('$name — option order', ({component, modelValue, opener}) => {
+describe.each(SORTABLE)('$name — option order', ({component, props}) => {
     const renderedOrder = async (extra: Record<string, unknown>) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic SFCs through one mount
         const wrapper = mount(component as any, {
-            props: {options: CALLER_ORDER, optionLabel: 'name', id: 'f', modelValue, ...extra},
+            props: {optionLabel: 'name', id: 'f', ...props, ...extra},
             attachTo: document.body,
         });
-        await wrapper.find(opener).trigger('click');
+        await wrapper.find('[role="combobox"]').trigger('click');
         return wrapper.findAll('[role="option"]').map((option) => option.text());
     };
 

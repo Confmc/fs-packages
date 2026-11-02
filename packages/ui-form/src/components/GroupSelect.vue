@@ -106,6 +106,7 @@ const {
     id,
     placeholder = 'Select…',
     disabled = false,
+    alphabeticalSort = false,
     required = false,
     invalid = false,
     describedby,
@@ -124,6 +125,11 @@ const {
     id: string;
     placeholder?: string;
     disabled?: boolean;
+    /**
+     * sort each group's options by display string — off by default, so the caller's order is kept.
+     * The groups always keep the caller's order.
+     */
+    alphabeticalSort?: boolean;
     /** conveys the required state to assistive tech via `aria-required`. */
     required?: boolean;
     invalid?: boolean;
@@ -164,16 +170,27 @@ const labelOf = (option: T): string =>
         ? optionLabel(option)
         : String((option as Record<PropertyKey, unknown>)[optionLabel as PropertyKey]);
 
-// All options across all groups in declaration order — the flat index space useListbox and
-// commit/isSelected/isMuted operate on. Groups are caller-ordered; no alphabeticalSort.
-const flatOptions = computed(() => groups.flatMap((g) => g.options));
+// The groups as shown: caller-ordered, each group's options sorted by display string when
+// `alphabeticalSort` is set. `slice()` copies a group's options with its holes still holes, so
+// the hole-skipping `flatMap` and `buildGroupRows` keep agreeing; a spread would fill them.
+const shownGroups = computed(() =>
+    alphabeticalSort
+        ? groups.map((group) => ({
+              ...group,
+              options: group.options.slice().sort((a, b) => labelOf(a).localeCompare(labelOf(b))),
+          }))
+        : groups,
+);
+// All options across all groups in the order shown — the flat index space useListbox and
+// commit/isSelected/isMuted operate on.
+const flatOptions = computed(() => shownGroups.value.flatMap((g) => g.options));
 const selected = computed(() => flatOptions.value.find((option) => option.id === model.value));
 // Stable `v-for` keys for OptionList, indexed by the flat option index `rows` navigates.
 const optionKeys = computed(() => flatOptions.value.map((option) => String(option.id)));
 
 // The mixed header/boundary/option row sequence — the encoding lives once in `buildGroupRows`
 // (shared with GroupCombobox), so the boundary/empty-group rules stay a single-site invariant.
-const rows = computed(() => buildGroupRows(groups));
+const rows = computed(() => buildGroupRows(shownGroups.value));
 
 /** `aria-selected` marks the COMMITTED value — OptionList only asks about rendered indices. */
 const isSelected = (index: number): boolean => flatOptions.value[index].id === model.value;
