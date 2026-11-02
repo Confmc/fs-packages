@@ -66,3 +66,32 @@ export interface UseFormSubmit {
     /** `true` while a submit action is in flight — the form's loading state. */
     submitting: Ref<boolean>;
 }
+
+/** Options for `useForm`: the validation options plus the scroll to the first invalid field. */
+export type UseFormOptions<T extends string = string> = UseValidationErrorsOptions<T> & {
+    /**
+     * When this form takes a 422, scroll the first invalid field into view. Off unless you ask for it:
+     * the query is document-wide unless `scrollRoot` scopes it, so on a page with more than one form a
+     * field another form still marks can be the one scrolled to. Requires the controls to mark the
+     * errored field (the default target is `[aria-invalid="true"]`, which this package's controls render).
+     * @default false
+     */
+    scrollToError?: boolean;
+    /**
+     * Scopes the `scrollToError` query to one form's subtree; pass it when forms share a page.
+     * Omitted: document-wide. Provided but `null`: no scroll (never falls back to the document).
+     */
+    scrollRoot?: Ref<HTMLElement | null>;
+    /**
+     * CSS selector for the invalid-field mark, used by `scrollToError`. Pass your own when your
+     * inputs mark errors differently (e.g. a class); the form marks nothing itself.
+     * @default '[aria-invalid="true"]'
+     */
+    scrollTarget?: string;
+};
+
+/**
+ * Everything `useForm` returns: the field-error bag, `take` and `clearErrors` from
+ * `useValidationErrors`, plus `handleSubmit` and the `submitting` loading flag from `useFormSubmit`.
+ */
+export type UseForm<T extends string = string> = UseValidationErrors<T> & UseFormSubmit;
