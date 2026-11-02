@@ -224,6 +224,31 @@ describe('RadioGroup', () => {
         await radios[0].setValue(true);
         expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual(['b']);
     });
+
+    it('round-trips boolean ids, keeping false apart from null', async () => {
+        const answers = [
+            {id: true, name: 'Ja'},
+            {id: false, name: 'Nee'},
+        ];
+        const wrapper = mountGroup({options: answers});
+        const radios = wrapper.findAll('input[type="radio"]');
+        const checked = () => radios.map((radio) => (radio.element as HTMLInputElement).checked);
+
+        expect(checked()).toEqual([false, false]);
+
+        await radios[1].setValue(true);
+        expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([false]);
+        await wrapper.setProps({modelValue: false});
+        expect(checked()).toEqual([false, true]);
+
+        await radios[0].setValue(true);
+        expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([true]);
+        await wrapper.setProps({modelValue: true});
+        expect(checked()).toEqual([true, false]);
+
+        await wrapper.setProps({modelValue: null});
+        expect(checked()).toEqual([false, false]);
+    });
 });
 
 // WR-1922: the browser moves the checked radio before the host decides. A host that declines (never
