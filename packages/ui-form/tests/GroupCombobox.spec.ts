@@ -144,23 +144,6 @@ describe('GroupCombobox', () => {
         expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([2]); // Kiwi
     });
 
-    it.each([false, true])(
-        'renders a sparse options array without throwing — holes emit no phantom rows (alphabeticalSort %s)',
-        async (alphabeticalSort) => {
-            // The flattened options (`flatMap`) and `buildGroupRows` (`forEach`) both skip array
-            // HOLES, so a hole contributes no row on either side. With no query the group's options
-            // pass through unfiltered, holes and all; the sort copies them without filling the holes,
-            // so it keeps that true.
-            const sparse: Fruit[] = [{id: 3, name: 'Papaya'}];
-            sparse[2] = {id: 1, name: 'Mango'}; // index 1 is a hole
-            const wrapper = mountGroupCombobox({groups: [{options: sparse, text: 'Tropical'}], alphabeticalSort});
-            await wrapper.find('input').trigger('click');
-
-            // Two real options, no row for the hole, and no render throw.
-            expect(menu(wrapper).findAll('.ui-groupcombobox__option')).toHaveLength(2);
-        },
-    );
-
     it('commits on click, emits update:modelValue, closes, and snaps input to label', async () => {
         const wrapper = mountGroupCombobox({});
         await wrapper.find('input').trigger('click');

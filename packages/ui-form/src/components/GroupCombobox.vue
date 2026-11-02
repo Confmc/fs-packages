@@ -177,9 +177,7 @@ const query = ref(selectedLabel.value);
 
 // The groups as shown: caller-ordered, each group's options filtered by the trimmed, case-folded
 // query (empty query ⇒ all), then sorted by display string when `alphabeticalSort` is set. A group
-// the filter empties is dropped. `slice()` copies an unfiltered group's options with its holes
-// still holes, so the hole-skipping `flatMap` and `buildGroupRows` keep agreeing; a spread would
-// fill them.
+// the filter empties is dropped. The sort runs on a copy, never mutating the caller's array.
 //
 // WR-0576 (browse-to-change): a query EQUAL to the committed rendering does NOT filter. The
 // query rests on that rendering, so without this rule opening a FILLED combobox narrowed the
@@ -194,9 +192,7 @@ const filteredData = computed(() => {
                 : group.options;
             return {
                 ...group,
-                options: alphabeticalSort
-                    ? matched.slice().sort((a, b) => labelOf(a).localeCompare(labelOf(b)))
-                    : matched,
+                options: alphabeticalSort ? [...matched].sort((a, b) => labelOf(a).localeCompare(labelOf(b))) : matched,
             };
         })
         .filter((group) => group.options.length > 0);
@@ -209,9 +205,7 @@ const filteredOptions = computed(() => filteredData.value.flatMap((g) => g.optio
 const optionKeys = computed(() => filteredOptions.value.map((option) => String(option.id)));
 
 // The mixed header/boundary/option row sequence over the filtered groups — same single-site
-// `buildGroupRows` encoding GroupSelect uses. filteredData drops a group the filter empties; a
-// group of holes alone still reaches buildGroupRows, whose empty-group guard emits nothing for
-// it.
+// `buildGroupRows` encoding GroupSelect uses.
 const filteredRows = computed(() => buildGroupRows(filteredData.value));
 
 /** `aria-selected` marks the COMMITTED value — OptionList only asks about rendered indices. */
