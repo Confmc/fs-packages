@@ -1046,3 +1046,9 @@ pass `--maxWorkers=2` to vitest (the vitest guard hook is now scoped to emmie an
 - Pass `--maxWorkers=2` to vitest; run gates one at a time; Stryker with `--force` (incremental misreports).
 - Browser tests failing with "Executable doesn't exist … chromium_headless_shell-NNNN": never download; symlink the
   cached revision (`ln -sfn chromium_headless_shell-<have> chromium_headless_shell-<want>` in ~/.cache/ms-playwright).
+- **Local branch cleanup: deferred until further in** (Marcel, 2026-11-02: storage is cheap). Checked safe to delete
+  then: `experiment/{form-merge,form-wiring,ui-form,ui-form-field,ui-form-glue,ui-form-spread}`, all `split/*` (their
+  code is in `review/ui-form-vs-sources` on fork; every component they assembled is now a PR or fork branch), and
+  `slot-split-backup`. Keep `reference/ui-form-04-pressable`/`-disclosure` (sources for those two). Idea for then:
+  extend the bash-validator in `Confmc/claude-config` with a LOCAL-only exception for `script-development/fs-packages`
+  (forced branch deletion and worktree removal; remote/tag/ref deletion stay gated).
