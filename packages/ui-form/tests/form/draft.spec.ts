@@ -86,11 +86,14 @@ describe('useForm with a draft', () => {
                         h(
                             // mergeProps returns untyped props, which h() takes only for an untyped component
                             TextInput as Component,
-                            mergeProps({...field('firstName')}, {
-                                placeholder: 'Voornaam',
-                                modelValue: other.value,
-                                'onUpdate:modelValue': (value: string | null) => (other.value = value),
-                            }),
+                            mergeProps(
+                                {...field('firstName')},
+                                {
+                                    placeholder: 'Voornaam',
+                                    modelValue: other.value,
+                                    'onUpdate:modelValue': (value: string | null) => (other.value = value),
+                                },
+                            ),
                         );
                 },
             }),
