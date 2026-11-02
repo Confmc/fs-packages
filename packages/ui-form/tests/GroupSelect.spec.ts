@@ -144,6 +144,17 @@ describe('GroupSelect', () => {
         expect(menu(wrapper).exists()).toBe(false);
     });
 
+    it('commits nothing on Enter while no option is highlighted, and stays open', async () => {
+        const wrapper = mountGroupSelect({});
+        const control = wrapper.find('.ui-groupselect__trigger');
+
+        await control.trigger('keydown', {key: 'ArrowDown'}); // open, nothing highlighted
+        await control.trigger('keydown', {key: 'Enter'});
+
+        expect(wrapper.emitted('update:modelValue')).toBeUndefined();
+        expect(menu(wrapper).exists()).toBe(true);
+    });
+
     it('Home/End jump to first and last option', async () => {
         const wrapper = mountGroupSelect({});
         const control = wrapper.find('.ui-groupselect__trigger');
