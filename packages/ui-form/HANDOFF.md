@@ -790,7 +790,11 @@ CODEOWNERS requests the team automatically when a PR leaves draft).
   `flip({fallbackPlacements, flipAlignment: false})`), own listeners (incl. keydown) on the control before the
   consumer's attrs, IME-safe comboboxes (v-model query, composition keys skip the listbox, no open after a blur).
 
-**Next, in order:** apply the useForm review; then form chain slice 3 (typed paths + draft), 4 (`field()` with bound
+**In progress at day end:** slice 3 (typed paths + draft) on local branch `ui-form/n-form-paths` off `n-use-form`, worktree
+`scratchpad/s2-paths`, being ported by an agent (no fs-form original; source = the experiment's `path.ts`/`draft.ts`).
+If it isn't on fork yet, check that worktree; push it, review it like the others.
+
+**Next, in order:** form chain slice 3 (typed paths + draft), 4 (`field()` with bound
 FormLabel/FormError; `scrollToError` default true with id lookup), 5 (the kit + `createUiForm({texts})`), each off the
 previous, source = `experiment/ui-form-control`'s `src/form/` (built 10-19). Then a generic DatePicker (first shape:
 emmie's `DatePickerField` + `calendar/` grid under the package's rules; emmie's domain pickers stay emmie's). Then
