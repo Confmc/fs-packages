@@ -447,6 +447,7 @@ describe('useForm field()', () => {
 
         expect(form.field('email').id).toBe('invoice-email');
     });
+
     it('marks and describes the control it is bound to', async () => {
         let form!: UseForm<'email'>;
         const wrapper = mount(
@@ -482,7 +483,7 @@ describe('useForm FormLabel and FormError (form-bound)', () => {
                         h('div', [
                             h(form.FormLabel, {name: 'firstName', label: 'Voornaam', required: true, class: 'w-40'}),
                             h(TextInput, {...form.field('firstName'), placeholder: 'Voornaam', modelValue: ''}),
-                            h(form.FormError, {name: 'firstName'}),
+                            h(form.FormError, {name: 'firstName', class: 'mt-1'}),
                         ]);
                 },
             }),
@@ -495,7 +496,8 @@ describe('useForm FormLabel and FormError (form-bound)', () => {
         const label = wrapper.find('label');
 
         expect(label.attributes('for')).toBe('client-firstName');
-        expect(label.text()).toContain('Voornaam');
+        expect(label.attributes('for')).toBe(wrapper.find('input').attributes('id'));
+        expect(label.text()).toBe('Voornaam*');
         expect(label.find('.ui-label__req').exists()).toBe(true);
         expect(label.classes()).toContain('w-40');
 
@@ -505,6 +507,21 @@ describe('useForm FormLabel and FormError (form-bound)', () => {
         const message = wrapper.find(`#${wrapper.find('input').attributes('aria-describedby')}`);
         expect(message.text()).toBe('Vul een voornaam in');
         expect(message.attributes('role')).toBe('alert');
+        expect(message.classes()).toEqual(['ui-error', 'mt-1']);
+    });
+
+    it('renders no required mark unless asked', () => {
+        const wrapper = mount(
+            defineComponent({
+                setup() {
+                    const {FormLabel} = useForm<'firstName'>();
+                    return () => h(FormLabel, {name: 'firstName', label: 'Voornaam'});
+                },
+            }),
+        );
+
+        expect(wrapper.find('label').text()).toBe('Voornaam');
+        expect(wrapper.find('.ui-label__req').exists()).toBe(false);
     });
 
     it("keeps the message's element in place, empty, while the field is clean", () => {
