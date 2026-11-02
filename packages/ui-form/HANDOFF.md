@@ -860,8 +860,9 @@ Marcel is asking him). Pre-forms emmie counts: ~100 selects sorted by default, 1
 #354: merge main into each, push to the PR branch, delete the hold branch. `n-checkbox-group` already has the same
 `types.ts` change (@da1f523, identical lines, merges clean).
 
-**Next, in order:** the shape-review fixes Marcel approves; slice 6 after the controls merge; slice 5 (the kit + `createUiForm({texts})`), each off the
-previous, source = `experiment/ui-form-control`'s `src/form/` (built 10-19). Then Pressable/Disclosure after #332,
+**Next, in order:** the shape-review fixes Marcel approves (the token fix off main first; the slot split into slice
+5); landing.10 for the test bed; Pressable/Disclosure after #332; slice 6 once every control is on main (source:
+`experiment/ui-form-control`'s `src/form/kit.ts`),
 then the release PR (fresh off main once everything merged; see "Release sequence"). **No package DatePicker**
 (decided 2026-11-02, see below). BooleanRadioGroup: decided (2026-11-02): no own control. emmie's Ja/Nee pairs use the package RadioGroup; `SelectItem.id`
 widens to `string | number | boolean` so `{id: true, name: 'Ja'}` types. Do it on #344 (and the checkbox-group branch,
