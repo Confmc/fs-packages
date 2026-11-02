@@ -522,6 +522,33 @@ describe('Combobox', () => {
             expect(wrapper.emitted('update:modelValue')).toBeUndefined();
         });
 
+        // Browsers flag a key that belongs to a composition with `isComposing`; some report only
+        // keyCode 229 instead. An IME moves through its candidates with the arrow keys and confirms one
+        // with Enter, so neither may reach the list.
+        it.each([
+            ['isComposing', {isComposing: true}],
+            ['keyCode 229', {keyCode: 229}],
+        ])('leaves ArrowDown and Enter flagged by %s to the input method', async (_, flag) => {
+            const wrapper = mountCombobox({});
+            const input = wrapper.find('input');
+            const press = (key: string): void => {
+                input.element.dispatchEvent(
+                    new KeyboardEvent('keydown', {key, bubbles: true, cancelable: true, ...flag}),
+                );
+            };
+
+            await input.trigger('keydown', {key: 'ArrowDown'}); // open
+            input.element.dispatchEvent(new CompositionEvent('compositionstart', {bubbles: true}));
+            compose(input.element, 'か');
+            press('ArrowDown');
+            press('Enter');
+            await wrapper.vm.$nextTick();
+
+            expect(input.attributes('aria-activedescendant')).toBeUndefined();
+            expect(wrapper.emitted('update:modelValue')).toBeUndefined();
+            expect(menu(wrapper).exists()).toBe(true);
+        });
+
         it('keeps the candidate text in the field across a re-render while composing', async () => {
             const wrapper = mountCombobox({});
             const field = wrapper.find('input').element;
