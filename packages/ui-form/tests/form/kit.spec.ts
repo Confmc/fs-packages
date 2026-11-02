@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import {enableAutoUnmount, mount} from '@vue/test-utils';
-import {afterEach, describe, expect, it} from 'vitest';
+import {afterEach, describe, expect, it, vi} from 'vitest';
 import {defineComponent, h, nextTick, ref} from 'vue';
 
 import type {FieldBinding, UseDraftForm} from '../../src';
@@ -30,6 +30,7 @@ const mountWith = (render: (form: UseDraftForm<Draft>) => ReturnType<typeof h>) 
 // A failing test still unmounts: ids from useId() repeat across mounts, so a form left in the DOM
 // would be found in place of the next test's.
 enableAutoUnmount(afterEach);
+afterEach(() => vi.restoreAllMocks());
 
 describe('form-bound controls', () => {
     it('draws the field around the control, wired by its name: label, value, write-back, message', async () => {
@@ -178,6 +179,21 @@ describe('form-bound controls', () => {
             'Opnieuw',
         ]);
         expect(wrapper.findAllComponents(TextInput)).toHaveLength(2);
+    });
+
+    it("shows the server's 422 on its bound field and scrolls the refused control into view", async () => {
+        const scrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {});
+        const {wrapper, form} = mountWith(({TextField}) =>
+            h(TextField, {name: 'name', label: 'Naam', placeholder: 'Vul in'}),
+        );
+        const refusal = {isAxiosError: true, response: {status: 422, data: {errors: {name: ['Al in gebruik']}}}};
+
+        await expect(form().handleSubmit(() => Promise.reject(refusal))).resolves.toBe('refused');
+
+        const input = wrapper.find('input');
+        expect(input.attributes('aria-invalid')).toBe('true');
+        expect(wrapper.find(`#${input.attributes('aria-describedby')}`).text()).toBe('Al in gebruik');
+        expect(scrollIntoView.mock.contexts).toEqual([input.element]);
     });
 
     it('takes a v-model at the call site over the draft, so a proxy converts before the draft is written', async () => {
