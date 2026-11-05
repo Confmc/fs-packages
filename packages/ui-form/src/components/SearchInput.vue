@@ -47,11 +47,14 @@ import {controlAttrs, rootAttrs} from '../internal/split-attrs';
 import ErrorIcon from './ErrorIcon.vue';
 
 const {
+    modelValue,
     disabled = false,
     invalid = false,
     clearLabel,
     autofocus = false,
 } = defineProps<{
+    /** the value; `null` shows an empty control. */
+    modelValue: string | null;
     /** control id, pairing the input with its label and error; inside a `FormField` the field passes its own. */
     id: string;
     /** required, so no input goes without one. */
@@ -72,7 +75,15 @@ const {
 defineOptions({inheritAttrs: false});
 
 // As TextInput: binds null as empty, emits '' when cleared.
-const model = defineModel<string | null>({required: true});
+const emit = defineEmits<{'update:modelValue': [value: string]}>();
+// v-model stays on the native element (so Vue's IME handling applies), over a computed: the event is
+// declared as what it writes, a string, so a draft path typed plain `string` binds. defineModel cannot
+// type its event apart from its prop.
+const model = computed({
+    get: () => modelValue,
+    // the native element writes its text, never null
+    set: (value: string | null) => emit('update:modelValue', value!),
+});
 
 const showClear = computed(() => clearLabel !== undefined && !disabled && Boolean(model.value));
 
