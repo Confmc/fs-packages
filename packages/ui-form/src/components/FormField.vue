@@ -50,9 +50,9 @@ defineSlots<{
     /** `field` for a control of this package, `aria` for a native element (a `role="group"` div). */
     default?: (scope: {field: FieldBinding; aria: FieldAria}) => unknown;
     /**
-     * inside the label, after its text and required mark: a short note ("(roepnaam)") or a hover tooltip's icon.
-     * Its text joins the field's accessible name, and nothing in it may be focusable (a label holds no
-     * interactive content): a button belongs in `aside`. Shown only with a `label`.
+     * inside the label, after its text and required mark: a short note ("(roepnaam)"). A label holds phrasing
+     * content only (text, `<span>`), its text joins the field's accessible name, and nothing in it may be
+     * focusable: a button or other interactive content belongs in `aside`. Shown only with a `label`.
      */
     'label-after'?: () => unknown;
 }>();
