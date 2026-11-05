@@ -213,6 +213,9 @@
     --ui-danger-shadow: 0 0 0 3px rgba(220, 38, 38, 0.2);
     --ui-error-size: 0.8125rem;
     --ui-error-weight: 400;
+    /* a field's hint (FormField #hint): the message's size, in the muted control text. */
+    --ui-hint-text: var(--ui-control-text-muted);
+    --ui-hint-size: var(--ui-error-size);
 }
 
 @layer ui-form {
@@ -256,9 +259,14 @@
             grid-row: 1;
             min-width: 0;
         }
+        /* the hint and the message sit under the control; with a hint, the message one row lower */
+        .ui-field.is-horizontal > .ui-hint,
         .ui-field.is-horizontal > .ui-error {
             grid-column: 2;
             grid-row: 2;
+        }
+        .ui-field.is-horizontal > .ui-hint ~ .ui-error {
+            grid-row: 3;
         }
     }
 
@@ -850,6 +858,11 @@
     .ui-check-group .ui-check + .ui-check,
     .ui-radio-group .ui-check + .ui-check {
         margin-top: var(--ui-check-item-gap);
+    }
+
+    .ui-hint {
+        color: var(--ui-hint-text);
+        font-size: var(--ui-hint-size);
     }
 
     .ui-error {

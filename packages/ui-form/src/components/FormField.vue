@@ -10,16 +10,17 @@
         <div class="ui-field__control">
             <slot :field="field" :aria="aria" />
         </div>
+        <div v-if="$slots.hint" :id="hintId(id)" class="ui-hint"><slot name="hint" /></div>
         <FormError :error="error" :id="errorId" />
     </div>
 </template>
 
 <script setup lang="ts">
-import {computed} from 'vue';
+import {computed, useSlots} from 'vue';
 
 import type {FieldAria, FieldBinding} from '../types';
 
-import {labelId, messageId} from '../form/field';
+import {hintId, labelId, messageId} from '../form/field';
 import FormError from './FormError.vue';
 import FormLabel from './FormLabel.vue';
 
@@ -51,16 +52,19 @@ defineSlots<{
     default?: (scope: {field: FieldBinding; aria: FieldAria}) => unknown;
     /** inside the label, after its text and required mark: a tooltip. */
     'label-after'?: () => unknown;
+    /** under the control, above the message: what the field expects. Read with the field after the message. */
+    hint?: () => unknown;
 }>();
+const slots = useSlots();
 
 const errorId = computed(() => messageId(id));
 
 // The field decides the message; the control only learns whether it is invalid and where its message is.
-const field = computed<FieldBinding>(() => ({
-    id,
-    invalid: Boolean(error),
-    describedby: error ? errorId.value : undefined,
-}));
+const field = computed<FieldBinding>(() => {
+    const describedby = [error && errorId.value, slots.hint && hintId(id)].filter(Boolean).join(' ');
+
+    return {id, invalid: Boolean(error), describedby: describedby || undefined};
+});
 
 // A <label for> names only a form control; a native element is named by aria-labelledby instead. An attribute
 // that does not apply is left out, not set undefined, so one the consumer adds holds in any binding order.
