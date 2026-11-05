@@ -3,7 +3,7 @@
         :is="as"
         ref="control"
         class="ui-pressable"
-        :class="{'is-disabled': !native && disabled, 'keeps-tag-display': keepsTagDisplay}"
+        :class="{'is-disabled': emulatesDisabled, 'keeps-tag-display': keepsTagDisplay}"
         :aria-pressed="pressed"
         @click="onClick"
         @keydown="onKeydown"
@@ -97,6 +97,9 @@ const tag = computed(() => as.toLowerCase());
 
 const native = computed(() => tag.value === 'button');
 
+/** A disabled fallback: no native `disabled` exists, so the component emulates it. */
+const emulatesDisabled = computed(() => !native.value && disabled);
+
 /**
  * Tags whose parent's layout algorithm requires the child's own `display` — a `<tr>` forced to
  * `inline-flex` stops being a table row and its cells lose their table boxes. The clickable
@@ -146,7 +149,7 @@ const spaceArmed = ref(false);
 const isChildsOwnKey = (event: KeyboardEvent): boolean => event.target !== event.currentTarget;
 
 /**
- * Disabled inertness for clicks, in the CAPTURE phase — the only phase that reaches a click
+ * Disabled inertness for clicks on the FALLBACK, in the CAPTURE phase — the only phase that reaches a click
  * before the element it landed on. Three things follow from that and none of them from a
  * bubble-phase stop:
  *
@@ -158,14 +161,17 @@ const isChildsOwnKey = (event: KeyboardEvent): boolean => event.target !== event
  * - The consumer's fall-through `@click` is stopped without depending on Vue's handler merge
  *   order — a capture listener on the target runs before EVERY bubble listener on it.
  *
- * The browser is no help on either path: it withholds a click on a disabled <button> only for
- * USER ACTIVATION (`dispatchEvent` still runs every listener on one — measured in Chromium), and
- * the fallback stays fully in hit-testing deliberately, see the `.is-disabled` rule. Making the
- * subtree inert while disabled is also what `role="button"` already claims: its descendants are
- * presentational to assistive tech, so a live interactive child inside one is the defect.
+ * The native path needs none of it. The browser withholds every real click on a disabled
+ * `<button>`, a click on its descendant included: that one reaches the descendant's own listener
+ * and stops there, so no listener on the button, capture or bubble, sees it (measured in Chromium
+ * 157). Only a `dispatchEvent` on the button still runs them, and that is code, not a user. The
+ * fallback stays fully in hit-testing deliberately, see the `.is-disabled` rule, so a real click
+ * reaches it and its subtree. Making that subtree inert is also what `role="button"` already
+ * claims: its descendants are presentational to assistive tech, so a live interactive child inside
+ * one is the defect.
  */
 const onClickCapture = (event: Event): void => {
-    if (!disabled) return;
+    if (!emulatesDisabled.value) return;
 
     event.preventDefault();
     event.stopImmediatePropagation();
@@ -272,7 +278,8 @@ const translateKeydown = (event: KeyboardEvent): void => {
 const onKeydown = (event: KeyboardEvent): void => {
     // Deaf while disabled, and that covers EVERY key rather than the two translated ones: the leak
     // is the consumer's handler, which does not care which key produced it. Reachable, not
-    // theoretical — see the mouse-focusable note above. Propagation is untouched by design.
+    // theoretical on the fallback — see the mouse-focusable note above. (A disabled native button
+    // takes no focus, so no real key reaches it here.) Propagation is untouched by design.
     if (disabled) return;
 
     translateKeydown(event);

@@ -73,17 +73,12 @@ describe('Pressable', () => {
         expect(wrapper.emitted('update:pressed')?.at(-1)).toEqual([false]);
     });
 
-    it('renders disabled and ignores a click reaching the handler anyway', async () => {
+    it('renders disabled as a native disabled button', () => {
         const wrapper = mount(Pressable, {props: {label: 'Go', disabled: true, pressed: false}});
 
+        // The browser withholds every real click on it, so the component adds no guard of its own.
         expect(wrapper.attributes('disabled')).toBeDefined();
-        // Native dispatch — a real browser withholds a click on a disabled button only for USER
-        // ACTIVATION, so this is the path a real consumer's handler can still be reached on
-        // (`dispatchEvent` runs listeners on a disabled button in Chromium), and the guard is what
-        // stops it rather than the browser.
-        click(wrapper.element);
-        await wrapper.vm.$nextTick();
-        expect(wrapper.emitted('update:pressed')).toBeUndefined();
+        expect(wrapper.classes()).not.toContain('is-disabled');
     });
 
     it('falls attrs through to the button — the root IS the interactive element, so nothing is re-aimed', () => {
@@ -237,28 +232,6 @@ describe('Pressable — the discouraged `as` escape hatch', () => {
         await wrapper.vm.$nextTick();
         expect(onClick).not.toHaveBeenCalled();
         expect(wrapper.emitted('update:pressed')).toBeUndefined();
-    });
-
-    it('runs NOTHING when disabled — the fallback matches the native path it emulates', async () => {
-        // Half a disabled contract is worse than none, so the two paths are asserted against each
-        // other rather than separately: the browser refuses to dispatch on a disabled <button>,
-        // and the hand-rolled emulation has to reach the same observable end state.
-        const nativeClick = vi.fn();
-        const native = mount(Pressable, {props: {label: 'Row', disabled: true}, attrs: {onClick: nativeClick}});
-        click(native.element);
-
-        const fallbackClick = vi.fn();
-        const fallback = mount(Pressable, {
-            props: {as: 'div', label: 'Row', disabled: true},
-            attrs: {onClick: fallbackClick},
-        });
-        click(fallback.element);
-
-        await Promise.all([native.vm.$nextTick(), fallback.vm.$nextTick()]);
-
-        expect(nativeClick).not.toHaveBeenCalled();
-        expect(fallbackClick).not.toHaveBeenCalled();
-        expect(fallbackClick.mock.calls.length).toBe(nativeClick.mock.calls.length);
     });
 
     it('stops the fall-through handler because OUR handler is merged ahead of it', async () => {
@@ -518,8 +491,8 @@ describe('Pressable — a disabled control is deaf to keys, not merely un-activa
         return {wrapper, onKeydown, onKeyup};
     };
 
-    it.each(['div', undefined])('stops the fall-through handlers on the as=%s path', (as) => {
-        const {wrapper, onKeydown, onKeyup} = mountWithKeyHandlers({as, disabled: true});
+    it('stops the fall-through handlers on a disabled fallback', () => {
+        const {wrapper, onKeydown, onKeyup} = mountWithKeyHandlers({as: 'div', disabled: true});
 
         key(wrapper.element, 'keydown', 'Enter');
         key(wrapper.element, 'keydown', ' ');
@@ -543,7 +516,7 @@ describe('Pressable — a disabled control is deaf to keys, not merely un-activa
         expect(onKeyup).toHaveBeenCalledTimes(1);
     });
 
-    it.each(['div', undefined])('lets an ANCESTOR keep receiving keys past a disabled as=%s', (as) => {
+    it('lets an ANCESTOR keep receiving keys past a disabled fallback', () => {
         // The regression this pins: a disabled Pressable is mouse-focusable and stays in
         // hit-testing, so a key pressed ON it used to be stopImmediatePropagation()'d and never
         // reached the dialog/table listening above — an Escape that no longer closed the dialog.
@@ -555,7 +528,7 @@ describe('Pressable — a disabled control is deaf to keys, not merely un-activa
 
         const onKeydown = vi.fn();
         const wrapper = mount(Pressable, {
-            props: {label: 'Row', as, disabled: true},
+            props: {label: 'Row', as: 'div', disabled: true},
             attrs: {onKeydown},
             attachTo: host,
         });
