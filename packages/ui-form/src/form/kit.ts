@@ -52,7 +52,8 @@ export interface BoundControls<D> {
     /**
      * `TextInput` in a `FormField`, bound by name:
      * `<TextField name="email" label="E-mail" placeholder="…" required />`. On a draft form the name is a
-     * path holding `string` or `string | null`.
+     * path holding `string` or `string | null`. Its `label-after`, `aside` and `hint` slots go to the field
+     * (the control names the hint after the message), every other slot to `TextInput`.
      */
     TextField: BoundControl<NamesFor<D, string | null, string>, typeof TextInput, string | null>;
     /**
@@ -131,13 +132,15 @@ type Message = (name: string) => string | undefined;
 /**
  * One form-bound control: `FormField` around the control, wired by `field(name)`. The control's own
  * props and attributes pass through (`class`/`style` land on the field), and they win over the wiring,
- * so `:invalid="false"` or a `v-model` at the call site overrides the form's.
+ * so `:invalid="false"` or a `v-model` at the call site overrides the form's. The frame's slots
+ * (`label-after`, `aside`, `hint`) go to the field, every other slot to the control.
  */
 const bind = (field: Field, message: Message, control: Component, name: string) =>
     defineComponent(
         (props: BoundShell<string>, {attrs, slots}) =>
             () => {
                 const {class: className, style, ...rest} = attrs;
+                const {'label-after': labelAfter, aside, hint, ...controlSlots} = slots;
                 const wiring = field(props.name);
                 return h(
                     FormField,
@@ -150,7 +153,18 @@ const bind = (field: Field, message: Message, control: Component, name: string) 
                         class: className,
                         style,
                     },
-                    {default: () => h(control, {...wiring, required: props.required, ...rest}, slots)},
+                    {
+                        // the frame names the message and the hint
+                        default: ({field: frame}: FrameScope) =>
+                            h(
+                                control,
+                                {...wiring, describedby: frame.describedby, required: props.required, ...rest},
+                                controlSlots,
+                            ),
+                        'label-after': labelAfter,
+                        aside,
+                        hint,
+                    },
                 );
             },
         {name, inheritAttrs: false, props: ['name', 'label', 'required', 'orientation']},

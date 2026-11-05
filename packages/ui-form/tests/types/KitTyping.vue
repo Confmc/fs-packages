@@ -40,7 +40,12 @@
     <FormField v-slot="{field}" name="contractNumber" label="Uren">
         <TextInput v-bind="field" v-model="hours" placeholder="Vul in" />
     </FormField>
-    <!-- the frame's own slots route through the bound frame -->
+    <!-- the frame's own slots route through the bound field and the bound frame -->
+    <TextField name="name" label="Naam" placeholder="Vul in">
+        <template #label-after><span>(werk)</span></template>
+        <template #aside><span>aan</span></template>
+        <template #hint>Zoals op het contract</template>
+    </TextField>
     <FormField name="name" label="Naam">
         <template #default="{field, model}"><TextInput v-bind="{...field, ...model}" placeholder="Vul in" /></template>
         <template #label-after><span>(werk)</span></template>

@@ -375,4 +375,26 @@ describe("the field frame's slots through the bound components", () => {
         expectFramePlaced(wrapper, id);
         expect(scope.field.describedby).toBe(`${id}-hint`);
     });
+
+    it("routes a bound TextField's label-after, aside and hint to the frame; the control names the hint after the message", async () => {
+        const {wrapper, form} = mountWith(({TextField}) =>
+            h(TextField, {name: 'name', label: 'Naam', required: true, placeholder: 'Vul in'}, frameSlots),
+        );
+        const id = form().field('name').id;
+
+        expectFramePlaced(wrapper, id);
+        expect(wrapper.find('input').attributes('aria-describedby')).toBe(`${id}-hint`);
+
+        form().refuse('name', 'Te kort');
+        await nextTick();
+        expect(wrapper.find('input').attributes('aria-describedby')).toBe(`${id}-error ${id}-hint`);
+    });
+
+    it("sends a bound TextField's other slots to the control, and the frame's slots not", () => {
+        const {wrapper} = mountWith(({TextField}) =>
+            h(TextField, {name: 'name', placeholder: 'Vul in'}, {...frameSlots, extra: () => 'x'}),
+        );
+
+        expect(Object.keys(wrapper.findComponent(TextInput).vm.$slots)).toEqual(['extra']);
+    });
 });
