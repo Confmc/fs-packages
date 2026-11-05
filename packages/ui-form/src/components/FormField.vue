@@ -65,7 +65,10 @@ defineSlots<{
     'label-after'?: () => unknown;
     /** under the control, above the message: what the field expects. Read with the field after the message. */
     hint?: () => unknown;
-    /** at the far end of the label's row, e.g. a switch that belongs to the field; it takes no wiring: the field's id is the control's. */
+    /**
+     * at the far end of the label's row, e.g. a switch or a tooltip button that belongs to the field; it takes no
+     * wiring: the field's id is the control's. Shown only with a `label` (the row is the label's).
+     */
     aside?: () => unknown;
 }>();
 const slots = useSlots();
