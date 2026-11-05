@@ -193,6 +193,18 @@ describe('Pressable — the discouraged `as` escape hatch', () => {
         expect(onClick).toHaveBeenCalledTimes(1);
     });
 
+    it('keeps Space armed through another key released mid-press', () => {
+        const onClick = vi.fn();
+        const wrapper = mount(Pressable, {props: {as: 'div', label: 'Row'}, attrs: {onClick}});
+
+        key(wrapper.element, 'keydown', ' ');
+        key(wrapper.element, 'keyup', 'Shift'); // neither activates nor disarms
+        expect(onClick).not.toHaveBeenCalled();
+
+        key(wrapper.element, 'keyup', ' ');
+        expect(onClick).toHaveBeenCalledTimes(1);
+    });
+
     it('ignores other keys, and a keyup that our own keydown never armed', () => {
         const onClick = vi.fn();
         const wrapper = mount(Pressable, {props: {as: 'div', label: 'Row'}, attrs: {onClick}});
@@ -562,11 +574,17 @@ describe('Pressable — a disabled control is deaf to keys, not merely un-activa
         const second = vi.fn();
         const first = vi.fn((event: KeyboardEvent) => event.stopImmediatePropagation());
         const wrapper = mount(Pressable, {props: {as: 'div', label: 'Row'}, attrs: {onKeydown: [first, second]}});
+        const later = vi.fn();
+        wrapper.element.addEventListener('keydown', later);
 
-        key(wrapper.element, 'keydown', 'a');
+        const event = key(wrapper.element, 'keydown', 'a');
 
         expect(first).toHaveBeenCalledTimes(1);
         expect(second).not.toHaveBeenCalled();
+        // The stop is the real one, so it reaches the element's later listeners too…
+        expect(later).not.toHaveBeenCalled();
+        // …and the event is handed back without the patch on it.
+        expect(Object.hasOwn(event, 'stopImmediatePropagation')).toBe(false);
     });
 
     it('still clears the Space latch on a disabled keyup — the stop comes AFTER the disarm', async () => {
