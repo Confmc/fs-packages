@@ -1052,3 +1052,26 @@ pass `--maxWorkers=2` to vitest (the vitest guard hook is now scoped to emmie an
   `slot-split-backup`. Keep `reference/ui-form-04-pressable`/`-disclosure` (sources for those two). Idea for then:
   extend the bash-validator in `Confmc/claude-config` with a LOCAL-only exception for `script-development/fs-packages`
   (forced branch deletion and worktree removal; remote/tag/ref deletion stay gated).
+
+## 2026-11-05 (work box)
+
+**Upstream:** #354 merged 11-04 (approved). No other review or answer since 11-02. All 14 open ui-form PRs are green
+on the current main, descriptions current, #353 out of draft (CODEOWNERS requested the team).
+
+**Done today, pushed to the open PRs (each with a description row):** main merged into #333 #335 #341 #342 #343 #344
+#353; held commits in (#344 boolean ids, #333 spec typing; the `hold/*` branches can go); #339's `?.` removal on
+#335 #341 #342 #343; stale descriptions fixed (#353 #336 #332 #339 #340, #333 "merges after #339"); **controls
+declare what they write**: TextInput (in #337, second commit), Textarea (#337), SearchInput (#342), PasswordInput
+(#343) emit `string`; RadioGroup (#344) emits `T['id']`; props unchanged. `defineModel` cannot type its event apart
+from its prop (probed), so the string controls use defineProps + defineEmits + a writable computed under the inner
+`v-model` (IME unchanged); RadioGroup emits directly. Selects keep `id | null`: a type following `clearLabel` was
+probed and works, but declined: the documented rule (ui-inputs § Nullable values) puts non-null domain fields in a
+`FormDraft` narrowed at submit. A permanent type test for the emit types lands with `tests/types` (slice 3).
+
+**Test bed on landing.10:** 4 screens held in the browser (converting proxy writes once; a modal's 422 marks only
+its fields; the token-scope fix confirmed on ProductFormDrawer). Findings: A (string emit, fixed), C (select on a
+non-null field: consumer side, FormDraft), B (`withdraw('learningGoals')` after a splice drops every row's messages;
+a `removeAt(path, index)` that shifts later rows is a candidate: check whether fs-form behaved the same first),
+frame slots missing on `form.FormField` (hint ContractFormDrawer.vue:128,:156,:173,:249 and
+PersonRouteBudgetFields.vue:49; aside PersonRouteBudgetFields.vue:10; label-after FinancingFormDrawer.vue:404,:788:
+build the routing against this list). Its work is local on ui-form-landing-test, uncommitted until Marcel's go.

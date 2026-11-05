@@ -51,6 +51,13 @@ choice. A paper review of nine emmie templates checked them against a real consu
    `:root` as `var()`, so a base token set on one area reaches its focus, invalid and checked states. (#342; the
    token fix on `n-token-scope`)
 
+   **A control's types say what it does.** A control's model prop reads what it can show (`string | null`, an
+   `id | null`); its `update:modelValue` declares only what it writes: a string control emits `string` (`''`
+   when cleared), RadioGroup an option's id; NumberInput, TimeInput and a select with a `clearLabel` can write
+   `null`. A form's draft is `FormDraft<T>` (every clearable value nullable), and a field non-null in the
+   domain is narrowed at submit: "widen the local form state, never the wire type" (ui-inputs' Nullable values
+   rule, carried over). (#337, #342, #343, #344)
+
 6. **[pending] App defaults.** `createUiForm` sets an app's defaults once: its texts, `alphabeticalSort`, and a default
    `clearLabel` per control type. A prop at the call site overrides; `clear-label=""` opts one field out.
 
