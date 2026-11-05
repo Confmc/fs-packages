@@ -30,6 +30,7 @@ export type {
     BoundValueProps,
     DraftFrameScope,
     FieldFrameSlots,
+    FrameContentSlots,
     FrameScope,
     NoAddonProps,
 } from './form/kit';

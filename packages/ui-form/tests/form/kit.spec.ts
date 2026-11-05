@@ -302,3 +302,77 @@ describe('form-bound controls', () => {
         expect(value.value).toBe('y');
     });
 });
+
+describe("the field frame's slots through the bound components", () => {
+    const frameSlots = {
+        'label-after': () => h('em', {class: 'note'}, 'werk'),
+        aside: () => h('span', {class: 'toggle'}, 'aan'),
+        hint: () => 'Zoals op het contract',
+    };
+
+    // label-after inside the label after its required mark, the aside at the end of the label's row, the hint
+    // under the control with the id the control names after the message
+    const expectFramePlaced = (wrapper: ReturnType<typeof mount>, id: string) => {
+        const head = wrapper.find('.ui-field > .ui-field__head');
+        expect(head.find('label').element.lastElementChild?.className).toBe('note');
+        expect(head.find('label .ui-label__req').exists()).toBe(true);
+        expect(head.element.lastElementChild?.className).toBe('toggle');
+        expect(wrapper.find('.ui-field__control + .ui-hint').attributes('id')).toBe(`${id}-hint`);
+        expect(wrapper.find('.ui-hint').text()).toBe('Zoals op het contract');
+    };
+
+    it("routes a bound FormField's label-after, aside and hint to the frame; its slot names the hint after the message", async () => {
+        let scope!: {field: FieldBinding; model?: FieldModel<string | null>};
+        const {wrapper, form} = mountWith(({FormField}) =>
+            h(
+                FormField,
+                {name: 'name', label: 'Naam', required: true},
+                {
+                    ...frameSlots,
+                    default: (slot: typeof scope) => {
+                        scope = slot;
+                        return h(TextInput as Component, mergeProps({...slot.field}, {...slot.model}));
+                    },
+                },
+            ),
+        );
+        const id = form().field('name').id;
+
+        expectFramePlaced(wrapper, id);
+        expect(scope.field.describedby).toBe(`${id}-hint`);
+        expect(scope.model?.modelValue).toBe('Ann');
+
+        form().refuse('name', 'Te kort');
+        await nextTick();
+        expect(scope.field.describedby).toBe(`${id}-error ${id}-hint`);
+        expect(wrapper.find('input').attributes('aria-describedby')).toBe(`${id}-error ${id}-hint`);
+    });
+
+    it('routes the frame slots of a bound FormField on a form without a draft', () => {
+        let scope!: {field: FieldBinding};
+        let id!: string;
+        const wrapper = mount(
+            defineComponent({
+                setup: () => {
+                    const {FormField, field} = useForm<'email'>();
+                    id = field('email').id;
+                    return () =>
+                        h(
+                            FormField,
+                            {name: 'email', label: 'E-mail', required: true},
+                            {
+                                ...frameSlots,
+                                default: (slot: typeof scope) => {
+                                    scope = slot;
+                                    return h('span');
+                                },
+                            },
+                        );
+                },
+            }),
+        );
+
+        expectFramePlaced(wrapper, id);
+        expect(scope.field.describedby).toBe(`${id}-hint`);
+    });
+});
