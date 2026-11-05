@@ -210,7 +210,7 @@ const onClick = (): void => {
  * price of every ANCESTOR: a disabled fallback is mouse-focusable at `tabindex="-1"` and stays in
  * hit-testing deliberately, so an Escape pressed on one died at the control instead of reaching the
  * dialog around it. Declining to call a handler this component holds itself costs ancestors
- * nothing. (PR #211, thread r3861464309.)
+ * nothing.
  *
  * Only the BUBBLE-phase pair is intercepted. `onKeydownCapture`/`onKeydownOnce` and friends stay in
  * the spread and still fire while disabled — a capture listener runs before this component sees the

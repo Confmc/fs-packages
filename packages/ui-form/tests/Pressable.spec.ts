@@ -150,8 +150,8 @@ describe('Pressable', () => {
         const wrapper = mount(Pressable, {props: {label: 'Go'}, attrs: {onClick}});
 
         // happy-dom does not synthesise the browser's key→click translation, so a click here could
-        // only come from the component doing it a second time. (The REAL translation is proven in
-        // the browser suite's keyboard walk.)
+        // only come from the component doing it a second time. The real translation needs a real
+        // browser, which this happy-dom spec is not.
         key(wrapper.element, 'keydown', 'Enter');
         key(wrapper.element, 'keydown', ' ');
         key(wrapper.element, 'keyup', ' ');
@@ -216,7 +216,7 @@ describe('Pressable — the discouraged `as` escape hatch', () => {
         expect(wrapper.attributes('aria-disabled')).toBe('true');
         // A <div> has no native `disabled`, so the state is mirrored as a class — which the
         // stylesheet reads for the muted colour and the not-allowed cursor, NOT for a pointer
-        // block (see the `must not come back` pin in styles.browser.spec.ts).
+        // block: the fallback stays in hit-testing (see the `.is-disabled` rule).
         expect(wrapper.classes()).toContain('is-disabled');
 
         key(wrapper.element, 'keydown', 'Enter');
@@ -294,9 +294,9 @@ describe('Pressable — the discouraged `as` escape hatch', () => {
         // below suggests: happy-dom performs no native Enter-to-click translation, so what this
         // pins is that the ROW's key handler stayed out of it. In a real browser the child's own
         // click then bubbles and the row does see one activation — the same one a mouse click
-        // gives it, which the browser suite asserts as an equivalence. Suppressing the default is
-        // exactly how the unguarded version stole the button's Enter outright (child handler
-        // measured at 0), so an untouched event is what hands the job back to the browser.
+        // gives it. Suppressing the default is exactly how the unguarded version stole the
+        // button's Enter outright (child handler measured at 0), so an untouched event is what
+        // hands the job back to the browser.
         const onClick = vi.fn();
         const wrapper = mount(Pressable, {
             props: {as: 'div', label: 'Row'},
@@ -453,8 +453,8 @@ describe('Pressable — `as` is matched case-insensitively', () => {
  * The chassis renders `display: inline-flex`, which is right for a button and wrong for anything
  * whose parent's layout algorithm requires the child's own display: a clickable `<tr>` — the
  * documented `as` example — stops being a table row and its cells lose their table boxes. The
- * component marks those tags; the stylesheet reverts them. The computed-style proof is in the
- * browser suite, where a layout engine exists.
+ * component marks those tags; the stylesheet reverts them. The computed style needs a layout
+ * engine, which happy-dom does not have, so this pins the marking only.
  */
 describe('Pressable — structural display tags keep their own display', () => {
     it.each(['tr', 'TR', 'td', 'th', 'table', 'thead', 'tbody', 'tfoot', 'caption', 'colgroup', 'col'])(
@@ -474,13 +474,12 @@ describe('Pressable — structural display tags keep their own display', () => {
  * the component activating but leaves a consumer's fall-through `@keydown`/`@keyup` running on it —
  * the same defect `onClick` was fixed for, unfixed in its two siblings. It is reachable: the
  * disabled fallback keeps `tabindex="-1"`, which is still MOUSE-focusable, and the stylesheet
- * deliberately keeps the control in hit-testing. The real-pointer-then-real-keys walk is pinned in
- * the browser suite; this asserts the component's own half.
+ * deliberately keeps the control in hit-testing. This asserts the component's own half; a real
+ * pointer followed by real keys needs a real browser.
  *
  * The inertness is scoped to the CONSUMER's handler and must not extend to the event's climb — the
  * distinction the `stopImmediatePropagation()` version could not express. Propagation is a platform
- * behaviour, so the ancestor arm below is duplicated in the BROWSER suite: a control that passes it
- * only under happy-dom has been measured against an emulation of the thing it is asserting.
+ * behaviour, so the ancestor arm below is measured against happy-dom's emulation of it.
  */
 describe('Pressable — a disabled control is deaf to keys, not merely un-activating', () => {
     const mountWithKeyHandlers = (props: Record<string, unknown>) => {
@@ -590,8 +589,8 @@ describe('Pressable — a disabled control is deaf to keys, not merely un-activa
 /**
  * Disabled inertness for clicks reaching a DESCENDANT. The stop is a CAPTURE-phase listener, which
  * is the only phase that arrives before the element the click landed on — a bubble-phase stop on the
- * root runs after a nested `<button @click>` has already fired. The real-pointer and real-navigation
- * halves are pinned in the browser suite; this is the component's own half.
+ * root runs after a nested `<button @click>` has already fired. This is the component's own half;
+ * a real pointer and real navigation need a real browser.
  */
 describe('Pressable — a disabled control is inert for its whole subtree', () => {
     const mountWithChild = (disabled: boolean) => {
