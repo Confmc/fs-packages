@@ -52,7 +52,8 @@ const {invalid = false, autofocus = false} = defineProps<{
 
 const input = useTemplateRef<HTMLInputElement>('input');
 onMounted(() => {
-    if (autofocus) input.value?.focus();
+    // the input is rendered by the time the component mounts
+    if (autofocus) input.value!.focus();
 });
 
 const model = defineModel<number | null>({required: true});
