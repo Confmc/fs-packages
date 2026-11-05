@@ -16,9 +16,15 @@
 </template>
 
 <script setup lang="ts">
-import {onBeforeUnmount, onMounted, useTemplateRef, watch} from 'vue';
+import {computed, onBeforeUnmount, onMounted, useTemplateRef, watch} from 'vue';
 
-const {autogrow = false, maxRows} = defineProps<{
+const {
+    modelValue,
+    autogrow = false,
+    maxRows,
+} = defineProps<{
+    /** the value; `null` shows an empty control. */
+    modelValue: string | null;
     /** control id, pairing the textarea with its label and error; inside a `FormField` the field passes its own. */
     id: string;
     /** required, so no textarea goes without one. */
@@ -42,7 +48,15 @@ const {autogrow = false, maxRows} = defineProps<{
 // ConvertEmptyStringsToNull middleware converts back to null on submit. Bound with
 // v-model, so Vue's own IME handling applies: nothing is emitted while an input
 // method composes.
-const model = defineModel<string | null>({required: true});
+const emit = defineEmits<{'update:modelValue': [value: string]}>();
+// v-model stays on the native element (so Vue's IME handling applies), over a computed: the event is
+// declared as what it writes, a string, so a draft path typed plain `string` binds. defineModel cannot
+// type its event apart from its prop.
+const model = computed({
+    get: () => modelValue,
+    // the native element writes its text, never null
+    set: (value: string | null) => emit('update:modelValue', value!),
+});
 
 // The textarea is its own (single) root, so every attribute, class and style included, lands on it.
 const textarea = useTemplateRef<HTMLTextAreaElement>('textarea');

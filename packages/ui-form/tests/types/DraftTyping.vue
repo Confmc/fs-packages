@@ -10,7 +10,7 @@
     <TextInput v-bind="field('age')" placeholder="Leeftijd" />
     <!-- @vue-expect-error not a path of the draft -->
     <TextInput v-bind="field('frstName')" placeholder="Voornaam" />
-    <!-- @vue-expect-error a non-nullable string: the text control writes null back -->
+    <!-- a non-nullable string binds: the text control writes a string back, never null -->
     <TextInput v-bind="field('code')" placeholder="Code" />
     <FormLabel name="learningGoals.0.title" label="Titel" required />
     <FormError name="learningGoals.0.title" />
