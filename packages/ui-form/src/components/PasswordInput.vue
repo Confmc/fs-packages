@@ -60,6 +60,7 @@ import {controlAttrs, rootAttrs} from '../internal/split-attrs';
 import ErrorIcon from './ErrorIcon.vue';
 
 const {
+    modelValue,
     id,
     disabled = false,
     invalid = false,
@@ -68,6 +69,8 @@ const {
     capsLockText = 'Caps Lock is on',
     autofocus = false,
 } = defineProps<{
+    /** the value; `null` shows an empty control. */
+    modelValue: string | null;
     /** control id, pairing the input with its label and error; inside a `FormField` the field passes its own. */
     id: string;
     /** required, so no input goes without one. */
@@ -92,7 +95,15 @@ const {
 defineOptions({inheritAttrs: false});
 
 // As TextInput: binds null as empty, emits '' when cleared.
-const model = defineModel<string | null>({required: true});
+const emit = defineEmits<{'update:modelValue': [value: string]}>();
+// v-model stays on the native element (so Vue's IME handling applies), over a computed: the event is
+// declared as what it writes, a string, so a draft path typed plain `string` binds. defineModel cannot
+// type its event apart from its prop.
+const model = computed({
+    get: () => modelValue,
+    // the native element writes its text, never null
+    set: (value: string | null) => emit('update:modelValue', value!),
+});
 
 const shown = ref(false);
 const capsLock = ref(false);
@@ -111,6 +122,7 @@ const describedbyWithCaps = computed(
 
 const input = useTemplateRef<HTMLInputElement>('input');
 onMounted(() => {
-    if (autofocus) input.value?.focus();
+    // the input is rendered by the time the component mounts
+    if (autofocus) input.value!.focus();
 });
 </script>
