@@ -6,7 +6,7 @@
              element; the wrapper keeps multi-node slot content in one grid cell when horizontal
              (display: contents otherwise) -->
         <div class="ui-field__control">
-            <slot :field="field" :aria="aria" />
+            <slot :field="field()" :aria="aria()" />
         </div>
         <div v-if="$slots.hint" :id="hintId(id)" class="ui-hint"><slot name="hint" /></div>
         <FormError :error="error" :id="errorId" />
@@ -56,21 +56,23 @@ const slots = useSlots();
 const errorId = computed(() => messageId(id));
 
 // The field decides the message; the control only learns whether it is invalid and where its message is.
-const field = computed<FieldBinding>(() => {
+// Built during render, not in a computed: slots are not reactive, so a computed would miss a hint that
+// appears after mount; render runs again whenever the parent passes other slots.
+const field = (): FieldBinding => {
     const describedby = [error && errorId.value, slots.hint && hintId(id)].filter(Boolean).join(' ');
 
     return {id, invalid: Boolean(error), describedby: describedby || undefined};
-});
+};
 
 // A <label for> names only a form control; a native element is named by aria-labelledby instead. An attribute
 // that does not apply is left out, not set undefined, so one the consumer adds holds in any binding order.
-const aria = computed<FieldAria>(() => {
-    const {invalid, describedby} = field.value;
+const aria = (): FieldAria => {
+    const {invalid, describedby} = field();
     const attributes: FieldAria = {id};
     if (label) attributes['aria-labelledby'] = labelId(id);
     if (invalid) attributes['aria-invalid'] = 'true';
     if (describedby) attributes['aria-describedby'] = describedby;
 
     return attributes;
-});
+};
 </script>

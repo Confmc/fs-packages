@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import {mount} from '@vue/test-utils';
 import {describe, expect, it} from 'vitest';
-import {h} from 'vue';
+import {defineComponent, h, nextTick, ref} from 'vue';
 
 import type {FieldBinding} from '../src';
 
@@ -45,6 +45,34 @@ describe('FormField', () => {
         expect(wrapper.find('.ui-hint').attributes('id')).toBe('email-hint');
         expect(wrapper.find('.ui-hint').text()).toBe('We never share it');
         expect(wrapper.text()).toContain('db:email-error email-hint');
+    });
+
+    it('names a hint that appears after mount, and drops it when it goes', async () => {
+        const shown = ref(false);
+        const wrapper = mount(
+            defineComponent({
+                setup: () => () =>
+                    h(
+                        FormField,
+                        {id: 'email', error: 'Required'},
+                        {
+                            default: ({field}: {field: FieldBinding}) =>
+                                h('input', {'aria-describedby': field.describedby}),
+                            ...(shown.value ? {hint: () => 'We never share it'} : {}),
+                        },
+                    ),
+            }),
+        );
+        const describedby = () => wrapper.find('input').attributes('aria-describedby');
+
+        expect(describedby()).toBe('email-error');
+        shown.value = true;
+        await nextTick();
+        expect(wrapper.find('.ui-hint').exists()).toBe(true);
+        expect(describedby()).toBe('email-error email-hint');
+        shown.value = false;
+        await nextTick();
+        expect(describedby()).toBe('email-error');
     });
 
     it('names the hint alone while there is no message, and nothing without a hint', () => {
