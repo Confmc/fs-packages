@@ -146,7 +146,7 @@ describe('Disclosure', () => {
      * …but not the trigger's own `type`. It used to sit above the `$attrs` spread as a static
      * attribute, and an attribute placed before a spread LOSES to it — so a consumer's
      * `type="submit"` turned the trigger into a submit button and a `<Disclosure>` inside a form
-     * submitted it on toggle. The real-form half is pinned in the browser suite.
+     * submitted it on toggle. A real form submitting needs a real browser; this pins the attribute.
      */
     it('will not let a consumer-supplied type turn the trigger into a submitter', () => {
         const wrapper = mount(Disclosure, {props: base, attrs: {type: 'submit'}});
