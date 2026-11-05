@@ -672,4 +672,14 @@ describe('Pressable — a disabled control is inert for its whole subtree', () =
         // Unmounting takes the listener with the element; nothing here should throw.
         expect(() => wrapper.unmount()).not.toThrow();
     });
+
+    it.each([true, false])('withholds the href of an as="a" only while disabled (disabled: %s)', (disabled) => {
+        // The fallback chassis has no native `disabled`, so a real click on a disabled anchor would
+        // follow its href; the cancelled click is what stops it.
+        const wrapper = mount(Pressable, {props: {as: 'a', label: 'Row', disabled}, attrs: {href: '#next'}});
+
+        const event = dispatch(wrapper.element, new MouseEvent('click', {bubbles: true, cancelable: true}));
+
+        expect(event.defaultPrevented).toBe(disabled);
+    });
 });
