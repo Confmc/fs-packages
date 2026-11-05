@@ -1103,3 +1103,10 @@ it / `n-token-scope` lands second converts them (guard count 28 → 30). landing
 + slot routing. **Open with Marcel:** hint vs tooltip: emmie's HoverTooltip on fields is mouse-only (not focusable,
 text teleported, not in describedby); proposal: explanations go in `hint`, a tooltip is a button in `aside`,
 `label-after` holds short label notes only.
+
+**Scope rule for emmie's epic (Marcel, 2026-11-05):** integrate, don't refactor. A screen moves with the smallest
+change that makes it work and type-check on ui-form; improvements beyond that are not epic tasks (they would make
+the epic own every template and its TS files). So: field tooltips stay as they are in `label-after` (no hint
+conversion task); keyed rows not needed; finding C's `FormDraft` stays (it is what makes that screen type-check);
+the "optioneel" marker only if emmie's `optional` cannot move over without it. landing.11 checked: typecheck 19 → 2
+(finding C, an old scratch spec), all 8 slot spots work in the browser.
