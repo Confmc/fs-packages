@@ -1086,3 +1086,8 @@ package: key rows by a stable key (send the list as an object keyed by id, a new
 survives the casing middleware), as emmie's Mdo screens do (`clients.${client.id}`); then removal moves nothing and
 `withdraw(\`list.${key}\`)` drops only that row. A removal policy (shift indexes) is the consumer's, not the package's.
 The test bed weighs whether emmie's epic does it (learning goals, room workplaces, EditLearningGoals).
+Test bed's verdict for emmie (its HANDOFF "State at 2026-11-05"): keyed rows NOT needed in the epic. Room workplaces
+are already keyed by id (EMMIE-2255); for learning goals keying costs both requests' DTOs for a rare case, and
+`withdraw('learningGoals')` shows no message on a wrong row ("quiet beats wrong"); EvaluationNotateGoals.vue:266
+(keys by position in a filtered list) gets `withdraw('learningGoalUpdates')` on toggle. **Epic rule:** a screen that
+removes, filters or reorders rows calls `withdraw(list)` at that moment; key by id only where rows already carry one.
