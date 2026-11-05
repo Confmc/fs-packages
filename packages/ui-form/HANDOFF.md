@@ -1091,3 +1091,15 @@ are already keyed by id (EMMIE-2255); for learning goals keying costs both reque
 `withdraw('learningGoals')` shows no message on a wrong row ("quiet beats wrong"); EvaluationNotateGoals.vue:266
 (keys by position in a filtered list) gets `withdraw('learningGoalUpdates')` on toggle. **Epic rule:** a screen that
 removes, filters or reorders rows calls `withdraw(list)` at that moment; key by id only where rows already carry one.
+
+**Later on 2026-11-05.** #344's red CI was a test race, not a flake: Vue drops a native event stamped in the same
+millisecond as its listener's attachment; the spec now fixes `Date` and advances 1 ms per dispatch (e79efa7). Without
+it, #353's `tests/fixed-date.ts` would have made those tests fail on main for good (landing.11 showed exactly that).
+`n-field-hint` fix bd014e7: FormField builds `field`/`aria` during render (slots are not reactive; a late hint was
+missing from describedby). Slot routing in slice 5 (`n-form-kit` @0632ce6): label-after/aside/hint through
+`form.FormField` and `form.TextField`, typed (a misspelt slot is an error), Stryker 99.68. **Ordering note (like
+#338's addon tokens):** `n-field-hint` declares `--ui-hint-text`/`--ui-hint-size` on `:root` as `var()`; whichever of
+it / `n-token-scope` lands second converts them (guard count 28 → 30). landing.11 (`be2f4cc`) holds today's PR updates
++ slot routing. **Open with Marcel:** hint vs tooltip: emmie's HoverTooltip on fields is mouse-only (not focusable,
+text teleported, not in describedby); proposal: explanations go in `hint`, a tooltip is a button in `aside`,
+`label-after` holds short label notes only.
