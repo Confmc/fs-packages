@@ -35,7 +35,7 @@
                     :class="{'is-invalid': invalid}"
                     :name="id"
                     :value="String(option.id)"
-                    :checked="model === option.id"
+                    :checked="modelValue === option.id"
                     :disabled="disabled || disabledOf(option)"
                     @change="onChange($event, option)"
                 />
@@ -56,6 +56,7 @@ import type {LabelKey, SelectItem} from '../types';
 import {vGuardWhileDisabled} from '../internal/disabled-guard';
 
 const {
+    modelValue,
     options,
     optionLabel,
     label,
@@ -65,6 +66,8 @@ const {
     invalid = false,
     describedby,
 } = defineProps<{
+    /** the committed choice, `null` while nothing is selected. */
+    modelValue: T['id'] | null;
     options: T[];
     /**
      * property name or getter for an option's display string (the family's labelOf
@@ -84,8 +87,8 @@ const {
     describedby?: string;
 }>();
 
-/** The committed choice — `null` while nothing is selected. */
-const model = defineModel<T['id'] | null>({required: true});
+// It writes an option's id, never null (a radio group has no way to clear), so a non-null field binds.
+const emit = defineEmits<{'update:modelValue': [value: T['id']]}>();
 
 /** Resolve an option's display string from the `optionLabel` prop (property name or getter). */
 const labelOf = (option: T): string =>
@@ -103,10 +106,10 @@ const disabledOf = (option: T): boolean => option.disabled === true;
 // disabled option takes no change, also not a dispatched one, which a browser runs on a disabled radio.
 const onChange = (event: Event, option: T): void => {
     const fieldset = (event.currentTarget as HTMLElement).closest('fieldset') as HTMLFieldSetElement;
-    if (!disabledOf(option)) model.value = option.id;
+    if (!disabledOf(option)) emit('update:modelValue', option.id);
     void nextTick(() => {
         const radios = fieldset.querySelectorAll<HTMLInputElement>('.ui-radio__input');
-        for (const [index, radio] of radios.entries()) radio.checked = model.value === options[index].id;
+        for (const [index, radio] of radios.entries()) radio.checked = modelValue === options[index].id;
     });
 };
 </script>

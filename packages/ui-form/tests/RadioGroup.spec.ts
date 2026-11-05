@@ -1,9 +1,19 @@
 // @vitest-environment happy-dom
 import {mount} from '@vue/test-utils';
-import {describe, expect, it} from 'vitest';
+import {describe, expect, it, vi} from 'vitest';
 import {h, nextTick} from 'vue';
 
 import RadioGroup from '../src/components/RadioGroup.vue';
+
+// Vue drops an event stamped no later than the moment a listener was attached, so a native event
+// dispatched in the same millisecond as the mount never reaches a consumer's listener on the fieldset
+// (it did, at random, on a fast machine). `Date` is fixed here, as `trigger()` would stamp it, and each
+// native event comes a millisecond later, as a real user's always does.
+vi.useFakeTimers({toFake: ['Date']});
+const dispatch = (target: Element, event: Event): void => {
+    vi.setSystemTime(Date.now() + 1);
+    target.dispatchEvent(event);
+};
 
 interface Fruit {
     id: number;
@@ -27,7 +37,7 @@ describe('RadioGroup', () => {
         const wrapper = mountGroup({disabled: true, onClickCapture: () => (heard += 1)});
         const click = () => {
             const event = new MouseEvent('click', {bubbles: true, cancelable: true});
-            wrapper.find('.ui-check__label').element.dispatchEvent(event);
+            dispatch(wrapper.find('.ui-check__label').element, event);
             return event.defaultPrevented;
         };
 
@@ -124,9 +134,9 @@ describe('RadioGroup', () => {
             const wrapper = mountGroup({[`on${type[0].toUpperCase()}${type.slice(1)}`]: () => (heard += 1)});
             const first = wrapper.find('input[type="radio"]').element as HTMLInputElement;
             // Native dispatch — VTU setValue() skips disabled elements (vacuous-assertion trap).
-            const dispatch = () => first.dispatchEvent(new Event(type, {bubbles: true}));
+            const fire = () => dispatch(first, new Event(type, {bubbles: true}));
 
-            dispatch();
+            fire();
             expect(heard).toBe(1);
 
             await wrapper.setProps({disabled: true});
@@ -135,13 +145,13 @@ describe('RadioGroup', () => {
             expect(radios.every((radio) => radio.attributes('disabled') !== undefined)).toBe(true);
             expect(wrapper.findAll('.ui-radio').every((row) => row.classes().includes('is-disabled'))).toBe(true);
             first.checked = true;
-            dispatch();
+            fire();
             await wrapper.vm.$nextTick();
             expect(heard).toBe(1);
             expect(wrapper.emitted('update:modelValue')?.length ?? 0).toBe(emitted);
 
             await wrapper.setProps({disabled: false});
-            dispatch();
+            fire();
             expect(heard).toBe(2);
         },
     );
@@ -171,7 +181,7 @@ describe('RadioGroup', () => {
 
         // A dispatched change runs on a disabled radio; a user's never fires.
         radios[1].element.checked = true;
-        radios[1].element.dispatchEvent(new Event('change', {bubbles: true}));
+        dispatch(radios[1].element, new Event('change', {bubbles: true}));
         await wrapper.vm.$nextTick();
 
         expect(wrapper.emitted('update:modelValue')).toBeUndefined();
@@ -184,7 +194,7 @@ describe('RadioGroup', () => {
 
         // The label text is not the disabled radio, so the browser withholds nothing here: the
         // click bubbles to the fieldset, where the consumer's attrs land.
-        wrapper.find('.ui-check__label').element.dispatchEvent(new MouseEvent('click', {bubbles: true}));
+        dispatch(wrapper.find('.ui-check__label').element, new MouseEvent('click', {bubbles: true}));
 
         expect(heard).toBe(0);
     });
@@ -195,9 +205,9 @@ describe('RadioGroup', () => {
         const radio = wrapper.find('input[type="radio"]').element;
 
         await wrapper.setProps({disabled: true});
-        radio.dispatchEvent(new Event('change', {bubbles: true}));
+        dispatch(radio, new Event('change', {bubbles: true}));
         await wrapper.setProps({disabled: false});
-        radio.dispatchEvent(new Event('change', {bubbles: true}));
+        dispatch(radio, new Event('change', {bubbles: true}));
 
         expect(heard).toBe(1);
     });
