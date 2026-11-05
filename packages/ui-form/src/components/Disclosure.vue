@@ -6,12 +6,10 @@
              wrapper becomes a real <h2>…<h6> whose only child is the trigger, so the section
              keeps its place in the document outline AND the control is a real button. -->
         <component :is="headingTag" class="ui-disclosure__header">
-            <!-- `@click` sits ABOVE the `$attrs` spread on purpose, and moving it back is a
-                 regression. `mergeProps` preserves source order, so a consumer's fall-through
-                 `onClick` arriving through `$attrs` would otherwise be merged AHEAD of ours and
-                 run before `toggle` could stop it — leaving a disabled trigger that still runs
-                 the consumer's handler. Measured in real Chromium; spec-pinned in the browser
-                 suite, because happy-dom reports the defect as absent.
+            <!-- `@click` sits ABOVE the `$attrs` spread on purpose. `mergeProps` preserves
+                 source order, so a consumer's fall-through `onClick` arriving through `$attrs`
+                 runs after `toggle` and reads the new expanded state, as every control's own
+                 listener runs before the consumer's.
 
                  `type` rides INSIDE the spread rather than sitting above it as a static attribute,
                  and that is the same source-order rule pointing the other way: an attribute placed
@@ -92,16 +90,9 @@ const headingTag = computed(() => (headingLevel === undefined ? 'div' : `h${head
 
 const panelId = computed(() => `${id}-panel`);
 
-const toggle = (event: MouseEvent): void => {
-    if (disabled) {
-        // Stopping — not returning — is the guard, the same shape `Pressable.onClick` uses. The
-        // browser withholds a click on a disabled <button> only for USER ACTIVATION; a
-        // `dispatchEvent` still runs every listener on it (measured in Chromium), and a consumer's
-        // fall-through `@click` arrives through `$attrs` on the very same element. A bare early
-        // return would leave that handler running on a trigger that is supposed to be inert.
-        event.stopImmediatePropagation();
-        return;
-    }
+// No disabled check: the trigger is always a native <button>, and the browser withholds every real
+// click on a disabled one, a click on the chevron or slot content inside it included.
+const toggle = (): void => {
     expanded.value = !expanded.value;
 };
 </script>

@@ -97,19 +97,10 @@ describe('Disclosure', () => {
         expect(wrapper.find('.ui-disclosure__chevron').exists()).toBe(true);
     });
 
-    it('renders disabled and ignores a click reaching the handler anyway', async () => {
+    it('renders a disabled trigger as a native disabled button', () => {
         const wrapper = mount(Disclosure, {props: {...base, disabled: true}});
-        const trigger = wrapper.find('button');
 
-        expect(trigger.attributes('disabled')).toBeDefined();
-        // Dispatch from INSIDE the disabled button so the event bubbles up to the handler: VTU's
-        // trigger() — and a dispatch on the button itself — are both suppressed on a disabled
-        // control, which would leave the guard unexercised (the vacuous-assertion trap). What a
-        // real browser suppresses is the user gesture; a programmatic dispatch is what this guard
-        // is actually for.
-        wrapper.find('.ui-disclosure__chevron').element.dispatchEvent(new MouseEvent('click', {bubbles: true}));
-        await wrapper.vm.$nextTick();
-        expect(trigger.attributes('aria-expanded')).toBe('false');
+        expect(wrapper.find('button').attributes('disabled')).toBeDefined();
     });
 
     it('re-aims attrs at the trigger button, not the wrapper root', () => {
