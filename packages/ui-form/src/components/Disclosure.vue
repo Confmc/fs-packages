@@ -21,7 +21,6 @@
                  below the spread — `class`, `:disabled`, `:aria-*` — already win by position. -->
             <button
                 :id="id"
-                ref="trigger"
                 @click="toggle"
                 v-bind="{...$attrs, type: 'button'}"
                 class="ui-pressable ui-disclosure__trigger"
@@ -55,10 +54,7 @@
 </template>
 
 <script setup lang="ts">
-import {computed, onMounted, useTemplateRef} from 'vue';
-
-import {warnWhenUnnamed} from '../internal/accessible-name';
-import {ensureRefValueExists} from '../internal/reactivity';
+import {computed} from 'vue';
 
 // The root is the wrapper div, so attrs are re-aimed at the trigger button — the element that
 // actually wants `aria-label`, `title`, `data-*` — per the family's fall-through contract
@@ -73,9 +69,8 @@ const {
 } = defineProps<{
     /** stable id — the trigger's own id, and the stem the panel's `${id}-panel` derives from. */
     id: string;
-    /** trigger text; the `trigger` slot overrides it for rich content. Supply one of the two — a
-     *  chevron alone is not an accessible name, and the dev-only mount check warns when neither
-     *  they nor `aria-label`/`aria-labelledby`/`title` names the trigger. */
+    /** trigger text; the `trigger` slot overrides it for rich content. Supply one of the two, or
+     *  an `aria-label`: a chevron alone is not an accessible name. */
     label?: string;
     /**
      * wraps the trigger in a real `<h1>`…`<h6>`. Omit it where the disclosure is not a section
@@ -96,15 +91,6 @@ const expanded = defineModel<boolean>('expanded', {default: false});
 const headingTag = computed(() => (headingLevel === undefined ? 'div' : `h${headingLevel}`));
 
 const panelId = computed(() => `${id}-panel`);
-
-const trigger = useTemplateRef<HTMLElement>('trigger');
-
-// `label` is optional and the `trigger` slot may render empty — leaving a trigger whose only
-// content is the aria-hidden chevron, i.e. nothing at all for assistive tech. Dev-only,
-// mount-time, once per instance.
-onMounted(() =>
-    warnWhenUnnamed(ensureRefValueExists(trigger), 'Disclosure', 'the `label` prop, `trigger`-slot content'),
-);
 
 const toggle = (event: MouseEvent): void => {
     if (disabled) {
