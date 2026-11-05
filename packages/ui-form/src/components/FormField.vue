@@ -52,7 +52,10 @@ const {
 defineSlots<{
     /** `field` for a control of this package, `aria` for a native element (a `role="group"` div). */
     default?: (scope: {field: FieldBinding; aria: FieldAria}) => unknown;
-    /** at the far end of the label's row, e.g. a switch that belongs to the field; it takes no wiring: the field's id is the control's. */
+    /**
+     * at the far end of the label's row, e.g. a switch or a tooltip button that belongs to the field; it takes no
+     * wiring: the field's id is the control's. Shown only with a `label` (the row is the label's).
+     */
     aside?: () => unknown;
 }>();
 
