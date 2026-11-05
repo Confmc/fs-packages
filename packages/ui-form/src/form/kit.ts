@@ -30,9 +30,15 @@ export interface NoAddonProps {
 // oxlint-disable-next-line typescript/no-explicit-any -- matches any component constructor
 type PropsOf<C> = C extends abstract new (...args: any) => {$props: infer P} ? P : never;
 
-/** A bound non-generic control of the form `D`: its shell, plus the control's own props minus the wiring. */
-type BoundControl<N, C, Value, Extra = NoAddonProps> = DefineSetupFnComponent<
-    BoundShell<N> & Extra & Omit<PropsOf<C>, Wiring | 'required' | 'label'> & BoundValueProps<Value>
+/**
+ * A bound non-generic control of the form `D`: its shell, plus the control's own props minus the wiring. Its
+ * slots are the frame's (`label-after`, `aside`, `hint`) plus the control's own (`ControlSlots`, none for a
+ * control without slots), so a misspelt slot name is a type error rather than content that silently vanishes.
+ */
+type BoundControl<N, C, Value, Extra = NoAddonProps, ControlSlots = {}> = DefineSetupFnComponent<
+    BoundShell<N> & Extra & Omit<PropsOf<C>, Wiring | 'required' | 'label'> & BoundValueProps<Value>,
+    {},
+    SlotsType<FrameContentSlots & ControlSlots>
 >;
 /**
  * The value at the call site, typed by what the control reads and writes. On a form without a draft it is
@@ -52,7 +58,9 @@ export interface BoundControls<D> {
     /**
      * `TextInput` in a `FormField`, bound by name:
      * `<TextField name="email" label="E-mail" placeholder="…" required />`. On a draft form the name is a
-     * path holding `string` or `string | null`.
+     * path holding `string` or `string | null`. Its `label-after`, `aside` and `hint` slots go to the field
+     * (the control names the hint after the message), every other slot to `TextInput`. A `describedby` given
+     * at the call site replaces the field's (the message and hint ids), as any prop given there does.
      */
     TextField: BoundControl<NamesFor<D, string | null, string>, typeof TextInput, string | null>;
     /**
@@ -63,6 +71,7 @@ export interface BoundControls<D> {
      * there is no `model`, the control takes its own `v-model`. Bind the control from the slot, never with
      * the form's `field()`: `<TextInput v-bind="{...field, ...model}" />`, or, for a proxy that converts,
      * `<TextInput v-bind="field" v-model="hours" />` (with `model` bound too, both would be written).
+     * Its `label-after`, `aside` and `hint` slots go to the frame; with a hint, `field` names it after the message.
      */
     FormField: D extends string ? DefineSetupFnComponent<BoundShell<D>, {}, FieldFrameSlots> : BoundDraftFrame<D>;
 }
@@ -81,8 +90,18 @@ export interface DraftFrameScope<V> extends FrameScope {
     model: FieldModel<V>;
 }
 
-/** The slots of the field frame on a form without a draft: the control gets the wiring. */
-export type FieldFrameSlots = SlotsType<{default: (scope: FrameScope) => VNode[]}>;
+/**
+ * The frame's own slots, beside the control's: content after the label text (`label-after`), at the far end
+ * of the label's row (`aside`), and under the control (`hint`, which the control names after the message).
+ */
+export interface FrameContentSlots {
+    'label-after'?: () => VNode[];
+    aside?: () => VNode[];
+    hint?: () => VNode[];
+}
+
+/** The slots of the field frame on a form without a draft: the control gets the wiring, the frame its content. */
+export type FieldFrameSlots = SlotsType<{default: (scope: FrameScope) => VNode[]} & FrameContentSlots>;
 
 /**
  * The field frame of a draft form: generic over its name, so the slot's `model` is typed by the value at
@@ -103,7 +122,7 @@ export interface BoundDraftFrame<D> {
 /** What a draft form's field frame declares for the name `N`: its props and its slot. Internal: vue-tsc's `__ctx`. */
 interface DraftFrameContext<D, N extends Path<D>> {
     props: BoundShell<N> & AllowedComponentProps & VNodeProps;
-    slots: {default?: (scope: DraftFrameScope<PathValue<D, N>>) => VNode[]};
+    slots: {default?: (scope: DraftFrameScope<PathValue<D, N>>) => VNode[]} & FrameContentSlots;
     attrs: Record<string, unknown>;
     emit: {};
 }
@@ -120,13 +139,15 @@ type Message = (name: string) => string | undefined;
 /**
  * One form-bound control: `FormField` around the control, wired by `field(name)`. The control's own
  * props and attributes pass through (`class`/`style` land on the field), and they win over the wiring,
- * so `:invalid="false"` or a `v-model` at the call site overrides the form's.
+ * so `:invalid="false"` or a `v-model` at the call site overrides the form's. The frame's slots
+ * (`label-after`, `aside`, `hint`) go to the field, every other slot to the control.
  */
 const bind = (field: Field, message: Message, control: Component, name: string) =>
     defineComponent(
         (props: BoundShell<string>, {attrs, slots}) =>
             () => {
                 const {class: className, style, ...rest} = attrs;
+                const {'label-after': labelAfter, aside, hint, ...controlSlots} = slots;
                 const wiring = field(props.name);
                 return h(
                     FormField,
@@ -139,7 +160,18 @@ const bind = (field: Field, message: Message, control: Component, name: string) 
                         class: className,
                         style,
                     },
-                    {default: () => h(control, {...wiring, required: props.required, ...rest}, slots)},
+                    {
+                        // the frame names the message and the hint
+                        default: ({field: frame}: FrameScope) =>
+                            h(
+                                control,
+                                {...wiring, describedby: frame.describedby, required: props.required, ...rest},
+                                controlSlots,
+                            ),
+                        'label-after': labelAfter,
+                        aside,
+                        hint,
+                    },
                 );
             },
         {name, inheritAttrs: false, props: ['name', 'label', 'required', 'orientation']},
@@ -147,8 +179,8 @@ const bind = (field: Field, message: Message, control: Component, name: string) 
 
 /**
  * The field frame by name: `FormField` with the form's id and message for that name; its slot gets the
- * wiring, and on a draft form the value at that name as `model`. Everything but the name (label, required,
- * orientation, class) falls through to `FormField`.
+ * wiring, and on a draft form the value at that name as `model`. Its `label-after`, `aside` and `hint` go to
+ * `FormField`. Everything but the name (label, required, orientation, class) falls through to `FormField`.
  */
 const bindFrame = (field: Field, message: Message) =>
     defineComponent(
@@ -167,7 +199,11 @@ const bindFrame = (field: Field, message: Message) =>
                               }
                             : scope,
                     );
-                return h(FormField, {id: wiring.id, error: message(props.name)}, {default: frame});
+                return h(
+                    FormField,
+                    {id: wiring.id, error: message(props.name)},
+                    {default: frame, 'label-after': slots['label-after'], aside: slots.aside, hint: slots.hint},
+                );
             },
         {name: 'FormField', props: ['name']},
     );

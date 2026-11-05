@@ -17,4 +17,12 @@ describe('FormLabel', () => {
         // the control conveys the required state through aria-required; the marker is only visual
         expect(wrapper.find('.ui-label__req').attributes('aria-hidden')).toBe('true');
     });
+
+    it('renders the after slot last, after the text and the required marker', () => {
+        const wrapper = mount(FormLabel, {
+            props: {htmlFor: 'name', required: true},
+            slots: {default: 'Name', after: '<em class="note">optional</em>'},
+        });
+        expect(wrapper.find('label').element.lastElementChild?.className).toBe('note');
+    });
 });

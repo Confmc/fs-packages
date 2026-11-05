@@ -225,6 +225,9 @@
     --ui-error-weight: 400;
     /* a notice beside a field that is not an error (PasswordInput's Caps Lock notice) */
     --ui-warning-text: #b45309;
+    /* a field's hint (FormField #hint): the message's size, in the muted control text. */
+    /* --ui-hint-text: unset; where it is used it falls back to --ui-control-text-muted. */
+    /* --ui-hint-size: unset; where it is used it falls back to --ui-error-size. */
 }
 
 @layer ui-form {
@@ -255,7 +258,8 @@
             grid-template-columns: var(--ui-field-label-width) minmax(0, 1fr);
             align-items: start;
         }
-        .ui-field.is-horizontal > .ui-label {
+        .ui-field.is-horizontal > .ui-label,
+        .ui-field.is-horizontal > .ui-field__head {
             grid-column: 1;
             grid-row: 1;
             align-self: var(--ui-field-label-align);
@@ -268,10 +272,22 @@
             grid-row: 1;
             min-width: 0;
         }
+        /* the hint and the message sit under the control; with a hint, the message one row lower */
+        .ui-field.is-horizontal > .ui-hint,
         .ui-field.is-horizontal > .ui-error {
             grid-column: 2;
             grid-row: 2;
         }
+        .ui-field.is-horizontal > .ui-hint ~ .ui-error {
+            grid-row: 3;
+        }
+    }
+
+    /* The label row a field gets when it has an aside: the label at the start, the aside at the far end. */
+    .ui-field__head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
     }
 
     .ui-label {
@@ -1002,6 +1018,11 @@
     .ui-check-group .ui-check + .ui-check,
     .ui-radio-group .ui-check + .ui-check {
         margin-top: var(--ui-check-item-gap);
+    }
+
+    .ui-hint {
+        color: var(--ui-hint-text, var(--ui-control-text-muted));
+        font-size: var(--ui-hint-size, var(--ui-error-size));
     }
 
     .ui-error {

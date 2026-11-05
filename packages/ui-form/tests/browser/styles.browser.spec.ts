@@ -1122,7 +1122,7 @@ describe('styles.css — a base token set on one area reaches the tokens derived
         ];
         const rules = uiCss.slice(uiCss.indexOf('@layer ui-form'));
 
-        expect(pairs).toHaveLength(28);
+        expect(pairs).toHaveLength(30);
         for (const [, derived, base] of pairs) {
             const uses = [...rules.matchAll(new RegExp(`var\\(${derived}(?![\\w-])[^)]*\\)?\\)?`, 'g'))].map(
                 ([use]) => use,

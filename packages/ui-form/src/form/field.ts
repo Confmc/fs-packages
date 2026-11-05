@@ -19,6 +19,9 @@ export const messageId = (id: string): string => `${id}-error`;
 /** The id of a field's label, which a native element names in `aria-labelledby`. */
 export const labelId = (id: string): string => `${id}-label`;
 
+/** The id of a field's hint, which the control names in `aria-describedby` after the message. */
+export const hintId = (id: string): string => `${id}-hint`;
+
 /** The props of a form-bound `FormLabel`. */
 export interface BoundFormLabelProps<T extends string = string> {
     /** the field the label names; its `for` is that field's id. */
@@ -29,12 +32,21 @@ export interface BoundFormLabelProps<T extends string = string> {
 
 /**
  * A `FormLabel` bound to one form: `<FormLabel name="firstName" label="Voornaam" required />` points its
- * `for` at the id `field('firstName')` gives the control. Attributes fall through to the `<label>`.
+ * `for` at the id `field('firstName')` gives the control. Its slot is content after the label text and the
+ * required mark, apart from the text by a space, as FormField's `label-after`. Attributes fall through to
+ * the `<label>`.
  */
 export const createFormLabel = <T extends string>(id: (name: T) => string) =>
     defineComponent(
-        (props: BoundFormLabelProps<T>) => () =>
-            h(FormLabel, {htmlFor: id(props.name), required: props.required}, {default: () => props.label}),
+        (props: BoundFormLabelProps<T>, {slots}) =>
+            () => {
+                const after = slots.default;
+                return h(
+                    FormLabel,
+                    {htmlFor: id(props.name), required: props.required},
+                    {default: () => props.label, after: after && (() => [' ', after()])},
+                );
+            },
         {name: 'FormLabel', props: ['name', 'label', 'required']},
     );
 

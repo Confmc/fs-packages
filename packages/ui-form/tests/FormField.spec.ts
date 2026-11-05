@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import {mount} from '@vue/test-utils';
 import {describe, expect, it} from 'vitest';
-import {h} from 'vue';
+import {defineComponent, h, nextTick, ref} from 'vue';
 
 import type {FieldBinding} from '../src';
 
@@ -34,6 +34,133 @@ describe('FormField', () => {
         expect(wrapper.text()).toContain('inv:true|db:email-error');
     });
 
+    it('puts label-after content inside the label, after the text and the required mark', () => {
+        const wrapper = mount(FormField, {
+            props: {label: 'Email', required: true, id: 'email'},
+            slots: {default: wiringSlot, 'label-after': '<em class="note">optional</em>'},
+        });
+
+        const label = wrapper.find('label.ui-label');
+        expect(label.find('.note').text()).toBe('optional');
+        expect(label.element.lastElementChild?.className).toBe('note');
+    });
+
+    it('separates label-after content from the label text, so the accessible name reads as words', () => {
+        const wrapper = mount(FormField, {
+            props: {label: 'Email', id: 'email'},
+            slots: {default: wiringSlot, 'label-after': '<span>(work)</span>'},
+        });
+        const plain = mount(FormField, {props: {label: 'Email', id: 'email'}, slots: {default: wiringSlot}});
+
+        expect(wrapper.find('label').element.textContent?.replace(/\s+/g, ' ').trim()).toBe('Email (work)');
+        expect(plain.find('label').element.textContent).toBe('Email');
+    });
+
+    it('renders a hint between the control and the message, read with the field after the message', () => {
+        const wrapper = mount(FormField, {
+            props: {label: 'Email', id: 'email', error: 'Bad email'},
+            slots: {default: wiringSlot, hint: 'We never share it'},
+        });
+
+        const parts = [...wrapper.find('.ui-field').element.children].map((child) => child.className);
+        expect(parts.slice(-3)).toEqual(['ui-field__control', 'ui-hint', 'ui-error']);
+        expect(wrapper.find('.ui-hint').attributes('id')).toBe('email-hint');
+        expect(wrapper.find('.ui-hint').text()).toBe('We never share it');
+        expect(wrapper.text()).toContain('db:email-error email-hint');
+    });
+
+    it('names a hint that appears after mount, and drops it when it goes', async () => {
+        const shown = ref(false);
+        const wrapper = mount(
+            defineComponent({
+                setup: () => () =>
+                    h(
+                        FormField,
+                        {id: 'email', error: 'Required'},
+                        {
+                            default: ({field}: {field: FieldBinding}) =>
+                                h('input', {'aria-describedby': field.describedby}),
+                            ...(shown.value ? {hint: () => 'We never share it'} : {}),
+                        },
+                    ),
+            }),
+        );
+        const describedby = () => wrapper.find('input').attributes('aria-describedby');
+
+        expect(describedby()).toBe('email-error');
+        shown.value = true;
+        await nextTick();
+        expect(wrapper.find('.ui-hint').exists()).toBe(true);
+        expect(describedby()).toBe('email-error email-hint');
+        shown.value = false;
+        await nextTick();
+        expect(describedby()).toBe('email-error');
+    });
+
+    it('names the hint alone while there is no message, and nothing without a hint', () => {
+        const hinted = mount(FormField, {
+            props: {label: 'Email', id: 'email'},
+            slots: {default: wiringSlot, hint: 'We never share it'},
+        });
+        const plain = mount(FormField, {props: {label: 'Email', id: 'email'}, slots: {default: wiringSlot}});
+
+        expect(hinted.text()).toContain('inv:false|db:email-hint');
+        expect(plain.find('.ui-hint').exists()).toBe(false);
+        expect(plain.text()).toContain('db:undefined');
+    });
+
+    it('renders no hint when the slot is left out conditionally, and names none', () => {
+        // what `<template v-if="hint" #hint>` hands over: a hint slot that is undefined
+        const wrapper = mount(() =>
+            h(FormField, {label: 'Email', id: 'email'}, {default: wiringSlot, hint: undefined}),
+        );
+
+        expect(wrapper.find('.ui-hint').exists()).toBe(false);
+        expect(wrapper.text()).toContain('db:undefined');
+    });
+
+    // The aside gets no wiring: the field's id belongs to the control the label names, never to the aside.
+    it('puts aside at the end of the label row, without the field wiring', () => {
+        let scope!: Record<string, unknown>;
+        const wrapper = mount(FormField, {
+            props: {label: 'Email', id: 'email'},
+            slots: {
+                default: wiringSlot,
+                aside: (props: Record<string, unknown>) => {
+                    scope = props;
+                    return h('span', {class: 'toggle'}, 'on');
+                },
+            },
+        });
+
+        const head = wrapper.find('.ui-field > .ui-field__head');
+        expect(head.find('label.ui-label').text()).toBe('Email');
+        expect(head.element.lastElementChild?.outerHTML).toBe('<span class="toggle">on</span>');
+        expect(scope).toEqual({});
+    });
+
+    it('keeps label-after inside the label when the label shares its row with an aside', () => {
+        const wrapper = mount(FormField, {
+            props: {label: 'Email', required: true, id: 'email'},
+            slots: {
+                default: wiringSlot,
+                'label-after': '<em class="note">optional</em>',
+                aside: '<span class="toggle">on</span>',
+            },
+        });
+
+        const head = wrapper.find('.ui-field > .ui-field__head');
+        expect(head.find('label.ui-label').element.lastElementChild?.className).toBe('note');
+        expect(head.element.lastElementChild?.className).toBe('toggle');
+    });
+
+    it('keeps the label a direct child of the field without an aside', () => {
+        const wrapper = mount(FormField, {props: {label: 'Email', id: 'email'}, slots: {default: wiringSlot}});
+
+        expect(wrapper.find('.ui-field > .ui-label').exists()).toBe(true);
+        expect(wrapper.find('.ui-field__head').exists()).toBe(false);
+    });
+
     it('hands a native element the same wiring as aria attributes, named by the label', () => {
         let aria!: Record<string, unknown>;
         const wrapper = mount(FormField, {
@@ -43,6 +170,7 @@ describe('FormField', () => {
                     aria = scope.aria;
                     return h('div', {role: 'group', ...scope.aria});
                 },
+                hint: 'Any that apply',
             },
         });
 
@@ -51,7 +179,7 @@ describe('FormField', () => {
             id: 'laws',
             'aria-labelledby': 'laws-label',
             'aria-invalid': 'true',
-            'aria-describedby': 'laws-error',
+            'aria-describedby': 'laws-error laws-hint',
         });
         expect(wrapper.find('[role="group"]').attributes()).not.toHaveProperty('invalid');
     });

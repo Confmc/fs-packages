@@ -566,6 +566,27 @@ describe('useForm FormLabel and FormError (form-bound)', () => {
         expect(wrapper.find('.ui-label__req').exists()).toBe(false);
     });
 
+    it('renders its slot after the label text and the required mark, apart from the text', () => {
+        const wrapper = mount(
+            defineComponent({
+                setup() {
+                    const {FormLabel} = useForm<'firstName'>();
+                    return () =>
+                        h(
+                            FormLabel,
+                            {name: 'firstName', label: 'Voornaam', required: true},
+                            {default: () => h('em', {class: 'note'}, '(roepnaam)')},
+                        );
+                },
+            }),
+        );
+        const label = wrapper.find('label');
+
+        expect(label.element.lastElementChild?.className).toBe('note');
+        expect(label.find('.ui-label__req + .note').exists()).toBe(true);
+        expect(label.element.textContent).toBe('Voornaam* (roepnaam)');
+    });
+
     it("keeps the message's element in place, empty, while the field is clean", () => {
         const {wrapper} = mountRow({idPrefix: 'client'});
         const message = wrapper.find('p.ui-error');

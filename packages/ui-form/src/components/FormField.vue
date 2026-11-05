@@ -1,23 +1,33 @@
 <template>
     <div class="ui-field" :class="{'is-horizontal': orientation === 'horizontal' && Boolean(label)}">
-        <FormLabel v-if="label" :id="labelId(id)" :html-for="id" :required="required">{{ label }}</FormLabel>
+        <!-- with an aside the label shares a row with it; without one the label stays a direct child, as in ui-inputs -->
+        <div v-if="label && $slots.aside" class="ui-field__head">
+            <FormLabel :id="labelId(id)" :html-for="id" :required="required">
+                {{ label }}<template v-if="$slots['label-after']" #after>{{ ' ' }}<slot name="label-after" /></template>
+            </FormLabel>
+            <slot name="aside" />
+        </div>
+        <FormLabel v-else-if="label" :id="labelId(id)" :html-for="id" :required="required">
+            {{ label }}<template v-if="$slots['label-after']" #after>{{ ' ' }}<slot name="label-after" /></template>
+        </FormLabel>
         <!-- the slot receives `field`, whose keys are the control's own prop names, so one
              `v-bind="field"` wires the control, and `aria`, the same wiring as attributes for a native
              element; the wrapper keeps multi-node slot content in one grid cell when horizontal
              (display: contents otherwise) -->
         <div class="ui-field__control">
-            <slot :field="field" :aria="aria" />
+            <slot :field="field()" :aria="aria()" />
         </div>
+        <div v-if="$slots.hint" :id="hintId(id)" class="ui-hint"><slot name="hint" /></div>
         <FormError :error="error" :id="errorId" />
     </div>
 </template>
 
 <script setup lang="ts">
-import {computed} from 'vue';
+import {computed, useSlots} from 'vue';
 
 import type {FieldAria, FieldBinding} from '../types';
 
-import {labelId, messageId} from '../form/field';
+import {hintId, labelId, messageId} from '../form/field';
 import FormError from './FormError.vue';
 import FormLabel from './FormLabel.vue';
 
@@ -47,26 +57,42 @@ const {
 defineSlots<{
     /** `field` for a control of this package, `aria` for a native element (a `role="group"` div). */
     default?: (scope: {field: FieldBinding; aria: FieldAria}) => unknown;
+    /**
+     * inside the label, after its text and required mark: a short note ("(roepnaam)") or a hover tooltip's icon.
+     * Its text joins the field's accessible name, and nothing in it may be focusable (a label holds no
+     * interactive content): a button belongs in `aside`. Shown only with a `label`.
+     */
+    'label-after'?: () => unknown;
+    /** under the control, above the message: what the field expects. Read with the field after the message. */
+    hint?: () => unknown;
+    /**
+     * at the far end of the label's row, e.g. a switch or a tooltip button that belongs to the field; it takes no
+     * wiring: the field's id is the control's. Shown only with a `label` (the row is the label's).
+     */
+    aside?: () => unknown;
 }>();
+const slots = useSlots();
 
 const errorId = computed(() => messageId(id));
 
 // The field decides the message; the control only learns whether it is invalid and where its message is.
-const field = computed<FieldBinding>(() => ({
-    id,
-    invalid: Boolean(error),
-    describedby: error ? errorId.value : undefined,
-}));
+// Built during render, not in a computed: slots are not reactive, so a computed would miss a hint that
+// appears after mount; render runs again whenever the parent passes other slots.
+const field = (): FieldBinding => {
+    const describedby = [error && errorId.value, slots.hint && hintId(id)].filter(Boolean).join(' ');
+
+    return {id, invalid: Boolean(error), describedby: describedby || undefined};
+};
 
 // A <label for> names only a form control; a native element is named by aria-labelledby instead. An attribute
 // that does not apply is left out, not set undefined, so one the consumer adds holds in any binding order.
-const aria = computed<FieldAria>(() => {
-    const {invalid, describedby} = field.value;
+const aria = (): FieldAria => {
+    const {invalid, describedby} = field();
     const attributes: FieldAria = {id};
     if (label) attributes['aria-labelledby'] = labelId(id);
     if (invalid) attributes['aria-invalid'] = 'true';
     if (describedby) attributes['aria-describedby'] = describedby;
 
     return attributes;
-});
+};
 </script>
