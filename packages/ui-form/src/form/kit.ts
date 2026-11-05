@@ -30,9 +30,15 @@ export interface NoAddonProps {
 // oxlint-disable-next-line typescript/no-explicit-any -- matches any component constructor
 type PropsOf<C> = C extends abstract new (...args: any) => {$props: infer P} ? P : never;
 
-/** A bound non-generic control of the form `D`: its shell, plus the control's own props minus the wiring. */
-type BoundControl<N, C, Value, Extra = NoAddonProps> = DefineSetupFnComponent<
-    BoundShell<N> & Extra & Omit<PropsOf<C>, Wiring | 'required' | 'label'> & BoundValueProps<Value>
+/**
+ * A bound non-generic control of the form `D`: its shell, plus the control's own props minus the wiring. Its
+ * slots are the frame's (`label-after`, `aside`, `hint`) plus the control's own (`ControlSlots`, none for a
+ * control without slots), so a misspelt slot name is a type error rather than content that silently vanishes.
+ */
+type BoundControl<N, C, Value, Extra = NoAddonProps, ControlSlots = {}> = DefineSetupFnComponent<
+    BoundShell<N> & Extra & Omit<PropsOf<C>, Wiring | 'required' | 'label'> & BoundValueProps<Value>,
+    {},
+    SlotsType<FrameContentSlots & ControlSlots>
 >;
 /**
  * The value at the call site, typed by what the control reads and writes. On a form without a draft it is
