@@ -102,7 +102,8 @@ const togglePicker = (): void => {
         return;
     }
     try {
-        input.value?.showPicker();
+        // the input is always rendered, so it is there whenever this runs
+        input.value!.showPicker();
         pickerOpen.value = true;
     } catch {
         // no picker here: the click edits the field, and the picker stays closed
@@ -113,10 +114,12 @@ const togglePicker = (): void => {
 const clear = (): void => {
     model.value = null;
     pickerOpen.value = false;
-    input.value?.focus();
+    // the input is always rendered, so it is there whenever this runs
+    input.value!.focus();
 };
 
 onMounted(() => {
-    if (autofocus) input.value?.focus();
+    // the input is rendered by the time the component mounts
+    if (autofocus) input.value!.focus();
 });
 </script>
