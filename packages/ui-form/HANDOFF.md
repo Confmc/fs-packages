@@ -1075,3 +1075,14 @@ a `removeAt(path, index)` that shifts later rows is a candidate: check whether f
 frame slots missing on `form.FormField` (hint ContractFormDrawer.vue:128,:156,:173,:249 and
 PersonRouteBudgetFields.vue:49; aside PersonRouteBudgetFields.vue:10; label-after FinancingFormDrawer.vue:404,:788:
 build the routing against this list). Its work is local on ui-form-landing-test, uncommitted until Marcel's go.
+
+**#355 FormField opened 2026-11-05** (ready, green on main, Stryker 100; Marcel: "maybe it'll encourage him to review
+one"). Its follow-ups `n-field-label-after`, `n-field-hint`, `n-field-aside` stay fork branches, one PR each after it.
+
+**Finding B (row removal), decided: supported, no `removeAt`.** Research: pre-forms emmie left index-keyed messages on
+the wrong row after a `splice` (care plan learning goals); a saved room workplace's delete emptied the whole bag;
+fs-form never re-keyed. So `withdraw(path)` is already better than the status quo. The clean answer is already in the
+package: key rows by a stable key (send the list as an object keyed by id, a new row a client key like `new139` that
+survives the casing middleware), as emmie's Mdo screens do (`clients.${client.id}`); then removal moves nothing and
+`withdraw(\`list.${key}\`)` drops only that row. A removal policy (shift indexes) is the consumer's, not the package's.
+The test bed weighs whether emmie's epic does it (learning goals, room workplaces, EditLearningGoals).
