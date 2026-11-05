@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import {mount} from '@vue/test-utils';
 import {describe, expect, it} from 'vitest';
+import {defineComponent, h, ref} from 'vue';
 
 import Disclosure from '../src/components/Disclosure.vue';
 
@@ -79,6 +80,26 @@ describe('Disclosure', () => {
 
         await wrapper.setProps({expanded: false});
         expect(wrapper.find('button').attributes('aria-expanded')).toBe('false');
+    });
+
+    it("runs a consumer's @click after its own toggle, so the handler reads the new state", async () => {
+        const expanded = ref(false);
+        const seen: boolean[] = [];
+        const wrapper = mount(
+            defineComponent(
+                () => () =>
+                    h(Disclosure, {
+                        ...base,
+                        expanded: expanded.value,
+                        'onUpdate:expanded': (value: boolean) => (expanded.value = value),
+                        onClick: () => seen.push(expanded.value),
+                    }),
+            ),
+        );
+
+        await wrapper.find('button').trigger('click');
+
+        expect(seen).toEqual([true]);
     });
 
     it('renders the chevron as decoration only, keyed on the ARIA state', () => {
