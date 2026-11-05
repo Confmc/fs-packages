@@ -59,7 +59,8 @@ export interface BoundControls<D> {
      * `TextInput` in a `FormField`, bound by name:
      * `<TextField name="email" label="E-mail" placeholder="…" required />`. On a draft form the name is a
      * path holding `string` or `string | null`. Its `label-after`, `aside` and `hint` slots go to the field
-     * (the control names the hint after the message), every other slot to `TextInput`.
+     * (the control names the hint after the message), every other slot to `TextInput`. A `describedby` given
+     * at the call site replaces the field's (the message and hint ids), as any prop given there does.
      */
     TextField: BoundControl<NamesFor<D, string | null, string>, typeof TextInput, string | null>;
     /**
