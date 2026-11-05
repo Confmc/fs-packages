@@ -91,6 +91,48 @@ describe('FormField', () => {
         expect(wrapper.text()).toContain('db:undefined');
     });
 
+    // The aside gets no wiring: the field's id belongs to the control the label names, never to the aside.
+    it('puts aside at the end of the label row, without the field wiring', () => {
+        let scope!: Record<string, unknown>;
+        const wrapper = mount(FormField, {
+            props: {label: 'Email', id: 'email'},
+            slots: {
+                default: wiringSlot,
+                aside: (props: Record<string, unknown>) => {
+                    scope = props;
+                    return h('span', {class: 'toggle'}, 'on');
+                },
+            },
+        });
+
+        const head = wrapper.find('.ui-field > .ui-field__head');
+        expect(head.find('label.ui-label').text()).toBe('Email');
+        expect(head.element.lastElementChild?.outerHTML).toBe('<span class="toggle">on</span>');
+        expect(scope).toEqual({});
+    });
+
+    it('keeps label-after inside the label when the label shares its row with an aside', () => {
+        const wrapper = mount(FormField, {
+            props: {label: 'Email', required: true, id: 'email'},
+            slots: {
+                default: wiringSlot,
+                'label-after': '<em class="note">optional</em>',
+                aside: '<span class="toggle">on</span>',
+            },
+        });
+
+        const head = wrapper.find('.ui-field > .ui-field__head');
+        expect(head.find('label.ui-label').element.lastElementChild?.className).toBe('note');
+        expect(head.element.lastElementChild?.className).toBe('toggle');
+    });
+
+    it('keeps the label a direct child of the field without an aside', () => {
+        const wrapper = mount(FormField, {props: {label: 'Email', id: 'email'}, slots: {default: wiringSlot}});
+
+        expect(wrapper.find('.ui-field > .ui-label').exists()).toBe(true);
+        expect(wrapper.find('.ui-field__head').exists()).toBe(false);
+    });
+
     it('hands a native element the same wiring as aria attributes, named by the label', () => {
         let aria!: Record<string, unknown>;
         const wrapper = mount(FormField, {
