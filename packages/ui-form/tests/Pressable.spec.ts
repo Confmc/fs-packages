@@ -5,12 +5,31 @@ import {defineComponent, h, ref} from 'vue';
 
 import Pressable from '../src/components/Pressable.vue';
 
-/** Dispatch a real, cancellable keyboard event — VTU's `trigger` cannot report defaultPrevented. */
-const key = (element: Element, type: 'keydown' | 'keyup', value: string): KeyboardEvent => {
-    const event = new KeyboardEvent(type, {key: value, bubbles: true, cancelable: true});
+/**
+ * Vue stamps an event with `Date.now()` at the first of its listeners to see it and skips every
+ * listener attached in that millisecond or later, so a dispatch in the same millisecond as the
+ * mount can drop the consumer's handler. `Date` is faked here and moved on 1 ms before every
+ * dispatch.
+ */
+beforeEach(() => {
+    vi.useFakeTimers({toFake: ['Date']});
+});
+
+afterEach(() => {
+    vi.useRealTimers();
+});
+
+const dispatch = <T extends Event>(element: Element, event: T): T => {
+    vi.setSystemTime(Date.now() + 1);
     element.dispatchEvent(event);
     return event;
 };
+
+/** Dispatch a real, cancellable keyboard event — VTU's `trigger` cannot report defaultPrevented. */
+const key = (element: Element, type: 'keydown' | 'keyup', value: string): KeyboardEvent =>
+    dispatch(element, new KeyboardEvent(type, {key: value, bubbles: true, cancelable: true}));
+
+const click = (element: Element): MouseEvent => dispatch(element, new MouseEvent('click', {bubbles: true}));
 
 describe('Pressable', () => {
     it('renders a real <button type="button"> by default, with its prop label', () => {
@@ -62,7 +81,7 @@ describe('Pressable', () => {
         // ACTIVATION, so this is the path a real consumer's handler can still be reached on
         // (`dispatchEvent` runs listeners on a disabled button in Chromium), and the guard is what
         // stops it rather than the browser.
-        wrapper.element.dispatchEvent(new MouseEvent('click', {bubbles: true}));
+        click(wrapper.element);
         await wrapper.vm.$nextTick();
         expect(wrapper.emitted('update:pressed')).toBeUndefined();
     });
@@ -214,7 +233,7 @@ describe('Pressable — the discouraged `as` escape hatch', () => {
         // The fallback stays in hit-testing, so a click DOES reach the element — and the guard has
         // to stop the consumer's own fall-through handler too, not just our toggle. An early
         // return cannot do that; `stopImmediatePropagation` can.
-        wrapper.element.dispatchEvent(new MouseEvent('click', {bubbles: true}));
+        click(wrapper.element);
         await wrapper.vm.$nextTick();
         expect(onClick).not.toHaveBeenCalled();
         expect(wrapper.emitted('update:pressed')).toBeUndefined();
@@ -226,14 +245,14 @@ describe('Pressable — the discouraged `as` escape hatch', () => {
         // and the hand-rolled emulation has to reach the same observable end state.
         const nativeClick = vi.fn();
         const native = mount(Pressable, {props: {label: 'Row', disabled: true}, attrs: {onClick: nativeClick}});
-        native.element.dispatchEvent(new MouseEvent('click', {bubbles: true}));
+        click(native.element);
 
         const fallbackClick = vi.fn();
         const fallback = mount(Pressable, {
             props: {as: 'div', label: 'Row', disabled: true},
             attrs: {onClick: fallbackClick},
         });
-        fallback.element.dispatchEvent(new MouseEvent('click', {bubbles: true}));
+        click(fallback.element);
 
         await Promise.all([native.vm.$nextTick(), fallback.vm.$nextTick()]);
 
@@ -259,13 +278,13 @@ describe('Pressable — the discouraged `as` escape hatch', () => {
         document.body.addEventListener('click', captured, true);
 
         try {
-            wrapper.element.dispatchEvent(new MouseEvent('click', {bubbles: true}));
+            click(wrapper.element);
             await wrapper.vm.$nextTick();
             expect(captured).toHaveBeenCalledTimes(1);
             expect(consumer).toHaveBeenCalledTimes(1); // enabled: ours toggled, theirs ran after
 
             await wrapper.setProps({disabled: true});
-            wrapper.element.dispatchEvent(new MouseEvent('click', {bubbles: true}));
+            click(wrapper.element);
             await wrapper.vm.$nextTick();
 
             expect(captured).toHaveBeenCalledTimes(2); // the click WAS dispatched…
@@ -373,7 +392,7 @@ describe('Pressable — the discouraged `as` escape hatch', () => {
             slots: {default: '<span class="lbl">Label</span>'},
         });
 
-        wrapper.element.querySelector('.lbl')!.dispatchEvent(new MouseEvent('click', {bubbles: true}));
+        click(wrapper.element.querySelector('.lbl')!);
 
         expect(onClick).toHaveBeenCalledTimes(1);
         expect(wrapper.emitted('update:pressed')?.at(-1)).toEqual([true]);
@@ -679,7 +698,7 @@ describe('Pressable — a disabled control is inert for its whole subtree', () =
     it("stops a click on a descendant before the child's own handler runs", async () => {
         const {wrapper, child, consumer} = mountWithChild(true);
 
-        wrapper.find('#remove').element.dispatchEvent(new MouseEvent('click', {bubbles: true}));
+        click(wrapper.find('#remove').element);
         await wrapper.vm.$nextTick();
 
         expect(child).not.toHaveBeenCalled();
@@ -689,7 +708,7 @@ describe('Pressable — a disabled control is inert for its whole subtree', () =
     it('POSITIVE CONTROL — the same fixture, enabled, reaches the child AND the consumer', async () => {
         const {wrapper, child, consumer} = mountWithChild(false);
 
-        wrapper.find('#remove').element.dispatchEvent(new MouseEvent('click', {bubbles: true}));
+        click(wrapper.find('#remove').element);
         await wrapper.vm.$nextTick();
 
         // Without this arm the zeros above are equally consistent with a fixture that wires nothing.
@@ -707,7 +726,7 @@ describe('Pressable — a disabled control is inert for its whole subtree', () =
         await wrapper.setProps({as: 'span'});
         expect(wrapper.element.tagName).toBe('SPAN');
 
-        wrapper.element.dispatchEvent(new MouseEvent('click', {bubbles: true}));
+        click(wrapper.element);
         await wrapper.vm.$nextTick();
         expect(consumer).not.toHaveBeenCalled();
 
