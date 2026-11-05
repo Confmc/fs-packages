@@ -111,6 +111,7 @@ const describedbyWithCaps = computed(
 
 const input = useTemplateRef<HTMLInputElement>('input');
 onMounted(() => {
-    if (autofocus) input.value?.focus();
+    // the input is rendered by the time the component mounts
+    if (autofocus) input.value!.focus();
 });
 </script>
