@@ -80,10 +80,12 @@ const input = useTemplateRef<HTMLInputElement>('input');
 
 const clear = (): void => {
     model.value = '';
-    input.value?.focus();
+    // the input is always rendered, so it is there whenever this runs
+    input.value!.focus();
 };
 
 onMounted(() => {
-    if (autofocus) input.value?.focus();
+    // the input is rendered by the time the component mounts
+    if (autofocus) input.value!.focus();
 });
 </script>
