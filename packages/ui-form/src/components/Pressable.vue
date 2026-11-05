@@ -15,11 +15,7 @@
 </template>
 
 <script setup lang="ts">
-import {computed, getCurrentInstance, onMounted, ref, useAttrs, useTemplateRef, watch} from 'vue';
-
-import {warnWhenUnnamed} from '../internal/accessible-name';
-import {devWarningsSuppressed} from '../internal/dev-warning';
-import {ensureRefValueExists} from '../internal/reactivity';
+import {computed, ref, useAttrs, useTemplateRef, watch} from 'vue';
 
 /**
  * The root IS the interactive element here (unlike Checkbox/Switch, whose root is the <label>), so
@@ -57,15 +53,14 @@ const {
      * component then hand-rolls the full contract together — `role="button"`, `tabindex`, Enter
      * on keydown, Space on keyup, a disabled emulation — because half of it is worse than none.
      * Never point it at an element that is ALREADY activatable (`a[href]`, `summary`): the
-     * component would hand-roll semantics the element already has. Development warns when it does.
+     * component would hand-roll semantics the element already has.
      *
      * Compared case-insensitively wherever the component branches on it, because
      * `<component :is>` resolves HTML tag names case-INsensitively: `as="BUTTON"` renders a
      * genuine native button and must take the native path with it.
      */
     as?: string;
-    /** label text; the default slot overrides it (icon-only? supply `aria-label` via attrs — the
-     *  dev-only mount check warns when no route names the control at all). */
+    /** label text; the default slot overrides it (icon-only? supply `aria-label` via attrs). */
     label?: string;
     disabled?: boolean;
 }>();
@@ -73,7 +68,8 @@ const {
 /**
  * Toggle mode, opt-in: bind `v-model:pressed` and the control conveys `aria-pressed` and flips
  * it on activation. Left unbound the attribute is ABSENT — a plain action button must not claim
- * toggle semantics.
+ * toggle semantics. `defineModel` cannot tell an unbound model from one bound to `undefined`, so
+ * bind a boolean: a model holding `undefined` reads as unbound and never toggles or emits.
  *
  * Unlike `Switch` (where `role="switch"` on a native checkbox lets the native checked state map
  * to `aria-checked`, so the component never sets it by hand), a `<button>` has NO native pressed
@@ -121,71 +117,7 @@ const STRUCTURAL_DISPLAY_TAGS = new Set([
 
 const keepsTagDisplay = computed(() => STRUCTURAL_DISPLAY_TAGS.has(tag.value));
 
-/** Tags the browser activates by itself, from both the pointer and the keyboard. */
-const SELF_ACTIVATING_TAGS = new Set(['a', 'summary']);
-
 const control = useTemplateRef<HTMLElement>('control');
-
-// Read in setup, where `<script setup>` guarantees an instance. `vnode.props` is null when the
-// consumer passes nothing at all, which is itself the unbound case.
-const vnodeProps = getCurrentInstance()?.vnode.props;
-
-/**
- * Dev-only guard for the cost of the trade above: `defineModel` cannot tell "no model bound" from
- * "model bound, holding `undefined`", and `onClick` skips the assignment on `undefined` to keep an
- * UNBOUND Pressable from claiming toggle semantics. A consumer who binds a `ref<boolean>()` they
- * never initialised therefore gets a control that silently never toggles and never emits.
- *
- * The two cases ARE distinguishable, just not through the model ref: a binding passes an
- * `onUpdate:pressed` listener alongside the prop. Verified to hold for `v-model:pressed` AND for a
- * hand-written `:pressed` + `@update:pressed` pair, and to stay absent for both a bare <Pressable>
- * and `:pressed` with no listener — so this cannot fire on correct code.
- */
-const warnWhenModelUninitialised = (): void => {
-    if (devWarningsSuppressed()) return;
-    if (pressed.value !== undefined) return;
-    if (vnodeProps?.['onUpdate:pressed'] === undefined) return;
-
-    console.warn(
-        '[ui-inputs] <Pressable> has `v-model:pressed` bound to `undefined`, so it renders no ' +
-            '`aria-pressed` and never toggles or emits. Initialise the bound ref to a boolean.',
-    );
-};
-
-/**
- * Dev-only bound on the `as` escape hatch. Aiming it at an element the browser already activates
- * gives that element a hand-rolled `role="button"` and a second Enter/Space translation on top of
- * the one it already has, and on the disabled path a native default action the fallback chassis
- * has no `disabled` to withhold. The prohibition was documentation-only; documentation is the
- * weakest rung of the enforcement ladder and every review round found another leak below it.
- *
- * Asserted against the RENDERED element rather than the prop, so `as="a"` without an `href` — an
- * anchor that activates nothing — stays silent. A warning that fires on correct code would cost
- * this one its authority, exactly as it would the accessible-name guard.
- */
-const warnWhenSelfActivating = (element: HTMLElement): void => {
-    if (devWarningsSuppressed()) return;
-
-    const rendered = element.tagName.toLowerCase();
-    if (!SELF_ACTIVATING_TAGS.has(rendered)) return;
-    if (rendered === 'a' && !element.hasAttribute('href')) return;
-
-    console.warn(
-        `[ui-inputs] <Pressable as="${as}"> aims the escape hatch at an element the browser ` +
-            'already activates, so it now carries a hand-rolled `role="button"` and a second ' +
-            'key-to-click translation on top of its own. Render a `<button>`, or an element that ' +
-            'activates nothing.',
-    );
-};
-
-// `label` is optional and the default slot may render empty, so a consumer can end up with a
-// focusable, correctly-roled, UNNAMED control. Dev-only, mount-time, once per instance.
-onMounted(() => {
-    const element = ensureRefValueExists(control);
-    warnWhenUnnamed(element, 'Pressable', 'the `label` prop, default-slot content');
-    warnWhenModelUninitialised();
-    warnWhenSelfActivating(element);
-});
 
 /** Per-path chassis: native semantics, or the hand-rolled equivalents the fallback must supply. */
 const chassis = computed(() =>

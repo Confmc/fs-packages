@@ -419,20 +419,15 @@ describe('Pressable — the discouraged `as` escape hatch', () => {
 
 /**
  * The cost of "no `aria-pressed` until `v-model:pressed` is bound": `defineModel` cannot tell an
- * UNBOUND model from one bound to `undefined`, and `onClick` skips the assignment on `undefined`,
- * so a consumer who binds an uninitialised `ref<boolean>()` gets a control that silently never
- * toggles. The click semantics are deliberately left alone — toggling from `undefined` would make
- * an unbound Pressable start emitting and rendering `aria-pressed`, which is the contract above.
- * The fix is to make the silent case LOUD, and the discriminator is the listener a binding passes
- * alongside the prop. Asserted in both directions: a warning that fires on correct code would cost
- * the guard its authority.
+ * UNBOUND model from one bound to `undefined`, and `onClick` skips the assignment on `undefined`.
+ * Toggling from `undefined` would make an unbound Pressable start emitting and rendering
+ * `aria-pressed`, so a model bound to `undefined` stays inert; the docblock tells the consumer to
+ * bind a boolean.
  */
-describe('Pressable — the uninitialised-model guard', () => {
-    /** A host that binds a real `v-model:pressed`, so the compiler — not the spec — builds the props. */
+describe('Pressable — a model bound to undefined', () => {
     const ModelHost = defineComponent({
-        props: {initial: {type: Boolean, default: undefined}},
-        setup(props) {
-            const pressed = ref<boolean | undefined>(props.initial);
+        setup() {
+            const pressed = ref<boolean | undefined>();
             return () =>
                 h(Pressable, {
                     pressed: pressed.value,
@@ -442,68 +437,12 @@ describe('Pressable — the uninitialised-model guard', () => {
         },
     });
 
-    let warn: ReturnType<typeof vi.spyOn>;
-
-    beforeEach(() => {
-        warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-    });
-
-    afterEach(() => {
-        vi.restoreAllMocks();
-        vi.unstubAllEnvs();
-    });
-
-    it('is the defect being reported: a bound model holding undefined never toggles or emits', async () => {
+    it('never toggles or emits, like an unbound one', async () => {
         const wrapper = mount(ModelHost);
         await wrapper.findComponent(Pressable).trigger('click');
 
-        // Unchanged on purpose — this is the trade, not the bug. The warning is the fix.
         expect(wrapper.findComponent(Pressable).emitted('update:pressed')).toBeUndefined();
         expect(wrapper.findComponent(Pressable).attributes('aria-pressed')).toBeUndefined();
-    });
-
-    it('warns when a real v-model:pressed is bound to an uninitialised ref', () => {
-        mount(ModelHost);
-
-        expect(warn).toHaveBeenCalledTimes(1);
-        const message = String(warn.mock.calls[0]?.[0]);
-        expect(message).toContain('<Pressable>');
-        expect(message).toContain('v-model:pressed');
-        expect(message).toContain('Initialise the bound ref to a boolean.');
-    });
-
-    it('warns on the hand-written `:pressed` + `@update:pressed` pair too — same discriminator', () => {
-        mount(Pressable, {props: {label: 'Bold', pressed: undefined, 'onUpdate:pressed': vi.fn()}});
-
-        expect(warn).toHaveBeenCalledTimes(1);
-    });
-
-    it('stays silent once the bound model holds a boolean — false is initialised, not absent', () => {
-        mount(ModelHost, {props: {initial: false}});
-
-        expect(warn).not.toHaveBeenCalled();
-    });
-
-    it('stays silent on an UNBOUND Pressable — the supported plain-action-button case', () => {
-        mount(Pressable, {props: {label: 'Go'}});
-
-        expect(warn).not.toHaveBeenCalled();
-    });
-
-    it('stays silent on `:pressed` with no listener — a prop without a binding is not a bound model', () => {
-        // The listener, not the prop, is the discriminator: this consumer never asked to be told
-        // about changes, so there is nothing uninitialised to complain about.
-        mount(Pressable, {props: {label: 'Go', pressed: undefined}});
-
-        expect(warn).not.toHaveBeenCalled();
-    });
-
-    it('is stripped in production, on the same gate as the accessible-name check', () => {
-        vi.stubEnv('NODE_ENV', 'production');
-
-        mount(ModelHost);
-
-        expect(warn).not.toHaveBeenCalled();
     });
 });
 
@@ -732,66 +671,5 @@ describe('Pressable — a disabled control is inert for its whole subtree', () =
 
         // Unmounting takes the listener with the element; nothing here should throw.
         expect(() => wrapper.unmount()).not.toThrow();
-    });
-});
-
-/**
- * The bound on the escape hatch, at a tier above the docblock that already forbade this. Aiming
- * `as` at an element the browser activates by itself gives it a hand-rolled `role="button"` and a
- * second key-to-click translation on top of the one it already has. Asserted in both directions:
- * this fires on the elements the documentation names and on nothing else, because a warning that
- * fires on correct code costs the guard its authority.
- */
-describe('Pressable — the `as` self-activating bound', () => {
-    let warn: ReturnType<typeof vi.spyOn>;
-
-    beforeEach(() => {
-        warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-    });
-
-    afterEach(() => {
-        vi.restoreAllMocks();
-        vi.unstubAllEnvs();
-    });
-
-    it('warns on an anchor that actually activates', () => {
-        mount(Pressable, {props: {as: 'a', label: 'Row'}, attrs: {href: '/somewhere'}});
-
-        expect(warn).toHaveBeenCalledTimes(1);
-        const message = String(warn.mock.calls[0]?.[0]);
-        expect(message).toContain('already activates');
-        expect(message).toContain('as="a"');
-    });
-
-    it('warns on as="A" — the bound normalises case like the native compare does', () => {
-        mount(Pressable, {props: {as: 'A', label: 'Row'}, attrs: {href: '/somewhere'}});
-
-        expect(warn).toHaveBeenCalledTimes(1);
-    });
-
-    it('warns on <summary>, which activates from the pointer AND the keyboard', () => {
-        mount(Pressable, {props: {as: 'summary', label: 'Row'}});
-
-        expect(warn).toHaveBeenCalledTimes(1);
-    });
-
-    it('stays SILENT on an anchor with no href — that one activates nothing', () => {
-        mount(Pressable, {props: {as: 'a', label: 'Row'}});
-
-        expect(warn).not.toHaveBeenCalled();
-    });
-
-    it.each(['div', 'tr', 'span', undefined])('stays SILENT on the supported as=%s', (as) => {
-        mount(Pressable, {props: {as, label: 'Row'}});
-
-        expect(warn).not.toHaveBeenCalled();
-    });
-
-    it('is stripped in production, on the same gate as the other dev warnings', () => {
-        vi.stubEnv('NODE_ENV', 'production');
-
-        mount(Pressable, {props: {as: 'summary', label: 'Row'}});
-
-        expect(warn).not.toHaveBeenCalled();
     });
 });
