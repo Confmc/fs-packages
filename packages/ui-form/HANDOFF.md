@@ -1110,3 +1110,14 @@ the epic own every template and its TS files). So: field tooltips stay as they a
 conversion task); keyed rows not needed; finding C's `FormDraft` stays (it is what makes that screen type-check);
 the "optioneel" marker only if emmie's `optional` cannot move over without it. landing.11 checked: typecheck 19 → 2
 (finding C, an old scratch spec), all 8 slot spots work in the browser.
+
+**Pressable and Disclosure ported, reviewed (2026-11-05):** `ui-form/n-pressable` @3eb7501 and `ui-form/n-disclosure`
+@ad186c0 on fork, each = #332's branch + main + the port; they open after #332 merges. (The 10-26 placeholders under
+those names, a copy + export on #332's old head, were deleted by Marcel and replaced; their content was identical.)
+Under #332's rulings: all `NODE_ENV` dev warnings dropped (cases now in docblocks); no click guard on a native
+disabled button (measured in Chromium: only `dispatchEvent` reaches it); the `as` fallback keeps its capture stop,
+`preventDefault` (disabled `as="a"`) and key guard (a disabled div gets real clicks and mouse focus). Disclosure drops
+its guard (its trigger is always a native button) and now splits attrs (class/style on the root, the rest on the
+trigger). Pressable 307 lines (ui-inputs 368), Disclosure 100 (121). Coverage 100, Stryker 100 (only split-attrs;
+with #339's .vue mutation as a trial: Pressable 98.4, Disclosure 100). PR bodies must say: the "unchanged copy"
+commit leaves the copied internals uncovered (as #332's did); coverage is green from the next commit on.
