@@ -1,5 +1,5 @@
 <template>
-    <div class="ui-disclosure">
+    <div v-bind="rootAttrs($attrs)" class="ui-disclosure">
         <!-- The heading CONTAINS the button; it never behaves as one. The live shape this
              replaces is `<h2 @click="collapse?.toggle">` — a heading with a click handler is
              invisible to the keyboard and lies about its role. Pass `headingLevel` and the
@@ -16,11 +16,11 @@
                  before the spread LOSES to it, so a consumer's `type="submit"` beat the static
                  `type="button"` and made this trigger submit its surrounding form on toggle
                  (measured in Chromium: the form submitted AND the panel expanded). The bindings
-                 below the spread — `class`, `:disabled`, `:aria-*` — already win by position. -->
+                 below the spread — `:disabled`, `:aria-*` — already win by position. -->
             <button
                 :id="id"
                 @click="toggle"
-                v-bind="{...$attrs, type: 'button'}"
+                v-bind="{...controlAttrs($attrs), type: 'button'}"
                 class="ui-pressable ui-disclosure__trigger"
                 :disabled="disabled"
                 :aria-expanded="expanded"
@@ -54,9 +54,11 @@
 <script setup lang="ts">
 import {computed} from 'vue';
 
-// The root is the wrapper div, so attrs are re-aimed at the trigger button — the element that
-// actually wants `aria-label`, `title`, `data-*` — per the family's fall-through contract
-// (see Checkbox/Switch for the same re-aim off a non-interactive root).
+import {controlAttrs, rootAttrs} from '../internal/split-attrs';
+
+// The root is the wrapper div, so `class` and `style` stay on it and every other attr goes to the
+// trigger button, the element that wants `aria-label`, `title`, `data-*` and listeners: the same
+// split as Checkbox and Switch.
 defineOptions({inheritAttrs: false});
 
 const {

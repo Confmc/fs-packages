@@ -132,6 +132,16 @@ describe('Disclosure', () => {
         expect(wrapper.element.getAttribute('data-test')).toBeNull();
     });
 
+    it('keeps class and style on the root, where a consumer styles the whole disclosure', () => {
+        const wrapper = mount(Disclosure, {props: base, attrs: {class: 'mine', style: 'margin: 1px'}});
+        const trigger = wrapper.find('button');
+
+        expect(wrapper.classes()).toEqual(expect.arrayContaining(['ui-disclosure', 'mine']));
+        expect(wrapper.attributes('style')).toBe('margin: 1px;');
+        expect(trigger.classes()).not.toContain('mine');
+        expect(trigger.attributes('style')).toBeUndefined();
+    });
+
     /**
      * …but not the trigger's own `type`. It used to sit above the `$attrs` spread as a static
      * attribute, and an attribute placed before a spread LOSES to it — so a consumer's
@@ -155,16 +165,11 @@ describe('Disclosure', () => {
     it('leaves the bindings BELOW the spread winning, as they already did', () => {
         // They are safe by position, not by the fix — and that is worth pinning, because the fix
         // moved a line in this template and the next edit might move another. A consumer cannot
-        // forge the expanded state, unmake the component class, or re-enable a disabled trigger.
-        const wrapper = mount(Disclosure, {
-            props: {...base, disabled: true},
-            attrs: {class: 'mine', 'aria-expanded': 'true'},
-        });
+        // forge the expanded state or re-enable a disabled trigger.
+        const wrapper = mount(Disclosure, {props: {...base, disabled: true}, attrs: {'aria-expanded': 'true'}});
         const trigger = wrapper.find('button');
 
         expect(trigger.attributes('aria-expanded')).toBe('false');
         expect(trigger.attributes('disabled')).toBeDefined();
-        expect(trigger.classes()).toContain('mine'); // class MERGES rather than replaces
-        expect(trigger.classes()).toContain('ui-disclosure__trigger');
     });
 });
