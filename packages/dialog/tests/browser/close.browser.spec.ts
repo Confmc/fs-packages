@@ -173,6 +173,43 @@ describe('Escape and a native close in a real browser (WR-1913)', () => {
         expect(stack()).toHaveLength(0);
     });
 
+    it('should still close on Escape with a non-modal dialog inside it over the corner the hit test reads', async () => {
+        // Arrange
+        const {service, stack} = mountService();
+        const WithPanel = defineComponent({
+            render: () =>
+                h('div', [
+                    h('button', 'inside'),
+                    h('dialog', {open: true, style: 'position:fixed;inset:0;margin:0;width:50px;height:50px'}, 'panel'),
+                ]),
+        });
+        service.open(WithPanel, {});
+        await settle();
+
+        // Act
+        await pressEscape();
+
+        // Assert
+        expect(stack()).toHaveLength(0);
+    });
+
+    it('should still close on Escape when the backdrop takes no pointer events', async () => {
+        // Arrange
+        const style = document.createElement('style');
+        style.textContent = 'dialog::backdrop { pointer-events: none; }';
+        document.head.append(style);
+        const {service, stack} = mountService();
+        service.open(Content, {});
+        await settle();
+
+        // Act
+        await pressEscape();
+        style.remove();
+
+        // Assert
+        expect(stack()).toHaveLength(0);
+    });
+
     it('should hold when something inside the dialog stops the key on its way up', async () => {
         // Arrange
         const {service, stack} = mountService();

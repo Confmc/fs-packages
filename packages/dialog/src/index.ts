@@ -197,8 +197,15 @@ export const createDialogService = (): DialogService => {
                 h(Suspense, null, {default: () => h(rawComponent, prepared)}),
             );
 
+        // Another service's dialog can be on top of this stack. Only the topmost modal is not inert
+        // and its backdrop fills the viewport, so a hit test names it, across copies of this package.
+        const isFrontmost = () => (document.elementFromPoint(0, 0)?.closest('dialog:modal') ?? element) === element;
+
         const applyEscapeRule = (isTop: boolean) =>
-            element?.setAttribute('closedby', isTop && allowsClose(options?.closeOnEscape) ? 'closerequest' : 'none');
+            element?.setAttribute(
+                'closedby',
+                isTop && isFrontmost() && allowsClose(options?.closeOnEscape) ? 'closerequest' : 'none',
+            );
 
         dialogs.value.push({render, key, restoreFocus, isClosed: () => element?.open === false, applyEscapeRule});
         updateBodyScroll();

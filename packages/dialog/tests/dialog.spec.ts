@@ -575,7 +575,15 @@ describe('dialog service', () => {
         afterEach(() => {
             attached?.unmount();
             attached = undefined;
+            vi.restoreAllMocks();
         });
+
+        // happy-dom has no layout, so these stub the browser's hit test.
+        const hitModal = (modal: Element | null) => {
+            const hit = document.createElement('div');
+            vi.spyOn(hit, 'closest').mockReturnValue(modal);
+            vi.spyOn(document, 'elementFromPoint').mockReturnValue(hit);
+        };
 
         it('should refuse on a dialog with closeOnEscape false', async () => {
             // Arrange
@@ -744,6 +752,68 @@ describe('dialog service', () => {
 
             // Act & Assert
             expect(() => pressEscape()).not.toThrow();
+        });
+
+        it('should refuse when a modal from elsewhere is in front of the top dialog', async () => {
+            // Arrange
+            const closeOnEscape = vi.fn(() => true);
+            const service = createDialogService();
+            const wrapper = mountAttached(service);
+            service.open(TestDialogContent, {title: 'Test'}, {closeOnEscape});
+            await nextTick();
+            hitModal(document.createElement('dialog'));
+
+            // Act
+            pressEscape();
+
+            // Assert
+            expect(closedBy(wrapper)).toEqual(['none']);
+            expect(closeOnEscape).not.toHaveBeenCalled();
+        });
+
+        it('should allow when the top dialog is the modal in front', async () => {
+            // Arrange
+            const service = createDialogService();
+            const wrapper = mountAttached(service);
+            service.open(TestDialogContent, {title: 'Test'});
+            await nextTick();
+            hitModal(wrapper.find('dialog').element);
+
+            // Act
+            pressEscape();
+
+            // Assert
+            expect(closedBy(wrapper)).toEqual(['closerequest']);
+        });
+
+        it('should fall back to its own stack when the hit test finds no modal', async () => {
+            // Arrange
+            const service = createDialogService();
+            const wrapper = mountAttached(service);
+            service.open(TestDialogContent, {title: 'Test'});
+            await nextTick();
+            hitModal(null);
+
+            // Act
+            pressEscape();
+
+            // Assert
+            expect(closedBy(wrapper)).toEqual(['closerequest']);
+        });
+
+        it('should fall back to its own stack when the hit test finds nothing', async () => {
+            // Arrange
+            const service = createDialogService();
+            const wrapper = mountAttached(service);
+            service.open(TestDialogContent, {title: 'Test'});
+            await nextTick();
+            vi.spyOn(document, 'elementFromPoint').mockReturnValue(null);
+
+            // Act
+            pressEscape();
+
+            // Assert
+            expect(closedBy(wrapper)).toEqual(['closerequest']);
         });
 
         it('should stop listening when the container unmounts with a dialog still on the stack', async () => {
