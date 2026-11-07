@@ -237,7 +237,9 @@ const whileIdle = () => !saving.value;
 dialog.open(EditForm, {/* props */}, {closeOnEscape: whileIdle, closeOnBackdropClick: whileIdle});
 ```
 
-A refused Escape is not final. Chromium closes a dialog natively when Escape is pressed a second time with no click or key press in between, whatever the dialog asked for. The service follows that close: the dialog leaves the stack, scrolling unlocks and focus is restored, exactly as for any other close.
+A refused Escape holds however often it is pressed, including when the key is held down. Only the topmost dialog's rule counts: a dialog that allows Escape closes, one per press, even over one that refuses it. The service sets the native [`closedby`](https://developer.mozilla.org/docs/Web/HTML/Reference/Elements/dialog#closedby) attribute when Escape goes down and does not cancel the key, so whatever is inside the dialog keeps its own Escape: a dropdown's key handler, a popover, a search field.
+
+A dialog can still be closed by the browser where `closedby` does not reach: a browser without it (Chrome before 134, Firefox before 141, Safari outside its preview), the Android back gesture, a `close()` from outside, or a form with `method="dialog"`. The service follows that close: the dialog leaves the stack, scrolling unlocks and focus is restored, exactly as for any other close.
 
 ## Focus
 

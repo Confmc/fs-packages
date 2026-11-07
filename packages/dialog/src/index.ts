@@ -1,7 +1,18 @@
 import type {Component, VNode} from 'vue';
 import type {ComponentProps} from 'vue-component-type-helpers';
 
-import {Suspense, defineComponent, h, markRaw, nextTick, onErrorCaptured, reactive, ref} from 'vue';
+import {
+    Suspense,
+    defineComponent,
+    h,
+    markRaw,
+    nextTick,
+    onBeforeUnmount,
+    onErrorCaptured,
+    onMounted,
+    reactive,
+    ref,
+} from 'vue';
 
 type UnregisterMiddleware = () => void;
 
@@ -51,6 +62,8 @@ interface DialogEntry {
     restoreFocus: () => void;
     /** True once the element has been shown and has closed since. */
     isClosed: () => boolean;
+    /** Tells the browser whether this dialog may close on the Escape being handled. */
+    applyEscapeRule: (isTop: boolean) => void;
 }
 
 const DIALOG_STYLE = 'padding:0;margin:auto;background:transparent;border:none';
@@ -112,6 +125,18 @@ export const createDialogService = (): DialogService => {
 
     const closeAll = () => closeFrom(0);
 
+    // Preventing cancel refuses one Escape: with no user activation since, the browser makes the
+    // next cancel uncancelable and closes the element itself (WR-1913). `closedby` is the rule it
+    // does follow, so it is set before the browser handles the key, and the key itself is left
+    // alone for anything inside the dialog. Lower dialogs are always `none`: the browser groups
+    // dialogs opened without an activation in between, and can close them together.
+    const applyEscapeRules = (event: KeyboardEvent) => {
+        if (event.key !== 'Escape') return;
+
+        const top = dialogs.value.length - 1;
+        dialogs.value.forEach((dialog, index) => dialog.applyEscapeRule(index === top));
+    };
+
     const open = <C extends Component>(component: C, props: ComponentProps<C>, options?: DialogOpenOptions): void => {
         // The browser queues a native close event, so an entry whose element closed may still be on
         // the stack; it goes first, or its late event would close this dialog with it (LIFO).
@@ -153,9 +178,9 @@ export const createDialogService = (): DialogService => {
 
                         onClose();
                     },
-                    // Chromium closes the element natively on a second Escape with no user activation
-                    // in between, whatever onCancel did (WR-1913); the entry follows it off the stack.
-                    // A close the service made itself finds no entry and does nothing.
+                    // A browser can still close the element itself: close() from outside, a form with
+                    // method=dialog, or one too old for closedby (WR-1913). The entry follows it off
+                    // the stack. A close the service made itself finds no entry and does nothing.
                     onClose,
                     onClick: (event: MouseEvent) => {
                         if ((event.target as HTMLElement).tagName !== 'DIALOG') return;
@@ -172,7 +197,10 @@ export const createDialogService = (): DialogService => {
                 h(Suspense, null, {default: () => h(rawComponent, prepared)}),
             );
 
-        dialogs.value.push({render, key, restoreFocus, isClosed: () => element?.open === false});
+        const applyEscapeRule = (isTop: boolean) =>
+            element?.setAttribute('closedby', isTop && allowsClose(options?.closeOnEscape) ? 'closerequest' : 'none');
+
+        dialogs.value.push({render, key, restoreFocus, isClosed: () => element?.open === false, applyEscapeRule});
         updateBodyScroll();
     };
 
@@ -200,6 +228,8 @@ export const createDialogService = (): DialogService => {
         name: 'DialogContainer',
         setup() {
             onErrorCaptured((error) => handleError(error));
+            onMounted(() => window.addEventListener('keydown', applyEscapeRules, true));
+            onBeforeUnmount(() => window.removeEventListener('keydown', applyEscapeRules, true));
 
             return () => dialogs.value.map((dialog) => dialog.render());
         },

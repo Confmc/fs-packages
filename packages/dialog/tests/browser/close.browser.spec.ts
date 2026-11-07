@@ -1,9 +1,9 @@
 import type {App} from 'vue';
 
-// Real Chromium, because the defect lives in its close watcher: happy-dom fires no cancel on
-// a key press and has no user-activation rule. The happy-dom suite pins the service's reaction
-// to a close event; this file pins that a real Escape produces one (WR-1913).
-import {afterEach, describe, expect, it} from 'vitest';
+// A real browser, because the defect lives in its close watcher: happy-dom fires no cancel on
+// a key press and has no user-activation rule. The happy-dom suite pins the attribute and the
+// service's reaction to a close event; this file pins what a real Escape does (WR-1913).
+import {afterEach, describe, expect, it, vi} from 'vitest';
 import {userEvent} from 'vitest/browser';
 import {createApp, defineComponent, h, nextTick} from 'vue';
 
@@ -16,7 +16,7 @@ const settle = async () => {
     await new Promise((resolve) => setTimeout(resolve, 50));
 };
 
-describe('native close in Chromium (WR-1913)', () => {
+describe('Escape and a native close in a real browser (WR-1913)', () => {
     let app: App | undefined;
     let host: HTMLElement | undefined;
 
@@ -51,30 +51,218 @@ describe('native close in Chromium (WR-1913)', () => {
         expect(document.body.style.overflowY).toBe('auto');
     });
 
-    it('should keep the stack in sync when Chromium force-closes an opted-out dialog', async () => {
+    const pressEscape = async (times = 1) => {
+        for (let press = 0; press < times; press++) {
+            await userEvent.keyboard('{Escape}');
+            await settle();
+        }
+    };
+
+    // Without closedby the second press gets an uncancelable cancel and closes the dialog.
+    it('should keep an opted-out dialog open through repeated Escape', async () => {
         // Arrange
         const {service, stack} = mountService();
-        const cancelable: boolean[] = [];
-        const record = (event: Event) => cancelable.push(event.cancelable);
-        document.addEventListener('cancel', record, true);
         service.open(Content, {}, {closeOnEscape: false});
         await settle();
-        const element = stack()[0]!;
 
         // Act
-        await userEvent.keyboard('{Escape}');
-        await settle();
-        const openAfterFirst = element.open;
-        await userEvent.keyboard('{Escape}');
-        await settle();
-        document.removeEventListener('cancel', record, true);
+        await pressEscape(4);
 
         // Assert
-        expect(openAfterFirst).toBe(true);
-        // Without the force-close this spec would pass on a service with no close listener.
-        expect(cancelable).toEqual([true, false]);
+        expect(stack()).toHaveLength(1);
+        expect(stack()[0]!.open).toBe(true);
+        expect(document.body.style.overflowY).toBe('hidden');
+    });
+
+    it('should keep an opted-out dialog open through repeated Escape with focus on the body', async () => {
+        // Arrange
+        const {service, stack} = mountService();
+        service.open(Content, {}, {closeOnEscape: false});
+        await settle();
+        (document.activeElement as HTMLElement).blur();
+
+        // Act
+        await pressEscape(4);
+
+        // Assert
+        expect(document.activeElement).toBe(document.body);
+        expect(stack()[0]?.open).toBe(true);
+    });
+
+    it('should keep an opted-out dialog open while Escape is held down', async () => {
+        // Arrange
+        const {service, stack} = mountService();
+        service.open(Content, {}, {closeOnEscape: false});
+        await settle();
+
+        // Act
+        await userEvent.keyboard('{Escape>5/}');
+        await settle();
+
+        // Assert
+        expect(stack()[0]?.open).toBe(true);
+    });
+
+    it('should hold while a getter refuses and close on the first press once it allows', async () => {
+        // Arrange
+        const {service, stack} = mountService();
+        let busy = true;
+        service.open(Content, {}, {closeOnEscape: () => !busy});
+        await settle();
+
+        // Act
+        await pressEscape(3);
+        const heldWhileBusy = stack()[0]?.open;
+        busy = false;
+        await pressEscape();
+
+        // Assert
+        expect(heldWhileBusy).toBe(true);
         expect(stack()).toHaveLength(0);
-        expect(document.body.style.overflowY).toBe('auto');
+    });
+
+    it('should close a top dialog that allows Escape and then hold the one below that refuses', async () => {
+        // Arrange
+        const {service, stack} = mountService();
+        service.open(Content, {}, {closeOnEscape: false});
+        service.open(Content, {});
+        await settle();
+        const lower = stack()[0]!;
+
+        // Act
+        await pressEscape();
+        const afterFirst = stack().length;
+        await pressEscape(3);
+
+        // Assert
+        expect(afterFirst).toBe(1);
+        expect(stack()[0]).toBe(lower);
+        expect(lower.open).toBe(true);
+    });
+
+    it('should hold a top dialog that refuses over one below that allows', async () => {
+        // Arrange
+        const {service, stack} = mountService();
+        service.open(Content, {});
+        service.open(Content, {}, {closeOnEscape: false});
+        await settle();
+
+        // Act
+        await pressEscape(3);
+
+        // Assert
+        expect(stack()).toHaveLength(2);
+        expect(stack()[0]!.open).toBe(true);
+        expect(stack()[1]!.open).toBe(true);
+    });
+
+    it('should close stacked dialogs one per press', async () => {
+        // Arrange
+        const {service, stack} = mountService();
+        service.open(Content, {});
+        service.open(Content, {});
+        await settle();
+
+        // Act
+        await pressEscape();
+        const afterFirst = stack().length;
+        await pressEscape();
+
+        // Assert
+        expect(afterFirst).toBe(1);
+        expect(stack()).toHaveLength(0);
+    });
+
+    it('should hold when something inside the dialog stops the key on its way up', async () => {
+        // Arrange
+        const {service, stack} = mountService();
+        const Stopping = defineComponent({
+            render: () => h('button', {onKeydown: (event: KeyboardEvent) => event.stopPropagation()}, 'inside'),
+        });
+        service.open(Stopping, {}, {closeOnEscape: false});
+        await settle();
+
+        // Act
+        await pressEscape(4);
+
+        // Assert
+        expect(stack()[0]?.open).toBe(true);
+    });
+
+    it('should hand the key to a listener inside a refusing dialog, not cancelled', async () => {
+        // Arrange
+        const {service} = mountService();
+        const seen: boolean[] = [];
+        const Listening = defineComponent({
+            render: () =>
+                h('button', {onKeydown: (event: KeyboardEvent) => seen.push(event.defaultPrevented)}, 'inside'),
+        });
+        service.open(Listening, {}, {closeOnEscape: false});
+        await settle();
+
+        // Act
+        await pressEscape(2);
+
+        // Assert
+        expect(seen).toEqual([false, false]);
+    });
+
+    it('should let a popover inside a refusing dialog close on Escape', async () => {
+        // Arrange
+        const {service, stack} = mountService();
+        const WithPopover = defineComponent({
+            render: () =>
+                h('div', [h('button', 'inside'), h('div', {id: 'inner-popover', popover: 'auto'}, 'popover')]),
+        });
+        service.open(WithPopover, {}, {closeOnEscape: false});
+        await settle();
+        const popover = document.getElementById('inner-popover')!;
+        popover.showPopover();
+        await settle();
+
+        // Act
+        await pressEscape();
+
+        // Assert
+        expect(popover.matches(':popover-open')).toBe(false);
+        expect(stack()[0]?.open).toBe(true);
+    });
+
+    it('should let a native dialog inside a refusing dialog close on Escape', async () => {
+        // Arrange
+        const {service, stack} = mountService();
+        const WithDialog = defineComponent({
+            render: () => h('div', [h('button', 'inside'), h('dialog', {id: 'inner-dialog'}, [h('button', 'nested')])]),
+        });
+        service.open(WithDialog, {}, {closeOnEscape: false});
+        await settle();
+        const nested = document.getElementById('inner-dialog') as HTMLDialogElement;
+        nested.showModal();
+        await settle();
+
+        // Act
+        await pressEscape();
+
+        // Assert
+        expect(nested.open).toBe(false);
+        expect(stack()[0]?.open).toBe(true);
+    });
+
+    // happy-dom removes a listener whatever its capture flag, so only a browser can show a leak.
+    it('should stop reading closeOnEscape once the host has unmounted', async () => {
+        // Arrange
+        const {service} = mountService();
+        const closeOnEscape = vi.fn(() => false);
+        service.open(Content, {}, {closeOnEscape});
+        await settle();
+        app?.unmount();
+        app = undefined;
+
+        // Act
+        await pressEscape();
+
+        // Assert
+        expect(closeOnEscape).not.toHaveBeenCalled();
     });
 
     // Chromium queues the close event as a task, so a dialog opened in between is already on the
@@ -151,6 +339,25 @@ describe('native close in Chromium (WR-1913)', () => {
         expect(stack()).toHaveLength(0);
         expect(document.activeElement).toBe(outside);
         outside.remove();
+    });
+
+    it('should keep the stack in sync when a form with method=dialog closes a refusing dialog', async () => {
+        // Arrange
+        const {service, stack} = mountService();
+        const WithForm = defineComponent({
+            render: () => h('form', {method: 'dialog'}, [h('button', {id: 'inner-submit'}, 'submit')]),
+        });
+        service.open(WithForm, {}, {closeOnEscape: false});
+        await settle();
+        await pressEscape(2);
+
+        // Act
+        document.getElementById('inner-submit')!.click();
+        await settle();
+
+        // Assert
+        expect(stack()).toHaveLength(0);
+        expect(document.body.style.overflowY).toBe('auto');
     });
 
     it('should keep the stack in sync when the element is closed from outside', async () => {

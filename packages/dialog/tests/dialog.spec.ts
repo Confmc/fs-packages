@@ -1,6 +1,10 @@
+import type {VueWrapper} from '@vue/test-utils';
+
 import {flushPromises, mount} from '@vue/test-utils';
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {defineComponent, h, nextTick} from 'vue';
+
+import type {DialogService} from '../src/index';
 
 // @vitest-environment happy-dom
 import {createDialogService} from '../src/index';
@@ -547,10 +551,239 @@ describe('dialog service', () => {
         });
     });
 
+    describe('the Escape rule set when the key goes down', () => {
+        // happy-dom has no close watcher, so these pin the attribute the browser follows;
+        // tests/browser pins that the browser follows it.
+        const pressEscape = (key = 'Escape'): KeyboardEvent => {
+            const event = new KeyboardEvent('keydown', {key, bubbles: true, cancelable: true});
+            document.body.dispatchEvent(event);
+
+            return event;
+        };
+        const closedBy = (mounted: VueWrapper) =>
+            mounted.findAll('dialog').map((dialog) => dialog.element.getAttribute('closedby'));
+
+        // Attached, so a key dispatched inside reaches window, and unmounted after each spec, or a
+        // failed assertion leaves it in the document for the specs after it.
+        let attached: VueWrapper | undefined;
+        const mountAttached = (service: DialogService): VueWrapper => {
+            attached = mount(service.DialogContainerComponent, {attachTo: document.body});
+
+            return attached;
+        };
+
+        afterEach(() => {
+            attached?.unmount();
+            attached = undefined;
+        });
+
+        it('should refuse on a dialog with closeOnEscape false', async () => {
+            // Arrange
+            const service = createDialogService();
+            const wrapper = mountAttached(service);
+            service.open(TestDialogContent, {title: 'Test'}, {closeOnEscape: false});
+            await nextTick();
+
+            // Act
+            pressEscape();
+
+            // Assert
+            expect(closedBy(wrapper)).toEqual(['none']);
+        });
+
+        it('should allow on a dialog with no opt-out', async () => {
+            // Arrange
+            const service = createDialogService();
+            const wrapper = mountAttached(service);
+            service.open(TestDialogContent, {title: 'Test'});
+            await nextTick();
+
+            // Act
+            pressEscape();
+
+            // Assert
+            expect(closedBy(wrapper)).toEqual(['closerequest']);
+        });
+
+        it('should leave the key itself alone', async () => {
+            // Arrange
+            const service = createDialogService();
+            mountAttached(service);
+            service.open(TestDialogContent, {title: 'Test'}, {closeOnEscape: false});
+            await nextTick();
+
+            // Act
+            const event = pressEscape();
+
+            // Assert
+            expect(event.defaultPrevented).toBe(false);
+        });
+
+        it('should read a getter at each key press, not at open', async () => {
+            // Arrange
+            let busy = true;
+            const closeOnEscape = vi.fn(() => !busy);
+            const service = createDialogService();
+            const wrapper = mountAttached(service);
+            service.open(TestDialogContent, {title: 'Test'}, {closeOnEscape});
+            await nextTick();
+            expect(closeOnEscape).not.toHaveBeenCalled();
+
+            // Act & Assert
+            pressEscape();
+            expect(closedBy(wrapper)).toEqual(['none']);
+
+            busy = false;
+            pressEscape();
+            expect(closedBy(wrapper)).toEqual(['closerequest']);
+            expect(closeOnEscape).toHaveBeenCalledTimes(2);
+        });
+
+        it('should let only the top dialog allow a close, whatever the one below says', async () => {
+            // Arrange
+            const service = createDialogService();
+            const wrapper = mountAttached(service);
+            service.open(TestDialogContent, {title: 'Bottom'});
+            service.open(TestDialogContent, {title: 'Top'});
+            await nextTick();
+
+            // Act
+            pressEscape();
+
+            // Assert
+            expect(closedBy(wrapper)).toEqual(['none', 'closerequest']);
+        });
+
+        it('should refuse on both when the top refuses over one that allows', async () => {
+            // Arrange
+            const service = createDialogService();
+            const wrapper = mountAttached(service);
+            service.open(TestDialogContent, {title: 'Bottom'});
+            service.open(TestDialogContent, {title: 'Top'}, {closeOnEscape: false});
+            await nextTick();
+
+            // Act
+            pressEscape();
+
+            // Assert
+            expect(closedBy(wrapper)).toEqual(['none', 'none']);
+        });
+
+        it('should read only the top dialog getter', async () => {
+            // Arrange
+            const lower = vi.fn(() => true);
+            const service = createDialogService();
+            mountAttached(service);
+            service.open(TestDialogContent, {title: 'Bottom'}, {closeOnEscape: lower});
+            service.open(TestDialogContent, {title: 'Top'}, {closeOnEscape: false});
+            await nextTick();
+
+            // Act
+            pressEscape();
+
+            // Assert
+            expect(lower).not.toHaveBeenCalled();
+        });
+
+        it('should give the rule to the dialog below once the top has gone', async () => {
+            // Arrange
+            const service = createDialogService();
+            const wrapper = mountAttached(service);
+            service.open(TestDialogContent, {title: 'Bottom'});
+            service.open(TestDialogContent, {title: 'Top'});
+            await nextTick();
+            pressEscape();
+            wrapper.findAll('dialog')[1]!.element.dispatchEvent(new Event('close'));
+            await nextTick();
+
+            // Act
+            pressEscape();
+
+            // Assert
+            expect(closedBy(wrapper)).toEqual(['closerequest']);
+        });
+
+        it('should leave everything alone on another key', async () => {
+            // Arrange
+            const closeOnEscape = vi.fn(() => false);
+            const service = createDialogService();
+            const wrapper = mountAttached(service);
+            service.open(TestDialogContent, {title: 'Test'}, {closeOnEscape});
+            await nextTick();
+
+            // Act
+            pressEscape('Enter');
+
+            // Assert
+            expect(closeOnEscape).not.toHaveBeenCalled();
+            expect(closedBy(wrapper)).toEqual([null]);
+        });
+
+        it('should see a key whose target stops it on the way up', async () => {
+            // Arrange
+            const service = createDialogService();
+            const wrapper = mountAttached(service);
+            service.open(TestDialogContent, {title: 'Test'}, {closeOnEscape: false});
+            await nextTick();
+            const button = wrapper.find('button').element;
+            button.addEventListener('keydown', (event) => event.stopPropagation());
+
+            // Act
+            button.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true}));
+
+            // Assert
+            expect(closedBy(wrapper)).toEqual(['none']);
+        });
+
+        it('should survive the key arriving before an opened dialog has rendered', () => {
+            // Arrange
+            const closeOnEscape = vi.fn(() => false);
+            const service = createDialogService();
+            mountAttached(service);
+            service.open(TestDialogContent, {title: 'Test'}, {closeOnEscape});
+
+            // Act & Assert
+            expect(() => pressEscape()).not.toThrow();
+        });
+
+        it('should stop listening when the container unmounts with a dialog still on the stack', async () => {
+            // Arrange
+            const closeOnEscape = vi.fn(() => false);
+            const service = createDialogService();
+            const wrapper = mount(service.DialogContainerComponent);
+            service.open(TestDialogContent, {title: 'Test'}, {closeOnEscape});
+            await nextTick();
+            wrapper.unmount();
+
+            // Act
+            pressEscape();
+
+            // Assert
+            expect(closeOnEscape).not.toHaveBeenCalled();
+        });
+
+        it('should stop reading the dialogs that closeAll took off the stack', async () => {
+            // Arrange
+            const closeOnEscape = vi.fn(() => false);
+            const service = createDialogService();
+            mountAttached(service);
+            service.open(TestDialogContent, {title: 'Test'}, {closeOnEscape});
+            await nextTick();
+            service.closeAll();
+            await nextTick();
+
+            // Act
+            pressEscape();
+
+            // Assert
+            expect(closeOnEscape).not.toHaveBeenCalled();
+        });
+    });
+
     describe('a native close (WR-1913)', () => {
-        // Chromium closes a dialog natively on a second Escape with no user activation in
-        // between (a non-cancelable cancel); happy-dom has no close watcher, so these specs
-        // dispatch the resulting close event. tests/browser drives the real key presses.
+        // A browser closes a dialog natively where closedby does not reach, or on close() from
+        // outside; happy-dom has no close watcher, so these specs dispatch the resulting close
+        // event. tests/browser drives the real key presses.
         const dispatchClose = (element: Element) => element.dispatchEvent(new Event('close'));
 
         it('should take the dialog off the stack and unlock the body', async () => {
