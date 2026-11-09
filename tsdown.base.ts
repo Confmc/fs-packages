@@ -13,5 +13,6 @@ export const baseConfig = {
     dts: {sourcemap: false},
     clean: true,
     sourcemap: false,
+    inputOptions: {experimental: {attachDebugInfo: 'none'}},
     outputOptions: {comments: {legal: false, annotation: true, jsdoc: false}},
 } satisfies UserConfig;

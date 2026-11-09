@@ -10,6 +10,6 @@ import {baseConfig} from '../../tsdown.base.ts';
 // `@floating-ui/vue` runtime dep are left unbundled without an explicit list.
 export default defineConfig({
     ...baseConfig,
-    dts: {...baseConfig.dts, vue: true},
+    dts: {...baseConfig.dts, tsc: {vue: true}},
     plugins: [Vue({isProduction: true, template: {compilerOptions: {comments: false}}})],
 });
