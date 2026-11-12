@@ -14,3 +14,4 @@ export type {
     UseValidationErrorsOptions,
     ValidationErrors,
 } from './form/types';
+export {default as NumberInput} from './components/NumberInput.vue';
