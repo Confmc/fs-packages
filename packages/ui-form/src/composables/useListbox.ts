@@ -339,8 +339,9 @@ export const useListbox = (options: UseListboxOptions) => {
             case 'Enter':
             case ' ':
                 // WR-2588: APG select-only combobox, Space commits the active option as Enter does.
-                // A Space inside a typed string never gets here: typeahead took it above.
-                commitActive(event);
+                // A Space inside a typed string never gets here: typeahead took it above. Ctrl/Alt/Meta+Space
+                // is a system shortcut (it switches the input source on some systems), not a pick.
+                if (!event.ctrlKey && !event.altKey && !event.metaKey) commitActive(event);
                 break;
             case 'Escape':
                 onDismiss();
@@ -352,6 +353,12 @@ export const useListbox = (options: UseListboxOptions) => {
     // Only a KEY reveals the highlight: a pointer hover already has the row under the mouse, and
     // scrolling it would slide the next row under the pointer and chain the hover down the list.
     const onKey = (event: KeyboardEvent) => {
+        // A held Space repeats its keydown: only the first press acts (it committed, or opened the list).
+        // Each repeat is cancelled so it neither reopens the list nor lets the trigger's keyup click toggle it.
+        if (event.key === ' ' && event.repeat) {
+            event.preventDefault();
+            return;
+        }
         const before = activeDescendant.value;
         handleKey(event);
         if (activeDescendant.value !== before) void nextTick(revealActive);

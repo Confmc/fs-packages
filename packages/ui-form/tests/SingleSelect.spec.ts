@@ -257,9 +257,9 @@ describe('SingleSelect', () => {
         // Dispatched by hand to read `defaultPrevented`: cancelling the keydown is what keeps the
         // button's keyup click from toggling the list straight back. The clock steps 1 ms first,
         // or Vue drops an event stamped in the millisecond its listener was attached.
-        const space = (wrapper: ReturnType<typeof mountSelect>): KeyboardEvent => {
+        const space = (wrapper: ReturnType<typeof mountSelect>, init: KeyboardEventInit = {}): KeyboardEvent => {
             vi.setSystemTime(Date.now() + 1);
-            const event = new KeyboardEvent('keydown', {key: ' ', bubbles: true, cancelable: true});
+            const event = new KeyboardEvent('keydown', {key: ' ', bubbles: true, cancelable: true, ...init});
             wrapper.find('.ui-select__trigger').element.dispatchEvent(event);
             return event;
         };
@@ -274,6 +274,21 @@ describe('SingleSelect', () => {
             await wrapper.vm.$nextTick();
             expect(wrapper.emitted('update:modelValue')).toEqual([[2]]);
             expect(menu(wrapper).exists()).toBe(false);
+        });
+
+        it("lets Ctrl, Alt or Meta with Space through, cancels a held Space's repeats; neither commits", async () => {
+            const wrapper = mountSelect({});
+            const control = wrapper.find('.ui-select__trigger');
+            await control.trigger('keydown', {key: 'ArrowDown'}); // opens
+            await control.trigger('keydown', {key: 'ArrowDown'}); // Apricot
+
+            for (const init of [{ctrlKey: true}, {altKey: true}, {metaKey: true}]) {
+                expect(space(wrapper, init).defaultPrevented).toBe(false);
+            }
+            expect(space(wrapper, {repeat: true}).defaultPrevented).toBe(true);
+            await wrapper.vm.$nextTick();
+            expect(wrapper.emitted('update:modelValue')).toBeUndefined();
+            expect(menu(wrapper).exists()).toBe(true);
         });
 
         it('with nothing highlighted, commits nothing and leaves the key to the button', async () => {
@@ -565,8 +580,8 @@ describe('SingleSelect', () => {
 });
 
 describe('SingleSelect reveals the active option (WR-2903)', () => {
-    // happy-dom has no layout, so this pins which row is scrolled into view, how, and when not;
-    // ui-inputs' browser suite measures the real scroll geometry.
+    // happy-dom has no layout, so this pins the mechanism only: which row is scrolled into view, how,
+    // and when not. The real scroll geometry is not measured here.
     let revealed: {id: string; options: unknown}[];
     beforeEach(() => {
         revealed = [];
