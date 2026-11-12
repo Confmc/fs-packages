@@ -1195,3 +1195,16 @@ CHANGELOG, docs; 601 unit + 206 browser tests) and `ui-form/n-select-fixes` @d3a
 `detect:publishable` (expects ui-inputs 0.17.2 → 0.17.3), one PR. Open question for Marcel: convert ui-inputs'
 typeahead "thousandth repeat" timing test (real-clock ratio, the only plausible cause of one unreproduced failure in 33
 runs) to a work counter, as its own comment prescribes, as a commit in that PR.
+
+### End of 2026-11-12, late (read this first after a compaction)
+
+All pushed, every worktree clean. Read the sections above from "End of 2026-11-12" down; this adds only the latest:
+- **landing.12** (`fork/experiment/ui-form-landing-12` @edfdbad): built FRESH from main; the test bed confirmed it end
+  to end (PasswordInput, SingleSelect, form chain held). Selects beyond SingleSelect and their screens' slots wait.
+- **Select patch** (one PR after #353): `ui-inputs/select-fixes` @966bc41 + `ui-form/n-select-fixes`; see above.
+- **Waiting on the reviewer:** re-review of #343/#344/#353 (Marcel re-requested), merging the 11 approved, the
+  `Agent Review Requested` label (we can't set it: read-only), the 11-02 questions (app defaults, Amendment 2,
+  placeholder). Nothing to build until something merges.
+- **When things merge:** #353 → the five select branches add back their stripped core pieces (list above), then the
+  select patch PR; #332 → pressable, disclosure, checkbox-group; #355 → the three slot branches; #333 → the form chain.
+- **Rule reminders:** "flaky" needs a cause (freeze `Date`); integrate, don't refactor; check context before changing.
