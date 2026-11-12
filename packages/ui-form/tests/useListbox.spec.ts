@@ -58,7 +58,6 @@ const Harness = defineComponent({
             openKeys: () => false,
             onCommit: () => false,
             onDismiss: () => {},
-            onOutside: () => {},
             ...(props.overrides as Partial<UseListboxOptions> | undefined),
         });
         return () => h('div', {ref: root});
@@ -286,51 +285,51 @@ describe('useListbox top-layer promotion (KD-1136)', () => {
 });
 
 describe('useListbox click-outside across shadow boundaries (KD-1136)', () => {
-    it('does not call onOutside while the list is closed', () => {
-        const onOutside = vi.fn();
-        const wrapper = mount(Harness, {props: {overrides: {onOutside}}, attachTo: document.body});
+    it('does not call onDismiss while the list is closed', () => {
+        const onDismiss = vi.fn();
+        const wrapper = mount(Harness, {props: {overrides: {onDismiss}}, attachTo: document.body});
 
         document.body.dispatchEvent(new MouseEvent('click', {bubbles: true}));
-        expect(onOutside).not.toHaveBeenCalled();
+        expect(onDismiss).not.toHaveBeenCalled();
         wrapper.unmount();
     });
 
     // At a DOCUMENT listener a click inside a shadow root is retargeted to the HOST, which is
     // an ancestor of `root` rather than a descendant — `root.contains(target)` rejects it and
-    // every option click would read as outside (a multi-select would close instead of
-    // toggling). `composedPath()` carries the true chain across the boundary.
+    // every click inside would read as outside (the trigger's own click would close the list it
+    // just opened). `composedPath()` carries the true chain across the boundary.
     it('treats a composed click from inside a shadow root as inside', () => {
-        const onOutside = vi.fn();
+        const onDismiss = vi.fn();
         const host = document.createElement('div');
         document.body.append(host);
         const mountPoint = document.createElement('div');
         host.attachShadow({mode: 'open'}).append(mountPoint);
-        const wrapper = mount(Harness, {props: {overrides: {onOutside}}, attachTo: mountPoint});
+        const wrapper = mount(Harness, {props: {overrides: {onDismiss}}, attachTo: mountPoint});
         api.openList();
 
         wrapper.element.dispatchEvent(new MouseEvent('click', {bubbles: true, composed: true}));
-        expect(onOutside).not.toHaveBeenCalled();
+        expect(onDismiss).not.toHaveBeenCalled();
         wrapper.unmount();
         host.remove();
     });
 
-    it('calls onOutside for a click that is in neither root nor floating', () => {
-        const onOutside = vi.fn();
-        const wrapper = mount(Harness, {props: {overrides: {onOutside}}, attachTo: document.body});
+    it('calls onDismiss for a click that is in neither root nor floating', () => {
+        const onDismiss = vi.fn();
+        const wrapper = mount(Harness, {props: {overrides: {onDismiss}}, attachTo: document.body});
         api.openList();
 
         document.body.dispatchEvent(new MouseEvent('click', {bubbles: true}));
-        expect(onOutside).toHaveBeenCalledTimes(1);
+        expect(onDismiss).toHaveBeenCalledTimes(1);
         wrapper.unmount();
     });
 
-    it('does not call onOutside for a click inside root', () => {
-        const onOutside = vi.fn();
-        const wrapper = mount(Harness, {props: {overrides: {onOutside}}, attachTo: document.body});
+    it('does not call onDismiss for a click inside root', () => {
+        const onDismiss = vi.fn();
+        const wrapper = mount(Harness, {props: {overrides: {onDismiss}}, attachTo: document.body});
         api.openList();
 
         wrapper.element.dispatchEvent(new MouseEvent('click', {bubbles: true}));
-        expect(onOutside).not.toHaveBeenCalled();
+        expect(onDismiss).not.toHaveBeenCalled();
         wrapper.unmount();
     });
 });

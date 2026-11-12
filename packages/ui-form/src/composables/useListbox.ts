@@ -34,10 +34,8 @@ export interface UseListboxOptions {
      * so a multi-select callback can toggle membership and stay open while SingleSelect's closes.
      */
     onCommit: (index: number) => boolean;
-    /** dismiss the list (Escape / Tab). SingleSelect closes; a combobox may revert its text first. */
+    /** dismiss the list (Escape, Tab, or a click outside the root). SingleSelect closes. */
     onDismiss: () => void;
-    /** click-outside disposition. SingleSelect closes; a combobox may revert its text first. */
-    onOutside: () => void;
     /**
      * floating-ui placement of the popup (default `'bottom-start'`). With no room it flips to the
      * opposite side at the same alignment (`bottom-start` → `top-start`), never to the other
@@ -102,7 +100,6 @@ export const useListbox = (options: UseListboxOptions) => {
         openKeys,
         onCommit,
         onDismiss,
-        onOutside,
         placement = 'bottom-start',
         clearEntry,
         onClearCommit,
@@ -344,12 +341,12 @@ export const useListbox = (options: UseListboxOptions) => {
         }
     };
 
-    // click-outside — closes/reverts without a shared directive dependency.
+    // click-outside — dismisses without a shared directive dependency.
     //
     // `composedPath()`, never `event.target`: at a DOCUMENT listener a click inside a shadow
     // root is retargeted to the shadow HOST, which is an ancestor of `root` rather than a
-    // descendant, so `root.contains(target)` rejects it and every option click would read as
-    // outside — a multi-select would close instead of toggling. The composed
+    // descendant, so `root.contains(target)` rejects it and every click inside would read as
+    // outside — the trigger's own click would close the list it just opened. The composed
     // path carries the true chain across shadow boundaries. The popup needs no separate check:
     // it is promoted to the top layer IN PLACE, so it never leaves `root`.
     const onDocumentPointer = (event: MouseEvent) => {
@@ -358,7 +355,7 @@ export const useListbox = (options: UseListboxOptions) => {
         // Non-null by lifetime (the listener only exists while mounted) — loud, named accessor
         // over a bare `!`: the same impossible state throws, but names the broken assumption.
         if (event.composedPath().includes(ensureRefValueExists(root))) return;
-        onOutside();
+        onDismiss();
     };
     onMounted(() => document.addEventListener('click', onDocumentPointer));
     onBeforeUnmount(() => {
