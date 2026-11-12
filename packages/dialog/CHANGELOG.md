@@ -1,5 +1,14 @@
 # @script-development/fs-dialog
 
+## 0.6.0 — 2026-11-07
+
+### Minor Changes
+
+- **`closeOnEscape: false` holds under repeated Escape (behaviour change).** A second Escape with no user activation in between used to close a refusing dialog natively, whatever `onCancel` did: seen in Chromium, Firefox and WebKit. The service now sets the native `closedby` attribute when Escape goes down, read from `closeOnEscape` at that moment, so the browser leaves the dialog open however often the key is pressed. A dialog that relied on a double Escape as its way out needs a close control of its own.
+- **Only the top dialog's rule decides, one close per press.** Everything below it is set to `closedby="none"`, because the browser can close dialogs opened without an activation in between together. That holds across dialog services and under a native `<dialog>` the consumer opened: three services' dialogs used to lose two on the second press.
+- The key itself is not cancelled, so whatever is inside the dialog keeps its own Escape: key handlers, popovers, search fields. A consumer's own `keydown` guard against the repeated Escape can go.
+- A browser without `closedby` (Chrome before 134, Firefox before 141, Safari outside its preview) behaves as in 0.5.0, as does any close the attribute does not cover: the service follows the native close (WR-1913).
+
 ## 0.5.0 — 2026-10-02
 
 ### Minor Changes
