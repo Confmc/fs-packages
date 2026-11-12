@@ -1,6 +1,7 @@
 export {default as Checkbox} from './components/Checkbox.vue';
 export {default as CheckboxGroup} from './components/CheckboxGroup.vue';
 export {default as DateInput} from './components/DateInput.vue';
+export {default as Disclosure} from './components/Disclosure.vue';
 export {default as FormError} from './components/FormError.vue';
 export {default as FormField} from './components/FormField.vue';
 export {default as FormLabel} from './components/FormLabel.vue';
