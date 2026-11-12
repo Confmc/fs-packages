@@ -291,6 +291,16 @@ describe('SingleSelect', () => {
             expect(menu(wrapper).exists()).toBe(true);
         });
 
+        it('leaves a held arrow key alone: its repeats keep moving the highlight', async () => {
+            const wrapper = mountSelect({});
+            const trigger = wrapper.find('.ui-select__trigger');
+            await trigger.trigger('keydown', {key: 'ArrowDown'}); // opens
+            await trigger.trigger('keydown', {key: 'ArrowDown'}); // opt-0
+            await trigger.trigger('keydown', {key: 'ArrowDown', repeat: true});
+
+            expect(trigger.attributes('aria-activedescendant')).toBe('fruit-opt-1');
+        });
+
         it('with nothing highlighted, commits nothing and leaves the key to the button', async () => {
             const wrapper = mountSelect({});
             await wrapper.find('.ui-select__trigger').trigger('keydown', {key: 'ArrowDown'}); // opens
