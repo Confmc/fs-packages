@@ -1172,3 +1172,15 @@ Amendment 2 draft: `AMENDMENT-2.draft.md` (pending the reviewer's answers from 1
 (freeze `Date` to make a timing bug deterministic; Vue drops a native event stamped in its listener's attach ms);
 `describedby` stays lowercase (matches `aria-describedby`, ui-inputs' API, emmie's 1119 uses); slots are not reactive
 (build slot-derived values in render); label-after holds phrasing content only; field tooltips stay as emmie has them.
+
+**landing.12 (2026-11-12):** `fork/experiment/ui-form-landing-12` @edfdbad, built FRESH from main (not on landing.11,
+whose selects carry the old full core): the 14 open PRs + checkbox-group, pressable, disclosure, the 3 FormField slots,
+token-scope, the form chain. Without MultiSelect/Combobox/GroupSelect/MultiCombobox/GroupCombobox (they need their core
+pieces back after #353). 583 tests, typecheck, browser 60/60 green. Hint tokens converted to the token-scope rule
+(guard count 30). Chromium alias `chromium_headless_shell-1254 -> -1252` added (no download).
+Test bed, end to end: PasswordInput fixes, SingleSelect (open/keys/clear/422), the form chain's indexed row keys all
+hold; typecheck 6 = 4 missing selects + finding C + an old spec. Slots untested (their screens import a missing
+select, and a missing named export kills the whole route): re-run after #353. **Inherited ui-inputs defects, not for
+the port** (beside the reviewer's WR-2588 Space, WR-2903 scrollIntoView): a MOUSE pick of an option or the clear entry
+leaves focus on body (no mousedown.prevent / no focus back to the trigger; APG returns it); Home skips the clear
+entry; Tab does not pick the active option. Settled: opening on a value starts at the top (emmie parity).
