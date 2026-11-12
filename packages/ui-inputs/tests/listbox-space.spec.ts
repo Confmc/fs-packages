@@ -86,6 +86,21 @@ describe('Space on an open select-only list (WR-2588)', () => {
             wrapper.unmount();
         });
 
+        it(`${member.name}: a held arrow key is left alone, its repeats keep moving the highlight`, async () => {
+            const wrapper = mountIt(member.component, member.props);
+            const trigger = wrapper.get('#f').element;
+
+            keydown(trigger, 'Enter');
+            await wrapper.vm.$nextTick();
+            keydown(trigger, 'ArrowDown');
+            await wrapper.vm.$nextTick();
+            keydown(trigger, 'ArrowDown', {repeat: true});
+            await wrapper.vm.$nextTick();
+
+            expect(trigger.getAttribute('aria-activedescendant')).toBe('f-opt-1');
+            wrapper.unmount();
+        });
+
         it(`${member.name}: with nothing highlighted, Space commits nothing and is not cancelled`, async () => {
             const wrapper = mountIt(member.component, member.props);
             const trigger = wrapper.get('#f').element;
