@@ -253,6 +253,50 @@ describe('SingleSelect', () => {
         expect(menu(wrapper).exists()).toBe(true);
     });
 
+    describe('Space on an open list (WR-2588)', () => {
+        // Dispatched by hand to read `defaultPrevented`: cancelling the keydown is what keeps the
+        // button's keyup click from toggling the list straight back. The clock steps 1 ms first,
+        // or Vue drops an event stamped in the millisecond its listener was attached.
+        const space = (wrapper: ReturnType<typeof mountSelect>): KeyboardEvent => {
+            vi.setSystemTime(Date.now() + 1);
+            const event = new KeyboardEvent('keydown', {key: ' ', bubbles: true, cancelable: true});
+            wrapper.find('.ui-select__trigger').element.dispatchEvent(event);
+            return event;
+        };
+
+        it('commits the active option, cancels the key and closes', async () => {
+            const wrapper = mountSelect({});
+            const control = wrapper.find('.ui-select__trigger');
+            await control.trigger('keydown', {key: 'ArrowDown'}); // opens
+            await control.trigger('keydown', {key: 'ArrowDown'}); // Apricot
+
+            expect(space(wrapper).defaultPrevented).toBe(true);
+            await wrapper.vm.$nextTick();
+            expect(wrapper.emitted('update:modelValue')).toEqual([[2]]);
+            expect(menu(wrapper).exists()).toBe(false);
+        });
+
+        it('with nothing highlighted, commits nothing and leaves the key to the button', async () => {
+            const wrapper = mountSelect({});
+            await wrapper.find('.ui-select__trigger').trigger('keydown', {key: 'ArrowDown'}); // opens
+
+            expect(space(wrapper).defaultPrevented).toBe(false);
+            expect(wrapper.emitted('update:modelValue')).toBeUndefined();
+        });
+
+        it('commits null on the highlighted clear entry and closes', async () => {
+            const wrapper = mountSelect({clearLabel: 'No fruit', modelValue: 3});
+            const control = wrapper.find('.ui-select__trigger');
+            await control.trigger('keydown', {key: 'ArrowDown'}); // open
+            await control.trigger('keydown', {key: 'ArrowDown'}); // → the clear entry
+
+            expect(space(wrapper).defaultPrevented).toBe(true);
+            await wrapper.vm.$nextTick();
+            expect(wrapper.emitted('update:modelValue')).toEqual([[null]]);
+            expect(menu(wrapper).exists()).toBe(false);
+        });
+    });
+
     it('ignores a non-opening key while closed', async () => {
         const wrapper = mountSelect({});
         await wrapper.find('.ui-select__trigger').trigger('keydown', {key: 'x'});
