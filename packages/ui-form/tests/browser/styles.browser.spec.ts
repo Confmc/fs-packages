@@ -1075,3 +1075,68 @@ describe('styles.css — TextInput error icon padding, scoped to ui-form markup'
         expect(getComputedStyle(invalidInput(false)).paddingRight).toBe('12px');
     });
 });
+
+describe('styles.css — a base token set on one area reaches the tokens derived from it', () => {
+    // A consumer gives one area its own look (`.drawer-fields { --ui-control-bg: … }`). The tokens
+    // derived from a base default to it where they are USED: declared on :root, they resolved there
+    // and froze the root's value, so focus, invalid, check and chip kept the root look inside the area.
+    it('a scoped --ui-control-bg is the focus and invalid background inside that area', async () => {
+        addStyle(uiCss);
+        addStyle('.ui-control { transition: none !important; }');
+        const control = addControl('--ui-control-bg: rgb(1, 2, 3); --ui-control-text: rgb(4, 5, 6)');
+
+        control.classList.add('is-invalid');
+        expect(getComputedStyle(control).backgroundColor).toBe('rgb(1, 2, 3)');
+        expect(getComputedStyle(control).color).toBe('rgb(4, 5, 6)');
+        control.classList.remove('is-invalid');
+
+        await userEvent.tab();
+        expect(document.activeElement).toBe(control);
+        expect(getComputedStyle(control).backgroundColor).toBe('rgb(1, 2, 3)');
+        expect(getComputedStyle(control).color).toBe('rgb(4, 5, 6)');
+    });
+
+    it('a derived token the consumer sets itself still wins over its base, on :root or on the area', () => {
+        addStyle(uiCss);
+        const control = addControl('--ui-control-bg: rgb(1, 2, 3); --ui-control-bg-invalid: rgb(7, 7, 7)');
+        control.classList.add('is-invalid');
+        expect(getComputedStyle(control).backgroundColor).toBe('rgb(7, 7, 7)');
+
+        const other = addControl('--ui-control-bg: rgb(1, 2, 3)');
+        other.classList.add('is-invalid');
+        document.documentElement.style.setProperty('--ui-control-bg-invalid', 'rgb(9, 9, 9)');
+        expect(getComputedStyle(other).backgroundColor).toBe('rgb(9, 9, 9)');
+    });
+
+    it('a scoped base reaches the check family too: an unchecked box takes the area background', () => {
+        addStyle(uiCss);
+        const box = addCheck();
+        (box.closest('.ui-check') as HTMLElement).style.setProperty('--ui-control-bg', 'rgb(1, 2, 3)');
+
+        expect(getComputedStyle(box).backgroundColor).toBe('rgb(1, 2, 3)');
+    });
+
+    it('uses every derived token with exactly the fallback its :root comment names', () => {
+        const pairs = [
+            ...uiCss.matchAll(/\/\* (--ui-[\w-]+): unset; where it is used it falls back to (--ui-[\w-]+)\. \*\//g),
+        ];
+        const rules = uiCss.slice(uiCss.indexOf('@layer ui-form'));
+
+        expect(pairs).toHaveLength(30);
+        for (const [, derived, base] of pairs) {
+            const uses = [...rules.matchAll(new RegExp(`var\\(${derived}(?![\\w-])[^)]*\\)?\\)?`, 'g'))].map(
+                ([use]) => use,
+            );
+
+            expect(uses.length, derived).toBeGreaterThan(0);
+            for (const use of uses) expect(use, derived).toBe(`var(${derived}, var(${base}))`);
+        }
+    });
+
+    it('declares no token on :root as another token: each one would freeze to the root value', () => {
+        const rootBlock = uiCss.slice(uiCss.indexOf(':where(:root)'), uiCss.indexOf('@layer ui-form'));
+        const derived = rootBlock.match(/--ui-[\w-]+:\s*var\(--ui-[\w-]+\)/g) ?? [];
+
+        expect(derived).toEqual([]);
+    });
+});

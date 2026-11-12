@@ -9,6 +9,12 @@
  * surface), and every component follows. The defaults use :where() so they carry
  * zero specificity and are trivially overridden by a territory theme.
  *
+ * A token that defaults to another (a focus or invalid hook, the check, chip and switch colours) is
+ * NOT declared on :root: a `var()` in a custom property resolves where it is declared, so on :root it
+ * would freeze to the root's value, and a base token set on one area (`.drawer-fields
+ * { --ui-control-bg: … }`) would never reach it there. It is resolved where it is used instead,
+ * `var(--ui-control-bg-focus, var(--ui-control-bg))`; the :root block lists each one as a comment.
+ *
  * Every component rule sits in the `ui-form` cascade layer, and the package's own rules keep their
  * specificity among themselves. Against consumer CSS the cascade decides by layer, not by
  * specificity or load order:
@@ -67,15 +73,15 @@
     --ui-control-bg: #ffffff;
     /* background-on-state hooks — default to the resting background so they are a
        no-op until a territory opts in (brick fills the control on focus/invalid). */
-    --ui-control-bg-focus: var(--ui-control-bg);
-    --ui-control-bg-invalid: var(--ui-control-bg);
+    /* --ui-control-bg-focus: unset; where it is used it falls back to --ui-control-bg. */
+    /* --ui-control-bg-invalid: unset; where it is used it falls back to --ui-control-bg. */
     --ui-control-bg-disabled: #f3f4f6;
     --ui-control-text: #111827;
     /* text-on-state hooks — default to the resting text colour so they are a no-op
        until a territory opts in (a strong bg-focus/bg-invalid fill needs a text
        partner for contrast). */
-    --ui-control-text-focus: var(--ui-control-text);
-    --ui-control-text-invalid: var(--ui-control-text);
+    /* --ui-control-text-focus: unset; where it is used it falls back to --ui-control-text. */
+    /* --ui-control-text-invalid: unset; where it is used it falls back to --ui-control-text. */
     --ui-control-text-muted: #6b7280;
     /* typography escape hatch — `inherit` reproduces the historical `font: inherit`
        size; a territory sizes control text through this var (which the package
@@ -93,8 +99,8 @@
     /* border-on-focus hooks — default to the resting border so they are a no-op
        until a territory opts in. .is-open / .is-invalid follow in source order and
        keep winning their border where they did before. */
-    --ui-control-border-color-focus: var(--ui-control-border-color);
-    --ui-control-border-width-focus: var(--ui-control-border-width);
+    /* --ui-control-border-color-focus: unset; where it is used it falls back to --ui-control-border-color. */
+    /* --ui-control-border-width-focus: unset; where it is used it falls back to --ui-control-border-width. */
     --ui-control-radius: 8px;
     --ui-control-pad-x: 0.75rem;
     --ui-control-pad-y: 0.55rem;
@@ -102,8 +108,8 @@
     --ui-control-shadow-hover: none;
     /* InputGroup's addons: the text joined to a control. Neutral by default: the disabled control
        background, and the control's own text colour (the muted one falls below 4.5:1 on it). */
-    --ui-addon-bg: var(--ui-control-bg-disabled);
-    --ui-addon-text: var(--ui-control-text);
+    /* --ui-addon-bg: unset; where it is used it falls back to --ui-control-bg-disabled. */
+    /* --ui-addon-text: unset; where it is used it falls back to --ui-control-text. */
     --ui-focus-ring: 0 0 0 3px rgba(37, 99, 235, 0.35);
 
     /* listbox menu */
@@ -133,21 +139,21 @@
     --ui-option-min-height: auto;
     /* muted options (`mutedOptions` prop) — defaults to the RESTING option text so the
        class is a no-op until a territory opts in (the state-variant-hook discipline). */
-    --ui-option-text-muted: var(--ui-control-text);
+    /* --ui-option-text-muted: unset; where it is used it falls back to --ui-control-text. */
     /* MultiSelect committed membership (`[aria-selected="true"]`) — both default to the
        resting option rendering (transparent bg, resting text), so the treatment is a
        no-op until a territory opts in. */
     --ui-option-bg-selected: transparent;
-    --ui-option-text-selected: var(--ui-control-text);
+    /* --ui-option-text-selected: unset; where it is used it falls back to --ui-control-text. */
     /* the committing clear entry (`clearLabel` prop) — danger-toned by default (it is a
        destructive-ish "commit null"); renders only when a consumer passes the prop. */
-    --ui-clear-text: var(--ui-danger-text);
+    /* --ui-clear-text: unset; where it is used it falls back to --ui-danger-text. */
 
     /* group header (GroupSelect / GroupCombobox) — the non-navigable label above each
        option run. Defaults derive from existing tokens so a territory's --ui-* map themes
        them for free; override individually to break from the muted-label treatment. */
-    --ui-group-header-pad: var(--ui-option-pad);
-    --ui-group-header-color: var(--ui-control-text-muted);
+    /* --ui-group-header-pad: unset; where it is used it falls back to --ui-option-pad. */
+    /* --ui-group-header-color: unset; where it is used it falls back to --ui-control-text-muted. */
     --ui-group-header-size: 0.75em;
     --ui-group-header-weight: 600;
     --ui-group-header-transform: uppercase;
@@ -155,9 +161,9 @@
 
     /* chip (MultiSelect) — every default derives from an existing resting token, so the
        chip contract is neutral until a territory opts in. */
-    --ui-chip-bg: var(--ui-option-bg-active);
-    --ui-chip-text: var(--ui-control-text);
-    --ui-chip-radius: var(--ui-option-radius);
+    /* --ui-chip-bg: unset; where it is used it falls back to --ui-option-bg-active. */
+    /* --ui-chip-text: unset; where it is used it falls back to --ui-control-text. */
+    /* --ui-chip-radius: unset; where it is used it falls back to --ui-option-radius. */
     --ui-chip-pad: 0.1rem 0.45rem;
 
     /* check (Checkbox / CheckboxGroup / RadioGroup) — every colour default derives from an
@@ -166,11 +172,11 @@
     --ui-check-size: 1.125rem;
     /* feeds a border-width declaration, so it takes the full shorthand grammar — like
        --ui-control-border-width (`0 0 1px` is valid, if unusual on a checkbox). */
-    --ui-check-border-width: var(--ui-control-border-width);
-    --ui-check-border-color: var(--ui-control-border-color);
-    --ui-check-bg: var(--ui-control-bg);
-    --ui-check-bg-checked: var(--ui-control-border-open);
-    --ui-check-mark-color: var(--ui-control-bg);
+    /* --ui-check-border-width: unset; where it is used it falls back to --ui-control-border-width. */
+    /* --ui-check-border-color: unset; where it is used it falls back to --ui-control-border-color. */
+    /* --ui-check-bg: unset; where it is used it falls back to --ui-control-bg. */
+    /* --ui-check-bg-checked: unset; where it is used it falls back to --ui-control-border-open. */
+    /* --ui-check-mark-color: unset; where it is used it falls back to --ui-control-bg. */
     --ui-check-radius: 4px;
     --ui-check-gap: 0.5rem;
     --ui-check-item-gap: 0.5rem;
@@ -179,10 +185,10 @@
     --ui-switch-track-width: 2.25rem;
     --ui-switch-track-height: 1.25rem;
     --ui-switch-track-radius: 999px;
-    --ui-switch-track-bg: var(--ui-control-border-color);
-    --ui-switch-track-bg-checked: var(--ui-control-border-open);
+    /* --ui-switch-track-bg: unset; where it is used it falls back to --ui-control-border-color. */
+    /* --ui-switch-track-bg-checked: unset; where it is used it falls back to --ui-control-border-open. */
     --ui-switch-thumb-size: 0.875rem;
-    --ui-switch-thumb-bg: var(--ui-control-bg);
+    /* --ui-switch-thumb-bg: unset; where it is used it falls back to --ui-control-bg. */
 
     /* pressable (Pressable, and the Disclosure trigger which reuses the class) — the defaults
        are deliberately CHROME-LESS: adopting Pressable in place of a bare `<span @click>` must
@@ -199,13 +205,13 @@
     --ui-pressable-line-height: inherit;
     --ui-pressable-border-width: 0;
     --ui-pressable-border-color: transparent;
-    --ui-pressable-radius: var(--ui-control-radius);
-    --ui-pressable-text-disabled: var(--ui-control-text-muted);
+    /* --ui-pressable-radius: unset; where it is used it falls back to --ui-control-radius. */
+    /* --ui-pressable-text-disabled: unset; where it is used it falls back to --ui-control-text-muted. */
     /* toggle mode ([aria-pressed="true"]). Unlike the other state hooks this one is NOT a no-op:
        a toggle whose pressed state is conveyed only to assistive tech is invisible to everyone
        else. The default is an EXISTING resting token, so it adds no colour vocabulary. */
-    --ui-pressable-bg-pressed: var(--ui-option-bg-active);
-    --ui-pressable-text-pressed: var(--ui-pressable-text);
+    /* --ui-pressable-bg-pressed: unset; where it is used it falls back to --ui-option-bg-active. */
+    /* --ui-pressable-text-pressed: unset; where it is used it falls back to --ui-pressable-text. */
 
     /* disclosure — neutral by default (the panel adds no box of its own). */
     --ui-disclosure-panel-pad: 0;
@@ -220,8 +226,8 @@
     /* a notice beside a field that is not an error (PasswordInput's Caps Lock notice) */
     --ui-warning-text: #b45309;
     /* a field's hint (FormField #hint): the message's size, in the muted control text. */
-    --ui-hint-text: var(--ui-control-text-muted);
-    --ui-hint-size: var(--ui-error-size);
+    /* --ui-hint-text: unset; where it is used it falls back to --ui-control-text-muted. */
+    /* --ui-hint-size: unset; where it is used it falls back to --ui-error-size. */
 }
 
 @layer ui-form {
@@ -337,10 +343,10 @@
     .ui-multiselect__box:focus-within,
     .ui-multicombobox__box:focus-within {
         outline: none;
-        color: var(--ui-control-text-focus);
-        background: var(--ui-control-bg-focus);
-        border-color: var(--ui-control-border-color-focus);
-        border-width: var(--ui-control-border-width-focus);
+        color: var(--ui-control-text-focus, var(--ui-control-text));
+        background: var(--ui-control-bg-focus, var(--ui-control-bg));
+        border-color: var(--ui-control-border-color-focus, var(--ui-control-border-color));
+        border-width: var(--ui-control-border-width-focus, var(--ui-control-border-width));
         box-shadow: var(--ui-focus-ring);
     }
     .ui-control.is-open {
@@ -348,8 +354,8 @@
         box-shadow: var(--ui-focus-ring);
     }
     .ui-control.is-invalid {
-        background: var(--ui-control-bg-invalid);
-        color: var(--ui-control-text-invalid);
+        background: var(--ui-control-bg-invalid, var(--ui-control-bg));
+        color: var(--ui-control-text-invalid, var(--ui-control-text));
         border-color: var(--ui-danger-border);
         box-shadow: var(--ui-danger-shadow);
     }
@@ -386,8 +392,8 @@
         align-items: center;
         padding: 0 var(--ui-control-pad-x);
         border: var(--ui-control-border-width) solid var(--ui-control-border-color);
-        background: var(--ui-addon-bg);
-        color: var(--ui-addon-text);
+        background: var(--ui-addon-bg, var(--ui-control-bg-disabled));
+        color: var(--ui-addon-text, var(--ui-control-text));
         font-size: var(--ui-control-font-size);
         white-space: nowrap;
     }
@@ -598,9 +604,9 @@
         align-items: center;
         gap: 0.25rem;
         padding: var(--ui-chip-pad);
-        background: var(--ui-chip-bg);
-        color: var(--ui-chip-text);
-        border-radius: var(--ui-chip-radius);
+        background: var(--ui-chip-bg, var(--ui-option-bg-active));
+        color: var(--ui-chip-text, var(--ui-control-text));
+        border-radius: var(--ui-chip-radius, var(--ui-option-radius));
         font-size: 0.875em;
     }
     .ui-multiselect__chip-remove,
@@ -777,7 +783,7 @@
     .ui-multiselect__option[aria-selected='true'],
     .ui-multicombobox__option[aria-selected='true'] {
         background: var(--ui-option-bg-selected);
-        color: var(--ui-option-text-selected);
+        color: var(--ui-option-text-selected, var(--ui-control-text));
     }
     /* Muted options — visual de-emphasis only; committable, and last in the colour cascade
        so a muted option stays muted while selected or under the pointer highlight. */
@@ -787,7 +793,7 @@
     .ui-multicombobox__option.is-muted,
     .ui-groupselect__option.is-muted,
     .ui-groupcombobox__option.is-muted {
-        color: var(--ui-option-text-muted);
+        color: var(--ui-option-text-muted, var(--ui-control-text));
     }
     .ui-select__option.is-active,
     .ui-combobox__option.is-active,
@@ -808,7 +814,7 @@
         cursor: pointer;
         min-height: var(--ui-option-min-height);
         box-sizing: border-box;
-        color: var(--ui-clear-text);
+        color: var(--ui-clear-text, var(--ui-danger-text));
     }
     .ui-select__clear.is-active,
     .ui-combobox__clear.is-active,
@@ -845,8 +851,8 @@
     .ui-groupselect__group-header,
     .ui-groupcombobox__group-header {
         display: block;
-        padding: var(--ui-group-header-pad);
-        color: var(--ui-group-header-color);
+        padding: var(--ui-group-header-pad, var(--ui-option-pad));
+        color: var(--ui-group-header-color, var(--ui-control-text-muted));
         font-size: var(--ui-group-header-size);
         font-weight: var(--ui-group-header-weight);
         text-transform: var(--ui-group-header-transform);
@@ -882,10 +888,10 @@
         width: var(--ui-check-size);
         height: var(--ui-check-size);
         box-sizing: border-box;
-        background: var(--ui-check-bg);
+        background: var(--ui-check-bg, var(--ui-control-bg));
         border-style: solid;
-        border-width: var(--ui-check-border-width);
-        border-color: var(--ui-check-border-color);
+        border-width: var(--ui-check-border-width, var(--ui-control-border-width));
+        border-color: var(--ui-check-border-color, var(--ui-control-border-color));
         border-radius: var(--ui-check-radius);
         cursor: inherit;
         transition:
@@ -898,8 +904,8 @@
     }
     .ui-check__input:checked,
     .ui-check__input:where([type='checkbox']):indeterminate {
-        background: var(--ui-check-bg-checked);
-        border-color: var(--ui-check-bg-checked);
+        background: var(--ui-check-bg-checked, var(--ui-control-border-open));
+        border-color: var(--ui-check-bg-checked, var(--ui-control-border-open));
     }
     /* State order mirrors .ui-control: :focus-visible first, .is-invalid after, so the invalid
        treatment keeps winning on a focused invalid control by source order. */
@@ -927,7 +933,7 @@
         width: calc(var(--ui-check-size) * 0.75);
         height: calc(var(--ui-check-size) * 0.75);
         pointer-events: none;
-        color: var(--ui-check-mark-color);
+        color: var(--ui-check-mark-color, var(--ui-control-bg));
     }
     .ui-check__mark,
     .ui-check__dash,
@@ -954,14 +960,14 @@
         width: var(--ui-switch-track-width);
         height: var(--ui-switch-track-height);
         box-sizing: border-box;
-        background: var(--ui-switch-track-bg);
+        background: var(--ui-switch-track-bg, var(--ui-control-border-color));
         border: none;
         border-radius: var(--ui-switch-track-radius);
         cursor: inherit;
         transition: background 0.12s ease;
     }
     .ui-switch__input:checked {
-        background: var(--ui-switch-track-bg-checked);
+        background: var(--ui-switch-track-bg-checked, var(--ui-control-border-open));
     }
     .ui-switch__input:focus-visible {
         outline: none;
@@ -980,7 +986,7 @@
         left: calc((var(--ui-switch-track-height) - var(--ui-switch-thumb-size)) / 2);
         width: var(--ui-switch-thumb-size);
         height: var(--ui-switch-thumb-size);
-        background: var(--ui-switch-thumb-bg);
+        background: var(--ui-switch-thumb-bg, var(--ui-control-bg));
         border-radius: 50%;
         pointer-events: none;
         transform: translateY(-50%);
@@ -1015,8 +1021,8 @@
     }
 
     .ui-hint {
-        color: var(--ui-hint-text);
-        font-size: var(--ui-hint-size);
+        color: var(--ui-hint-text, var(--ui-control-text-muted));
+        font-size: var(--ui-hint-size, var(--ui-error-size));
     }
 
     .ui-error {
@@ -1043,7 +1049,7 @@
         border-style: solid;
         border-width: var(--ui-pressable-border-width);
         border-color: var(--ui-pressable-border-color);
-        border-radius: var(--ui-pressable-radius);
+        border-radius: var(--ui-pressable-radius, var(--ui-control-radius));
         /* decomposed rather than `font: inherit` — see the --ui-pressable-font-size rationale. */
         font-family: inherit;
         font-size: var(--ui-pressable-font-size);
@@ -1063,11 +1069,11 @@
         box-shadow: var(--ui-focus-ring);
     }
     .ui-pressable[aria-pressed='true'] {
-        background: var(--ui-pressable-bg-pressed);
-        color: var(--ui-pressable-text-pressed);
+        background: var(--ui-pressable-bg-pressed, var(--ui-option-bg-active));
+        color: var(--ui-pressable-text-pressed, var(--ui-pressable-text));
     }
     .ui-pressable:disabled {
-        color: var(--ui-pressable-text-disabled);
+        color: var(--ui-pressable-text-disabled, var(--ui-control-text-muted));
         cursor: not-allowed;
     }
     /* `as` renders an arbitrary tag, so the chassis's `display` cannot be applied blindly: on the
@@ -1089,7 +1095,7 @@
        document.elementFromPoint; pinned in the browser suite). Transparent is worse than inert.
        `cursor` is set here because the rule no longer hides the resting `cursor: pointer`. */
     .ui-pressable.is-disabled {
-        color: var(--ui-pressable-text-disabled);
+        color: var(--ui-pressable-text-disabled, var(--ui-control-text-muted));
         cursor: not-allowed;
     }
 
