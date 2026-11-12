@@ -556,3 +556,64 @@ describe('useListbox keyboard and highlight contract', () => {
         wrapper.unmount();
     });
 });
+
+describe('useListbox active-row reveal (WR-2903)', () => {
+    const popupWith = (...ids: string[]): HTMLElement => {
+        const popup = document.createElement('div');
+        for (const rowId of ids) {
+            const row = document.createElement('li');
+            row.id = rowId;
+            popup.append(row);
+        }
+        return popup;
+    };
+
+    it('reveals nothing, and throws nothing, while no popup element is mounted', async () => {
+        const reveal = vi.spyOn(HTMLElement.prototype, 'scrollIntoView');
+        const wrapper = mount(Harness, {props: {overrides: {listLength: () => 2}}, attachTo: document.body});
+
+        api.toggle();
+        api.onKey(key('ArrowDown'));
+        await nextTick();
+        expect(api.activeDescendant.value).toBe('harness-opt-0');
+        expect(reveal).not.toHaveBeenCalled();
+        reveal.mockRestore();
+        wrapper.unmount();
+    });
+
+    it('reveals nothing when the popup renders no row under the active id', async () => {
+        const reveal = vi.spyOn(HTMLElement.prototype, 'scrollIntoView');
+        const floating = shallowRef<HTMLElement | null>(popupWith('harness-opt-1'));
+        const wrapper = mount(Harness, {props: {overrides: {floating, listLength: () => 2}}, attachTo: document.body});
+
+        api.toggle();
+        api.onKey(key('ArrowDown'));
+        await nextTick();
+        expect(api.activeDescendant.value).toBe('harness-opt-0');
+        expect(reveal).not.toHaveBeenCalled();
+        reveal.mockRestore();
+        wrapper.unmount();
+    });
+
+    it('reveals nothing when the highlight moves off every row', async () => {
+        const revealed: string[] = [];
+        const reveal = vi.spyOn(HTMLElement.prototype, 'scrollIntoView').mockImplementation(function (
+            this: HTMLElement,
+        ) {
+            revealed.push(this.id);
+        });
+        // A row whose id is the text `undefined` would match a lookup that skipped the guard.
+        const floating = shallowRef<HTMLElement | null>(popupWith('harness-opt-0', 'undefined'));
+        const wrapper = mount(Harness, {props: {overrides: {floating, listLength: () => 2}}, attachTo: document.body});
+
+        api.toggle();
+        api.onKey(key('ArrowDown'));
+        await nextTick();
+        api.onKey(key('ArrowUp')); // option 0 → nothing highlighted
+        await nextTick();
+        expect(api.activeDescendant.value).toBeUndefined();
+        expect(revealed).toEqual(['harness-opt-0']);
+        reveal.mockRestore();
+        wrapper.unmount();
+    });
+});

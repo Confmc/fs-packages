@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import {useFloating} from '@floating-ui/vue';
 import {mount} from '@vue/test-utils';
-import {afterEach, describe, expect, it, vi} from 'vitest';
+import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {h} from 'vue';
 
 import SingleSelect from '../src/components/SingleSelect.vue';
@@ -561,6 +561,73 @@ describe('SingleSelect', () => {
             // `has-value` stays keyed on an actual selection — the model IS null.
             expect(wrapper.find('.ui-select__trigger').classes()).not.toContain('has-value');
         });
+    });
+});
+
+describe('SingleSelect reveals the active option (WR-2903)', () => {
+    // happy-dom has no layout, so this pins which row is scrolled into view, how, and when not;
+    // ui-inputs' browser suite measures the real scroll geometry.
+    let revealed: {id: string; options: unknown}[];
+    beforeEach(() => {
+        revealed = [];
+        vi.spyOn(HTMLElement.prototype, 'scrollIntoView').mockImplementation(function (this: HTMLElement, options) {
+            revealed.push({id: this.id, options});
+        });
+    });
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    const press = async (wrapper: ReturnType<typeof mountSelect>, key: string) => {
+        await wrapper.find('.ui-select__trigger').trigger('keydown', {key});
+        await wrapper.vm.$nextTick();
+    };
+    const nearest = (id: string) => ({id, options: {block: 'nearest'}});
+
+    it('ArrowDown, End and Home scroll the row they land on into view by the nearest edge', async () => {
+        const wrapper = mountSelect({});
+
+        await press(wrapper, 'Enter'); // opens, nothing highlighted: nothing to reveal
+        await press(wrapper, 'ArrowDown');
+        await press(wrapper, 'End');
+        await press(wrapper, 'Home');
+        expect(revealed).toEqual([nearest('fruit-opt-0'), nearest('fruit-opt-2'), nearest('fruit-opt-0')]);
+    });
+
+    it('a typeahead key on the closed trigger opens the list and reveals its match', async () => {
+        const wrapper = mountSelect({});
+
+        await press(wrapper, 'w');
+        expect(revealed).toEqual([nearest('fruit-opt-2')]);
+    });
+
+    it('reveals the clear entry when the highlight moves onto it', async () => {
+        const wrapper = mountSelect({clearLabel: 'No fruit'});
+
+        await press(wrapper, 'Enter');
+        await press(wrapper, 'ArrowDown');
+        expect(revealed).toEqual([nearest('fruit-clear')]);
+    });
+
+    it('a key that leaves the highlight where it was, or closes the list, reveals nothing', async () => {
+        const wrapper = mountSelect({});
+        await press(wrapper, 'Enter');
+        await press(wrapper, 'End');
+        revealed.length = 0;
+
+        await press(wrapper, 'ArrowDown'); // already on the last option
+        await press(wrapper, 'Escape');
+        expect(revealed).toEqual([]);
+    });
+
+    it('a pointer hover moves the highlight but scrolls nothing', async () => {
+        const wrapper = mountSelect({});
+        await wrapper.find('.ui-select__trigger').trigger('click');
+
+        await menu(wrapper).find('#fruit-opt-2').trigger('mouseover');
+        await wrapper.vm.$nextTick();
+        expect(wrapper.find('button').attributes('aria-activedescendant')).toBe('fruit-opt-2');
+        expect(revealed).toEqual([]);
     });
 });
 

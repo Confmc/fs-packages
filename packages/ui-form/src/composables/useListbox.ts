@@ -2,7 +2,7 @@ import type {Placement} from '@floating-ui/vue';
 import type {CSSProperties, Ref} from 'vue';
 
 import {autoUpdate, flip, hide, offset, shift, size, useFloating} from '@floating-ui/vue';
-import {computed, onBeforeUnmount, onMounted, readonly, ref, watch} from 'vue';
+import {computed, nextTick, onBeforeUnmount, onMounted, readonly, ref, watch} from 'vue';
 
 import {ensureRefValueExists} from '../internal/reactivity';
 
@@ -261,9 +261,22 @@ export const useListbox = (options: UseListboxOptions) => {
         }
     };
 
+    // WR-2903. The menu scrolls (`--ui-menu-max-height`), and focus stays on the trigger, so
+    // nothing brings a highlight that moved onto a clipped option into sight on its own. This
+    // scrolls the active row (option or clear entry) into the menu's view after the render that
+    // marks it, by the least distance (`nearest`), without moving focus. The scroll behaviour is
+    // left to CSS; styles.css sets no smooth scrolling, so it is instant. The row is searched
+    // inside the popup only, never the document, and nothing happens when there is none.
+    const revealActive = () => {
+        const target = activeDescendant.value;
+        const container = floating.value;
+        if (target === undefined || !container) return;
+        container.querySelector<HTMLElement>(`#${CSS.escape(target)}`)?.scrollIntoView({block: 'nearest'});
+    };
+
     // Listbox keyboard navigation. The trigger's native :disabled blocks pointer input; this
     // guards the keyboard path too.
-    const onKey = (event: KeyboardEvent) => {
+    const handleKey = (event: KeyboardEvent) => {
         if (disabled()) return;
         if (event.key === 'Tab') {
             onDismiss();
@@ -334,6 +347,14 @@ export const useListbox = (options: UseListboxOptions) => {
                 event.preventDefault();
                 break;
         }
+    };
+
+    // Only a KEY reveals the highlight: a pointer hover already has the row under the mouse, and
+    // scrolling it would slide the next row under the pointer and chain the hover down the list.
+    const onKey = (event: KeyboardEvent) => {
+        const before = activeDescendant.value;
+        handleKey(event);
+        if (activeDescendant.value !== before) void nextTick(revealActive);
     };
 
     // click-outside — dismisses without a shared directive dependency.
