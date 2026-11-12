@@ -4,7 +4,8 @@
              space — its own <li> above the options, its own id (`${id}-clear`), its own highlight
              flag — so every option index below keeps mapping 1:1 onto the parent's list. It is an
              option to assistive tech (role="option" inside the listbox); aria-selected marks the
-             committed-null state. -->
+             committed-null state. Its mousedown default is cancelled for the same reason as an
+             option row's (ListboxOption): a pointer pick must leave focus on the trigger. -->
         <li
             v-if="clearLabel !== undefined"
             :id="clearId"
@@ -13,6 +14,7 @@
             role="option"
             :aria-selected="clearSelected"
             @mouseover="emit('clearHover')"
+            @mousedown.prevent
             @click="emit('clearCommit')"
         >
             {{ clearLabel }}

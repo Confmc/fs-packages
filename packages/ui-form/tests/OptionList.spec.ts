@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import {mount} from '@vue/test-utils';
-import {describe, expect, it} from 'vitest';
+import {describe, expect, it, vi} from 'vitest';
 import {h} from 'vue';
 
 import OptionList from '../src/components/OptionList.vue';
@@ -51,6 +51,27 @@ describe('OptionList', () => {
 
         expect(wrapper.emitted('hover')).toEqual([[1]]);
         expect(wrapper.emitted('commit')).toEqual([[1]]);
+    });
+
+    it('cancels the mousedown on every option row and the clear entry, never on the listbox', () => {
+        // The default a row cancels is the focus move onto the body; happy-dom performs none, so
+        // this pins the mechanism. The listbox keeps its default: a scrollbar drag starts there.
+        const wrapper = mountList({clearLabel: 'None', clearId: 'fruit-clear'});
+        const mousedown = (element: Element): boolean => {
+            vi.setSystemTime(Date.now() + 1);
+            const event = new MouseEvent('mousedown', {bubbles: true, cancelable: true});
+            element.dispatchEvent(event);
+            return event.defaultPrevented;
+        };
+
+        expect(wrapper.findAll('[role="option"]').map((option) => mousedown(option.element))).toEqual([
+            true,
+            true,
+            true,
+            true,
+            true,
+        ]);
+        expect(mousedown(wrapper.get('[role="listbox"]').element)).toBe(false);
     });
 
     it('marks the pointer active, the muted options muted and the committed option selected', () => {
