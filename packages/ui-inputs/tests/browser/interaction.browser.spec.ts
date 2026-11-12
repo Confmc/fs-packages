@@ -1621,6 +1621,17 @@ describe('listbox family — a mouse pick keeps focus on the trigger', () => {
         }
     }
 
+    for (const member of LISTBOX_MEMBERS.filter((candidate) => candidate.grouped)) {
+        it(`${member.name}: a real click on a group header keeps focus on the ${member.input ? 'input' : 'trigger'} and the list open`, async () => {
+            const {trigger} = await renderMember(member);
+
+            await userEvent.click(trigger);
+            await userEvent.click(document.querySelector('[class$="__group-header"]') as HTMLElement);
+            expect(document.activeElement).toBe(trigger);
+            expect(listbox()).not.toBeNull();
+        });
+    }
+
     it('MultiSelect: a real click on a chip-remove button still removes the chip', async () => {
         const {model} = await renderMember(LISTBOX_MEMBERS[1]);
         model.value = [2, 3];
