@@ -348,6 +348,22 @@ describe('useListbox edges of the keyboard skeleton', () => {
         wrapper.unmount();
     });
 
+    it('ArrowDown on an empty list with no clear entry leaves nothing for a later entry to light', () => {
+        // The pointer stays at -1, the clear entry's slot; only the dropped clear flag keeps an
+        // entry rendered afterwards from reading as highlighted.
+        const entry = ref(false);
+        const wrapper = mount(Harness, {props: {overrides: {clearEntry: () => entry.value}}}); // listLength 0
+
+        api.toggle();
+        api.onKey(key('ArrowDown'));
+        entry.value = true;
+
+        expect(api.pointer.value).toBe(-1);
+        expect(api.clearHighlighted.value).toBe(false);
+        expect(api.activeDescendant.value).toBeUndefined();
+        wrapper.unmount();
+    });
+
     it('ArrowDown on the last option stays there', () => {
         const wrapper = mount(Harness, {props: {overrides: {listLength: () => 3}}});
 
