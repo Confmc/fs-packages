@@ -71,6 +71,22 @@ describe('PasswordInput', () => {
         wrapper.unmount();
     });
 
+    it('keeps a shown password out of spellcheck, autocorrect and autocapitalisation', async () => {
+        const wrapper = mountPassword();
+        const input = wrapper.find('input');
+        const exempt = () => [
+            input.attributes('spellcheck'),
+            input.attributes('autocorrect'),
+            input.attributes('autocapitalize'),
+        ];
+
+        expect(exempt()).toEqual(['false', 'off', 'off']);
+        await wrapper.find('.ui-input__button').trigger('click');
+        expect(input.attributes('type')).toBe('text');
+        expect(exempt()).toEqual(['false', 'off', 'off']);
+        wrapper.unmount();
+    });
+
     it('focuses the input, not the toggle, when the toggle is pressed with a pointer', () => {
         const wrapper = mountPassword();
         const down = new MouseEvent('mousedown', {cancelable: true});

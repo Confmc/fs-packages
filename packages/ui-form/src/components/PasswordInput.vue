@@ -2,6 +2,8 @@
     <span v-bind="rootAttrs($attrs)" class="ui-password">
         <!-- class/style style the whole control (this root); everything else lands on the <input>. -->
         <span class="ui-input-wrap">
+            <!-- a shown password is a text field: spellcheck services and mobile autocorrect would read it, so
+                 they are off (and harmless while hidden), after the consumer's attrs so they hold -->
             <input
                 v-model="model"
                 @keydown="checkCapsLock"
@@ -10,6 +12,9 @@
                 ref="input"
                 :id="id"
                 :type="shown ? 'text' : 'password'"
+                spellcheck="false"
+                autocorrect="off"
+                autocapitalize="off"
                 class="ui-control ui-input has-button"
                 :class="{'is-invalid': invalid}"
                 :placeholder="placeholder"
