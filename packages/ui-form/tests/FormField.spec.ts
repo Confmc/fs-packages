@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import {mount} from '@vue/test-utils';
 import {describe, expect, it} from 'vitest';
-import {h} from 'vue';
+import {defineComponent, h, nextTick, ref} from 'vue';
 
 import type {FieldBinding} from '../src';
 
@@ -56,6 +56,69 @@ describe('FormField', () => {
         expect(plain.find('label').element.textContent).toBe('Email');
     });
 
+    it('renders a hint between the control and the message, read with the field after the message', () => {
+        const wrapper = mount(FormField, {
+            props: {label: 'Email', id: 'email', error: 'Bad email'},
+            slots: {default: wiringSlot, hint: 'We never share it'},
+        });
+
+        const parts = [...wrapper.find('.ui-field').element.children].map((child) => child.className);
+        expect(parts.slice(-3)).toEqual(['ui-field__control', 'ui-hint', 'ui-error']);
+        expect(wrapper.find('.ui-hint').attributes('id')).toBe('email-hint');
+        expect(wrapper.find('.ui-hint').text()).toBe('We never share it');
+        expect(wrapper.text()).toContain('db:email-error email-hint');
+    });
+
+    it('names a hint that appears after mount, and drops it when it goes', async () => {
+        const shown = ref(false);
+        const wrapper = mount(
+            defineComponent({
+                setup: () => () =>
+                    h(
+                        FormField,
+                        {id: 'email', error: 'Required'},
+                        {
+                            default: ({field}: {field: FieldBinding}) =>
+                                h('input', {'aria-describedby': field.describedby}),
+                            ...(shown.value ? {hint: () => 'We never share it'} : {}),
+                        },
+                    ),
+            }),
+        );
+        const describedby = () => wrapper.find('input').attributes('aria-describedby');
+
+        expect(describedby()).toBe('email-error');
+        shown.value = true;
+        await nextTick();
+        expect(wrapper.find('.ui-hint').exists()).toBe(true);
+        expect(describedby()).toBe('email-error email-hint');
+        shown.value = false;
+        await nextTick();
+        expect(describedby()).toBe('email-error');
+    });
+
+    it('names the hint alone while there is no message, and nothing without a hint', () => {
+        const hinted = mount(FormField, {
+            props: {label: 'Email', id: 'email'},
+            slots: {default: wiringSlot, hint: 'We never share it'},
+        });
+        const plain = mount(FormField, {props: {label: 'Email', id: 'email'}, slots: {default: wiringSlot}});
+
+        expect(hinted.text()).toContain('inv:false|db:email-hint');
+        expect(plain.find('.ui-hint').exists()).toBe(false);
+        expect(plain.text()).toContain('db:undefined');
+    });
+
+    it('renders no hint when the slot is left out conditionally, and names none', () => {
+        // what `<template v-if="hint" #hint>` hands over: a hint slot that is undefined
+        const wrapper = mount(() =>
+            h(FormField, {label: 'Email', id: 'email'}, {default: wiringSlot, hint: undefined}),
+        );
+
+        expect(wrapper.find('.ui-hint').exists()).toBe(false);
+        expect(wrapper.text()).toContain('db:undefined');
+    });
+
     it('hands a native element the same wiring as aria attributes, named by the label', () => {
         let aria!: Record<string, unknown>;
         const wrapper = mount(FormField, {
@@ -65,6 +128,7 @@ describe('FormField', () => {
                     aria = scope.aria;
                     return h('div', {role: 'group', ...scope.aria});
                 },
+                hint: 'Any that apply',
             },
         });
 
@@ -73,7 +137,7 @@ describe('FormField', () => {
             id: 'laws',
             'aria-labelledby': 'laws-label',
             'aria-invalid': 'true',
-            'aria-describedby': 'laws-error',
+            'aria-describedby': 'laws-error laws-hint',
         });
         expect(wrapper.find('[role="group"]').attributes()).not.toHaveProperty('invalid');
     });
