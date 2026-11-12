@@ -30,8 +30,8 @@ afterEach(() => {
 const mountIt = (component: any, props: Record<string, unknown>) =>
     mount(component, {props: {label: 'name', id: 'f', ...props}, attachTo: document.body});
 
-const keydown = (target: Element, key: string): KeyboardEvent => {
-    const event = new KeyboardEvent('keydown', {key, bubbles: true, cancelable: true});
+const keydown = (target: Element, key: string, init: KeyboardEventInit = {}): KeyboardEvent => {
+    const event = new KeyboardEvent('keydown', {key, bubbles: true, cancelable: true, ...init});
     target.dispatchEvent(event);
     return event;
 };
@@ -63,6 +63,26 @@ describe('Space on an open select-only list (WR-2588)', () => {
             await wrapper.vm.$nextTick();
             expect(wrapper.emitted('update:modelValue')).toEqual([[member.multi ? [1] : 1]]);
             expect(trigger.getAttribute('aria-expanded')).toBe(String(member.multi));
+            wrapper.unmount();
+        });
+
+        it(`${member.name}: a Space with Ctrl, Alt or Meta passes through, a held Space's repeats are cancelled; neither commits`, async () => {
+            const wrapper = mountIt(member.component, member.props);
+            const trigger = wrapper.get('#f').element;
+
+            keydown(trigger, 'Enter');
+            await wrapper.vm.$nextTick();
+            keydown(trigger, 'ArrowDown');
+            await wrapper.vm.$nextTick();
+
+            // Ctrl+Space switches the input source on some systems: it passes through untouched
+            for (const init of [{ctrlKey: true}, {altKey: true}, {metaKey: true}]) {
+                expect(keydown(trigger, ' ', init).defaultPrevented).toBe(false);
+            }
+            // a held Space's repeats are cancelled, so they neither reopen the list nor click the trigger
+            expect(keydown(trigger, ' ', {repeat: true}).defaultPrevented).toBe(true);
+            await wrapper.vm.$nextTick();
+            expect(wrapper.emitted('update:modelValue')).toBeUndefined();
             wrapper.unmount();
         });
 
@@ -110,6 +130,8 @@ describe('Space on an open select-only list (WR-2588)', () => {
             expect(input.getAttribute('aria-activedescendant')).toBe('f-opt-0');
 
             expect(keydown(input, ' ').defaultPrevented).toBe(false);
+            // a held Space types spaces into the query: its repeats are not cancelled either
+            expect(keydown(input, ' ', {repeat: true}).defaultPrevented).toBe(false);
             expect(wrapper.emitted('update:modelValue')).toBeUndefined();
             expect(input.getAttribute('aria-expanded')).toBe('true');
             wrapper.unmount();

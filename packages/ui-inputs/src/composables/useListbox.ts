@@ -374,7 +374,11 @@ export const useListbox = (options: UseListboxOptions) => {
                 // select-only list is the one that passes typeahead labels; on a combobox Space
                 // is a query character and stays with the input. A Space inside a typed string
                 // never gets here: typeahead took it above.
-                if (foldedLabels !== undefined) commitActive(event);
+                // Ctrl/Alt/Meta+Space is a system shortcut (Ctrl+Space switches the input source on some
+                // systems), not a pick: it passes through untouched.
+                if (foldedLabels !== undefined && !event.ctrlKey && !event.altKey && !event.metaKey) {
+                    commitActive(event);
+                }
                 break;
             case 'Escape':
                 onDismiss();
@@ -386,6 +390,13 @@ export const useListbox = (options: UseListboxOptions) => {
     // Only a KEY reveals the highlight: a pointer hover already has the row under the mouse, and
     // scrolling it would slide the next row under the pointer and chain the hover down the list.
     const onKey = (event: KeyboardEvent) => {
+        // A held Space on a select-only control repeats its keydown: only the first press acts (it
+        // committed, or opened the list). Each repeat is cancelled so it neither reopens the list nor
+        // lets the trigger's keyup click toggle it. On a combobox a held Space types spaces.
+        if (event.key === ' ' && event.repeat && foldedLabels !== undefined) {
+            event.preventDefault();
+            return;
+        }
         const before = activeDescendant.value;
         handleKey(event);
         if (activeDescendant.value !== before) void nextTick(revealActive);
