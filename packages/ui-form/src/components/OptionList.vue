@@ -1,5 +1,5 @@
 <template>
-    <ul :id="listboxId" :class="`${variant}__menu`" role="listbox" :aria-label="optionsLabel">
+    <ul :id="listboxId" class="ui-select__menu" role="listbox" :aria-label="optionsLabel">
         <!-- The committing clear entry (a select's `clearLabel`) renders OUTSIDE the index
              space — its own <li> above the options, its own id (`${id}-clear`), its own highlight
              flag — so every option index below keeps mapping 1:1 onto the parent's list. It is an
@@ -8,7 +8,8 @@
         <li
             v-if="clearLabel !== undefined"
             :id="clearId"
-            :class="[`${variant}__clear`, {'is-active': clearActive}]"
+            class="ui-select__clear"
+            :class="{'is-active': clearActive}"
             role="option"
             :aria-selected="clearSelected"
             @mouseover="emit('clearHover')"
@@ -24,7 +25,7 @@
              option (the APG no-results pattern) satisfies both — it is a valid listbox child and
              gives the listbox its required option, while aria-disabled marks it non-selectable
              (the pointer never lands on it — useListbox has no navigable index when empty). -->
-        <li v-if="keys.length === 0" :class="`${variant}__empty`" role="option" aria-disabled="true">
+        <li v-if="keys.length === 0" class="ui-select__empty" role="option" aria-disabled="true">
             {{ emptyText }}
         </li>
         <!-- The option row itself is the shared `ListboxOption`; the index-scoped `option` slot
@@ -36,7 +37,6 @@
             v-for="(key, index) in keys"
             :key="key"
             :index="index"
-            :variant="variant"
             :option-id="optionId"
             :active="pointer === index"
             :muted="isMuted(index)"
@@ -53,11 +53,10 @@
 import ListboxOption from './ListboxOption.vue';
 
 /**
- * The listbox popup shared by every ui-form select control — INTERNAL, deliberately not
- * exported from the barrel (like `useListbox`, its behavioural twin). Where the composable
- * dedupes behaviour, this component dedupes markup: one `<ul>/<li>` body, parameterised only
- * by the class-prefix `variant`, so the `role="listbox"` / `role="option"` / position-keyed
- * `optionId` / committed-value `aria-selected` semantics stay byte-identical across the family.
+ * The listbox popup of the ui-form select — INTERNAL, deliberately not exported from the barrel
+ * (like `useListbox`, its behavioural twin). Where the composable owns behaviour, this component
+ * owns markup: the `<ul>/<li>` body carrying the `role="listbox"` / `role="option"` /
+ * position-keyed `optionId` / committed-value `aria-selected` semantics.
  *
  * Entirely index-based, mirroring `useListbox`: the option type `T` never crosses this
  * boundary. The parent hands down `keys` derived from ITS list (SingleSelect's `sorted`) plus
@@ -79,7 +78,6 @@ const {
     optionId,
     isSelected,
     isMuted,
-    variant,
     optionsLabel,
     emptyText,
     clearLabel,
@@ -100,14 +98,6 @@ const {
     isSelected: (index: number) => boolean;
     /** whether the option at an index is visually MUTED (`.is-muted`) — still committable. */
     isMuted: (index: number) => boolean;
-    /** class prefix of the owning control — the only visual divergence across the family. */
-    variant:
-        | 'ui-select'
-        | 'ui-combobox'
-        | 'ui-multiselect'
-        | 'ui-multicombobox'
-        | 'ui-groupselect'
-        | 'ui-groupcombobox';
     /** accessible name for the listbox popup (`aria-label`). */
     optionsLabel: string;
     /** shown when there are no navigable options. */

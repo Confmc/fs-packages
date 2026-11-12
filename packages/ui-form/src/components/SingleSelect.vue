@@ -47,7 +47,6 @@
              trigger, so the menu's `min-width: 100%` measures the trigger. -->
         <div v-if="open" ref="floating" popover="manual" class="ui-menu-anchor" :style="floatingStyles">
             <OptionList
-                variant="ui-select"
                 :keys="optionKeys"
                 :pointer="pointer"
                 :listbox-id="listboxId"

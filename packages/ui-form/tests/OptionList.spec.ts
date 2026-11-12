@@ -16,7 +16,6 @@ const mountList = (props: Record<string, unknown> = {}) =>
             optionId: (index: number) => `fruit-opt-${index}`,
             isSelected: () => false,
             isMuted: () => false,
-            variant: 'ui-select',
             optionsLabel: 'Fruits',
             emptyText: 'No fruit',
             ...props,

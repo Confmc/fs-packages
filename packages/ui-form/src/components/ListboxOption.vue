@@ -1,7 +1,8 @@
 <template>
     <li
         :id="optionId(index)"
-        :class="[`${variant}__option`, {'is-active': active, 'is-muted': muted}]"
+        class="ui-select__option"
+        :class="{'is-active': active, 'is-muted': muted}"
         role="option"
         :aria-selected="selected"
         @mouseover="emit('hover', index)"
@@ -26,17 +27,9 @@
  * keeps the highlight/selection chrome on this `<li>`, outside the slot, so custom content
  * never re-creates it.
  */
-const {index, variant, optionId, active, muted, selected} = defineProps<{
+const {index, optionId, active, muted, selected} = defineProps<{
     /** the option's position in the listbox index space — its identity for id/hover/commit. */
     index: number;
-    /** class prefix of the owning control — the only visual divergence across the family. */
-    variant:
-        | 'ui-select'
-        | 'ui-combobox'
-        | 'ui-multiselect'
-        | 'ui-multicombobox'
-        | 'ui-groupselect'
-        | 'ui-groupcombobox';
     /** position-keyed option-id scheme from `useListbox` (`${id}-opt-${index}`). */
     optionId: (index: number) => string;
     /** whether this option holds the highlight (`.is-active`) — the pointer, owned by the parent. */
