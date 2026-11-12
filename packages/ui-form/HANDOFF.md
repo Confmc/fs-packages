@@ -1145,3 +1145,30 @@ committedIndex optional, openList and resetHighlight returned, a modified-Home/E
 MultiSelect / MultiCombobox: multiselectable, clearEntry/onClearCommit optional, committedIndex optional; GroupSelect /
 GroupCombobox: rows/group-rows/grouped runs and ListboxOption's shared markup; all: a class prefix (variant) for their
 own `ui-*` classes. onOutside and the floating knobs do not come back (no caller passes them).
+
+### End of 2026-11-12 (read this first after a compaction)
+
+**Upstream:** 11 approved, not merged (#332 #333 #335-#342 #355). #343 #344 #353 answered today, CI green, waiting on
+re-review (Marcel clicks re-request). We cannot label or merge: the account has read access only (`push: false`;
+adding `Agent Review Requested` returns 403 "Must have admin rights"). The label exists on this repo and is set by the
+reviewer/war room; no ui-form PR has had it. Message for the reviewer (Marcel sends): label #343/#344/#353 if he wants
+crit, and how the 11 approved get merged (merge main in first?). Do not push to an approved PR uninvited.
+
+**Sessions:** this one (`ui-form-control`) leads: package, PRs, fork branches, packs, HANDOFF. The test bed is the
+session named `error-keys-raw` (named after its first branch), working in `~/worktrees/emmie-2` on
+`ui-form-landing-test` @16d40b05e2 (pushed; contains the old `error-keys-raw` branch). Its handoff: emmie
+`docs/plans/fs-packages-ui-form/HANDOFF.md` "State at 2026-11-05". Last pack checked: landing.11 (typecheck 2: finding
+C waitlist FormDraft, an old scratch spec). Other emmie sessions (emmie-1-4c on EMMIE-0246, the EMMIE-2916 PR #3510)
+are not ui-form work.
+
+**Fork branches waiting on merges:** after #353: n-multi-select, n-combobox, n-group-select, n-multi-combobox,
+n-group-combobox (each adds back its stripped core piece, list above); after #332: n-pressable @3eb7501,
+n-disclosure @ad186c0, n-checkbox-group; after #355: n-field-label-after, n-field-hint, n-field-aside; after #333: the
+form chain n-use-form → n-form-paths → n-field → n-form-refusals → n-form-kit @1b6c498 (slot routing in); after #340:
+n-token-scope. Still to build: slice 6 (other bound controls + createUiForm, once controls are on main), release PR.
+Amendment 2 draft: `AMENDMENT-2.draft.md` (pending the reviewer's answers from 11-02, still none).
+
+**Rules from this stretch:** integrate, don't refactor (emmie epic: minimal change per screen); "flaky" is a hypothesis
+(freeze `Date` to make a timing bug deterministic; Vue drops a native event stamped in its listener's attach ms);
+`describedby` stays lowercase (matches `aria-describedby`, ui-inputs' API, emmie's 1119 uses); slots are not reactive
+(build slot-derived values in render); label-after holds phrasing content only; field tooltips stay as emmie has them.
