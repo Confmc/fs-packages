@@ -125,13 +125,6 @@ export const useListbox = (options: UseListboxOptions) => {
         pointer.value = -1;
     };
 
-    // Reset the highlight to "nothing" — shared by close() and a combobox's keystroke reset
-    // (typing must drop a hovered clear entry exactly as it drops an option highlight).
-    const resetHighlight = () => {
-        clearActive.value = false;
-        pointer.value = -1;
-    };
-
     // The one dismissal step every consumer needs: close the list AND reset the highlight.
     // Owned here so a future consumer cannot forget the `-1` — a stale pointer would resurface
     // as a phantom highlight (and a phantom aria-activedescendant) on the next open. The
@@ -160,7 +153,8 @@ export const useListbox = (options: UseListboxOptions) => {
     };
     const close = () => {
         open.value = false;
-        resetHighlight();
+        clearActive.value = false;
+        pointer.value = -1;
         dropTyped();
     };
     const toggle = () => {
@@ -431,12 +425,10 @@ export const useListbox = (options: UseListboxOptions) => {
         activeDescendant,
         floatingStyles: gatedFloatingStyles,
         onKey,
-        openList,
         close,
         toggle,
         clearHighlighted,
         clearId,
         highlightClear,
-        resetHighlight,
     };
 };

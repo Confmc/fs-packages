@@ -147,7 +147,7 @@ describe('useListbox Home/End (WR-0521)', () => {
     it('End jumps to the last option and Home back to the first, both swallowing the key', () => {
         const wrapper = mount(Harness, {props: {overrides: {listLength: () => 3}}});
 
-        api.openList();
+        api.toggle();
         const end = key('End');
         api.onKey(end);
         expect(api.pointer.value).toBe(2);
@@ -163,7 +163,7 @@ describe('useListbox Home/End (WR-0521)', () => {
     it('an empty list leaves the highlight untouched but still swallows the key while open', () => {
         const wrapper = mount(Harness); // listLength 0
 
-        api.openList();
+        api.toggle();
         const home = key('Home');
         api.onKey(home);
         expect(api.pointer.value).toBe(-1);
@@ -175,7 +175,7 @@ describe('useListbox Home/End (WR-0521)', () => {
     it('modified Home/End (Shift/Ctrl/Meta) fall through to native text-selection — never swallowed', () => {
         const wrapper = mount(Harness, {props: {overrides: {listLength: () => 3}}});
 
-        api.openList();
+        api.toggle();
         api.onKey(key('ArrowDown')); // highlight option 0 so a wrongly-taken arm would move it
         expect(api.pointer.value).toBe(0);
 
@@ -195,7 +195,7 @@ describe('useListbox Home/End (WR-0521)', () => {
             props: {overrides: {clearEntry: () => true, onClearCommit: () => true, listLength: () => 2}},
         });
 
-        api.openList();
+        api.toggle();
         api.onKey(key('ArrowDown')); // "nothing" → the clear entry
         expect(api.clearHighlighted.value).toBe(true);
 
@@ -213,7 +213,7 @@ describe('useListbox clear-entry option combinations', () => {
     it('a rendered clear entry with NO commit callback highlights but never swallows Enter', () => {
         const wrapper = mount(Harness, {props: {overrides: {clearEntry: () => true, listLength: () => 2}}});
 
-        api.openList();
+        api.toggle();
         api.onKey(key('ArrowDown')); // "nothing" → the clear entry
         expect(api.clearHighlighted.value).toBe(true);
         expect(api.activeDescendant.value).toBe('harness-clear');
@@ -230,7 +230,7 @@ describe('useListbox clear-entry option combinations', () => {
             props: {overrides: {clearEntry: () => true, onClearCommit: () => false, listLength: () => 2}},
         });
 
-        api.openList();
+        api.toggle();
         api.onKey(key('ArrowDown'));
         expect(api.clearHighlighted.value).toBe(true);
 
@@ -245,7 +245,7 @@ describe('useListbox clear-entry option combinations', () => {
             props: {overrides: {clearEntry: () => true, onClearCommit: () => true, listLength: () => 0}},
         });
 
-        api.openList();
+        api.toggle();
         api.onKey(key('ArrowDown')); // → clear entry
         api.onKey(key('ArrowDown')); // empty list → nowhere to go, stays
         expect(api.clearHighlighted.value).toBe(true);
@@ -305,7 +305,7 @@ describe('useListbox click-outside across shadow boundaries (KD-1136)', () => {
         const mountPoint = document.createElement('div');
         host.attachShadow({mode: 'open'}).append(mountPoint);
         const wrapper = mount(Harness, {props: {overrides: {onDismiss}}, attachTo: mountPoint});
-        api.openList();
+        api.toggle();
 
         wrapper.element.dispatchEvent(new MouseEvent('click', {bubbles: true, composed: true}));
         expect(onDismiss).not.toHaveBeenCalled();
@@ -316,7 +316,7 @@ describe('useListbox click-outside across shadow boundaries (KD-1136)', () => {
     it('calls onDismiss for a click that is in neither root nor floating', () => {
         const onDismiss = vi.fn();
         const wrapper = mount(Harness, {props: {overrides: {onDismiss}}, attachTo: document.body});
-        api.openList();
+        api.toggle();
 
         document.body.dispatchEvent(new MouseEvent('click', {bubbles: true}));
         expect(onDismiss).toHaveBeenCalledTimes(1);
@@ -326,7 +326,7 @@ describe('useListbox click-outside across shadow boundaries (KD-1136)', () => {
     it('does not call onDismiss for a click inside root', () => {
         const onDismiss = vi.fn();
         const wrapper = mount(Harness, {props: {overrides: {onDismiss}}, attachTo: document.body});
-        api.openList();
+        api.toggle();
 
         wrapper.element.dispatchEvent(new MouseEvent('click', {bubbles: true}));
         expect(onDismiss).not.toHaveBeenCalled();
@@ -385,7 +385,7 @@ describe('useListbox without the optional hooks', () => {
     it('without a clear entry, ArrowUp on the first option leaves nothing highlighted', () => {
         const wrapper = mount(Harness, {props: {overrides: {listLength: () => 3}}});
 
-        api.openList();
+        api.toggle();
         api.onKey(key('ArrowDown'));
         expect(api.pointer.value).toBe(0);
         api.onKey(key('ArrowUp'));
@@ -398,7 +398,7 @@ describe('useListbox without the optional hooks', () => {
     it('without typeahead labels, an open list leaves a printable key alone', () => {
         const wrapper = mount(Harness, {props: {overrides: {listLength: () => 3}}});
 
-        api.openList();
+        api.toggle();
         const event = key('b');
         api.onKey(event);
 
@@ -410,7 +410,7 @@ describe('useListbox without the optional hooks', () => {
     it('ArrowDown on the last option stays there', () => {
         const wrapper = mount(Harness, {props: {overrides: {listLength: () => 3}}});
 
-        api.openList();
+        api.toggle();
         for (let press = 0; press < 4; press++) api.onKey(key('ArrowDown'));
 
         expect(api.pointer.value).toBe(2);
@@ -425,7 +425,7 @@ describe('useListbox without the optional hooks', () => {
             props: {overrides: {listLength: () => 3, clearEntry: () => entry.value as boolean}},
         });
 
-        api.openList();
+        api.toggle();
         api.onKey(key('ArrowDown'));
         api.onKey(key('ArrowUp'));
         entry.value = true;
@@ -472,7 +472,7 @@ describe('useListbox keyboard and highlight contract', () => {
     it.each(['ArrowDown', 'ArrowUp', 'Escape'])('swallows %s while open', (name) => {
         const wrapper = mount(Harness, {props: {overrides: {listLength: () => 3}}});
 
-        api.openList();
+        api.toggle();
         api.onKey(key('ArrowDown'));
         const event = key(name);
         api.onKey(event);
@@ -484,7 +484,7 @@ describe('useListbox keyboard and highlight contract', () => {
     it('swallows Enter when it commits an option', () => {
         const wrapper = mount(Harness, {props: {overrides: {listLength: () => 3, onCommit: () => true}}});
 
-        api.openList();
+        api.toggle();
         api.onKey(key('ArrowDown'));
         const enter = key('Enter');
         api.onKey(enter);
@@ -496,7 +496,7 @@ describe('useListbox keyboard and highlight contract', () => {
     it('ArrowDown from the first option moves to the second, past the clear entry above it', () => {
         const wrapper = mount(Harness, {props: {overrides: {listLength: () => 3, clearEntry: () => true}}});
 
-        api.openList();
+        api.toggle();
         api.onKey(key('ArrowDown'));
         api.onKey(key('ArrowDown'));
         api.onKey(key('ArrowDown'));
@@ -509,7 +509,7 @@ describe('useListbox keyboard and highlight contract', () => {
     it('ArrowUp from the last option moves to the one above, not to the clear entry', () => {
         const wrapper = mount(Harness, {props: {overrides: {listLength: () => 3, clearEntry: () => true}}});
 
-        api.openList();
+        api.toggle();
         api.onKey(key('End'));
         api.onKey(key('ArrowUp'));
 
@@ -521,7 +521,7 @@ describe('useListbox keyboard and highlight contract', () => {
     it('a highlighted clear flag without a clear entry is no highlight', () => {
         const wrapper = mount(Harness, {props: {overrides: {listLength: () => 3}}});
 
-        api.openList();
+        api.toggle();
         api.highlightClear();
 
         expect(api.clearHighlighted.value).toBe(false);
@@ -531,10 +531,10 @@ describe('useListbox keyboard and highlight contract', () => {
     it('closing drops the clear entry highlight, so reopening shows none', () => {
         const wrapper = mount(Harness, {props: {overrides: {listLength: () => 3, clearEntry: () => true}}});
 
-        api.openList();
+        api.toggle();
         api.highlightClear();
         api.close();
-        api.openList();
+        api.toggle();
 
         expect(api.clearHighlighted.value).toBe(false);
         expect(api.activeDescendant.value).toBeUndefined();
@@ -547,7 +547,7 @@ describe('useListbox keyboard and highlight contract', () => {
         const length = ref(3);
         const wrapper = mount(Harness, {props: {overrides: {listLength: () => length.value, clearEntry: () => true}}});
 
-        api.openList();
+        api.toggle();
         api.highlightClear();
         api.pointer.value = 2;
         length.value = 0;
@@ -563,7 +563,7 @@ describe('useListbox keyboard and highlight contract', () => {
         const length = ref(3);
         const wrapper = mount(Harness, {props: {overrides: {listLength: () => length.value}}});
 
-        api.openList();
+        api.toggle();
         api.onKey(key('End'));
         length.value = 2;
         await nextTick();
@@ -576,7 +576,7 @@ describe('useListbox keyboard and highlight contract', () => {
     it('names no active option when nothing is highlighted', () => {
         const wrapper = mount(Harness, {props: {overrides: {listLength: () => 3}}});
 
-        api.openList();
+        api.toggle();
 
         expect(api.activeDescendant.value).toBeUndefined();
         wrapper.unmount();
@@ -586,7 +586,7 @@ describe('useListbox keyboard and highlight contract', () => {
         const length = ref(3);
         const wrapper = mount(Harness, {props: {overrides: {listLength: () => length.value}}});
 
-        api.openList();
+        api.toggle();
         api.onKey(key('End'));
         // Shrunk to exactly the pointer: index 2 is one past the new end.
         length.value = 2;
@@ -608,7 +608,7 @@ describe('useListbox keyboard and highlight contract', () => {
             },
         });
 
-        api.openList();
+        api.toggle();
         api.onKey(key('ArrowDown'));
         api.onKey(key('b'));
 
