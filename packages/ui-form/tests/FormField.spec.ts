@@ -139,6 +139,21 @@ describe('FormField', () => {
         expect(scope).toEqual({});
     });
 
+    it('keeps label-after inside the label when the label shares its row with an aside', () => {
+        const wrapper = mount(FormField, {
+            props: {label: 'Email', required: true, id: 'email'},
+            slots: {
+                default: wiringSlot,
+                'label-after': '<em class="note">optional</em>',
+                aside: '<span class="toggle">on</span>',
+            },
+        });
+
+        const head = wrapper.find('.ui-field > .ui-field__head');
+        expect(head.find('label.ui-label').element.lastElementChild?.className).toBe('note');
+        expect(head.element.lastElementChild?.className).toBe('toggle');
+    });
+
     it('keeps the label a direct child of the field without an aside', () => {
         const wrapper = mount(FormField, {props: {label: 'Email', id: 'email'}, slots: {default: wiringSlot}});
 
