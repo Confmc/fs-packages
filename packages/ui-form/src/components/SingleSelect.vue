@@ -196,11 +196,10 @@ const commit = (index: number): boolean => {
 };
 
 // The clear entry commits the family's other legal value — null — and closes, exactly like
-// choosing an option. Always a real commit (null is always committable), so always `true`.
-const commitClear = (): boolean => {
+// choosing an option.
+const commitClear = (): void => {
     model.value = null;
     close();
-    return true;
 };
 
 const {

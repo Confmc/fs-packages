@@ -49,20 +49,16 @@ export interface UseListboxOptions {
      * slot between "nothing highlighted" and index 0, plus its own activedescendant id
      * (`${id}-clear`). A getter so it tracks the prop reactively.
      */
-    clearEntry?: () => boolean;
-    /** Commit the clear entry; returns whether a commit happened (decides preventDefault). */
-    onClearCommit?: () => boolean;
-    /**
-     * The rendered options' display strings, index-aligned with the list — supplying it turns on
-     * typeahead. Select-only listboxes pass it; a combobox never does, because its typed
-     * characters belong to its text input.
-     */
-    typeaheadLabels?: () => string[];
+    clearEntry: () => boolean;
+    /** Commit the clear entry. Null is always committable, so Enter on the entry is always swallowed. */
+    onClearCommit: () => void;
+    /** The rendered options' display strings, index-aligned with the list — the typeahead's haystack. */
+    typeaheadLabels: () => string[];
     /**
      * Index of the single committed option in the rendered list, or -1. A typeahead search with
      * nothing highlighted starts from it, as a native <select> searches from its value.
      */
-    committedIndex?: () => number;
+    committedIndex: () => number;
 }
 
 /** How long the typed string survives without a keystroke (the APG listbox examples' 500 ms). */
@@ -82,8 +78,7 @@ const TYPEAHEAD_MAX_LENGTH = 64;
 const fold = (text: string): string => Array.from(text, (character) => character.toLocaleLowerCase()).join('');
 
 /**
- * The behavioural core shared by every ui-form listbox control (SingleSelect; the optional
- * hooks serve selects that filter or pick many). Entirely position/index-based, so the
+ * The behavioural core of the ui-form listbox control (SingleSelect). Entirely position/index-based, so the
  * option type `T` never crosses this boundary: the caller owns the derived list and hands back
  * only its length and index-keyed callbacks. Owns `open`/`pointer`, the position-keyed IDREFs,
  * `aria-activedescendant`, the clamp watcher, click-outside, floating-ui, and the keyboard-nav
@@ -117,7 +112,7 @@ export const useListbox = (options: UseListboxOptions) => {
     // highlighted). The entry check runs FIRST so a select without a clear entry settles
     // the computed on its own leg.
     const clearActive = ref(false);
-    const clearHighlighted = computed(() => (clearEntry?.() ?? false) && clearActive.value && pointer.value === -1);
+    const clearHighlighted = computed(() => clearEntry() && clearActive.value && pointer.value === -1);
     const clearId = computed(() => `${id()}-clear`);
     /** Move the highlight onto the clear entry (keyboard slot above index 0, or hover). */
     const highlightClear = () => {
@@ -173,7 +168,7 @@ export const useListbox = (options: UseListboxOptions) => {
         (event.key !== ' ' || typed !== '');
 
     // Folded once per change of the labels, not on every key a held, matching-nothing key repeats.
-    const foldedLabels = typeaheadLabels && computed(() => typeaheadLabels().map(fold));
+    const foldedLabels = computed(() => typeaheadLabels().map(fold));
 
     /**
      * The WAI-ARIA listbox typeahead, with native <select> parity: the typed string grows while keys
@@ -197,7 +192,7 @@ export const useListbox = (options: UseListboxOptions) => {
         }
 
         const needle = repeated ? first : typed;
-        const from = pointer.value >= 0 ? pointer.value : (committedIndex?.() ?? -1);
+        const from = pointer.value >= 0 ? pointer.value : committedIndex();
         const start = repeated ? from + 1 : Math.max(from, 0);
         for (let step = 0; step < labels.length; step++) {
             const index = (start + step) % labels.length;
@@ -259,7 +254,7 @@ export const useListbox = (options: UseListboxOptions) => {
             onDismiss();
             return;
         }
-        if (foldedLabels !== undefined && isTypeahead(event)) {
+        if (isTypeahead(event)) {
             event.preventDefault();
             // Closed, a match OPENS the list on it (the APG select-only combobox), never commits.
             if (typeahead(event.key, foldedLabels.value) && !open.value) openList();
@@ -281,7 +276,7 @@ export const useListbox = (options: UseListboxOptions) => {
                         clearActive.value = false;
                         pointer.value = 0;
                     }
-                } else if (pointer.value === -1 && (clearEntry?.() ?? false)) {
+                } else if (pointer.value === -1 && clearEntry()) {
                     // The clear entry owns the keyboard slot between "nothing" and index 0.
                     highlightClear();
                 } else {
@@ -291,7 +286,7 @@ export const useListbox = (options: UseListboxOptions) => {
                 event.preventDefault();
                 break;
             case 'ArrowUp':
-                if (pointer.value === 0 && (clearEntry?.() ?? false)) {
+                if (pointer.value === 0 && clearEntry()) {
                     highlightClear();
                 } else {
                     // From the clear entry (pointer -1) this lands on "nothing highlighted".
@@ -319,11 +314,13 @@ export const useListbox = (options: UseListboxOptions) => {
                 event.preventDefault();
                 break;
             case 'Enter':
-                // The commit callbacks own the read-through-a-local race guard and the close
-                // decision; they report whether they committed, and only a real commit
+                // The commit callbacks own the close decision. The clear entry always commits
+                // (null is always legal); an option commit reports whether it happened — its
+                // callback owns the read-through-a-local race guard — and only a real commit
                 // swallows Enter.
                 if (clearHighlighted.value) {
-                    if (onClearCommit?.() ?? false) event.preventDefault();
+                    onClearCommit();
+                    event.preventDefault();
                 } else if (onCommit(pointer.value)) {
                     event.preventDefault();
                 }

@@ -11,11 +11,10 @@ import {useListbox} from '../src/composables/useListbox';
 // The component suites (SingleSelect's) exercise the composable's behaviour against
 // the REAL floating-ui. This suite pins the things they cannot see: the exact layout policy
 // handed to floating-ui (the family defaults, and a given placement), the
-// hide()-middleware visibility gate (driven off a controlled `middlewareData`), and the
-// clear-entry option combinations no component produces (a rendered entry without a commit
-// callback). Middleware factories return opaque objects, so each is mocked to a marker
-// recording its args (vi.mock is hoisted above the imports, so the top-level import gets the
-// mock too).
+// hide()-middleware visibility gate (driven off a controlled `middlewareData`), and keyboard
+// edges the component suites do not reach. Middleware factories return opaque objects, so each
+// is mocked to a marker recording its args (vi.mock is hoisted above the imports, so the
+// top-level import gets the mock too).
 const floatingMock = vi.hoisted(() => ({
     styles: {position: 'absolute', top: '0px'} as Record<string, string>,
     middlewareData: {} as Record<string, unknown>,
@@ -58,6 +57,10 @@ const Harness = defineComponent({
             openKeys: () => false,
             onCommit: () => false,
             onDismiss: () => {},
+            clearEntry: () => false,
+            onClearCommit: () => {},
+            typeaheadLabels: () => [],
+            committedIndex: () => -1,
             ...(props.overrides as Partial<UseListboxOptions> | undefined),
         });
         return () => h('div', {ref: root});
@@ -191,9 +194,7 @@ describe('useListbox Home/End (WR-0521)', () => {
     });
 
     it('Home drops a clear-entry highlight and lands on the first OPTION', () => {
-        const wrapper = mount(Harness, {
-            props: {overrides: {clearEntry: () => true, onClearCommit: () => true, listLength: () => 2}},
-        });
+        const wrapper = mount(Harness, {props: {overrides: {clearEntry: () => true, listLength: () => 2}}});
 
         api.toggle();
         api.onKey(key('ArrowDown')); // "nothing" → the clear entry
@@ -207,43 +208,9 @@ describe('useListbox Home/End (WR-0521)', () => {
     });
 });
 
-describe('useListbox clear-entry option combinations', () => {
-    // The components always pass `clearEntry` and `onClearCommit` together; the composable
-    // treats them as independent optionals, so the decoupled combinations are pinned here.
-    it('a rendered clear entry with NO commit callback highlights but never swallows Enter', () => {
-        const wrapper = mount(Harness, {props: {overrides: {clearEntry: () => true, listLength: () => 2}}});
-
-        api.toggle();
-        api.onKey(key('ArrowDown')); // "nothing" → the clear entry
-        expect(api.clearHighlighted.value).toBe(true);
-        expect(api.activeDescendant.value).toBe('harness-clear');
-
-        const enter = key('Enter');
-        api.onKey(enter); // no onClearCommit → nothing commits, Enter falls through
-        expect(enter.defaultPrevented).toBe(false);
-        expect(api.open.value).toBe(true);
-        wrapper.unmount();
-    });
-
-    it('a clear commit callback returning false does not swallow Enter', () => {
-        const wrapper = mount(Harness, {
-            props: {overrides: {clearEntry: () => true, onClearCommit: () => false, listLength: () => 2}},
-        });
-
-        api.toggle();
-        api.onKey(key('ArrowDown'));
-        expect(api.clearHighlighted.value).toBe(true);
-
-        const enter = key('Enter');
-        api.onKey(enter);
-        expect(enter.defaultPrevented).toBe(false);
-        wrapper.unmount();
-    });
-
+describe('useListbox clear entry on an empty list', () => {
     it('ArrowDown stays on the clear entry when the option list is empty', () => {
-        const wrapper = mount(Harness, {
-            props: {overrides: {clearEntry: () => true, onClearCommit: () => true, listLength: () => 0}},
-        });
+        const wrapper = mount(Harness, {props: {overrides: {clearEntry: () => true, listLength: () => 0}}});
 
         api.toggle();
         api.onKey(key('ArrowDown')); // → clear entry
@@ -251,7 +218,7 @@ describe('useListbox clear-entry option combinations', () => {
         expect(api.clearHighlighted.value).toBe(true);
 
         const enter = key('Enter');
-        api.onKey(enter); // the callback commits → swallowed
+        api.onKey(enter); // the entry commits → swallowed
         expect(enter.defaultPrevented).toBe(true);
         wrapper.unmount();
     });
@@ -356,9 +323,7 @@ describe('useListbox size middleware — the anchor tracks the trigger width', (
     });
 });
 
-describe('useListbox without the optional hooks', () => {
-    // SingleSelect passes every hook; the controls that leave one out are not in this package yet,
-    // so what the composable does without each is pinned here.
+describe('useListbox edges of the keyboard skeleton', () => {
     it('closed, a key openKeys rejects opens nothing and is not swallowed', () => {
         const wrapper = mount(Harness, {props: {overrides: {listLength: () => 3}}});
 
@@ -367,18 +332,6 @@ describe('useListbox without the optional hooks', () => {
 
         expect(api.open.value).toBe(false);
         expect(event.defaultPrevented).toBe(false);
-        wrapper.unmount();
-    });
-
-    it('without committedIndex, a closed search starts at the top', () => {
-        const wrapper = mount(Harness, {
-            props: {overrides: {listLength: () => 3, typeaheadLabels: () => ['Banana', 'Blue moon', 'Berry']}},
-        });
-
-        api.onKey(key('b'));
-
-        expect(api.open.value).toBe(true);
-        expect(api.pointer.value).toBe(0);
         wrapper.unmount();
     });
 
@@ -395,18 +348,6 @@ describe('useListbox without the optional hooks', () => {
         wrapper.unmount();
     });
 
-    it('without typeahead labels, an open list leaves a printable key alone', () => {
-        const wrapper = mount(Harness, {props: {overrides: {listLength: () => 3}}});
-
-        api.toggle();
-        const event = key('b');
-        api.onKey(event);
-
-        expect(api.pointer.value).toBe(-1);
-        expect(event.defaultPrevented).toBe(false);
-        wrapper.unmount();
-    });
-
     it('ArrowDown on the last option stays there', () => {
         const wrapper = mount(Harness, {props: {overrides: {listLength: () => 3}}});
 
@@ -414,24 +355,6 @@ describe('useListbox without the optional hooks', () => {
         for (let press = 0; press < 4; press++) api.onKey(key('ArrowDown'));
 
         expect(api.pointer.value).toBe(2);
-        wrapper.unmount();
-    });
-
-    it('ArrowUp from the first option with no clear entry does not park the highlight on one that appears later', () => {
-        // A nullish answer is "no entry". Were ArrowUp to read it as an entry, the clear entry would
-        // light up the moment one renders.
-        const entry = ref<boolean | undefined>(undefined);
-        const wrapper = mount(Harness, {
-            props: {overrides: {listLength: () => 3, clearEntry: () => entry.value as boolean}},
-        });
-
-        api.toggle();
-        api.onKey(key('ArrowDown'));
-        api.onKey(key('ArrowUp'));
-        entry.value = true;
-
-        expect(api.pointer.value).toBe(-1);
-        expect(api.clearHighlighted.value).toBe(false);
         wrapper.unmount();
     });
 });
