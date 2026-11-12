@@ -1192,9 +1192,10 @@ for any press inside the list incl. group headers; Space commits like Enter (WR-
 a held Space acts once, comboboxes keep Space; the active option scrolls into view (WR-2903); version 0.17.3,
 CHANGELOG, docs; 601 unit + 206 browser tests) and `ui-form/n-select-fixes` @d3acc7f (the port for SingleSelect, off
 #353's branch, Stryker 96.78). At #353's merge: one branch off main merging both, merge main in, rerun all gates incl.
-`detect:publishable` (expects ui-inputs 0.17.2 → 0.17.3), one PR. Open question for Marcel: convert ui-inputs'
-typeahead "thousandth repeat" timing test (real-clock ratio, the only plausible cause of one unreproduced failure in 33
-runs) to a work counter, as its own comment prescribes, as a commit in that PR.
+`detect:publishable` (expects ui-inputs 0.17.2 → 0.17.3), one PR. The one ui-inputs failure seen while building the patch
+was LOCAL, on uncommitted mid-edit code; its output was overwritten, so the test is unknown and "WSL clock" was a guess.
+Not a flake finding: the committed heads passed 33+ runs since (re-checked 11-12: 601 unit, 206 browser, ui-form 164).
+No test change for it. If ui-inputs fails again, the failing test's name decides; keep each run's log in its own file.
 
 ### End of 2026-11-12, late (read this first after a compaction)
 
