@@ -7,7 +7,7 @@
         :aria-multiselectable="multiselectable || undefined"
     >
         <!-- The committing clear entry (a select's `clearLabel`) renders OUTSIDE the index
-             space — its own <li> above the rows, its own id (`${id}-clear`), its own highlight
+             space — its own <li> above the options, its own id (`${id}-clear`), its own highlight
              flag — so every option index below keeps mapping 1:1 onto the parent's list. It is an
              option to assistive tech (role="option" inside the listbox); aria-selected marks the
              committed-null state. -->
@@ -30,66 +30,32 @@
              option (the APG no-results pattern) satisfies both — it is a valid listbox child and
              gives the listbox its required option, while aria-disabled marks it non-selectable
              (the pointer never lands on it — useListbox has no navigable index when empty). -->
-        <li v-if="!hasOptions" :class="`${variant}__empty`" role="option" aria-disabled="true">{{ emptyText }}</li>
-        <!-- The row sequence is `rows`: flat controls pass an all-option run (no headers); the
-             grouped controls interleave header/boundary rows. `groupedRuns` collapses that into
-             named/headerless runs. APG listbox grouping pattern: a NAMED group uses role="group"
-             + aria-label on the inner <ul> so the group name is announced to AT; the <li> wrapper
-             carries role="presentation" (html-aria disallows role="group" on <li>), and the visual
-             header span is aria-hidden to avoid double-reading. Options without a header (flat
-             controls, or `header:false` groups) render flat — no group wrapper. The run key mixes
-             the group's identity (its header, or the flat marker) WITH its position, so a filter
-             that drops a group never reuses a header node for a different group.
-             The option row itself is the shared `ListboxOption` (its markup is byte-identical
-             across the family); the index-scoped `option` slot forwards through so `T` never
-             crosses this boundary — the parent re-scopes the index into its typed payload and owns
-             the slotless fallback (the labelOf text). Highlight/selection chrome stays on the <li>
-             inside ListboxOption, outside the slot, so custom content never re-creates it. -->
-        <template v-for="(run, ri) in groupedRuns" :key="run.header !== null ? `h${ri}:${run.header}` : `b${ri}`">
-            <li v-if="run.header !== null" :class="`${variant}__group`" role="presentation">
-                <span :class="`${variant}__group-header`" aria-hidden="true">{{ run.header }}</span>
-                <ul role="group" :aria-label="run.header">
-                    <ListboxOption
-                        v-for="index in run.indices"
-                        :key="keys[index]"
-                        :index="index"
-                        :variant="variant"
-                        :option-id="optionId"
-                        :active="pointer === index"
-                        :muted="isMuted(index)"
-                        :selected="isSelected(index)"
-                        @hover="emit('hover', $event)"
-                        @commit="emit('commit', $event)"
-                    >
-                        <slot name="option" :index="index" />
-                    </ListboxOption>
-                </ul>
-            </li>
-            <template v-else>
-                <ListboxOption
-                    v-for="index in run.indices"
-                    :key="keys[index]"
-                    :index="index"
-                    :variant="variant"
-                    :option-id="optionId"
-                    :active="pointer === index"
-                    :muted="isMuted(index)"
-                    :selected="isSelected(index)"
-                    @hover="emit('hover', $event)"
-                    @commit="emit('commit', $event)"
-                >
-                    <slot name="option" :index="index" />
-                </ListboxOption>
-            </template>
-        </template>
+        <li v-if="keys.length === 0" :class="`${variant}__empty`" role="option" aria-disabled="true">
+            {{ emptyText }}
+        </li>
+        <!-- The option row itself is the shared `ListboxOption`; the index-scoped `option` slot
+             forwards through so `T` never crosses this boundary — the parent re-scopes the index
+             into its typed payload and owns the slotless fallback (the labelOf text).
+             Highlight/selection chrome stays on the <li> inside ListboxOption, outside the slot, so
+             custom content never re-creates it. -->
+        <ListboxOption
+            v-for="(key, index) in keys"
+            :key="key"
+            :index="index"
+            :variant="variant"
+            :option-id="optionId"
+            :active="pointer === index"
+            :muted="isMuted(index)"
+            :selected="isSelected(index)"
+            @hover="emit('hover', $event)"
+            @commit="emit('commit', $event)"
+        >
+            <slot name="option" :index="index" />
+        </ListboxOption>
     </ul>
 </template>
 
 <script setup lang="ts">
-import {computed} from 'vue';
-
-import type {GroupRow} from '../internal/group-rows';
-
 import ListboxOption from './ListboxOption.vue';
 
 /**
@@ -99,16 +65,8 @@ import ListboxOption from './ListboxOption.vue';
  * by the class-prefix `variant`, so the `role="listbox"` / `role="option"` / position-keyed
  * `optionId` / committed-value `aria-selected` semantics stay byte-identical across the family.
  *
- * Flat and grouped selects render through this single component: the ONLY difference is the
- * `rows` a parent hands down. A flat control (SingleSelect) passes a run of all-option rows (no
- * headers, rendered flat); a grouped control interleaves `header`/`boundary` rows and this
- * component folds them into named `role="group"` runs. `boundary` closes the open run so a
- * `header:false` group after a named one renders flat instead of being absorbed into the
- * preceding group.
- *
  * Entirely index-based, mirroring `useListbox`: the option type `T` never crosses this
- * boundary. The parent hands down `rows` + `keys` derived from ITS list (SingleSelect's
- * `sorted`; a filtering select's filtered list; a grouped one's flattened groups) plus
+ * boundary. The parent hands down `keys` derived from ITS list (SingleSelect's `sorted`) plus
  * index-keyed lookups, and receives `hover`/`commit` back by index — the parent stays the sole
  * owner of `pointer` and of the commit disposition. Per-option content flows through the
  * index-scoped `option` slot; the clear entry (`clear*` props) sits above the list, outside the
@@ -121,7 +79,6 @@ import ListboxOption from './ListboxOption.vue';
  * own width. This component renders no positioning of its own and takes no floating-ui styles.
  */
 const {
-    rows,
     keys,
     pointer,
     listboxId,
@@ -137,11 +94,8 @@ const {
     clearActive = false,
     clearSelected = false,
 } = defineProps<{
-    /** the render-order row sequence: an all-option run for flat controls, or a header/option/
-     *  boundary mix for the grouped ones. */
-    rows: GroupRow[];
-    /** stable `v-for` keys (stringified option ids), indexed by option index — parallel to the
-     *  parent's flattened option list. */
+    /** stable `v-for` keys (stringified option ids), indexed by option index — one per option, in
+     *  the parent's list order. */
     keys: string[];
     /** the highlighted index (`-1` for none) — owned by the parent, moved via `hover`. */
     pointer: number;
@@ -178,30 +132,4 @@ const {
 }>();
 
 const emit = defineEmits<{hover: [index: number]; commit: [index: number]; clearHover: []; clearCommit: []}>();
-
-const hasOptions = computed(() => rows.some((row) => row.type === 'option'));
-
-// Collapse the flat GroupRow[] into runs keyed by header. Named runs use role="group"; runs
-// without a header (a flat control's whole list, or a `header:false` group) render options flat
-// in the listbox. A `boundary` row closes the open run so the following headerless options start
-// their own run (via the `!current` path) rather than being absorbed into a preceding group.
-const groupedRuns = computed(() => {
-    const runs: {header: string | null; indices: number[]}[] = [];
-    let current: {header: string | null; indices: number[]} | null = null;
-    for (const row of rows) {
-        if (row.type === 'header') {
-            current = {header: row.text, indices: []};
-            runs.push(current);
-        } else if (row.type === 'boundary') {
-            current = null;
-        } else {
-            if (!current) {
-                current = {header: null, indices: []};
-                runs.push(current);
-            }
-            current.indices.push(row.index);
-        }
-    }
-    return runs;
-});
 </script>

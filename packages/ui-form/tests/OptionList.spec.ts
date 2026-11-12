@@ -3,18 +3,13 @@ import {mount} from '@vue/test-utils';
 import {describe, expect, it} from 'vitest';
 import {h} from 'vue';
 
-import type {GroupRow} from '../src/internal/group-rows';
-
 import OptionList from '../src/components/OptionList.vue';
 
 const LABELS = ['Apricot', 'Banana', 'Cherry', 'Damson'];
 
-const optionRows = (...indices: number[]): GroupRow[] => indices.map((index) => ({type: 'option', index}));
-
 const mountList = (props: Record<string, unknown> = {}) =>
     mount(OptionList, {
         props: {
-            rows: optionRows(0, 1, 2, 3),
             keys: LABELS,
             pointer: -1,
             listboxId: 'fruit-listbox',
@@ -32,14 +27,13 @@ const mountList = (props: Record<string, unknown> = {}) =>
 const texts = (elements: {text: () => string}[]) => elements.map((element) => element.text());
 
 describe('OptionList', () => {
-    it('renders an all-option run flat in the listbox, with no group', () => {
+    it('renders every option in the listbox, in order', () => {
         const wrapper = mountList();
         const listbox = wrapper.find('[role="listbox"]');
 
         expect(listbox.attributes('id')).toBe('fruit-listbox');
         expect(listbox.attributes('aria-label')).toBe('Fruits');
         expect(listbox.classes()).toContain('ui-select__menu');
-        expect(wrapper.find('[role="group"]').exists()).toBe(false);
         expect(texts(wrapper.findAll('[role="listbox"] > [role="option"]'))).toEqual(LABELS);
         expect(wrapper.findAll('[role="option"]').map((option) => option.attributes('id'))).toEqual([
             'fruit-opt-0',
@@ -49,47 +43,7 @@ describe('OptionList', () => {
         ]);
     });
 
-    it('puts the options after a header in a group named by it, the visible header hidden from assistive tech', () => {
-        const wrapper = mountList({
-            rows: [
-                {type: 'header', text: 'Stone fruit'},
-                ...optionRows(0, 2),
-                {type: 'header', text: 'Other'},
-                ...optionRows(1),
-            ],
-        });
-        const groups = wrapper.findAll('[role="group"]');
-
-        expect(groups.map((group) => group.attributes('aria-label'))).toEqual(['Stone fruit', 'Other']);
-        expect(texts(groups[0].findAll('[role="option"]'))).toEqual(['Apricot', 'Cherry']);
-        expect(texts(groups[1].findAll('[role="option"]'))).toEqual(['Banana']);
-        const wrapperItem = wrapper.find('.ui-select__group');
-        expect(wrapperItem.attributes('role')).toBe('presentation');
-        expect(wrapperItem.find('.ui-select__group-header').attributes('aria-hidden')).toBe('true');
-        expect(wrapperItem.find('.ui-select__group-header').text()).toBe('Stone fruit');
-    });
-
-    it('starts a flat run after a boundary, so its options stay out of the group before it', () => {
-        const wrapper = mountList({
-            rows: [{type: 'header', text: 'Stone fruit'}, ...optionRows(0), {type: 'boundary'}, ...optionRows(1, 2)],
-        });
-
-        expect(texts(wrapper.find('[role="group"]').findAll('[role="option"]'))).toEqual(['Apricot']);
-        expect(texts(wrapper.findAll('[role="listbox"] > [role="option"]'))).toEqual(['Banana', 'Cherry']);
-    });
-
-    it('emits hover and commit with the index of an option inside a group', async () => {
-        const wrapper = mountList({rows: [{type: 'header', text: 'Other'}, ...optionRows(3)]});
-        const option = wrapper.find('#fruit-opt-3');
-
-        await option.trigger('mouseover');
-        await option.trigger('click');
-
-        expect(wrapper.emitted('hover')).toEqual([[3]]);
-        expect(wrapper.emitted('commit')).toEqual([[3]]);
-    });
-
-    it('emits hover and commit with the index of a flat option', async () => {
+    it('emits hover and commit with the index of an option', async () => {
         const wrapper = mountList();
         const option = wrapper.find('#fruit-opt-1');
 
@@ -118,11 +72,8 @@ describe('OptionList', () => {
         ]);
     });
 
-    it.each([
-        ['no rows', []],
-        ['only a header', [{type: 'header', text: 'Stone fruit'}]],
-    ])('shows the empty text as a disabled option with %s', (_, rows) => {
-        const wrapper = mountList({rows});
+    it('shows the empty text as a disabled option with no options', () => {
+        const wrapper = mountList({keys: []});
         const empty = wrapper.find('.ui-select__empty');
 
         expect(empty.text()).toBe('No fruit');
