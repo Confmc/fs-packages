@@ -15,3 +15,4 @@ export type {
     ValidationErrors,
 } from './form/types';
 export {default as NumberInput} from './components/NumberInput.vue';
+export {default as DateInput} from './components/DateInput.vue';
