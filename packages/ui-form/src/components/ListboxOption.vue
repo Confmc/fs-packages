@@ -6,7 +6,6 @@
         role="option"
         :aria-selected="selected"
         @mouseover="emit('hover', index)"
-        @mousedown.prevent
         @click="emit('commit', index)"
     >
         <slot />
@@ -27,12 +26,7 @@
  * and the commit disposition. Per-option content flows through the default slot; the parent
  * keeps the highlight/selection chrome on this `<li>`, outside the slot, so custom content
  * never re-creates it.
- *
- * `mousedown.prevent` keeps DOM focus on the trigger through a pointer pick. The row is not
- * focusable, so a mousedown on it would otherwise move focus to the body, and the user would
- * be left on nothing after the commit (APG select-only combobox: focus stays on the combobox).
- * Only the row's own default is cancelled: a mousedown on the listbox's scrollbar lands on the
- * `<ul>`, never here, so dragging it still scrolls.
+
  */
 const {index, optionId, active, muted, selected} = defineProps<{
     /** the option's position in the listbox index space — its identity for id/hover/commit. */

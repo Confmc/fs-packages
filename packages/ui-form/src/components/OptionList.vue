@@ -1,11 +1,10 @@
 <template>
-    <ul :id="listboxId" class="ui-select__menu" role="listbox" :aria-label="optionsLabel">
+    <ul :id="listboxId" class="ui-select__menu" role="listbox" :aria-label="optionsLabel" @mousedown="keepFocus">
         <!-- The committing clear entry (a select's `clearLabel`) renders OUTSIDE the index
              space — its own <li> above the options, its own id (`${id}-clear`), its own highlight
              flag — so every option index below keeps mapping 1:1 onto the parent's list. It is an
              option to assistive tech (role="option" inside the listbox); aria-selected marks the
-             committed-null state. Its mousedown default is cancelled for the same reason as an
-             option row's (ListboxOption): a pointer pick must leave focus on the trigger. -->
+             committed-null state. -->
         <li
             v-if="clearLabel !== undefined"
             :id="clearId"
@@ -14,7 +13,6 @@
             role="option"
             :aria-selected="clearSelected"
             @mouseover="emit('clearHover')"
-            @mousedown.prevent
             @click="emit('clearCommit')"
         >
             {{ clearLabel }}
@@ -115,4 +113,11 @@ const {
 }>();
 
 const emit = defineEmits<{hover: [index: number]; commit: [index: number]; clearHover: []; clearCommit: []}>();
+
+// A press anywhere inside the list (an option, the clear entry) keeps focus on the trigger: neither is
+// focusable, so the press would move focus to the body and leave the keyboard on nothing (APG: focus stays
+// on the combobox). A press on the listbox element itself is its scrollbar, which keeps its default.
+const keepFocus = (event: MouseEvent): void => {
+    if (event.target !== event.currentTarget) event.preventDefault();
+};
 </script>
