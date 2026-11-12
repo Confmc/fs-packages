@@ -21,9 +21,13 @@
         <!-- Native radios sharing one name: the browser provides the roving tabindex and the
              arrow-key selection (never hand-rolled here) — the component only mirrors the
              model from the native change event. -->
+        <!-- each option guards itself too: a disabled option inside an enabled group passes the fieldset's
+             guard, and a pointer on its label text (or a dispatched change on its radio) would reach the
+             consumer. The label's capture listener runs before both the radio and the fieldset. -->
         <label
             v-for="(option, index) in options"
             :key="String(option.id)"
+            v-guard-while-disabled="disabled || disabledOf(option)"
             class="ui-check ui-radio"
             :class="{'is-disabled': disabled || disabledOf(option)}"
         >
@@ -103,10 +107,10 @@ const disabledOf = (option: T): boolean => option.disabled === true;
 // has already moved the checked radio, so once the host has rendered every radio is set back to the
 // model — a declined or deferred change otherwise leaves the clicked one showing (WR-1922). The
 // radios are found from the one that changed: every radio sits inside this component's fieldset. A
-// disabled option takes no change, also not a dispatched one, which a browser runs on a disabled radio.
+// disabled option never gets here: its label's guard stops a dispatched change before the radio's listener.
 const onChange = (event: Event, option: T): void => {
     const fieldset = (event.currentTarget as HTMLElement).closest('fieldset') as HTMLFieldSetElement;
-    if (!disabledOf(option)) emit('update:modelValue', option.id);
+    emit('update:modelValue', option.id);
     void nextTick(() => {
         const radios = fieldset.querySelectorAll<HTMLInputElement>('.ui-radio__input');
         for (const [index, radio] of radios.entries()) radio.checked = modelValue === options[index].id;

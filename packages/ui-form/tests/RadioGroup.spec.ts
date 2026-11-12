@@ -175,17 +175,30 @@ describe('RadioGroup', () => {
         ]);
     });
 
-    it('takes no change on a disabled option, a dispatched one included, and sets its radio back', async () => {
+    it('takes no change on a disabled option, a dispatched one included', async () => {
         const wrapper = mountGroup({options: STOCK, modelValue: 1});
         const radios = wrapper.findAll<HTMLInputElement>('input[type="radio"]');
 
-        // A dispatched change runs on a disabled radio; a user's never fires.
-        radios[1].element.checked = true;
+        // A dispatched change runs on a disabled radio; a user's never fires. The option's guard stops it.
         dispatch(radios[1].element, new Event('change', {bubbles: true}));
         await wrapper.vm.$nextTick();
 
         expect(wrapper.emitted('update:modelValue')).toBeUndefined();
-        expect(radios.map((radio) => radio.element.checked)).toEqual([true, false, false]);
+    });
+
+    it('keeps a disabled option from the consumer inside an enabled group: a label click and a dispatched change', () => {
+        let clicks = 0;
+        let changes = 0;
+        const wrapper = mountGroup({options: STOCK, onClick: () => (clicks += 1), onChange: () => (changes += 1)});
+        const rows = wrapper.findAll('.ui-radio');
+
+        dispatch(rows[1].find('.ui-check__label').element, new MouseEvent('click', {bubbles: true, cancelable: true}));
+        dispatch(rows[1].find('input').element, new Event('change', {bubbles: true}));
+        expect([clicks, changes]).toEqual([0, 0]);
+
+        // an enabled option in the same group still reaches the consumer
+        dispatch(rows[0].find('.ui-check__label').element, new MouseEvent('click', {bubbles: true, cancelable: true}));
+        expect(clicks).toBeGreaterThan(0);
     });
 
     it('keeps a click on an option label from the consumer while disabled', () => {
