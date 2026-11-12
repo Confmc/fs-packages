@@ -7,6 +7,7 @@ export {default as FormLabel} from './components/FormLabel.vue';
 export {default as InputGroup} from './components/InputGroup.vue';
 export {default as NumberInput} from './components/NumberInput.vue';
 export {default as PasswordInput} from './components/PasswordInput.vue';
+export {default as Pressable} from './components/Pressable.vue';
 export {default as RadioGroup} from './components/RadioGroup.vue';
 export {default as SearchInput} from './components/SearchInput.vue';
 export {default as SingleSelect} from './components/SingleSelect.vue';
@@ -26,6 +27,4 @@ export type {
     ValidationErrors,
 } from './form/types';
 
-export type {LabelKey, SelectItem} from './types';
-
-export type {FieldAria, FieldBinding} from './types';
+export type {FieldAria, FieldBinding, LabelKey, SelectItem} from './types';
