@@ -9,7 +9,13 @@ import {describe, expect, it} from 'vitest';
 import {nextTick} from 'vue';
 
 import Checkbox from '../src/components/Checkbox.vue';
+import CheckboxGroup from '../src/components/CheckboxGroup.vue';
 import Switch from '../src/components/Switch.vue';
+
+const FRUITS = [
+    {id: 1, name: 'Watermelon'},
+    {id: 2, name: 'Apricot'},
+];
 
 // A bound listener is what makes the model controlled: with no `onUpdate:modelValue` at all,
 // `defineModel` keeps the value locally and the host never gets to decline.
@@ -59,4 +65,25 @@ describe.each([
     });
 });
 
-// CheckboxGroup's and RadioGroup's cases return with them.
+describe('CheckboxGroup — a change the host does not take', () => {
+    it('host declines — the member goes back to unchecked', async () => {
+        const wrapper = mount(CheckboxGroup, {
+            props: {
+                id: 'g',
+                label: 'Fruit',
+                options: FRUITS,
+                optionLabel: 'name',
+                modelValue: [] as number[],
+                'onUpdate:modelValue': decline,
+            },
+        });
+
+        await wrapper.findAll('input')[1].setValue(true);
+        await nextTick();
+
+        expect(wrapper.emitted('update:modelValue')).toEqual([[[2]]]);
+        expect(checkedOf(wrapper)).toEqual([false, false]);
+    });
+});
+
+// RadioGroup's cases return with it.
