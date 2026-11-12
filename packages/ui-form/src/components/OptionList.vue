@@ -1,11 +1,5 @@
 <template>
-    <ul
-        :id="listboxId"
-        :class="`${variant}__menu`"
-        role="listbox"
-        :aria-label="optionsLabel"
-        :aria-multiselectable="multiselectable || undefined"
-    >
+    <ul :id="listboxId" :class="`${variant}__menu`" role="listbox" :aria-label="optionsLabel">
         <!-- The committing clear entry (a select's `clearLabel`) renders OUTSIDE the index
              space — its own <li> above the options, its own id (`${id}-clear`), its own highlight
              flag — so every option index below keeps mapping 1:1 onto the parent's list. It is an
@@ -88,7 +82,6 @@ const {
     variant,
     optionsLabel,
     emptyText,
-    multiselectable = false,
     clearLabel,
     clearId,
     clearActive = false,
@@ -119,8 +112,6 @@ const {
     optionsLabel: string;
     /** shown when there are no navigable options. */
     emptyText: string;
-    /** marks the listbox `aria-multiselectable` (a multi-select) — absent, not "false", otherwise. */
-    multiselectable?: boolean;
     /** display string of the committing clear entry — absent means no entry renders. */
     clearLabel?: string;
     /** the clear entry's activedescendant id (`${id}-clear`, from `useListbox`). */

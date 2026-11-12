@@ -85,15 +85,6 @@ describe('OptionList', () => {
         expect(mountList().find('.ui-select__empty').exists()).toBe(false);
     });
 
-    it.each([
-        [true, 'true'],
-        [false, undefined],
-    ])('with multiselectable %s, aria-multiselectable is %s', (multiselectable, expected) => {
-        const wrapper = mountList({multiselectable});
-
-        expect(wrapper.find('[role="listbox"]').attributes('aria-multiselectable')).toBe(expected);
-    });
-
     describe('clear entry', () => {
         it('renders no entry without a clearLabel', () => {
             expect(mountList().find('.ui-select__clear').exists()).toBe(false);
