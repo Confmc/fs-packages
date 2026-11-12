@@ -10,7 +10,7 @@ import {useListbox} from '../src/composables/useListbox';
 
 // The component suites (SingleSelect's) exercise the composable's behaviour against
 // the REAL floating-ui. This suite pins the things they cannot see: the exact layout policy
-// handed to floating-ui (the family defaults, and the `floatingOptions` overrides), the
+// handed to floating-ui (the family defaults, and a given placement), the
 // hide()-middleware visibility gate (driven off a controlled `middlewareData`), and the
 // clear-entry option combinations no component produces (a rendered entry without a commit
 // callback). Middleware factories return opaque objects, so each is mocked to a marker
@@ -85,7 +85,7 @@ describe('useListbox floating options', () => {
             placement: 'bottom-start',
             middleware: [
                 {name: 'offset', value: 4},
-                {name: 'flip', config: {fallbackPlacements: undefined, flipAlignment: false}},
+                {name: 'flip', config: {flipAlignment: false}},
                 {name: 'shift', config: {padding: 8}},
                 {name: 'size', config: {apply: expect.any(Function)}},
                 {name: 'hide'},
@@ -94,51 +94,22 @@ describe('useListbox floating options', () => {
         wrapper.unmount();
     });
 
-    // With no fallback list and flipAlignment off, flip() tries only the opposite side at the same
-    // alignment: the default bottom-start falls back to top-start, and a given top-start to
-    // bottom-start. A given list would keep `top` from flipping below; flipAlignment left on would
-    // try top-end before bottom-start, so a given bottom-start would lay out unlike the default.
+    // With flipAlignment off, flip() tries only the opposite side at the same alignment: the
+    // default bottom-start falls back to top-start, and a given top-start to bottom-start.
+    // flipAlignment left on would try top-end before bottom-start, so a given bottom-start would
+    // lay out unlike the default.
     it.each([
         [undefined, 'bottom-start'],
         ['top-start', 'top-start'],
         ['top', 'top'],
     ] as const)('flips placement %s only to the opposite side, keeping its alignment', (placement, expected) => {
-        const wrapper = mount(Harness, {
-            props: {overrides: placement === undefined ? {} : {floatingOptions: {placement}}},
-        });
+        const wrapper = mount(Harness, {props: {overrides: placement === undefined ? {} : {placement}}});
 
         const config = lastFloatingConfig();
         expect(config?.placement).toBe(expected);
         expect(config?.middleware?.find((middleware) => middleware?.name === 'flip')).toEqual({
             name: 'flip',
-            config: {fallbackPlacements: undefined, flipAlignment: false},
-        });
-        wrapper.unmount();
-    });
-
-    it('honours every floatingOptions override', () => {
-        const wrapper = mount(Harness, {
-            props: {
-                overrides: {
-                    floatingOptions: {
-                        placement: 'top-end',
-                        offset: 12,
-                        fallbackPlacements: ['bottom-end'],
-                        shiftPadding: 2,
-                    },
-                },
-            },
-        });
-
-        expect(lastFloatingConfig()).toMatchObject({
-            placement: 'top-end',
-            middleware: [
-                {name: 'offset', value: 12},
-                {name: 'flip', config: {fallbackPlacements: ['bottom-end'], flipAlignment: false}},
-                {name: 'shift', config: {padding: 2}},
-                {name: 'size', config: {apply: expect.any(Function)}},
-                {name: 'hide'},
-            ],
+            config: {flipAlignment: false},
         });
         wrapper.unmount();
     });

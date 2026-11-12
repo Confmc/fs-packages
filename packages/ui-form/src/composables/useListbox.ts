@@ -12,25 +12,6 @@ import {ensureRefValueExists} from '../internal/reactivity';
  */
 type ElementRef = Readonly<Ref<HTMLElement | null>>;
 
-/**
- * Overrides for the floating-ui layout policy. Every value defaults to the family standard,
- * so the knob is a no-op until a consumer opts in.
- */
-export interface ListboxFloatingOptions {
-    /** floating-ui placement of the popup (default `'bottom-start'`). */
-    placement?: Placement;
-    /** `offset()` main-axis distance between reference and popup, in px (default `4`). */
-    offset?: number;
-    /**
-     * `flip()` fallback placements tried when the primary placement overflows. Default: only the
-     * opposite side at the same alignment (`bottom-start` → `top-start`, `top` → `bottom`), so a
-     * given placement lays out as the default one does; the other alignment is never tried.
-     */
-    fallbackPlacements?: Placement[];
-    /** `shift()` viewport padding, in px (default `8`). */
-    shiftPadding?: number;
-}
-
 export interface UseListboxOptions {
     /** the component root — click-outside is measured against it (the popup stays inside it). */
     root: ElementRef;
@@ -57,8 +38,12 @@ export interface UseListboxOptions {
     onDismiss: () => void;
     /** click-outside disposition. SingleSelect closes; a combobox may revert its text first. */
     onOutside: () => void;
-    /** floating-ui layout-policy overrides — layout is the caller's business, not the core's. */
-    floatingOptions?: ListboxFloatingOptions;
+    /**
+     * floating-ui placement of the popup (default `'bottom-start'`). With no room it flips to the
+     * opposite side at the same alignment (`bottom-start` → `top-start`), never to the other
+     * alignment.
+     */
+    placement?: Placement;
     /**
      * Whether a committing CLEAR ENTRY currently renders above the option list (the
      * `clearLabel` feature on SingleSelect). The entry lives OUTSIDE the index
@@ -118,7 +103,7 @@ export const useListbox = (options: UseListboxOptions) => {
         onCommit,
         onDismiss,
         onOutside,
-        floatingOptions = {},
+        placement = 'bottom-start',
         clearEntry,
         onClearCommit,
         typeaheadLabels,
@@ -405,14 +390,14 @@ export const useListbox = (options: UseListboxOptions) => {
         // autoUpdate already recomputes on ancestor scroll, which is what a fixed popup
         // needs to stay glued to its trigger.
         strategy: 'fixed',
-        placement: floatingOptions.placement ?? 'bottom-start',
+        placement,
         middleware: [
-            offset(floatingOptions.offset ?? 4),
-            // With no list, flip() falls back to the opposite side; `flipAlignment: false` keeps it
-            // from trying the other alignment first (top-end before bottom-start for `top-start`),
-            // so the default `bottom-start` falls back to `top-start` exactly as a given one does.
-            flip({fallbackPlacements: floatingOptions.fallbackPlacements, flipAlignment: false}),
-            shift({padding: floatingOptions.shiftPadding ?? 8}),
+            offset(4),
+            // flip() falls back to the opposite side; `flipAlignment: false` keeps it from trying
+            // the other alignment first (top-end before bottom-start for `top-start`), so the
+            // default `bottom-start` falls back to `top-start` exactly as a given one does.
+            flip({flipAlignment: false}),
+            shift({padding: 8}),
             // `elements.floating` is the `.ui-menu-anchor` box, not the <ul>. Sizing it to the
             // trigger is what keeps `--ui-menu-min-width: 100%` meaning "as wide as the
             // trigger" — the menu's percentage resolves against this box. Without it the

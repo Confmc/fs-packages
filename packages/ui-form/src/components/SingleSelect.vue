@@ -232,7 +232,7 @@ const {
     committedIndex: () => sorted.value.findIndex((option) => option.id === model.value),
     clearEntry: () => clearLabel !== undefined,
     onClearCommit: commitClear,
-    floatingOptions: {placement},
+    placement,
 });
 
 const choose = (option: T): void => {
