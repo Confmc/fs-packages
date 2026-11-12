@@ -340,6 +340,19 @@ describe('SingleSelect', () => {
         document.body.dispatchEvent(new MouseEvent('click', {bubbles: true}));
     });
 
+    it('leaves no typeahead timer behind when it unmounts mid-search', async () => {
+        vi.useFakeTimers();
+        const wrapper = mountSelect({});
+        const before = vi.getTimerCount();
+
+        // a key no option starts with: the search string waits for its timeout, the list stays closed
+        await wrapper.find('.ui-select__trigger').trigger('keydown', {key: 'z'});
+        wrapper.unmount();
+
+        expect(vi.getTimerCount()).toBe(before);
+        vi.useRealTimers();
+    });
+
     it('leaves the highlight on nothing when ArrowUp is pressed on the first option (no clear entry)', async () => {
         const wrapper = mountSelect({});
         const control = wrapper.find('.ui-select__trigger');
