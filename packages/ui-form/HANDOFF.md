@@ -1121,3 +1121,27 @@ its guard (its trigger is always a native button) and now splits attrs (class/st
 trigger). Pressable 307 lines (ui-inputs 368), Disclosure 100 (121). Coverage 100, Stryker 100 (only split-attrs;
 with #339's .vue mutation as a trial: Pressable 98.4, Disclosure 100). PR bodies must say: the "unchanged copy"
 commit leaves the copied internals uncovered (as #332's did); coverage is green from the next commit on.
+
+## 2026-11-12 (work box): the reviewer's round of 11-09
+
+**Approved, not merged (11):** #332 #333 #335 #336 #337 #338 #339 #340 #341 #342 #355. Merging is a team approval
+(CODEOWNERS: `fs-packages-admins`, crit-ai on it); publishing is the reviewer's npm-publish press. Our account cannot
+merge (push: false). Several approved PRs are BEHIND main: do not push to them uninvited (a push can drop approval).
+
+**Changes requested, done today, pushed, every thread answered with its commit:**
+- #343 PasswordInput: spellcheck/autocorrect/autocapitalize off (108cc8d); Caps Lock resets on blur (148f50a); the
+  notice is announced once, by its live region, not also via describedby (18054e7).
+- #344 RadioGroup: each option's label carries the disabled guard (`disabled || disabledOf(option)`), so a label
+  click / dispatched change on a disabled option in an enabled group stays out (657aa55); onChange's own check went;
+  the guard's docblock names what it guards today (0e52459).
+- #353 SingleSelect: the listbox core stripped to what SingleSelect uses (0543fd3..a2c0434): flat OptionList,
+  no multiselectable/variant/group-rows, only `placement`, onOutside → onDismiss, resetHighlight/openList not
+  returned, the always-passed hooks required, modified Home/End pass-through gone (Shift+Home now jumps). DOM
+  identical before/after. Stryker 96.75. WR-2588/WR-2903 untouched.
+
+**Consequence when #353 merges:** merging the stripped #353 into the select branches DELETES the pieces they use (they
+never edited those lines). Each must add back its piece: Combobox / MultiCombobox / GroupCombobox: typeaheadLabels and
+committedIndex optional, openList and resetHighlight returned, a modified-Home/End pass-through for the input;
+MultiSelect / MultiCombobox: multiselectable, clearEntry/onClearCommit optional, committedIndex optional; GroupSelect /
+GroupCombobox: rows/group-rows/grouped runs and ListboxOption's shared markup; all: a class prefix (variant) for their
+own `ui-*` classes. onOutside and the floating knobs do not come back (no caller passes them).
