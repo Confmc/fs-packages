@@ -356,3 +356,29 @@ describe('useListbox size middleware — the anchor tracks the trigger width', (
         wrapper.unmount();
     });
 });
+
+describe('useListbox active-row reveal (WR-2903)', () => {
+    it('reveals nothing, and throws nothing, while no popup element is mounted', async () => {
+        const wrapper = mount(Harness, {props: {overrides: {listLength: () => 2}}, attachTo: document.body});
+
+        api.openList();
+        api.onKey(key('ArrowDown'));
+        await nextTick();
+        expect(api.activeDescendant.value).toBe('harness-opt-0');
+        wrapper.unmount();
+    });
+
+    it('reveals nothing when the popup renders no row under the active id', async () => {
+        const reveal = vi.spyOn(HTMLElement.prototype, 'scrollIntoView');
+        const floating = shallowRef<HTMLElement | null>(document.createElement('div'));
+        const wrapper = mount(Harness, {props: {overrides: {floating, listLength: () => 2}}, attachTo: document.body});
+
+        api.openList();
+        api.onKey(key('ArrowDown'));
+        await nextTick();
+        expect(api.activeDescendant.value).toBe('harness-opt-0');
+        expect(reveal).not.toHaveBeenCalled();
+        reveal.mockRestore();
+        wrapper.unmount();
+    });
+});

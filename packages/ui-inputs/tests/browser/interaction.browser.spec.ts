@@ -1680,3 +1680,86 @@ describe('listbox family — Space on an open list (WR-2588)', () => {
         expect(listbox()).toBeNull();
     });
 });
+
+describe('listbox family — the active option scrolls into view (WR-2903)', () => {
+    // Taller than the 15rem menu; `Zebra` last, so typeahead `z` jumps to the clipped end.
+    const LONG: Fruit[] = [
+        ...Array.from({length: 39}, (_, index) => ({
+            id: index + 1,
+            name: `Option ${String(index + 1).padStart(2, '0')}`,
+        })),
+        {id: 40, name: 'Zebra'},
+    ];
+
+    /** Whether `element` lies wholly inside the listbox's visible (scrolled) box. */
+    const inView = (element: Element): boolean => {
+        const box = listbox().getBoundingClientRect();
+        const rect = element.getBoundingClientRect();
+        return rect.top >= box.top - 1 && rect.bottom <= box.bottom + 1;
+    };
+    const activeOption = (trigger: HTMLElement): HTMLElement =>
+        document.getElementById(trigger.getAttribute('aria-activedescendant') as string) as HTMLElement;
+
+    const tallPage = () => {
+        const spacer = document.createElement('div');
+        spacer.style.height = '3000px';
+        document.body.append(spacer);
+        cleanupTargets.push(spacer);
+    };
+
+    for (const member of LISTBOX_MEMBERS) {
+        it(`${member.name}: End, Home and ArrowDown keep the highlight visible without scrolling the page`, async () => {
+            tallPage();
+            const {trigger} = await renderMember(member, LONG);
+
+            if (member.input) {
+                await userEvent.click(trigger);
+            } else {
+                await userEvent.tab();
+                await userEvent.keyboard('{Enter}');
+            }
+            expect(listbox().scrollHeight).toBeGreaterThan(listbox().clientHeight);
+            const pageY = window.scrollY;
+
+            await userEvent.keyboard('{End}');
+            expect(activeOption(trigger).textContent?.trim()).toBe('Zebra');
+            expect(inView(activeOption(trigger))).toBe(true);
+
+            await userEvent.keyboard('{Home}');
+            expect(inView(activeOption(trigger))).toBe(true);
+
+            await userEvent.keyboard('{ArrowDown>25}');
+            expect(trigger.getAttribute('aria-activedescendant')).toBe('fruit-opt-25');
+            expect(inView(activeOption(trigger))).toBe(true);
+
+            await userEvent.keyboard('{ArrowUp>10}');
+            expect(inView(activeOption(trigger))).toBe(true);
+
+            expect(window.scrollY).toBe(pageY);
+            expect(document.activeElement).toBe(trigger);
+        });
+    }
+
+    it('SingleSelect: a typeahead jump onto a clipped option scrolls it into view', async () => {
+        const {trigger} = await renderMember(LISTBOX_MEMBERS[0], LONG);
+
+        await userEvent.tab();
+        await userEvent.keyboard('{Enter}');
+        await userEvent.keyboard('z');
+        expect(activeOption(trigger).textContent?.trim()).toBe('Zebra');
+        expect(inView(activeOption(trigger))).toBe(true);
+    });
+
+    it('SingleSelect: walking back up onto the clear entry scrolls it into view', async () => {
+        const {trigger} = await renderMember(LISTBOX_MEMBERS[0], LONG, {clearLabel: 'None'});
+
+        await userEvent.tab();
+        await userEvent.keyboard('{Enter}{ArrowDown}');
+        expect(trigger.getAttribute('aria-activedescendant')).toBe('fruit-clear');
+        // Scroll the entry out of sight by hand (a wheel would), then step off it and back.
+        listbox().scrollTop = listbox().scrollHeight;
+        await userEvent.keyboard('{ArrowDown}{ArrowUp}');
+        expect(trigger.getAttribute('aria-activedescendant')).toBe('fruit-clear');
+        expect(inView(document.getElementById('fruit-clear') as HTMLElement)).toBe(true);
+    });
+});
