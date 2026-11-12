@@ -8,6 +8,7 @@
                 v-model="model"
                 @keydown="checkCapsLock"
                 @keyup="checkCapsLock"
+                @blur="capsLock = false"
                 v-bind="controlAttrs($attrs)"
                 ref="input"
                 :id="id"
@@ -115,7 +116,8 @@ const capsLock = ref(false);
 const capsId = computed(() => `${id}-caps`);
 
 // A key says whether Caps Lock is on. A browser's autofill fires keydown and keyup as plain events, which
-// cannot say, so they leave the notice as it is.
+// cannot say, so they leave the notice as it is. Leaving the field drops it: Caps Lock can change while focus is
+// elsewhere, and the next key in the field says again.
 const checkCapsLock = (event: Event): void => {
     if (event instanceof KeyboardEvent) capsLock.value = event.getModifierState('CapsLock');
 };

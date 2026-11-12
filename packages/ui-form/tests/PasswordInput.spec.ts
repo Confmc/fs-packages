@@ -136,6 +136,18 @@ describe('PasswordInput', () => {
         wrapper.unmount();
     });
 
+    it('drops the notice when the field loses focus, so it never outlives the typing it was about', async () => {
+        const wrapper = mountPassword();
+        const notice = wrapper.find('.ui-password__caps');
+
+        await pressKey(wrapper, 'keydown', true);
+        expect(notice.text()).toBe('Caps Lock is on');
+        await wrapper.find('input').trigger('blur');
+
+        expect(notice.text()).toBe('');
+        wrapper.unmount();
+    });
+
     it('leaves the notice as it is on an autofill key event, which cannot say', async () => {
         const wrapper = mountPassword();
         await pressKey(wrapper, 'keydown', true);
