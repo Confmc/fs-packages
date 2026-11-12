@@ -23,7 +23,7 @@
                 :disabled="disabled"
                 :aria-required="required || undefined"
                 :aria-invalid="invalid || undefined"
-                :aria-describedby="describedbyWithCaps"
+                :aria-describedby="describedby"
             />
             <!-- a toggle: one name, its state in aria-pressed. A pointer press focuses the input, not the toggle,
                  so typing goes on in the field; the keyboard reaches the toggle by Tab -->
@@ -54,7 +54,8 @@
             </button>
             <ErrorIcon v-if="invalid" />
         </span>
-        <!-- always there, so a screen reader announces the notice when its text arrives -->
+        <!-- always there, so a screen reader announces the notice when its text arrives; the live region alone
+             carries it (also naming it in the input's describedby would read it twice) -->
         <span :id="capsId" class="ui-password__caps" role="status">{{ capsLock ? capsLockText : '' }}</span>
     </span>
 </template>
@@ -121,11 +122,6 @@ const capsId = computed(() => `${id}-caps`);
 const checkCapsLock = (event: Event): void => {
     if (event instanceof KeyboardEvent) capsLock.value = event.getModifierState('CapsLock');
 };
-
-// The notice is read with the field while it shows.
-const describedbyWithCaps = computed(
-    () => [describedby, capsLock.value && capsId.value].filter(Boolean).join(' ') || undefined,
-);
 
 const input = useTemplateRef<HTMLInputElement>('input');
 onMounted(() => {

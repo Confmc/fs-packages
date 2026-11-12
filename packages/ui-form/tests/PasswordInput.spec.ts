@@ -105,7 +105,7 @@ describe('PasswordInput', () => {
         wrapper.unmount();
     });
 
-    it('shows the Caps Lock notice while a key says it is on, and reads it with the field', async () => {
+    it('shows the Caps Lock notice in a live region while a key says it is on, and keeps it out of describedby', async () => {
         const wrapper = mountPassword({describedby: 'password-error', capsLockText: 'Capslock staat aan'});
         const input = wrapper.find('input');
         const notice = wrapper.find('.ui-password__caps');
@@ -116,23 +116,20 @@ describe('PasswordInput', () => {
         expect(input.attributes('aria-describedby')).toBe('password-error');
 
         await pressKey(wrapper, 'keydown', true);
+        // announced once, by the live region: as a describedby target it would be read a second time
         expect(notice.text()).toBe('Capslock staat aan');
-        expect(input.attributes('aria-describedby')).toBe('password-error password-caps');
+        expect(input.attributes('aria-describedby')).toBe('password-error');
 
         await pressKey(wrapper, 'keyup', false);
         expect(notice.text()).toBe('');
-        expect(input.attributes('aria-describedby')).toBe('password-error');
         wrapper.unmount();
     });
 
-    it('describes the field by the notice alone without a message, and by nothing while it is off', async () => {
+    it('leaves describedby off while the notice shows and the field has no message', async () => {
         const wrapper = mountPassword();
-        const input = wrapper.find('input');
-
-        expect(input.attributes()).not.toHaveProperty('aria-describedby');
         await pressKey(wrapper, 'keyup', true);
 
-        expect(input.attributes('aria-describedby')).toBe('password-caps');
+        expect(wrapper.find('input').attributes()).not.toHaveProperty('aria-describedby');
         wrapper.unmount();
     });
 
