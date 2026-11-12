@@ -1184,3 +1184,14 @@ select, and a missing named export kills the whole route): re-run after #353. **
 the port** (beside the reviewer's WR-2588 Space, WR-2903 scrollIntoView): a MOUSE pick of an option or the clear entry
 leaves focus on body (no mousedown.prevent / no focus back to the trigger; APG returns it); Home skips the clear
 entry; Tab does not pick the active option. Settled: opening on a value starts at the top (emmie parity).
+
+**Inherited select defects, prepared as ONE patch PR (decided 2026-11-12):** ui-inputs 0.17.3 + its ui-form port in a
+single PR (ADR-0043 Amendment 1 § 5: the fix PR carries its port), opened once #353 merges (the port needs SingleSelect
+on main). Branches on fork, both green: `ui-inputs/select-fixes` @966bc41 (all six selects: focus stays on the trigger
+for any press inside the list incl. group headers; Space commits like Enter (WR-2588), Ctrl/Alt/Meta pass through,
+a held Space acts once, comboboxes keep Space; the active option scrolls into view (WR-2903); version 0.17.3,
+CHANGELOG, docs; 601 unit + 206 browser tests) and `ui-form/n-select-fixes` @d3acc7f (the port for SingleSelect, off
+#353's branch, Stryker 96.78). At #353's merge: one branch off main merging both, merge main in, rerun all gates incl.
+`detect:publishable` (expects ui-inputs 0.17.2 → 0.17.3), one PR. Open question for Marcel: convert ui-inputs'
+typeahead "thousandth repeat" timing test (real-clock ratio, the only plausible cause of one unreproduced failure in 33
+runs) to a work counter, as its own comment prescribes, as a commit in that PR.
