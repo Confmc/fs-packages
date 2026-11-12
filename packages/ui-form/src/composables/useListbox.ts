@@ -15,7 +15,7 @@ type ElementRef = Readonly<Ref<HTMLElement | null>>;
 export interface UseListboxOptions {
     /** the component root — click-outside is measured against it (the popup stays inside it). */
     root: ElementRef;
-    /** the floating-ui reference element (the trigger button, or a combobox's input). */
+    /** the floating-ui reference element (the trigger button). */
     reference: ElementRef;
     /** the floating-ui floating element (the listbox popup). */
     floating: ElementRef;
@@ -23,15 +23,15 @@ export interface UseListboxOptions {
     id: () => string;
     /** whether the control is disabled — the keyboard path guards on it, as a getter so it stays live. */
     disabled: () => boolean;
-    /** length of the currently-rendered option list (SingleSelect's `sorted`, or a filtered list). */
+    /** length of the currently-rendered option list (SingleSelect's `sorted`). */
     listLength: () => number;
     /** whether a key pressed while CLOSED should open the list (SingleSelect: Enter/ArrowDown/Space). */
     openKeys: (key: string) => boolean;
     /**
      * Commit the option at `index`; returns whether a commit actually happened, which is what
      * decides whether Enter is `preventDefault`-ed. The callback owns the read-through-a-local
-     * race guard (the array read) AND the close decision — the composable NEVER closes on commit,
-     * so a multi-select callback can toggle membership and stay open while SingleSelect's closes.
+     * race guard (the array read) AND the close decision: the composable NEVER closes on commit,
+     * so the caller decides (SingleSelect's closes).
      */
     onCommit: (index: number) => boolean;
     /** dismiss the list (Escape, Tab, or a click outside the root). SingleSelect closes. */
@@ -124,7 +124,7 @@ export const useListbox = (options: UseListboxOptions) => {
     // Owned here so a future consumer cannot forget the `-1` — a stale pointer would resurface
     // as a phantom highlight (and a phantom aria-activedescendant) on the next open. The
     // composable still never calls this on commit: closing after a commit stays the caller's
-    // decision (`onCommit` — a multi-select toggles and stays open).
+    // decision (`onCommit`).
     let typed = '';
     // The first key, folded. Not `typed[0]`: a fold can be two code units (İ → i̇).
     let first = '';
@@ -219,7 +219,7 @@ export const useListbox = (options: UseListboxOptions) => {
     const optionId = (index: number): string => `${id()}-opt-${index}`;
     // Absent (not empty) when there is nothing focused — a dangling IDREF is worse than none.
     // The upper bound is load-bearing: the rendered list can shrink while the listbox is open
-    // (a reactive `options` prop reloading, or a combobox filter narrowing), leaving `pointer`
+    // (a reactive `options` prop reloading), leaving `pointer`
     // past the end.
     const activeDescendant = computed(() => {
         if (!open.value) return undefined;
