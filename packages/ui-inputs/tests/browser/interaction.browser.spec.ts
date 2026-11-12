@@ -359,13 +359,13 @@ describe('MultiCombobox — input-as-trigger, real focus choreography', () => {
         await userEvent.keyboard('ma'); // filter → Mango
         expect(input.value).toBe('ma');
 
-        // A real click lands on a non-focusable <li>, which genuinely drops DOM focus off
-        // the input (the part happy-dom cannot prove) — the component must pull it back.
+        // A real click lands on a non-focusable <li>; the row cancels its mousedown, so DOM focus
+        // never leaves the input (the part happy-dom cannot prove).
         await userEvent.click(optionAt(0));
         expect(model.value).toEqual([3]); // Mango toggled in
         expect(menu()).not.toBeNull(); // menu stays open
         expect(input.value).toBe(''); // query cleared — the full list is re-offered
-        expect(document.activeElement).toBe(input); // focus returned to the input
+        expect(document.activeElement).toBe(input); // focus still on the input
     });
 
     it('real Backspace with an empty query pops the last chip', async () => {
@@ -1551,5 +1551,83 @@ describe('Pressable — a disabled control and a focusable DESCENDANT', () => {
 
         expect(keydowns.value).toBe(1);
         expect(keyups.value).toBe(1);
+    });
+});
+
+// The six listbox controls, for the defects their shared core carried (focus after a mouse pick,
+// Space on an open list, the active option scrolled into view). `input` marks the comboboxes,
+// whose trigger is a text input that owns Space; `multi` marks the toggle-and-stay-open pair.
+const LISTBOX_MEMBERS = [
+    {name: 'SingleSelect', component: SingleSelect, grouped: false, input: false, multi: false, clear: true},
+    {name: 'MultiSelect', component: MultiSelect, grouped: false, input: false, multi: true, clear: false},
+    {name: 'GroupSelect', component: GroupSelect, grouped: true, input: false, multi: false, clear: true},
+    {name: 'Combobox', component: Combobox, grouped: false, input: true, multi: false, clear: true},
+    {name: 'MultiCombobox', component: MultiCombobox, grouped: false, input: true, multi: true, clear: false},
+    {name: 'GroupCombobox', component: GroupCombobox, grouped: true, input: true, multi: false, clear: true},
+] as const;
+type ListboxMember = (typeof LISTBOX_MEMBERS)[number];
+
+/** Render a member with a real v-model over `options` (split into groups for the grouped pair). */
+const renderMember = async (member: ListboxMember, options: Fruit[] = FRUITS, props: Record<string, unknown> = {}) => {
+    const groups = [
+        {text: 'First', options: options.slice(0, Math.ceil(options.length / 2))},
+        {text: 'Second', options: options.slice(Math.ceil(options.length / 2))},
+    ];
+    const model = ref<unknown>(member.multi ? [] : null);
+    await render(
+        defineComponent(
+            () => () =>
+                h(member.component as never, {
+                    ...(member.grouped ? {groups} : {options}),
+                    label: 'name',
+                    id: 'fruit',
+                    ...props,
+                    modelValue: model.value,
+                    'onUpdate:modelValue': (value: unknown) => {
+                        model.value = value;
+                    },
+                }),
+        ),
+    );
+    return {model, trigger: document.getElementById('fruit') as HTMLElement};
+};
+
+const listbox = (): HTMLElement => document.querySelector('[role="listbox"]') as HTMLElement;
+
+describe('listbox family — a mouse pick keeps focus on the trigger', () => {
+    for (const member of LISTBOX_MEMBERS) {
+        it(`${member.name}: a real click on an option leaves focus on the ${member.input ? 'input' : 'trigger button'}`, async () => {
+            const {model, trigger} = await renderMember(member);
+
+            await userEvent.click(trigger);
+            expect(document.activeElement).toBe(trigger);
+            expect(listbox()).not.toBeNull();
+
+            await userEvent.click(optionAt(0));
+            expect(model.value).toEqual(member.multi ? [1] : 1);
+            expect(document.activeElement).toBe(trigger);
+        });
+
+        if (member.clear) {
+            it(`${member.name}: a real click on the clear entry leaves focus on the trigger`, async () => {
+                const {model, trigger} = await renderMember(member, FRUITS, {clearLabel: 'None'});
+                model.value = 1;
+
+                await userEvent.click(trigger);
+                await userEvent.click(document.getElementById('fruit-clear') as HTMLElement);
+                expect(model.value).toBeNull();
+                expect(document.activeElement).toBe(trigger);
+            });
+        }
+    }
+
+    it('MultiSelect: a real click on a chip-remove button still removes the chip', async () => {
+        const {model} = await renderMember(LISTBOX_MEMBERS[1]);
+        model.value = [2, 3];
+        await nextTick();
+
+        const remove = document.querySelector('.ui-multiselect__chip-remove') as HTMLButtonElement;
+        await userEvent.click(remove);
+        expect(model.value).toEqual([3]);
     });
 });

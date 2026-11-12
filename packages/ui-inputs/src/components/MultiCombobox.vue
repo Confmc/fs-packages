@@ -246,8 +246,9 @@ const toggleValue = (value: T['id']): void => {
 // Both keyboard (Enter via useListbox) and pointer (OptionList `commit`) funnel through this
 // one guard. Toggle-in-place: a commit flips membership and the menu STAYS OPEN. The
 // multi-combobox choreography on top (kendo's searchable mode): the query clears so the
-// full list is re-offered, and DOM focus returns to the input (a pointer commit lands on a
-// non-focusable <li> and would otherwise drop focus to the body). The highlight resets only
+// full list is re-offered, and DOM focus is on the input afterwards. A pointer pick no longer
+// moves focus at all (the option row cancels its mousedown); the refocus stays for any path that
+// still drops it, such as a touch browser that moves focus anyway. The highlight resets only
 // when clearing the query actually changed the list — an unfiltered keyboard walk keeps its
 // position, so Enter can toggle neighbouring options without restarting from the top.
 // Read through a local rather than indexing blind: the clamp watcher normally keeps
