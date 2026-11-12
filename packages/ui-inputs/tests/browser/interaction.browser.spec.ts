@@ -1631,3 +1631,52 @@ describe('listbox family — a mouse pick keeps focus on the trigger', () => {
         expect(model.value).toEqual([3]);
     });
 });
+
+describe('listbox family — Space on an open list (WR-2588)', () => {
+    for (const member of LISTBOX_MEMBERS.filter((candidate) => !candidate.input)) {
+        it(`${member.name}: Space commits the active option${member.multi ? ' and the list stays open' : ' and closes'}`, async () => {
+            const {model, trigger} = await renderMember(member);
+
+            await userEvent.tab();
+            await userEvent.keyboard('{Enter}');
+            expect(listbox()).not.toBeNull();
+            await userEvent.keyboard('{ArrowDown}');
+
+            // One full press: the keyup must not click the button and toggle the list back.
+            await userEvent.keyboard(' ');
+            expect(model.value).toEqual(member.multi ? [1] : 1);
+            expect(document.activeElement).toBe(trigger);
+            if (member.multi) {
+                expect(listbox()).not.toBeNull();
+                await userEvent.keyboard(' ');
+                expect(model.value).toEqual([]);
+                expect(listbox()).not.toBeNull();
+            } else {
+                expect(listbox()).toBeNull();
+            }
+        });
+    }
+
+    for (const member of LISTBOX_MEMBERS.filter((candidate) => candidate.input)) {
+        it(`${member.name}: Space types into the query and commits nothing`, async () => {
+            const {model, trigger} = await renderMember(member);
+
+            await userEvent.click(trigger);
+            await userEvent.keyboard('{ArrowDown}');
+            await userEvent.keyboard(' ');
+            expect((trigger as HTMLInputElement).value).toBe(' ');
+            expect(model.value).toEqual(member.multi ? [] : null);
+            expect(listbox()).not.toBeNull();
+        });
+    }
+
+    it('SingleSelect: Space on the highlighted clear entry commits null', async () => {
+        const {model} = await renderMember(LISTBOX_MEMBERS[0], FRUITS, {clearLabel: 'None'});
+        model.value = 2;
+
+        await userEvent.tab();
+        await userEvent.keyboard('{Enter}{ArrowDown} ');
+        expect(model.value).toBeNull();
+        expect(listbox()).toBeNull();
+    });
+});

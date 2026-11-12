@@ -182,7 +182,8 @@ export const useListbox = (options: UseListboxOptions) => {
 
     // A key is typeahead when it prints one character with no command modifier. Characters are
     // counted as `fold` counts them, by code point, so 🍎 is one and a named key such as Enter is not.
-    // Space counts only inside a string already being typed — on its own it keeps its open/toggle meaning.
+    // Space counts only inside a string already being typed — on its own it opens a closed list
+    // and commits on an open one.
     const isTypeahead = (event: KeyboardEvent): boolean =>
         Array.from(event.key).length === 1 &&
         !event.ctrlKey &&
@@ -269,6 +270,19 @@ export const useListbox = (options: UseListboxOptions) => {
         {flush: 'pre'},
     );
 
+    // Enter, and Space on a select-only list: commit the highlight. The commit callbacks own the
+    // read-through-a-local race guard and the close decision; they report whether they
+    // committed, and only a real commit swallows the key. On a button trigger that also cancels
+    // the click the key would otherwise fire (Enter on keydown, Space on keyup), which would
+    // toggle the list straight back.
+    const commitActive = (event: KeyboardEvent) => {
+        if (clearHighlighted.value) {
+            if (onClearCommit?.() ?? false) event.preventDefault();
+        } else if (onCommit(pointer.value)) {
+            event.preventDefault();
+        }
+    };
+
     // Listbox keyboard navigation. The trigger's native :disabled blocks pointer input; this
     // guards the keyboard path too.
     const onKey = (event: KeyboardEvent) => {
@@ -339,14 +353,15 @@ export const useListbox = (options: UseListboxOptions) => {
                 event.preventDefault();
                 break;
             case 'Enter':
-                // The commit callbacks own the read-through-a-local race guard and the close
-                // decision; they report whether they committed, and only a real commit
-                // swallows Enter.
-                if (clearHighlighted.value) {
-                    if (onClearCommit?.() ?? false) event.preventDefault();
-                } else if (onCommit(pointer.value)) {
-                    event.preventDefault();
-                }
+                commitActive(event);
+                break;
+            case ' ':
+                // WR-2588. APG select-only combobox: Space on an open list commits the active
+                // option, as Enter does (MultiSelect toggles it and stays open, as on Enter). A
+                // select-only list is the one that passes typeahead labels; on a combobox Space
+                // is a query character and stays with the input. A Space inside a typed string
+                // never gets here: typeahead took it above.
+                if (foldedLabels !== undefined) commitActive(event);
                 break;
             case 'Escape':
                 onDismiss();
