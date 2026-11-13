@@ -1209,3 +1209,28 @@ All pushed, every worktree clean. Read the sections above from "End of 2026-11-1
 - **When things merge:** #353 → the five select branches add back their stripped core pieces (list above), then the
   select patch PR; #332 → pressable, disclosure, checkbox-group; #355 → the three slot branches; #333 → the form chain.
 - **Rule reminders:** "flaky" needs a cause (freeze `Date`); integrate, don't refactor; check context before changing.
+
+## 2026-11-13 (Friday, work box): nothing moved; for the weekend
+
+**Upstream, checked 11-13 morning:** unchanged since "End of 2026-11-12, late". #343/#344/#353 still
+CHANGES_REQUESTED; the newest review on each is our own answer (11-12 ~08:15-08:35), and the 09:07 `updatedAt` is the
+re-request, not a review. The 11 approved are still unmerged. Merged ui-form so far: #328, #330, #331 (+ deps #354).
+
+**Repo state:** everything committed and pushed. Two local branches only LOOK unpushed:
+- `ui-form/n-form-kit` shows 3 local commits (11-02) not on the fork: they are the pre-rewrite copies of commits the
+  fork already carries (fork head 1b6c498, 11-05, is newer). The fork is the truth; do not push the local one.
+- `fix/audit-follow-redirects-qs`: its commit landed as #354.
+Several branches track the branch below them in the old stack, so `git status` "ahead N" means nothing; compare with
+the branch's own name on the fork (`git rev-list --count fork/<b>..<b>`).
+
+**Not ui-form:** the emmie session `emmie-next-2` got a brief for EMMIE-1822 (ADR-0002: replace the 10 live
+`cascadeOnDelete()` FKs with `restrictOnDelete()` + explicit deletes in the Actions, shrinking the arch test's baseline
+in the same PR). It waits on Marcel's go. Clients are only soft-deleted, so the client part is a migration + test and
+DeleteClientAction stays as it is.
+
+**If something comes in over the weekend:**
+- A re-review on #343/#344/#353: answer per thread with the fixing commit, as on 11-12. Run Stryker before pushing.
+- Merges: follow "When things merge" above (#353 first unblocks the most: five select branches + the select patch PR).
+- Nothing in: there is nothing to build until something merges. Slice 6 waits on controls being on main; Amendment 2
+  waits on the reviewer's 11-02 answers.
+- On the home box: `git fetch fork` first; this section lives on `fork/experiment/ui-form-control`.
